@@ -106,6 +106,11 @@ const (
 	// be held.
 	FinalizingReason = "Finalizing"
 
+	// WaitingForPlansToStopReason surfaces when an operation that ended with plans still running on
+	// the cluster has asked the agents to stop them, and is holding the beacon until they report
+	// that they have, so that the next operation does not start while they are still executing.
+	WaitingForPlansToStopReason = "WaitingForPlansToStop"
+
 	// HookAbandonedReason surfaces when an operation finished with a lifecycle hook label still on
 	// it, because there was never going to be a beacon to hand that hook's delegate: the cluster or
 	// the beacon went away first. The hook is not waited on, since nothing would ever satisfy it,

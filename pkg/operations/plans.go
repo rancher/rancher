@@ -2,9 +2,12 @@ package operations
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
+	"time"
 
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -30,21 +33,46 @@ func PlanDispatchedBy(secret *corev1.Secret, ownerKey string) bool {
 	return secret.Annotations[planapi.PlanWriterAnnotation] == ownerKey
 }
 
-// CancelDispatchedPlans asks the agents to abort every plan the operation holding the beacon under
-// ownerKey dispatched to the given cluster and has not yet seen finish, and reports how many it had
-// to cancel.
+// DispatchedPlanStopTimeout bounds how long an operation that ended with plans still running holds
+// the beacon waiting for the agents to report that they have stopped. An agent that is down, or a
+// node that is gone, never reports anything, and waiting on it without a bound would hold the
+// cluster's beacon until the operation was deleted, and deleting it would only arrive back here.
+const DispatchedPlanStopTimeout = 5 * time.Minute
+
+// stopClock is replaced in tests.
+var stopClock = time.Now
+
+// StopDispatchedPlans asks the agents to abort every plan the operation holding the beacon under
+// ownerKey dispatched to the given cluster and has not yet seen finish, and reports whether they all
+// have. A terminal phase handler calls it before releasing the beacon, and keeps the beacon until it
+// reports true.
 //
 // This is what makes an operation's terminal outcome mean something on the cluster rather than only
 // in its status. Marking the operation Canceled or Failed stops the controller dispatching anything
 // further, but a plan already sitting in a machine-plan secret is the agent's to run, and it will
 // keep running it — so an operation that released the beacon on the strength of its status alone
 // would let the next operation start while the previous one's instructions were still executing.
-// Canceling the plans first is what closes that window. See planapi.PlanCanceledAnnotation.
+// Canceling the plans, and waiting for the agents to report that they have stopped, is what closes
+// that window. See planapi.PlanCanceledAnnotation.
 //
-// Only plans the agent may still act on are canceled (see planapi.PlanState.IsActive). One that has
-// finished has nothing left to stop: a succeeded plan's one-time instructions have all run, and
-// canceling it would only stop its periodic instructions and record a cancellation of work which
-// in fact completed.
+// Only plans the agent may still act on are canceled and waited on (see planapi.PlanState.IsActive).
+// One that has finished has nothing left to stop: a succeeded plan's one-time instructions have all
+// run, and canceling it would only stop its periodic instructions and record a cancellation of work
+// which in fact completed. A canceled plan has stopped once the agent records it as canceled, which
+// it does only after the instruction it interrupted has been terminated; one that finished in its
+// own right before the agent saw the cancellation is just as stopped.
+//
+// It reports true without waiting for everything, once waiting no longer protects anything:
+//   - the operation has no claim on the beacon, so releasing it is a no-op and whoever holds the
+//     beacon now is not this operation's to protect;
+//   - a plan was reassigned by another writer, or its secret is gone, which leaves it out of the
+//     plans waited on;
+//   - DispatchedPlanStopTimeout has passed since the operation reached its terminal phase.
+//
+// While it waits, it reports so on the Finalized condition. Once it is done, it notes on the
+// outcome condition anything an operator has to check before starting another disruptive
+// operation: the plans the agents never reported stopping, and those whose agents reported
+// planapi.PlanCheckpoint.TerminationIncomplete, meaning work the plan started may still be running.
 //
 // Only plans this operation wrote are touched, so a secret another operation has since taken over is
 // left to it. And nothing is written at all unless the operation is still the beacon's current
@@ -53,31 +81,32 @@ func PlanDispatchedBy(secret *corev1.Secret, ownerKey string) bool {
 // check and the write. "Current holder" is planapi.AuthorizedForBeacon: the beacon's owner, or the
 // delegate it was last handed to. An operation part-way down the delegate chain has handed its
 // authority on without giving the beacon up, so this returns an error for the caller to try again
-// once it is handed back; one with no claim on the beacon at all has nothing it is entitled to
-// cancel, and is passed over.
+// once it is handed back.
 //
 // There is nothing to cancel without a cluster to enumerate secrets under or a store to write
-// through, so it does nothing rather than failing: an operation whose cluster has gone has no agent
+// through, so it reports true rather than failing: an operation whose cluster has gone has no agent
 // left to run anything it dispatched either.
-func CancelDispatchedPlans(store *planapi.Store, secrets planapi.SecretClient, cluster *unstructured.Unstructured, namespace string, op metav1.Object, ownerKey string, beacon *planv1alpha1.Beacon) (int, error) {
+func StopDispatchedPlans(store *planapi.Store, secrets planapi.SecretClient, cluster *unstructured.Unstructured, namespace string,
+	op metav1.Object, ownerKey string, beacon *planv1alpha1.Beacon, status *opv1alpha1.OperationStatus,
+) (bool, error) {
 	if store == nil || secrets == nil || cluster == nil || op == nil || ownerKey == "" {
-		return 0, nil
+		return true, nil
 	}
 
 	if !planapi.HoldsBeacon(beacon, ownerKey) {
 		logrus.Infof("[operations] %s/%s: no longer holds the beacon, leaving the plans it dispatched to whoever holds it now",
 			op.GetNamespace(), op.GetName())
 
-		return 0, nil
+		return true, nil
 	}
 	if !planapi.AuthorizedForBeacon(beacon, ownerKey) {
-		return 0, fmt.Errorf("cannot cancel the plans %s/%s dispatched while it has handed the beacon on to a delegate",
+		return false, fmt.Errorf("cannot cancel the plans %s/%s dispatched while it has handed the beacon on to a delegate",
 			op.GetNamespace(), op.GetName())
 	}
 
 	collected, err := planapi.NewCollector(secrets, cluster, namespace).Collect()
 	if planapi.IsTransient(err) {
-		return 0, err
+		return false, err
 	} else if err != nil {
 		// The machine-plan secrets cannot be enumerated at all and no retry will change that, so
 		// this is reported and stepped over rather than returned. The operation still has to be able
@@ -87,10 +116,10 @@ func CancelDispatchedPlans(store *planapi.Store, secrets planapi.SecretClient, c
 		logrus.Errorf("[operations] %s/%s: cannot enumerate machine-plan secrets to cancel the plans it dispatched, any still in flight will run to completion: %v",
 			op.GetNamespace(), op.GetName(), err)
 
-		return 0, nil
+		return true, nil
 	}
 
-	canceled := 0
+	var running, terminationIncomplete []string
 
 	for _, secret := range collected {
 		if !PlanDispatchedBy(secret, ownerKey) {
@@ -98,23 +127,105 @@ func CancelDispatchedPlans(store *planapi.Store, secrets planapi.SecretClient, c
 		}
 
 		// A status which cannot be read is malformed bookkeeping, not a sign the plan is done, so the
-		// plan is canceled anyway: asking the agent to stop is safe whatever state it is in.
-		if status, err := planapi.Status(secret); err == nil && !status.State.IsActive() {
+		// plan is canceled and waited on anyway: asking the agent to stop is safe whatever state it is
+		// in.
+		planStatus, err := planapi.Status(secret)
+		if err == nil && !planStatus.State.IsActive() {
+			if checkpoint := planapi.ParsePlanCheckpoint(secret); checkpoint != nil && checkpoint.TerminationIncomplete {
+				terminationIncomplete = append(terminationIncomplete, planNodeName(secret))
+			}
 			continue
 		}
+		running = append(running, planNodeName(secret))
 
 		written, _, err := store.CancelPlan(secret, ownerKey)
 		if err != nil {
-			return canceled, err
+			return false, err
 		}
 		if written {
 			logrus.Infof("[operations] %s/%s: canceled the plan it dispatched to %s/%s",
 				op.GetNamespace(), op.GetName(), secret.Namespace, secret.Name)
-			canceled++
 		}
 	}
 
-	return canceled, nil
+	if len(running) > 0 && stopClock().Before(status.LastUpdated.Add(DispatchedPlanStopTimeout)) {
+		opv1alpha1.FinalizedCondition.False(status)
+		opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.WaitingForPlansToStopReason)
+		opv1alpha1.FinalizedCondition.Message(status, "waiting for the agents to stop the plans it dispatched to "+nodesSummary(running))
+
+		return false, nil
+	}
+
+	var notes []string
+	if len(running) > 0 {
+		logrus.Warnf("[operations] %s/%s: the agents did not report stopping the plans on %v within %s; releasing the beacon anyway",
+			op.GetNamespace(), op.GetName(), running, DispatchedPlanStopTimeout)
+		notes = append(notes, fmt.Sprintf("the agents did not report stopping the plans on %s within %s",
+			nodesSummary(running), DispatchedPlanStopTimeout))
+	}
+	if len(terminationIncomplete) > 0 {
+		logrus.Warnf("[operations] %s/%s: the agents on %v could not confirm that every process the canceled plans started had exited",
+			op.GetNamespace(), op.GetName(), terminationIncomplete)
+		notes = append(notes, "work started by the canceled plans may still be running on "+nodesSummary(terminationIncomplete)+
+			", whose agents could not confirm that every process they terminated had exited")
+	}
+	noteOutcome(status, notes)
+
+	opv1alpha1.FinalizedCondition.False(status)
+	opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.FinalizingReason)
+	opv1alpha1.FinalizedCondition.Message(status, "waiting for terminal handling to complete")
+
+	return true, nil
+}
+
+// noteOutcome appends notes to the message of the condition asserting the operation's outcome,
+// which is where the record of how it ended is kept. Each note is added once, however often it is
+// noted.
+func noteOutcome(status *opv1alpha1.OperationStatus, notes []string) {
+	if len(notes) == 0 {
+		return
+	}
+
+	outcome, _ := opv1alpha1.OutcomeConditionFor(status.Phase)
+	message := outcome.GetMessage(status)
+	for _, note := range notes {
+		if strings.Contains(message, note) {
+			continue
+		}
+		if message == "" {
+			message = note
+		} else {
+			message = message + "; " + note
+		}
+	}
+	outcome.Message(status, message)
+}
+
+// planNodeName names the node a machine-plan secret belongs to, for messages: its machine, if it is
+// labeled with one, otherwise the secret itself.
+func planNodeName(secret *corev1.Secret) string {
+	if machineName := secret.Labels[planv1alpha1.MachineLifecycleNameLabel]; machineName != "" {
+		return machineName
+	}
+	return secret.Name
+}
+
+// nodesSummary names the first of nodes in lexicographic order and counts the rest:
+// "X", "X & 1 other node" or "X & N other nodes".
+func nodesSummary(nodes []string) string {
+	nodes = slices.Clone(nodes)
+	sort.Strings(nodes)
+
+	switch len(nodes) {
+	case 0:
+		return ""
+	case 1:
+		return nodes[0]
+	case 2:
+		return nodes[0] + " & 1 other node"
+	default:
+		return fmt.Sprintf("%s & %d other nodes", nodes[0], len(nodes)-1)
+	}
 }
 
 // PlanFailureMessage returns message, the message an operation is failed with because of
@@ -205,11 +316,7 @@ func PlansMessage(results []planapi.PlanStatus) string {
 			continue
 		}
 
-		name := res.Secret.Name
-		if machineName := res.Secret.Labels[planv1alpha1.MachineLifecycleNameLabel]; machineName != "" {
-			name = machineName
-		}
-		buckets[bucket] = append(buckets[bucket], name)
+		buckets[bucket] = append(buckets[bucket], planNodeName(res.Secret))
 	}
 
 	var messages []string
@@ -217,18 +324,7 @@ func PlansMessage(results []planapi.PlanStatus) string {
 		if len(nodes) == 0 {
 			continue
 		}
-
-		// Sort node names lexicographically within their own bucket
-		sort.Strings(nodes)
-
-		switch len(nodes) {
-		case 1:
-			messages = append(messages, fmt.Sprintf("%s for %s", planMessageBuckets[i], nodes[0]))
-		case 2:
-			messages = append(messages, fmt.Sprintf("%s for %s & 1 other node", planMessageBuckets[i], nodes[0]))
-		default:
-			messages = append(messages, fmt.Sprintf("%s for %s & %d other nodes", planMessageBuckets[i], nodes[0], len(nodes)-1))
-		}
+		messages = append(messages, fmt.Sprintf("%s for %s", planMessageBuckets[i], nodesSummary(nodes)))
 	}
 
 	return strings.Join(messages, ", ")

@@ -2412,9 +2412,10 @@ func (f *fakePlanSecrets) Update(secret *corev1.Secret) (*corev1.Secret, error) 
 
 // A canceled operation has to stop the work it already handed to the agents, not just record that
 // it was called off: a plan sitting in a machine-plan secret is the agent's to run, and releasing
-// the beacon lets the next operation start on the same cluster. So the plans go first, and this
-// asserts that order rather than just the two writes.
-func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T) {
+// the beacon lets the next operation start on the same cluster. So the plans are canceled first, and
+// the beacon is held until the agent reports them stopped, which this asserts by order rather than
+// just the writes.
+func TestHandleCanceled_HoldsBeaconUntilDispatchedPlansStop(t *testing.T) {
 	op := newOp()
 	s := newScope(op, newBeacon(ops.BeaconOwnerKey(OperationKind, op), true), &stubAdapter{})
 
@@ -2433,10 +2434,13 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.TerminatedAt.IsZero() {
-		t.Fatal("the terminal handling completed, so it must be recorded")
+	if !got.TerminatedAt.IsZero() {
+		t.Fatal("the beacon is held until the agent reports the plan stopped, so the handling is not complete")
 	}
-	if want := []string{"cancel-plan/node-a", "beacon-write"}; !slices.Equal(events, want) {
+	if reason := opv1alpha1.FinalizedCondition.GetReason(&got); reason != opv1alpha1.WaitingForPlansToStopReason {
+		t.Fatalf("Finalized reason = %q, want %q", reason, opv1alpha1.WaitingForPlansToStopReason)
+	}
+	if want := []string{"cancel-plan/node-a"}; !slices.Equal(events, want) {
 		t.Fatalf("events = %v, want %v: the plans this operation dispatched must be canceled while it is still the authorized writer", events, want)
 	}
 	if len(secrets.updates) != 1 {
@@ -2444,6 +2448,21 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 	}
 	if got := secrets.updates[0].Annotations[plan.PlanCanceledAnnotation]; got != "true" {
 		t.Fatalf("canceled annotation = %q, want \"true\"", got)
+	}
+
+	// The agent stops the plan and records it as canceled.
+	secrets.items[0] = secrets.updates[0]
+	secrets.items[0].Data[plan.PlanStateKey] = []byte(plan.PlanStateCanceled)
+
+	got, err = h.handleCanceled(s, got)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.TerminatedAt.IsZero() {
+		t.Fatal("the terminal handling completed, so it must be recorded")
+	}
+	if want := []string{"cancel-plan/node-a", "beacon-write"}; !slices.Equal(events, want) {
+		t.Fatalf("events = %v, want %v: the beacon is released once the plan has stopped", events, want)
 	}
 }
 

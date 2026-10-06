@@ -53,7 +53,7 @@ func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.Operation
 // canceled until it is resumed.
 //
 // This records the decision; it does not carry it out. Stopping the work already dispatched is
-// CancelDispatchedPlans, which the Canceled and Failed phases' terminal handlers run before they
+// StopDispatchedPlans, which the Canceled and Failed phases' terminal handlers run before they
 // release the beacon — a plan sitting in a machine-plan secret belongs to the agent, and moving the
 // phase alone would leave it running while the next operation acquired the beacon.
 func CancelForRequest(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) (opv1alpha1.OperationPhase, bool) {
@@ -187,10 +187,14 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 
 		// Read the delegate back off the operation rather than remembering it on a condition: the
 		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
-		if delegate := TerminalHookDelegate(op, status.Phase); delegate != "" {
+		switch delegate := TerminalHookDelegate(op, status.Phase); {
+		case delegate != "":
 			opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
-		} else {
+		case opv1alpha1.FinalizedCondition.GetReason(status) == opv1alpha1.WaitingForPlansToStopReason:
+			// Left as StopDispatchedPlans reported it: only the terminal phase handler knows which plans
+			// it is still waiting on, and it reports again, or moves on, every time it runs.
+		default:
 			opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.FinalizingReason)
 			opv1alpha1.FinalizedCondition.Message(status, "waiting for terminal handling to complete")
 		}

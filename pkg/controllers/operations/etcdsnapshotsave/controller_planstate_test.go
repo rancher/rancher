@@ -1,7 +1,9 @@
 package etcdsnapshotsave
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // stepUnderTest is one of the plan-dispatching steps, along with the plan it assigns and the step
@@ -222,7 +225,8 @@ func TestConsecutiveStepsAssignDistinctPlans(t *testing.T) {
 }
 
 // Both terminal outcomes that leave work behind stop it before the beacon is released, but only the
-// work that is still running: a plan that already finished has nothing left to stop.
+// work that is still running: a plan that already finished has nothing left to stop. The beacon is
+// held until the agents report the running plans stopped, or until the wait for them times out.
 func TestTerminalPhasesCancelActivePlans(t *testing.T) {
 	t.Parallel()
 
@@ -249,12 +253,61 @@ func TestTerminalPhasesCancelActivePlans(t *testing.T) {
 
 			got, err := handle(h, s, status)
 			require.NoError(t, err)
-			assert.False(t, got.TerminatedAt.IsZero())
-			assert.Equal(t, []string{"cancel-plan/running", "beacon-write"}, events,
-				"only the running plan is canceled, and before the beacon is released")
+			assert.True(t, got.TerminatedAt.IsZero(), "the beacon is held until the running plan has stopped")
+			assert.Equal(t, opv1alpha1.WaitingForPlansToStopReason, opv1alpha1.FinalizedCondition.GetReason(&got))
+			assert.Equal(t, []string{"cancel-plan/running"}, events, "only the running plan is canceled")
 			require.Len(t, secrets.updates, 1)
 			assert.Equal(t, "true", secrets.updates[0].Annotations[planapi.PlanCanceledAnnotation])
 			assert.Equal(t, testOwnerKey, secrets.updates[0].Annotations[planapi.PlanWriterAnnotation])
+
+			// Reconciled again before the agent has acted on it: still waiting, nothing rewritten.
+			secrets.items[0] = secrets.updates[0]
+			got, err = handle(h, s, got)
+			require.NoError(t, err)
+			assert.True(t, got.TerminatedAt.IsZero())
+			assert.Len(t, secrets.updates, 1)
+
+			// The agent stops the plan and records it as canceled, unable to confirm that every
+			// process it terminated exited.
+			stopped := secrets.updates[0].DeepCopy()
+			stopped.Data[planapi.PlanStateKey] = []byte(planapi.PlanStateCanceled)
+			stopped.Data[planapi.PlanCheckpointKey] = []byte(fmt.Sprintf(`{"checksum":%q,"terminationIncomplete":true}`,
+				planapi.Checksum(stopped.Data[planapi.PlanDataKey])))
+			secrets.items[0] = stopped
+
+			got, err = handle(h, s, got)
+			require.NoError(t, err)
+			assert.False(t, got.TerminatedAt.IsZero(), "the beacon is released once the plan has stopped")
+			assert.Equal(t, []string{"cancel-plan/running", "beacon-write"}, events)
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
+			assert.Contains(t, outcome.GetMessage(&got), "work started by the canceled plans may still be running on running",
+				"a termination the agent could not confirm is recorded with the outcome")
+		})
+
+		// An agent that never reports the plan stopped does not hold the beacon forever.
+		t.Run(string(phase)+" past the deadline", func(t *testing.T) {
+			t.Parallel()
+
+			op := newOp()
+			adapter := defaultAdapter()
+			s := newScope(op, newBeacon(testOwnerKey, true), adapter)
+
+			var events []string
+			secrets := &fakePlanSecrets{events: &events, items: []*corev1.Secret{
+				withPlanState(newPlanSecret("unreachable"), op, expectedSavePlan(op, adapter), planapi.PlanStatePending),
+			}}
+			h := &handler{beacons: &fakeBeaconClient{beacon: s.beacon, events: &events}, secrets: secrets, store: planapi.NewStore(secrets), dynamic: &fakeDynamic{}}
+
+			status := opv1alpha1.ETCDSnapshotSaveStatus{}
+			status.SetPhase(phase)
+			status.LastUpdated = metav1.NewTime(time.Now().Add(-ops.DispatchedPlanStopTimeout - time.Minute))
+
+			got, err := handle(h, s, status)
+			require.NoError(t, err)
+			assert.False(t, got.TerminatedAt.IsZero())
+			assert.Equal(t, []string{"cancel-plan/unreachable", "beacon-write"}, events, "the plan is still asked to stop")
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
+			assert.Contains(t, outcome.GetMessage(&got), "the agents did not report stopping the plans on unreachable within 5m0s")
 		})
 
 		// An operation that has lost the beacon must not reach into the work of whoever holds it now,
@@ -336,10 +389,11 @@ func TestFollowUpAfterCanceledOperation(t *testing.T) {
 	// in which the canceled operation still held it, the plan is no longer one it wrote.
 	for name, beacon := range map[string]string{"follow-up's beacon": ops.BeaconOwnerKey(OperationKind, followUp), "stale beacon": canceledKey} {
 		secrets = &fakePlanSecrets{items: []*corev1.Secret{secret}}
-		n, err := ops.CancelDispatchedPlans(planapi.NewStore(secrets), secrets, newScope(canceled, nil, adapter).clusterObj, "fleet-default",
-			canceled, canceledKey, newBeacon(beacon, true))
+		canceledStatus := status.OperationStatus
+		done, err := ops.StopDispatchedPlans(planapi.NewStore(secrets), secrets, newScope(canceled, nil, adapter).clusterObj, "fleet-default",
+			canceled, canceledKey, newBeacon(beacon, true), &canceledStatus)
 		require.NoError(t, err, name)
-		assert.Zero(t, n, name)
+		assert.True(t, done, "%s: the follow-up's plan is not the canceled operation's to wait on", name)
 		assert.Empty(t, secrets.updates, name)
 	}
 }

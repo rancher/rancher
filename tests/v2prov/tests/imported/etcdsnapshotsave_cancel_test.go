@@ -191,7 +191,22 @@ func cancelSnapshotSaveWhilePaused(t *testing.T, cs *clients.Clients, fx *import
 			return false, fmt.Errorf("operation reached %s instead of Canceled at step %q", got.Status.Phase, got.Status.Step)
 		}
 		latest = got
-		// Terminated is recorded only after the dispatched plans were canceled and the beacon released.
+
+		// The beacon is held until the agent reports the canceled plan stopped, so the next operation
+		// cannot start while it is still executing. Read the beacon before the secret: if the beacon
+		// has been let go, the agent must already have recorded the cancellation.
+		beacon, err := cs.Plan.Beacon().Get(beaconNS, beaconName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if !planapi.HoldsBeacon(beacon, ownerKey) {
+			if state := planapi.PlanState(etcdPlanSecret(t, cs, fx).Data[planapi.PlanStateKey]); state != planapi.PlanStateCanceled {
+				return false, fmt.Errorf("the beacon was released while the canceled plan was still in plan-state %q", state)
+			}
+		}
+
+		// Terminated is recorded only after the dispatched plans were canceled, the agent reported them
+		// stopped, and the beacon was released.
 		return got.Status.Phase == opv1alpha1.OperationPhaseCanceled && !got.Status.TerminatedAt.IsZero(), nil
 	})
 	if err != nil {
@@ -199,9 +214,9 @@ func cancelSnapshotSaveWhilePaused(t *testing.T, cs *clients.Clients, fx *import
 	}
 	assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(latest))
 
-	secret = waitForPlanSecret(t, cs, fx, "the agent to record the plan as canceled", func(secret *corev1.Secret) bool {
-		return planapi.PlanState(secret.Data[planapi.PlanStateKey]) == planapi.PlanStateCanceled
-	})
+	secret = etcdPlanSecret(t, cs, fx)
+	require.Equal(t, string(planapi.PlanStateCanceled), string(secret.Data[planapi.PlanStateKey]),
+		"the operation terminated, so the agent must have recorded the plan as canceled")
 	assert.Equal(t, "true", secret.Annotations[planapi.PlanCanceledAnnotation])
 	assert.True(t, ops.PlanDispatchedBy(secret, ownerKey), "the canceled plan should still be the one the operation dispatched")
 	assert.Equal(t, "snapshot", firstInstructionName(t, secret), "the restart plan must never have been dispatched")

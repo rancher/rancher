@@ -1,9 +1,12 @@
 package operations
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -113,12 +116,23 @@ func TestPlanDispatchedBy(t *testing.T) {
 	})
 }
 
-func TestCancelDispatchedPlans(t *testing.T) {
+func TestStopDispatchedPlans(t *testing.T) {
 	op := testOp("op-uid")
 	ownerKey := testOwnerKey("op-uid")
 
-	cancel := func(secrets *fakeSecrets, beacon *planv1alpha1.Beacon) (int, error) {
-		return CancelDispatchedPlans(planapi.NewStore(secrets), secrets, testCluster(), "fleet-default", op, ownerKey, beacon)
+	entered := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	stopClock = func() time.Time { return entered.Add(time.Minute) }
+	t.Cleanup(func() { stopClock = time.Now })
+
+	// canceledStatus is the status of an operation that reached the Canceled phase at entered.
+	canceledStatus := func() *opv1alpha1.OperationStatus {
+		status := &opv1alpha1.OperationStatus{}
+		status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
+		status.LastUpdated = metav1.NewTime(entered)
+		return status
+	}
+	stop := func(secrets *fakeSecrets, beacon *planv1alpha1.Beacon, status *opv1alpha1.OperationStatus) (bool, error) {
+		return StopDispatchedPlans(planapi.NewStore(secrets), secrets, testCluster(), "fleet-default", op, ownerKey, beacon, status)
 	}
 	canceledNames := func(secrets *fakeSecrets) []string {
 		var names []string
@@ -129,24 +143,32 @@ func TestCancelDispatchedPlans(t *testing.T) {
 		}
 		return names
 	}
+	assertWaiting := func(t *testing.T, status *opv1alpha1.OperationStatus, message string) {
+		t.Helper()
+		assert.Equal(t, "False", opv1alpha1.FinalizedCondition.GetStatus(status))
+		assert.Equal(t, opv1alpha1.WaitingForPlansToStopReason, opv1alpha1.FinalizedCondition.GetReason(status))
+		assert.Equal(t, message, opv1alpha1.FinalizedCondition.GetMessage(status))
+	}
 
-	t.Run("cancels only the plans this operation dispatched", func(t *testing.T) {
+	t.Run("cancels only the plans this operation dispatched, and waits on them", func(t *testing.T) {
 		secrets := &fakeSecrets{items: []corev1.Secret{
 			planSecret("node-a", ownerKey, planapi.PlanStateInProgress),
 			planSecret("node-b", testOwnerKey("other-uid"), planapi.PlanStateInProgress),
 			planSecret("node-c", ownerKey, planapi.PlanStatePending),
 			planSecret("node-d", "", planapi.PlanStateInProgress),
 		}}
+		status := canceledStatus()
 
-		canceled, err := cancel(secrets, heldBeacon(ownerKey))
+		done, err := stop(secrets, heldBeacon(ownerKey), status)
 		require.NoError(t, err)
-		assert.Equal(t, 2, canceled)
+		assert.False(t, done, "the agents have yet to report the plans stopped")
 		assert.ElementsMatch(t, []string{"node-a", "node-c"}, canceledNames(secrets))
+		assertWaiting(t, status, "waiting for the agents to stop the plans it dispatched to node-a & 1 other node")
 	})
 
 	// A plan that has finished has nothing left to stop; canceling a succeeded one would only stop
 	// its periodic instructions and misreport work that completed.
-	t.Run("cancels only the plans the agent may still act on", func(t *testing.T) {
+	t.Run("cancels and waits on only the plans the agent may still act on", func(t *testing.T) {
 		secrets := &fakeSecrets{items: []corev1.Secret{
 			planSecret("pending", ownerKey, planapi.PlanStatePending),
 			planSecret("in-progress", ownerKey, planapi.PlanStateInProgress),
@@ -155,36 +177,139 @@ func TestCancelDispatchedPlans(t *testing.T) {
 			planSecret("failed", ownerKey, planapi.PlanStateFailed),
 			planSecret("canceled", ownerKey, planapi.PlanStateCanceled),
 		}}
+		status := canceledStatus()
 
-		canceled, err := cancel(secrets, heldBeacon(ownerKey))
+		done, err := stop(secrets, heldBeacon(ownerKey), status)
 		require.NoError(t, err)
-		assert.Equal(t, 3, canceled)
+		assert.False(t, done)
 		assert.ElementsMatch(t, []string{"pending", "in-progress", "paused"}, canceledNames(secrets))
+		assertWaiting(t, status, "waiting for the agents to stop the plans it dispatched to in-progress & 2 other nodes")
 	})
 
-	// Asking the agent to stop is safe whatever state the plan is in, so bookkeeping that cannot be
-	// read is not taken as a sign that there is nothing to stop.
-	t.Run("cancels a plan whose status cannot be read", func(t *testing.T) {
+	// Once the agents have recorded every plan as stopped — canceled, or finished in their own right
+	// before they saw the cancellation — there is nothing left to wait on.
+	t.Run("done once every plan has stopped", func(t *testing.T) {
+		secrets := &fakeSecrets{items: []corev1.Secret{
+			planSecret("canceled", ownerKey, planapi.PlanStateCanceled),
+			planSecret("succeeded", ownerKey, planapi.PlanStateSucceeded),
+			planSecret("failed", ownerKey, planapi.PlanStateFailed),
+			// Still running, but no longer this operation's.
+			planSecret("reassigned", testOwnerKey("other-uid"), planapi.PlanStateInProgress),
+		}}
+		status := canceledStatus()
+
+		done, err := stop(secrets, heldBeacon(ownerKey), status)
+		require.NoError(t, err)
+		assert.True(t, done)
+		assert.Empty(t, secrets.updates)
+		assert.Equal(t, opv1alpha1.FinalizingReason, opv1alpha1.FinalizedCondition.GetReason(status), "the wait is no longer reported")
+		assert.Equal(t, "cancellation requested", opv1alpha1.CanceledCondition.GetMessage(status), "there is nothing to note")
+	})
+
+	t.Run("done when nothing was dispatched", func(t *testing.T) {
+		done, err := stop(&fakeSecrets{}, heldBeacon(ownerKey), canceledStatus())
+		require.NoError(t, err)
+		assert.True(t, done)
+	})
+
+	// The agent could not confirm that every process it terminated exited. Nothing will ever say
+	// they have, so it is not waited on, but it is recorded with the outcome.
+	t.Run("notes plans whose termination was incomplete", func(t *testing.T) {
+		incomplete := planSecret("node-a", ownerKey, planapi.PlanStateCanceled)
+		incomplete.Data[planapi.PlanCheckpointKey] = checkpoint(t, incomplete, planapi.PlanCheckpoint{TerminationIncomplete: true})
+		complete := planSecret("node-b", ownerKey, planapi.PlanStateCanceled)
+		complete.Data[planapi.PlanCheckpointKey] = checkpoint(t, complete, planapi.PlanCheckpoint{Completed: 1, Total: 2})
+		// A checkpoint left by an earlier plan says nothing about this one.
+		stale := planSecret("node-c", ownerKey, planapi.PlanStateCanceled)
+		stale.Data[planapi.PlanCheckpointKey] = []byte(`{"checksum":"other","terminationIncomplete":true}`)
+
+		secrets := &fakeSecrets{items: []corev1.Secret{incomplete, complete, stale}}
+		status := canceledStatus()
+
+		done, err := stop(secrets, heldBeacon(ownerKey), status)
+		require.NoError(t, err)
+		assert.True(t, done)
+		note := "work started by the canceled plans may still be running on node-a, whose agents could not confirm that every process they terminated had exited"
+		assert.Equal(t, "cancellation requested; "+note, opv1alpha1.CanceledCondition.GetMessage(status))
+
+		// The terminal phase can be handled again before it terminates; the note is not repeated.
+		_, err = stop(secrets, heldBeacon(ownerKey), status)
+		require.NoError(t, err)
+		assert.Equal(t, "cancellation requested; "+note, opv1alpha1.CanceledCondition.GetMessage(status))
+	})
+
+	t.Run("notes on the outcome the operation actually reached", func(t *testing.T) {
+		incomplete := planSecret("node-a", ownerKey, planapi.PlanStateCanceled)
+		incomplete.Data[planapi.PlanCheckpointKey] = checkpoint(t, incomplete, planapi.PlanCheckpoint{TerminationIncomplete: true})
+		status := &opv1alpha1.OperationStatus{}
+		status.MarkFailed(opv1alpha1.PlanFailedReason, "restart failed for node-b")
+		status.LastUpdated = metav1.NewTime(entered)
+
+		done, err := stop(&fakeSecrets{items: []corev1.Secret{incomplete}}, heldBeacon(ownerKey), status)
+		require.NoError(t, err)
+		assert.True(t, done)
+		assert.Contains(t, opv1alpha1.FailedCondition.GetMessage(status), "restart failed for node-b; work started by the canceled plans may still be running on node-a")
+	})
+
+	// An agent that is down never reports anything. Past the deadline the beacon is released anyway,
+	// and the plans that never reported stopping are recorded with the outcome.
+	t.Run("gives up waiting at the deadline", func(t *testing.T) {
+		for name, offset := range map[string]time.Duration{"at": DispatchedPlanStopTimeout, "after": 2 * DispatchedPlanStopTimeout} {
+			t.Run(name, func(t *testing.T) {
+				stopClock = func() time.Time { return entered.Add(offset) }
+				t.Cleanup(func() { stopClock = func() time.Time { return entered.Add(time.Minute) } })
+
+				secrets := &fakeSecrets{items: []corev1.Secret{
+					planSecret("node-a", ownerKey, planapi.PlanStateInProgress),
+					planSecret("node-b", ownerKey, planapi.PlanStatePending),
+				}}
+				status := canceledStatus()
+
+				done, err := stop(secrets, heldBeacon(ownerKey), status)
+				require.NoError(t, err)
+				assert.True(t, done)
+				assert.Len(t, secrets.updates, 2, "the plans are still asked to stop")
+				assert.Equal(t, "cancellation requested; the agents did not report stopping the plans on node-a & 1 other node within 5m0s",
+					opv1alpha1.CanceledCondition.GetMessage(status))
+				assert.Equal(t, opv1alpha1.FinalizingReason, opv1alpha1.FinalizedCondition.GetReason(status))
+			})
+		}
+	})
+
+	t.Run("waits until just before the deadline", func(t *testing.T) {
+		stopClock = func() time.Time { return entered.Add(DispatchedPlanStopTimeout - time.Second) }
+		t.Cleanup(func() { stopClock = func() time.Time { return entered.Add(time.Minute) } })
+
+		done, err := stop(&fakeSecrets{items: []corev1.Secret{planSecret("node-a", ownerKey, planapi.PlanStateInProgress)}},
+			heldBeacon(ownerKey), canceledStatus())
+		require.NoError(t, err)
+		assert.False(t, done)
+	})
+
+	// Bookkeeping that cannot be read is not taken as a sign that there is nothing to stop, since
+	// asking the agent to stop is safe whatever state the plan is in.
+	t.Run("cancels and waits on a plan whose status cannot be read", func(t *testing.T) {
 		secret := planSecret("node-a", ownerKey, planapi.PlanStateSucceeded)
 		secret.Annotations[planapi.PlanProbesPassedAnnotation] = "yes"
 		secret.Data["probe-statuses"] = []byte("{")
 		secrets := &fakeSecrets{items: []corev1.Secret{secret}}
 
-		canceled, err := cancel(secrets, heldBeacon(ownerKey))
+		done, err := stop(secrets, heldBeacon(ownerKey), canceledStatus())
 		require.NoError(t, err)
-		assert.Equal(t, 1, canceled)
+		assert.False(t, done)
+		assert.Len(t, secrets.updates, 1)
 	})
 
-	// The terminal phase is reconciled repeatedly until the operation is collected, so a second
-	// pass over already-canceled plans must not keep writing.
-	t.Run("a second pass writes nothing", func(t *testing.T) {
+	// The terminal phase is reconciled repeatedly while it waits, so a second pass over
+	// already-canceled plans must not keep writing.
+	t.Run("a second pass waits without writing", func(t *testing.T) {
 		secret := planSecret("node-a", ownerKey, planapi.PlanStateInProgress)
 		secret.Annotations[planapi.PlanCanceledAnnotation] = "true"
 		secrets := &fakeSecrets{items: []corev1.Secret{secret}}
 
-		canceled, err := cancel(secrets, heldBeacon(ownerKey))
+		done, err := stop(secrets, heldBeacon(ownerKey), canceledStatus())
 		require.NoError(t, err)
-		assert.Zero(t, canceled)
+		assert.False(t, done)
 		assert.Empty(t, secrets.updates)
 	})
 
@@ -196,25 +321,26 @@ func TestCancelDispatchedPlans(t *testing.T) {
 		t.Run("cancels "+name, func(t *testing.T) {
 			secrets := &fakeSecrets{items: []corev1.Secret{planSecret("node-a", ownerKey, planapi.PlanStateInProgress)}}
 
-			canceled, err := cancel(secrets, beacon)
+			_, err := stop(secrets, beacon, canceledStatus())
 			require.NoError(t, err)
-			assert.Equal(t, 1, canceled)
+			assert.Len(t, secrets.updates, 1)
 		})
 	}
 
-	// Known not to hold the beacon: writing would reach into the work of whoever does now, so
-	// nothing is written. There is nothing to retry either, so the operation is free to finish.
+	// Known not to hold the beacon: writing would reach into the work of whoever does now, and
+	// waiting would protect an operation that is not this one's to protect. So nothing is written,
+	// and the operation is free to finish.
 	for name, beacon := range map[string]*planv1alpha1.Beacon{
 		"held by another operation": heldBeacon(testOwnerKey("other-uid")),
 		"released":                  heldBeacon(""),
 		"gone":                      nil,
 	} {
-		t.Run("writes nothing when the beacon is "+name, func(t *testing.T) {
+		t.Run("neither writes nor waits when the beacon is "+name, func(t *testing.T) {
 			secrets := &fakeSecrets{items: []corev1.Secret{planSecret("node-a", ownerKey, planapi.PlanStateInProgress)}}
 
-			canceled, err := cancel(secrets, beacon)
+			done, err := stop(secrets, beacon, canceledStatus())
 			require.NoError(t, err)
-			assert.Zero(t, canceled)
+			assert.True(t, done)
 			assert.Empty(t, secrets.updates)
 		})
 	}
@@ -224,16 +350,18 @@ func TestCancelDispatchedPlans(t *testing.T) {
 	t.Run("retries while it has handed the beacon on", func(t *testing.T) {
 		secrets := &fakeSecrets{items: []corev1.Secret{planSecret("node-a", ownerKey, planapi.PlanStateInProgress)}}
 
-		_, err := cancel(secrets, heldBeacon("someone-else", ownerKey, "delegate"))
+		done, err := stop(secrets, heldBeacon("someone-else", ownerKey, "delegate"), canceledStatus())
 		require.Error(t, err)
+		assert.False(t, done)
 		assert.Empty(t, secrets.updates)
 	})
 
 	// A failure to reach the secrets must not let the operation release the beacon: the caller
 	// returns the error and the next reconcile tries again.
 	t.Run("propagates a listing failure", func(t *testing.T) {
-		_, err := cancel(&fakeSecrets{listErr: errors.New("boom")}, heldBeacon(ownerKey))
+		done, err := stop(&fakeSecrets{listErr: errors.New("boom")}, heldBeacon(ownerKey), canceledStatus())
 		require.Error(t, err)
+		assert.False(t, done)
 	})
 
 	t.Run("propagates a write failure", func(t *testing.T) {
@@ -242,20 +370,31 @@ func TestCancelDispatchedPlans(t *testing.T) {
 			updateErr: errors.New("boom"),
 		}
 
-		_, err := cancel(secrets, heldBeacon(ownerKey))
+		done, err := stop(secrets, heldBeacon(ownerKey), canceledStatus())
 		require.Error(t, err)
+		assert.False(t, done)
 	})
 
 	// An operation whose cluster is gone has no agent left running anything either, so there is
-	// nothing to cancel and nothing to fail over.
+	// nothing to cancel and nothing to wait on.
 	t.Run("does nothing without a cluster", func(t *testing.T) {
 		secrets := &fakeSecrets{items: []corev1.Secret{planSecret("node-a", ownerKey, planapi.PlanStateInProgress)}}
 
-		canceled, err := CancelDispatchedPlans(planapi.NewStore(secrets), secrets, nil, "fleet-default", op, ownerKey, heldBeacon(ownerKey))
+		done, err := StopDispatchedPlans(planapi.NewStore(secrets), secrets, nil, "fleet-default", op, ownerKey, heldBeacon(ownerKey), canceledStatus())
 		require.NoError(t, err)
-		assert.Zero(t, canceled)
+		assert.True(t, done)
 		assert.Empty(t, secrets.updates)
 	})
+}
+
+// checkpoint returns p, scoped to the plan on secret, encoded the way the agent stores it.
+func checkpoint(t *testing.T, secret corev1.Secret, p planapi.PlanCheckpoint) []byte {
+	t.Helper()
+
+	p.Checksum = planapi.Checksum(secret.Data[planapi.PlanDataKey])
+	data, err := json.Marshal(p)
+	require.NoError(t, err)
+	return data
 }
 
 func TestPlanFailureMessage(t *testing.T) {

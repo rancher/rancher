@@ -2262,9 +2262,10 @@ func (f *fakePlanSecrets) Update(secret *corev1.Secret) (*corev1.Secret, error) 
 
 // A canceled operation has to stop the work it already handed to the agents, not just record that
 // it was called off: a plan sitting in a machine-plan secret is the agent's to run, and releasing
-// the beacon lets the next operation start on the same cluster. So the plans go first, and this
-// asserts that order rather than just the two writes.
-func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T) {
+// the beacon lets the next operation start on the same cluster. So the plans are canceled first, and
+// the beacon is held until the agent reports them stopped, which this asserts by order rather than
+// just the writes.
+func TestHandleCanceled_HoldsBeaconUntilDispatchedPlansStop(t *testing.T) {
 	t.Parallel()
 
 	op := newOp()
@@ -2283,11 +2284,21 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 
 	got, err := h.handleCanceled(s, status)
 	require.NoError(t, err)
-	assert.False(t, got.TerminatedAt.IsZero(), "the terminal handling completed")
-	assert.Equal(t, []string{"cancel-plan/node-a", "beacon-write"}, events,
+	assert.True(t, got.TerminatedAt.IsZero(), "the beacon is held until the agent reports the plan stopped")
+	assert.Equal(t, opv1alpha1.WaitingForPlansToStopReason, opv1alpha1.FinalizedCondition.GetReason(&got))
+	assert.Equal(t, []string{"cancel-plan/node-a"}, events,
 		"the plans this operation dispatched must be canceled while it is still the authorized writer")
 	require.Len(t, secrets.updates, 1)
 	assert.Equal(t, "true", secrets.updates[0].Annotations[planapi.PlanCanceledAnnotation])
+
+	// The agent stops the plan and records it as canceled.
+	secrets.items[0] = secrets.updates[0]
+	secrets.items[0].Data[planapi.PlanStateKey] = []byte(planapi.PlanStateCanceled)
+
+	got, err = h.handleCanceled(s, got)
+	require.NoError(t, err)
+	assert.False(t, got.TerminatedAt.IsZero(), "the terminal handling completed")
+	assert.Equal(t, []string{"cancel-plan/node-a", "beacon-write"}, events, "the beacon is released once the plan has stopped")
 }
 
 // withDispatchedPlan returns a copy of secret holding a plan this operation dispatched and the agent
