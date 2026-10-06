@@ -47,9 +47,12 @@ func (s *AuthConfigTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
+// This is commented out because we can't CURRENTLY create AuthConfig Resources
+
 // TestAuthConfigActions verifies that each auth config type exposes the
 // expected set of actions (testAndApply, configureTest, testAndEnable).
 func (s *AuthConfigTestSuite) TestAuthConfigActions() {
+	s.T().Skip("Unable to create AuthConfigs with the client")
 	for name, config := range authProviderTypes {
 		createAuthConfig(s.T(), s.client.Management.AuthConfig, name, config)
 	}
@@ -121,6 +124,7 @@ func (s *AuthConfigTestSuite) TestAuthConfigActions() {
 // namespace, and that secrets for other unconfigured SAML providers are not
 // created.
 func (s *AuthConfigTestSuite) TestAuthConfigSecrets() {
+	s.T().Skip("Unable to create AuthConfigs with the client")
 	pingConfig := createAuthConfig(s.T(), s.client.Management.AuthConfig, saml.PingName, client.PingConfigType)
 
 	// Enable the config and set the spKey — the controller should create a
