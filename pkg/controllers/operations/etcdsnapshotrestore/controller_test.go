@@ -88,6 +88,9 @@ type stubAdapter struct {
 
 	// leader is the secret FindOrElectLeader serves.
 	leader *corev1.Secret
+
+	// pauseCalls records every PauseCluster call, in order.
+	pauseCalls []bool
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -104,8 +107,11 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 
 func (a *stubAdapter) BeaconRef() (string, string)    { return "test-namespace", "test-cluster" }
 func (a *stubAdapter) WaitForRegister() (bool, error) { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(_ bool) error      { return nil }
-func (a *stubAdapter) RuntimeCommand() string         { return a.runtimeCommand }
+func (a *stubAdapter) PauseCluster(paused bool) error {
+	a.pauseCalls = append(a.pauseCalls, paused)
+	return nil
+}
+func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 	return a.dataDir, a.dataDirErr
 }

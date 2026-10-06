@@ -640,6 +640,16 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.EncryptionKeyRo
 		return status, nil
 	}
 
+	// The machine-plan webhook holds every plan to its cluster through these labels, so they are
+	// checked before anything is assigned.
+	if problem, err := ops.CheckLifecycleLabels(h.secrets, s.clusterObj, s.namespace, s.op.Spec.ClusterRef); err != nil {
+		return status, err
+	} else if problem != "" {
+		logrus.Errorf("[encryptionkeyrotation] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, problem)
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, problem)
+		return status, nil
+	}
+
 	// The rotation needs a control-plane leader to run rotate-keys on. Electing one changes nothing
 	// on the cluster, so the rotation waits for one here, before it is committed.
 	if leader, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsControlPlane); err != nil {

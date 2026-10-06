@@ -666,6 +666,16 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSav
 		return status, nil
 	}
 
+	// The machine-plan webhook holds every plan to its cluster through these labels, so they are
+	// checked before anything is assigned.
+	if problem, err := ops.CheckLifecycleLabels(h.secrets, s.clusterObj, s.namespace, s.op.Spec.ClusterRef); err != nil {
+		return status, err
+	} else if problem != "" {
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, problem)
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, problem)
+		return status, nil
+	}
+
 	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to save", s.op.Namespace, s.op.Name)
 
 	status.SetStep(opv1alpha1.ETCDSnapshotSaveStepSave)

@@ -637,6 +637,16 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.CertificateRota
 		return status, nil
 	}
 
+	// The machine-plan webhook holds every plan to its cluster through these labels, so they are
+	// checked before anything is assigned.
+	if problem, err := ops.CheckLifecycleLabels(h.secrets, s.clusterObj, s.namespace, s.op.Spec.ClusterRef); err != nil {
+		return status, err
+	} else if problem != "" {
+		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, problem)
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, problem)
+		return status, nil
+	}
+
 	// Everything above can reject the request without having touched the cluster, so the pause waits
 	// until the operation is committed to dispatching work: a rotation turned away for a service this
 	// distro does not have must not leave the cluster paused behind it.
