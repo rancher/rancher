@@ -37,14 +37,8 @@ func WithSaveLabels(labels map[string]string) SnapshotSaveOption {
 	}
 }
 
-// RunETCDSnapshotSaveOperationTest creates an ETCDSnapshotSave operation targeting the given
-// clusterRef and waits for it to reach the Succeeded phase. This tests the operation.cattle.io/v1alpha1
-// ETCDSnapshotSave controller which manages snapshot lifecycle through beacons and plan secrets.
-// Pass options (e.g. WithSaveLabels) to mutate the operation object before creation — useful for
-// driving non-default code paths like lifecycle hooks.
-func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
-	t.Helper()
-
+// buildSnapshotSaveOp returns an ETCDSnapshotSave of the cluster clusterRef names, ready to create.
+func buildSnapshotSaveOp(namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
 	op := &opv1alpha1.ETCDSnapshotSave{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-snapshot-",
@@ -62,7 +56,18 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 		opt(op)
 	}
 
-	op, err := clients.Operation.ETCDSnapshotSave().Create(op)
+	return op
+}
+
+// RunETCDSnapshotSaveOperationTest creates an ETCDSnapshotSave operation targeting the given
+// clusterRef and waits for it to reach the Succeeded phase. This tests the operation.cattle.io/v1alpha1
+// ETCDSnapshotSave controller which manages snapshot lifecycle through beacons and plan secrets.
+// Pass options (e.g. WithSaveLabels) to mutate the operation object before creation — useful for
+// driving non-default code paths like lifecycle hooks.
+func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
+	t.Helper()
+
+	op, err := clients.Operation.ETCDSnapshotSave().Create(buildSnapshotSaveOp(namespace, clusterRef, opts...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,24 +97,7 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 func CreateETCDSnapshotSaveOp(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
 	t.Helper()
 
-	op := &opv1alpha1.ETCDSnapshotSave{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "test-snapshot-",
-			Namespace:    namespace,
-		},
-		Spec: opv1alpha1.ETCDSnapshotSaveSpec{
-			OperationSpec: opv1alpha1.OperationSpec{
-				ClusterRef: &clusterRef,
-				TTL:        60,
-			},
-		},
-	}
-
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	op, err := clients.Operation.ETCDSnapshotSave().Create(op)
+	op, err := clients.Operation.ETCDSnapshotSave().Create(buildSnapshotSaveOp(namespace, clusterRef, opts...))
 	if err != nil {
 		t.Fatal(err)
 	}

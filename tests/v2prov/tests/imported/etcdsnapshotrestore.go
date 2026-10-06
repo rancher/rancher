@@ -342,14 +342,11 @@ func AdvancePastSnapshotRestoreHook(
 	}
 }
 
-// WaitForSnapshotRestoreFailed polls until the op reaches the Failed phase and returns it, for tests
-// which assert that a restore is refused. Fails fast if the operation instead succeeds.
-//
-// Canceled is reported separately from Failed on purpose: the preflight step cancels (rather than
-// fails) the operation when the check instruction itself could not run — e.g. the server token file
-// was not found where the controller looked for it — which is a different defect from the check
-// running and rejecting the snapshot.
-func WaitForSnapshotRestoreFailed(t *testing.T, clients *clients.Clients, op *opv1alpha1.ETCDSnapshotRestore) *opv1alpha1.ETCDSnapshotRestore {
+// WaitForSnapshotRestoreRejected polls until the op is Rejected and has terminated, and returns it,
+// for tests which assert that a restore is refused by its preflight checks. Fails fast if the
+// operation instead succeeds, fails or is canceled: a restore turned away by its checks has called its
+// own work off, before changing anything, which is what Rejected records.
+func WaitForSnapshotRestoreRejected(t *testing.T, clients *clients.Clients, op *opv1alpha1.ETCDSnapshotRestore) *opv1alpha1.ETCDSnapshotRestore {
 	t.Helper()
 
 	var latestOp *opv1alpha1.ETCDSnapshotRestore
@@ -359,13 +356,11 @@ func WaitForSnapshotRestoreFailed(t *testing.T, clients *clients.Clients, op *op
 			return false, err
 		}
 		switch got.Status.Phase {
-		case opv1alpha1.OperationPhaseSucceeded:
-			return false, fmt.Errorf("operation %s/%s reached Succeeded but should have failed", got.Namespace, got.Name)
-		case opv1alpha1.OperationPhaseCanceled:
-			return false, fmt.Errorf("operation %s/%s was canceled at step %q (%s: %s) but should have failed",
-				got.Namespace, got.Name, got.Status.Step,
-				opv1alpha1.CanceledCondition.GetReason(got), opv1alpha1.CanceledCondition.GetMessage(got))
-		case opv1alpha1.OperationPhaseFailed:
+		case opv1alpha1.OperationPhaseSucceeded, opv1alpha1.OperationPhaseFailed, opv1alpha1.OperationPhaseCanceled:
+			outcome, _ := opv1alpha1.OutcomeConditionFor(got.Status.Phase)
+			return false, fmt.Errorf("operation %s/%s reached %s at step %q (%s: %s) but should have been rejected",
+				got.Namespace, got.Name, got.Status.Phase, got.Status.Step, outcome.GetReason(got), outcome.GetMessage(got))
+		case opv1alpha1.OperationPhaseRejected:
 			// The next operation may only be created once this one has released the beacon.
 			if got.Status.TerminatedAt.IsZero() {
 				return false, nil

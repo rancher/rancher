@@ -146,7 +146,7 @@ func (s *serverTokenFixture) waitForAPI(t *testing.T) {
 // disk and compares the two.
 //
 // The test takes a snapshot, rotates the server token (re-encrypting the live cluster's bootstrap
-// data and restarting the node with the new token), and asserts the restore fails at Preflight with
+// data and restarting the node with the new token), and asserts the restore is rejected at Preflight with
 // the token-hash mismatch. It then rotates back to the original token — the documented way to make
 // a pre-rotation snapshot restorable again — and asserts a fresh restore of that same snapshot
 // succeeds and rolls etcd back, proving the guard rejected the restore on the token rather than on
@@ -206,13 +206,13 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreTokenRotation(t *te
 	// The restore must be refused. A longer TTL than the default keeps the operation around while its
 	// terminal state is asserted, instead of racing garbage collection.
 	refused := CreateETCDSnapshotRestoreOp(t, cs, fx.ns.Name, snapshot.Name, fx.clusterRef, WithRestoreTTL(600))
-	refused = WaitForSnapshotRestoreFailed(t, cs, refused)
+	refused = WaitForSnapshotRestoreRejected(t, cs, refused)
 
-	assert.Equal(t, opv1alpha1.OperationPhaseFailed, refused.Status.Phase)
+	assert.Equal(t, opv1alpha1.OperationPhaseRejected, refused.Status.Phase)
 	assert.Equal(t, opv1alpha1.ETCDSnapshotRestoreStepPreflight, refused.Status.Step,
 		"the restore should be refused before it shuts anything down")
-	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.FailedCondition.GetReason(refused))
-	assert.Contains(t, opv1alpha1.FailedCondition.GetMessage(refused), "does not match snapshot token hash")
+	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.RejectedCondition.GetReason(refused))
+	assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(refused), "does not match snapshot token hash")
 
 	// Rotating back restores the bootstrap data the snapshot's token can decrypt, which is what makes
 	// a pre-rotation snapshot restorable again.
