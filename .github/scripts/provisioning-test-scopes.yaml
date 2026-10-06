@@ -178,11 +178,11 @@ scopes:
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
     package-paths:
-      - '^pkg/controllers/operations'
       - '^pkg/controllers/capr/etcdmgmt/'             # also imported
       - '^pkg/controllers/capr/machinedrain/'         # also basic
+      - '^pkg/controllers/operations'                 # also imported
       - '^pkg/rkecerts/'
-      - '^pkg/operations/'
+      - '^pkg/operations/'                            # also imported
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     file-paths:
@@ -200,6 +200,8 @@ scopes:
       - '^pkg/controllers/capr/etcdmgmt/'             # also operations
       - '^pkg/capr/configserver/'                     # also basic
       - '^tests/v2prov/tests/imported/'
+      - '^pkg/controllers/operations/'                # also operations
+      - '^pkg/operations/'                            # also operations
     file-paths:
       - path: '^trigger-imported-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
