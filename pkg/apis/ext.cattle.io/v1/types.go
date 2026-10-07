@@ -287,6 +287,17 @@ type KubeconfigSpec struct {
 	// When false, the entry is omitted.
 	// +optional
 	IncludeDefaultEntry *bool `json:"includeDefaultEntry,omitempty"`
+	// PreferRancherProxy controls the current-context of the generated kubeconfig when the cluster
+	// selected by CurrentContext has the Authorized Cluster Endpoint (ACE) enabled.
+	// When true, the current-context is the context that points to the cluster through the Rancher
+	// server proxy. When false, it's the ACE context: the FQDN if set, otherwise the first ready
+	// control plane node, or the Rancher proxy context if no control plane node is ready.
+	// It has no effect for clusters without ACE, which always use the Rancher proxy context.
+	// If omitted on create, the value of the kubeconfig-prefer-rancher-proxy setting is used and
+	// stored. It's not set for kubeconfigs created before this field was added; those use the ACE
+	// context. It can't be changed after create. If omitted on update, the stored value is kept.
+	// +optional
+	PreferRancherProxy *bool `json:"preferRancherProxy,omitempty"`
 }
 
 // KubeconfigStatus defines the most recently observed status of the Kubeconfig.

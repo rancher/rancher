@@ -423,6 +423,13 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"preferRancherProxy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PreferRancherProxy controls the current-context of the generated kubeconfig when the cluster selected by CurrentContext has the Authorized Cluster Endpoint (ACE) enabled. When true, the current-context is the context that points to the cluster through the Rancher server proxy. When false, it's the ACE context: the FQDN if set, otherwise the first ready control plane node, or the Rancher proxy context if no control plane node is ready. It has no effect for clusters without ACE, which always use the Rancher proxy context. If omitted on create, the value of the kubeconfig-prefer-rancher-proxy setting is used and stored. It's not set for kubeconfigs created before this field was added; those use the ACE context. It can't be changed after create. If omitted on update, the stored value is kept.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
