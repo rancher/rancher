@@ -34,7 +34,7 @@ jobs:
         uses: rancher-eio/read-vault-secrets@dfae8acd43a9e170fca5f90168da22f814fe4e9a # main
         with:
           # We use Renovate's App token, because it has the same permissions
-          # needed and serve the same purpose.
+          # needed and serves the same purpose.
           secrets: |
             secret/data/github/org/rancher/github/renovate-rancher appId      | APP_ID ;
             secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
