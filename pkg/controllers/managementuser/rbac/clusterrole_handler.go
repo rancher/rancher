@@ -26,21 +26,37 @@ func newClusterRoleHandler(r *manager) *crHandler {
 
 // sync validates that a clusterRole's parent roleTemplate still exists in management
 // and will remove the clusterRole if the roleTemplate no longer exists.
+//
+// In a nested Rancher setup, the same physical cluster can be managed as a downstream cluster by one
+// Rancher install while also being the local cluster of another. A ClusterRole created by a different
+// install (identified by the clusterRoleOwnerInstallUUIDLabel label) is not in this install's
+// RoleTemplate management plane and must be left alone, even if the owning RoleTemplate can't be
+// found locally.
 func (c *crHandler) sync(key string, obj *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}
 
-	if owner, ok := obj.Annotations[clusterRoleOwner]; ok {
-		_, err := c.roleTemplateLister.Get(owner)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				logrus.Tracef("[cluster-clusterrole-sync] installUUID=%s cluster=%s: roleTemplate %q owning clusterRole %q not found locally, deleting clusterRole",
-					settings.InstallUUID.Get(), c.clusterName, owner, obj.Name)
-				return obj, c.clusterRoles.Delete(obj.Name, &metav1.DeleteOptions{})
-			}
-			return obj, err
+	owner, ok := obj.Annotations[clusterRoleOwner]
+	if !ok {
+		return obj, nil
+	}
+
+	installUUID := settings.InstallUUID.Get()
+	if ownerInstallUUID, ok := obj.Labels[clusterRoleOwnerInstallUUIDLabel]; ok && ownerInstallUUID != installUUID {
+		logrus.Tracef("[cluster-clusterrole-sync] installUUID=%s cluster=%s: clusterRole %q is owned by roleTemplate %q from a different Rancher install (installUUID=%s), skipping",
+			installUUID, c.clusterName, obj.Name, owner, ownerInstallUUID)
+		return obj, nil
+	}
+
+	_, err := c.roleTemplateLister.Get(owner)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Tracef("[cluster-clusterrole-sync] installUUID=%s cluster=%s: roleTemplate %q owning clusterRole %q not found locally, deleting clusterRole",
+				installUUID, c.clusterName, owner, obj.Name)
+			return obj, c.clusterRoles.Delete(obj.Name, &metav1.DeleteOptions{})
 		}
+		return obj, err
 	}
 
 	return obj, nil
