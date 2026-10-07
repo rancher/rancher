@@ -86,6 +86,8 @@ spec:
                       about.
                     maxLength: 63
                     type: string
+                required:
+                - name
                 type: object
               cancel:
                 default: false

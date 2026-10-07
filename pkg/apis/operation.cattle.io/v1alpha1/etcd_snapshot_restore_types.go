@@ -8,7 +8,7 @@ import (
 // Name specifies the name of the snapshot file.
 type ETCDSnapshotRestoreArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
-	// +optional
+	// +required
 	Name string `json:"name,omitempty"`
 
 	// RestoreMode names a key in the snapshot's restoreModes metadata, e.g. "kubernetesVersion" or
