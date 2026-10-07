@@ -25,16 +25,20 @@ type k8sToAutoscalerVersion struct {
 // hardcoded k8s minor <-> imageTag tag + chartVersion version mapping, adding new versions here will automatically
 // rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version for imageTag or chartVersion)
 var k8sVersionToAutoscalerChartVersions = map[int]*k8sToAutoscalerVersion{
+	36: {
+		imageTag:     "1.36.1-3.1",
+		chartVersion: "9.59.0",
+	},
 	35: {
-		imageTag:     "1.35.0-4.1",
+		imageTag:     "1.35.2-11.1",
 		chartVersion: "9.56.0",
 	},
 	34: {
-		imageTag:     "1.34.0-3.4",
+		imageTag:     "1.34.5-15.1",
 		chartVersion: "9.50.1",
 	},
 	33: {
-		imageTag:     "1.33.0-3.3",
+		imageTag:     "1.33.4-15.1",
 		chartVersion: "9.50.1",
 	},
 	32: {
