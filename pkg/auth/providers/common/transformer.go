@@ -1,8 +1,6 @@
 package common
 
-import (
-	"strings"
-)
+import "strings"
 
 func TransformToAuthProvider(authConfig map[string]any) map[string]any {
 	result := map[string]any{}
