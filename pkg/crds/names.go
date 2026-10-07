@@ -68,6 +68,7 @@ func BasicCRDs() []string {
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
+		"tableconfigurations.ui.cattle.io",
 		"proxyendpoints.management.cattle.io",
 	}
 }
@@ -293,6 +294,7 @@ var MigratedResources = map[string]bool{
 	"serviceaccounttokens.project.cattle.io":                          false,
 	"settings.management.cattle.io":                                   false,
 	"sshauths.project.cattle.io":                                      false,
+	"tableconfigurations.ui.cattle.io":                                true,
 	"templatecontents.management.cattle.io":                           false,
 	"templates.management.cattle.io":                                  false,
 	"templateversions.management.cattle.io":                           false,
