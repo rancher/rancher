@@ -1809,6 +1809,10 @@ func (s *Store) Update(
 	if oldKubeconfig.Spec.TTL != newKubeconfig.Spec.TTL {
 		return nil, false, apierrors.NewBadRequest("spec.ttl is immutable")
 	}
+	if newKubeconfig.Spec.IncludeDefaultEntry == nil {
+		// A request without the field keeps the stored value, so older clients can still update.
+		newKubeconfig.Spec.IncludeDefaultEntry = oldKubeconfig.Spec.IncludeDefaultEntry
+	}
 	if !reflect.DeepEqual(oldKubeconfig.Spec.IncludeDefaultEntry, newKubeconfig.Spec.IncludeDefaultEntry) {
 		return nil, false, apierrors.NewBadRequest("spec.includeDefaultEntry is immutable")
 	}

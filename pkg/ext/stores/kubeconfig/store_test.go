@@ -3776,6 +3776,77 @@ func TestStoreUpdate(t *testing.T) {
 			})
 		}
 	})
+	t.Run("spec.includeDefaultEntry", func(t *testing.T) {
+		tests := []struct {
+			desc    string
+			stored  *bool // Nil when the field was omitted on create.
+			value   *bool
+			wantErr bool
+		}{
+			{desc: "false changed to true is rejected", stored: ptr.To(false), value: ptr.To(true), wantErr: true},
+			{desc: "true changed to false is rejected", stored: ptr.To(true), value: ptr.To(false), wantErr: true},
+			{desc: "value set on a kubeconfig without one is rejected", value: ptr.To(false), wantErr: true},
+			{desc: "unchanged false is kept", stored: ptr.To(false), value: ptr.To(false)},
+			{desc: "unchanged true is kept", stored: ptr.To(true), value: ptr.To(true)},
+			{desc: "unset keeps the stored value", stored: ptr.To(true)},
+			{desc: "unset on a kubeconfig without a value", value: nil},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				storedConfigMap := oldConfigMap.DeepCopy()
+				if tt.stored != nil {
+					storedConfigMap.Data[IncludeDefaultEntryField] = strconv.FormatBool(*tt.stored)
+				}
+
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+					return storedConfigMap.DeepCopy(), nil
+				})
+				if !tt.wantErr {
+					configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+						assert.Equal(t, storedConfigMap.Data[IncludeDefaultEntryField], configMap.Data[IncludeDefaultEntryField])
+						assert.Equal(t, "updated", configMap.Data[DescriptionField])
+						return configMap.DeepCopy(), nil
+					})
+				}
+
+				store := &Store{
+					authorizer:      commonAuthorizer,
+					configMapClient: configMapClient,
+					userCache:       userCache,
+					tokenMgr:        tokenManager,
+				}
+
+				updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
+
+				ctx := userContext(userID, "")
+
+				oldKubeconfig, err := store.fromConfigMap(storedConfigMap)
+				require.NoError(t, err)
+
+				update := oldKubeconfig.DeepCopy()
+				update.Spec.Description = "updated"
+				update.Spec.IncludeDefaultEntry = tt.value
+				objInfo := &fakeUpdatedObjectInfo{obj: update}
+
+				obj, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, &metav1.UpdateOptions{})
+				assert.False(t, isCreated)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Nil(t, obj)
+					assert.True(t, apierrors.IsBadRequest(err))
+					assert.ErrorContains(t, err, "spec.includeDefaultEntry is immutable")
+					return
+				}
+
+				require.NoError(t, err)
+				updated := obj.(*ext.Kubeconfig)
+				assert.Equal(t, tt.stored, updated.Spec.IncludeDefaultEntry)
+				assert.Equal(t, "updated", updated.Spec.Description)
+			})
+		}
+	})
 	t.Run("dryRun", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {

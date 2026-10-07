@@ -285,6 +285,7 @@ type KubeconfigSpec struct {
 	// pointing directly to the Rancher server URL is included in the generated kubeconfig.
 	// When nil or true (the default), the entry is included for backward compatibility.
 	// When false, the entry is omitted.
+	// It can't be changed after create. If omitted on update, the stored value is kept.
 	// +optional
 	IncludeDefaultEntry *bool `json:"includeDefaultEntry,omitempty"`
 	// PreferRancherProxy controls the current-context of the generated kubeconfig when the cluster
