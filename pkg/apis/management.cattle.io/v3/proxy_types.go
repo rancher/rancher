@@ -27,6 +27,7 @@ type ProxyEndpointSpec struct {
 	Routes []ProxyEndpointRoute `json:"routes,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!(has(self.caBundle) && size(self.caBundle) > 0 && has(self.insecureSkipTLSVerify) && self.insecureSkipTLSVerify)",message="caBundle cannot be set when insecureSkipTLSVerify is true"
 type ProxyEndpointRoute struct {
 	// Domain is the domain to be added to the proxy allowlist.
 	// Absolute domain names (e.g., example.com) and wildcard patterns are supported.
@@ -64,6 +65,15 @@ type ProxyEndpointRoute struct {
 	// Use this only for development or when the endpoint uses a self-signed certificate.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+ 
+	// CABundle is a PEM-encoded bundle of CA certificates to trust when verifying the TLS
+	// certificate of the endpoint. This is useful for self-signed certificates or certificates
+	// from non-public Certificate Authorities.
+	// When specified, only these CA certificates (plus the system's root CAs) will be trusted
+	// for verifying the endpoint's certificate. Do not use this with InsecureSkipTLSVerify.
+	// +optional
+	// +kubebuilder:validation:MaxLength=100000
+	CABundle string `json:"caBundle,omitempty"`
 
 	// CredentialInjection defines how credentials are applied to proxied requests for this domain.
 	// When set, clients need to supply a credential ID and values for the secret fields via X-API-CattleAuth-Header;
@@ -75,7 +85,6 @@ type ProxyEndpointRoute struct {
 }
 
 // CredentialInjectionSpec defines how a credential secret's values are injected into a proxied request.
-
 // +kubebuilder:validation:XValidation:rule="(self.mode != 'headerinject' && self.mode != 'bodyinject') || (has(self.fields) && size(self.fields) > 0)",message="fields is required when mode is headerinject or bodyinject"
 // +kubebuilder:validation:XValidation:rule="self.mode != 'bearer' || has(self.tokenField) && size(self.tokenField) > 0",message="tokenField is required when mode is bearer"
 // +kubebuilder:validation:XValidation:rule="self.mode != 'basic' || (has(self.usernameField) && size(self.usernameField) > 0 && has(self.passwordField) && size(self.passwordField) > 0)",message="usernameField and passwordField are required when mode is basic"
