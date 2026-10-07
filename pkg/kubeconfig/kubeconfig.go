@@ -39,6 +39,14 @@ type data struct {
 	Token           string
 	EndpointEnabled bool
 	Nodes           []kubeNode
+	ExecUser        *ExecUser
+}
+
+// ExecUser is the Rancher user written in exec entries of a kubeconfig without a token.
+// When set, exec entries run "rancher auth get-token" instead of "rancher token".
+type ExecUser struct {
+	ID           string
+	AuthProvider string
 }
 
 type Cluster struct {
@@ -71,6 +79,7 @@ type KubeConfig struct {
 	Users          []User
 	Contexts       []Context
 	CurrentContext string
+	ExecUser       *ExecUser
 }
 
 func FormatCertString(certData string) string {
@@ -108,7 +117,7 @@ func getDefaultNode(clusterName, clusterID, host string) kubeNode {
 	}
 }
 
-func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
+func ForTokenBased(clusterName, clusterID, host, token string, execUser *ExecUser) (string, error) {
 	data := &data{
 		ClusterName:     clusterName,
 		ClusterID:       clusterID,
@@ -118,6 +127,7 @@ func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
 		Token:           token,
 		Nodes:           []kubeNode{getDefaultNode(clusterName, clusterID, host)},
 		EndpointEnabled: false,
+		ExecUser:        execUser,
 	}
 
 	if data.ClusterName == "" {
@@ -129,7 +139,7 @@ func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
 	return buf.String(), err
 }
 
-func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clusterID, host, token string) (string, error) {
+func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clusterID, host, token string, execUser *ExecUser) (string, error) {
 	clusterName := cluster.Name
 	if clusterName == "" {
 		clusterName = clusterID
@@ -170,6 +180,7 @@ func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clu
 		Token:           token,
 		Nodes:           nodesForConfig,
 		EndpointEnabled: true,
+		ExecUser:        execUser,
 	}
 
 	buf := &bytes.Buffer{}

@@ -266,6 +266,10 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
+	// KubeconfigExecGetToken determines whether kubeconfigs without a token run "rancher auth get-token" with the user id and auth provider.
+	// If set to false they run "rancher token" with the kubeconfig user entry name. Valid values are "true" and "false". An empty string means "false".
+	KubeconfigExecGetToken = NewSetting("kubeconfig-exec-get-token", "false")
+
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
 	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
 

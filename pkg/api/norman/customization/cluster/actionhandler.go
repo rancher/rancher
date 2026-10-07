@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/user"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,6 +108,19 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
 		UserPrincipal: authToken.GetUserPrincipal(),
+	}, nil
+}
+
+// execUser returns the requesting user and their auth provider for the exec entry of a kubeconfig without a token.
+func (a ActionHandler) execUser(apiContext *types.APIContext) (*kubeconfig.ExecUser, error) {
+	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeconfig.ExecUser{
+		ID:           a.UserMgr.GetUser(apiContext.Request),
+		AuthProvider: authToken.GetAuthProvider(),
 	}, nil
 }
 

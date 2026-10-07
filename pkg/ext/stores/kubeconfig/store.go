@@ -143,6 +143,7 @@ type Store struct {
 	getMaxTTL           func() (int64, error)
 	getServerURL        func() string
 	shouldGenerateToken func() bool
+	shouldExecGetToken  func() bool
 	tableConverter      rest.TableConvertor
 }
 
@@ -167,6 +168,9 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		getServerURL:    settings.ServerURL.Get,
 		shouldGenerateToken: func() bool {
 			return strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
+		},
+		shouldExecGetToken: func() bool {
+			return strings.EqualFold(settings.KubeconfigExecGetToken.Get(), "true")
 		},
 		tableConverter: printerstorage.TableConvertor{
 			TableGenerator: printers.NewTableGenerator().With(printHandler),
@@ -485,6 +489,14 @@ func (s *Store) Create(
 			}
 			return ""
 		}(),
+	}
+
+	if s.shouldExecGetToken() {
+		// User entries without a token, including those of a dry run, run "rancher auth get-token".
+		data.ExecUser = &kconfig.ExecUser{
+			ID:           userInfo.GetName(),
+			AuthProvider: authToken.GetAuthProvider(),
+		}
 	}
 
 	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
