@@ -1,0 +1,143 @@
+name: Update Helm version
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0,12 * * *'
+
+permissions: {}
+
+jobs:
+  update-helm-version:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - main
+          - release/v2.15
+          - release/v2.14
+          - release/v2.13
+          - release/v2.12
+    concurrency:
+      group: update-helm-version-${{ matrix.branch }}
+      cancel-in-progress: false
+    env:
+      TARGET_BRANCH: ${{ matrix.branch }}
+    steps:
+      - name: Get App secrets
+        uses: rancher-eio/read-vault-secrets@dfae8acd43a9e170fca5f90168da22f814fe4e9a # main
+        with:
+          # We use Renovate's App token, because it has the same permissions
+          # needed and serve the same purpose.
+          secrets: |
+            secret/data/github/org/rancher/github/renovate-rancher appId      | APP_ID ;
+            secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
+
+      - name: Create App token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Synchronize Helm version and create or refresh PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          gh auth setup-git
+          git clone --single-branch --depth 1 --branch "$TARGET_BRANCH" \
+            "https://github.com/${GITHUB_REPOSITORY}.git" "$GITHUB_WORKSPACE/repository"
+          cd "$GITHUB_WORKSPACE/repository"
+
+          if [ ! -f build.yaml ] || [ ! -f package/Dockerfile ]; then
+            echo "Skipping $TARGET_BRANCH: build.yaml or package/Dockerfile is missing."
+            exit 0
+          fi
+
+          image_count=$(grep -c '^defaultShellVersion:' build.yaml || true)
+          env_count=$(grep -c '^ENV CATTLE_HELM_VERSION=' package/Dockerfile || true)
+          if [ "$image_count" -eq 0 ] || [ "$env_count" -eq 0 ]; then
+            echo "Skipping $TARGET_BRANCH: defaultShellVersion or CATTLE_HELM_VERSION is missing."
+            exit 0
+          fi
+          if [ "$image_count" -ne 1 ] || [ "$env_count" -ne 1 ]; then
+            echo "::error::Expected exactly one defaultShellVersion and one CATTLE_HELM_VERSION."
+            exit 1
+          fi
+
+          image=$(sed -n 's/^defaultShellVersion:[[:blank:]]*//p' build.yaml)
+          if [ -z "$image" ]; then
+            echo "Skipping $TARGET_BRANCH: defaultShellVersion has no image value."
+            exit 0
+          fi
+          image_pattern='^([a-z0-9]+([._-][a-z0-9]+)*(:[0-9]+)?/)*[a-z0-9]+([._-][a-z0-9]+)*(:[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}|@sha256:[a-f0-9]{64})$'
+          if [[ ! "$image" =~ $image_pattern ]]; then
+            echo "::error::defaultShellVersion must be a plain, unquoted image reference with a tag or SHA256 digest."
+            exit 1
+          fi
+
+          command -v podman
+          version=$(podman run --rm "$image" helm version --template '{{.Version}}')
+          version_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$version" =~ $version_pattern ]]; then
+            echo "::error::Helm returned an empty or unexpected version."
+            exit 1
+          fi
+
+          old_version=$(sed -n 's/^ENV CATTLE_HELM_VERSION=//p' package/Dockerfile)
+          sed -i "s|^ENV CATTLE_HELM_VERSION=.*$|ENV CATTLE_HELM_VERSION=${version}|" package/Dockerfile
+          pr_branch="automation/helm-version/${TARGET_BRANCH}"
+          if git diff --quiet -- package/Dockerfile; then
+            pr_number=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+              --head "$pr_branch" --base "$TARGET_BRANCH" --limit 1 \
+              --json number --template '{{range .}}{{.number}}{{end}}')
+            if [ -n "$pr_number" ]; then
+              gh pr close "$pr_number" --repo "$GITHUB_REPOSITORY" \
+                --comment "Closing because the target branch is already synchronized with the shell image."
+            fi
+            echo "Helm version is already $version on $TARGET_BRANCH."
+            exit 0
+          fi
+          title="[${TARGET_BRANCH}] Sync Helm version with Shell image"
+          body="Auto-generated Helm version update for ${TARGET_BRANCH}.
+
+          Shell image: ${image}
+          Helm version: ${old_version} -> ${version}"
+
+          remote_ref=$(git ls-remote --heads origin "refs/heads/${pr_branch}")
+          expected_sha=""
+          if [ -n "$remote_ref" ]; then
+            read -r expected_sha _ <<< "$remote_ref"
+          fi
+
+          git checkout -b "$pr_branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- package/Dockerfile
+          git commit -m "Update Helm version to ${version} for ${TARGET_BRANCH}"
+          # An empty expected SHA requires the branch to still be absent.
+          git push --force-with-lease="refs/heads/${pr_branch}:${expected_sha}" \
+            origin "HEAD:refs/heads/${pr_branch}"
+
+          pr_number=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --head "$pr_branch" --base "$TARGET_BRANCH" --limit 1 \
+            --json number --template '{{range .}}{{.number}}{{end}}')
+          if [ -z "$pr_number" ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" \
+              --head "$pr_branch" --base "$TARGET_BRANCH" \
+              --title "$title" --body "$body"
+          else
+            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" \
+              --title "$title" --body "$body"
+          fi
