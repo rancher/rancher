@@ -68,8 +68,8 @@ github.com/rancher/aks-operator v1.15.2 h1:1aiZlCGVrB+hTpX5Ck5aK7PcHhRWAA3NqbUiz
 github.com/rancher/aks-operator v1.15.2/go.mod h1:q1D2q/KyPv5gyK2Hp8p9trXAogHMd7IlPeatkkxUvus=
 github.com/rancher/ali-operator v1.15.1 h1:diFSU5kgHjCvUqJ2O+oRymvtvsDfFzJWoXGZQhhsacE=
 github.com/rancher/ali-operator v1.15.1/go.mod h1:VZVDmLBZd1RUpbHck3LQzrSqOtyvUrgjjrLTSmZ/0sE=
-github.com/rancher/eks-operator v1.15.2 h1:qkjCD0X1DigdJItvByLkF7lXDSOCZXuzkLcQP4AcWOs=
-github.com/rancher/eks-operator v1.15.2/go.mod h1:DvUtmuHcpYRlX6llHLjERKhxCgKDXb5Bdj7yfqhSTpo=
+github.com/rancher/eks-operator v1.15.3-rc.1 h1:UcfwGV2UXaxVvkLqO9LAEW1hEcgaqUg/L8+NjRmr06w=
+github.com/rancher/eks-operator v1.15.3-rc.1/go.mod h1:DvUtmuHcpYRlX6llHLjERKhxCgKDXb5Bdj7yfqhSTpo=
 github.com/rancher/fleet/pkg/apis v0.16.3-alpha.1 h1:cBRzD46txAfp48VRBfZto+WGQzxh8mCCr5ynb3KAA3U=
 github.com/rancher/fleet/pkg/apis v0.16.3-alpha.1/go.mod h1:kCxm83CnFoZ1JOdBKGeQLXsMmtteoXH/ASW1RTdv1y8=
 github.com/rancher/gke-operator v1.15.3 h1:Ag61jhP4rRwQFuD0pq2EsUk0i5UXQYGG0q0gX10Q/48=
