@@ -58,8 +58,11 @@ explicit:
         - main
         # - release/v2.15 uncomment once the nightly workflow has been backported
     tests:
-      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+      # Give restore and lifecycle-hook tests separate package timeout budgets.
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetE_Imported.*$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetE_Imported.*$' }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
       - { dist: rke2, regex: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
       - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance
