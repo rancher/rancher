@@ -226,11 +226,16 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 		timeout = 600
 	}
 
+	gracePeriod := drainOpts.GracePeriod
+	if gracePeriod == 0 {
+		gracePeriod = -1
+	}
+
 	helper := &drain.Helper{
 		Ctx:                             h.ctx,
 		Client:                          k8s,
 		Force:                           drainOpts.Force,
-		GracePeriodSeconds:              drainOpts.GracePeriod,
+		GracePeriodSeconds:              gracePeriod,
 		IgnoreAllDaemonSets:             drainOpts.IgnoreDaemonSets == nil || *drainOpts.IgnoreDaemonSets,
 		Timeout:                         time.Duration(timeout) * time.Second,
 		DeleteEmptyDirData:              drainOpts.DeleteEmptyDirData,
