@@ -1,9 +1,18 @@
 package ldap
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"reflect"
+	"slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -82,8 +91,6 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 		secrets               wcorev1.SecretController
 		userMGR               user.Manager
 		tokenMGR              *tokens.Manager
-		certs                 string
-		caPool                *x509.CertPool
 		providerName          string
 		testAndApplyInputType string
 	}
@@ -92,15 +99,11 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 		objectMap            map[string]any
 		fields               fields
 		wantStoredLdapConfig *v3.LdapConfig
-		wantCaPool           *x509.CertPool
 		wantErr              bool
 	}{
 		{
-			name: "get LDAP config object",
-			fields: fields{
-				caPool: x509.NewCertPool(),
-				certs:  DummyCerts,
-			},
+			name:   "get LDAP config object",
+			fields: fields{},
 			wantStoredLdapConfig: &v3.LdapConfig{
 				LdapFields: v3.LdapFields{
 					Certificate: DummyCerts,
@@ -109,8 +112,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			objectMap: map[string]any{
 				"Certificate": DummyCerts,
 			},
-			wantCaPool: x509.NewCertPool(),
-			wantErr:    false,
+			wantErr: false,
 		},
 		{
 			name: "ldap config is nil",
@@ -151,8 +153,6 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			name: "server gets added",
 			fields: fields{
 				providerName: "okta",
-				caPool:       x509.NewCertPool(),
-				certs:        DummyCerts,
 			},
 			objectMap: map[string]any{
 				"openLdapConfig": map[string]any{
@@ -169,8 +169,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 					Certificate: DummyCerts,
 				},
 			},
-			wantCaPool: x509.NewCertPool(),
-			wantErr:    false,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -180,8 +179,6 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 				secrets:               tt.fields.secrets,
 				userMGR:               tt.fields.userMGR,
 				tokenMGR:              tt.fields.tokenMGR,
-				certs:                 tt.fields.certs,
-				caPool:                tt.fields.caPool,
 				providerName:          tt.fields.providerName,
 				testAndApplyInputType: tt.fields.testAndApplyInputType,
 			}
@@ -193,10 +190,101 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			if !reflect.DeepEqual(gotStoredLdapConfig, tt.wantStoredLdapConfig) {
 				t.Errorf("ldapProvider.getLDAPConfig() got ldapConfig = %v, want %v", gotStoredLdapConfig, tt.wantStoredLdapConfig)
 			}
-			if !reflect.DeepEqual(gotCaPool, tt.wantCaPool) {
-				t.Errorf("ldapProvider.getLDAPConfig() got caPool = %v, want %v", gotCaPool, tt.wantCaPool)
+			if tt.wantErr {
+				assert.Nil(t, gotCaPool)
+			} else {
+				assert.NotNil(t, gotCaPool)
 			}
 		})
+	}
+}
+
+func TestLdapProviderGetLDAPConfigUsesConfigCertificate(t *testing.T) {
+	makeCertificate := func(commonName string) (string, []byte) {
+		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		certificate := &x509.Certificate{
+			SerialNumber:          big.NewInt(1),
+			Subject:               pkix.Name{CommonName: commonName},
+			NotBefore:             time.Now().Add(-time.Hour),
+			NotAfter:              time.Now().Add(time.Hour),
+			IsCA:                  true,
+			BasicConstraintsValid: true,
+			KeyUsage:              x509.KeyUsageCertSign,
+		}
+		der, err := x509.CreateCertificate(rand.Reader, certificate, certificate, &key.PublicKey, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsedCertificate, err := x509.ParseCertificate(der)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})), parsedCertificate.RawSubject
+	}
+	containsSubject := func(pool *x509.CertPool, expected []byte) bool {
+		return slices.ContainsFunc(pool.Subjects(), func(subject []byte) bool {
+			return slices.Equal(subject, expected)
+		})
+	}
+
+	firstCertificate, firstSubject := makeCertificate("first config CA")
+	secondCertificate, secondSubject := makeCertificate("second config CA")
+	provider := &ldapProvider{}
+
+	type configRequest struct {
+		name        string
+		certificate string
+		subject     []byte
+		other       []byte
+	}
+	type configResult struct {
+		request           configRequest
+		configCertificate string
+		pool              *x509.CertPool
+		err               error
+	}
+	requests := []configRequest{
+		{name: "first", certificate: firstCertificate, subject: firstSubject, other: secondSubject},
+		{name: "second", certificate: secondCertificate, subject: secondSubject, other: firstSubject},
+	}
+	const lookupsPerConfig = 16
+	start := make(chan struct{})
+	results := make(chan configResult, len(requests)*lookupsPerConfig)
+	var workers sync.WaitGroup
+	for _, request := range requests {
+		for range lookupsPerConfig {
+			workers.Add(1)
+			go func(request configRequest) {
+				defer workers.Done()
+				<-start
+				config, pool, err := provider.getLDAPConfig(mockGenericClient{ObjectMap: map[string]any{
+					"Certificate": request.certificate,
+				}}, request.name)
+				result := configResult{request: request, pool: pool, err: err}
+				if config != nil {
+					result.configCertificate = config.Certificate
+				}
+				results <- result
+			}(request)
+		}
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+
+	for result := range results {
+		if result.err != nil {
+			t.Errorf("getLDAPConfig(%q) error = %v", result.request.name, result.err)
+			continue
+		}
+		assert.Equal(t, result.request.certificate, result.configCertificate)
+		assert.True(t, containsSubject(result.pool, result.request.subject))
+		assert.False(t, containsSubject(result.pool, result.request.other))
 	}
 }
 

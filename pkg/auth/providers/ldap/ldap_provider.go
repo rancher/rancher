@@ -76,8 +76,6 @@ type ldapProvider struct {
 	secrets               wcorev1.SecretController
 	userMGR               userManager
 	tokenMGR              tokenManager
-	certs                 string
-	caPool                *x509.CertPool
 	providerName          string
 	testAndApplyInputType string
 }
@@ -317,13 +315,9 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient, c
 		storedLdapConfig.Name = configName
 	}
 
-	if p.certs != storedLdapConfig.Certificate || p.caPool == nil {
-		pool, err := ldap.NewCAPool(storedLdapConfig.Certificate)
-		if err != nil {
-			return nil, nil, err
-		}
-		p.certs = storedLdapConfig.Certificate
-		p.caPool = pool
+	caPool, err := ldap.NewCAPool(storedLdapConfig.Certificate)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if storedLdapConfig.ServiceAccountPassword != "" {
@@ -335,7 +329,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient, c
 		storedLdapConfig.ServiceAccountPassword = value
 	}
 
-	return storedLdapConfig, p.caPool, nil
+	return storedLdapConfig, caPool, nil
 }
 
 func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
