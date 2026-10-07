@@ -24,7 +24,6 @@ func (g *Provider) formatter(apiContext *types.APIContext, resource *types.RawRe
 }
 
 func (g *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	// TODO: How to get the Name here?
 	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, g.authConfigs)
 	if err != nil {
 		return err
