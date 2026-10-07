@@ -184,9 +184,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		}, nil
 	}
 
-	if os := machine.GetLabels()[capr.CattleOSLabel]; os == capr.WindowsMachineOS {
-		return nil, fmt.Errorf("windows is not currently supported with external capi infrastructure providers")
-	}
+	isWindows := machine.GetLabels()[capr.CattleOSLabel] == capr.WindowsMachineOS
 
 	// For external capi infrastructure providers, we merge the user-provided
 	// userdata here.
@@ -215,6 +213,13 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 
 	command := "sh"
 	path := "/usr/local/custom_script/install.sh"
+	if isWindows {
+		// cloudbase-init (the Windows equivalent of cloud-init) accept the same cloud-config
+		// write_files and runcmd directives, but the install script needs to be run via powershell.exe
+		// and written to a Windows path rather than a linux path.
+		command = "powershell.exe -File"
+		path = `C:\install.ps1`
+	}
 
 	// Copy system agent install script
 	writeFiles := []any{
