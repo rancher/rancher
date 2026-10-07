@@ -173,7 +173,7 @@ ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher133.2
 ENV CATTLE_MACHINE_CHECKSUM_amd64=e675c4066e0d035768053edf7d79f9096d823c7909f648a2ec4fd3d5e7ed686d
 ENV CATTLE_MACHINE_CHECKSUM_arm64=6a6f8eb5366ef8c5637bb0636217ff2237a7140afc9ae838c041ce4d8a09deea
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_K3S_VERSION=v1.33.12+k3s1
+ENV CATTLE_K3S_VERSION=v1.33.13+k3s1
 ENV CATTLE_ETCD_VERSION=v3.5.31
 ENV CATTLE_ETCD_CHECKSUM_amd64=e76b75c73b10196dfeb1c52fcdf9f4014e51f3082f65f28fb2e69a7bec1f916b
 ENV CATTLE_ETCD_CHECKSUM_arm64=1fc441acb75486c076db0900470b18da61ee529a5d54df7c619dfc12dd13b984
@@ -277,7 +277,7 @@ RUN case "${ARCH}" in \
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.33.12-k3s1 \
+COPY --from=rancher/k3s:v1.33.13-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -416,7 +416,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.33.12+k3s1
+ENV CATTLE_K3S_VERSION=v1.33.13+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -537,9 +537,9 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/nsenter --version
 
 ARG ARCH
-ENV KUBECTL_VERSION=v1.33.6
-ENV KUBECTL_CHECKSUM_amd64=d25d9b63335c038333bed785e9c6c4b0e41d791a09cac5f3e8df9862c684afbe
-ENV KUBECTL_CHECKSUM_arm64=3ab32d945a67a6000ba332bf16382fc3646271da6b7d751608b320819e5b8f38
+ENV KUBECTL_VERSION=v1.33.13
+ENV KUBECTL_CHECKSUM_amd64=316d712726d857c20744c57cb36aa47cfc79bc0af7e82cebf3780244b654c073
+ENV KUBECTL_CHECKSUM_arm64=9fe8aadd5aab9421978c7ac95de6fad304a3c4c0ce9dbf4127579779e0699080
 
 RUN case "${ARCH}" in \
         amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
