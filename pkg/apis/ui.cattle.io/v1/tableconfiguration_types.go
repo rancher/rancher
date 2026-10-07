@@ -27,7 +27,7 @@ const (
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // TableConfiguration is a configuration of the UI's resource tables shared with every user. Each user's own
-// configuration is kept in their preferences; this is the one everyone starts from.
+// configuration is persisted elsewhere; this is the one everyone starts from.
 type TableConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -38,7 +38,7 @@ type TableConfiguration struct {
 	Spec TableConfigurationSpec `json:"spec"`
 }
 
-// TableConfigurationSpec is what is persisted (CRDEntry). Either page level configuration (PAGE) or a single
+// TableConfigurationSpec is what is persisted. Either page level configuration (PAGE) or a single
 // table configuration (VIEW).
 // +kubebuilder:validation:XValidation:rule="self.type == 'PAGE' ? has(self.views) : !has(self.views)",message="views is required when type is PAGE and not allowed when type is VIEW"
 // +kubebuilder:validation:XValidation:rule="self.type == 'VIEW' ? has(self.view) : !has(self.view)",message="view is required when type is VIEW and not allowed when type is PAGE"
@@ -78,7 +78,7 @@ type TableConfigurationSpec struct {
 
 // TableViewSaved is a saved table configuration.
 type TableViewSaved struct {
-	// ID identifies the view, among a page's views and in each user's preferences.
+	// ID identifies the view, among a page's views and in each user's views.
 	ID string `json:"id"`
 
 	// Name is the view's name, shown on its tab.

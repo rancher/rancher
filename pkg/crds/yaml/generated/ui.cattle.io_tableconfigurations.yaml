@@ -40,7 +40,7 @@ spec:
       openAPIV3Schema:
         description: |-
           TableConfiguration is a configuration of the UI's resource tables shared with every user. Each user's own
-          configuration is kept in their preferences; this is the one everyone starts from.
+          configuration is persisted elsewhere; this is the one everyone starts from.
         properties:
           apiVersion:
             description: |-
@@ -117,7 +117,7 @@ spec:
                     type: string
                   id:
                     description: ID identifies the view, among a page's views and
-                      in each user's preferences.
+                      in each user's views.
                     type: string
                   labelColumns:
                     description: LabelColumns are the label keys shown as columns.
@@ -169,7 +169,7 @@ spec:
                       type: string
                     id:
                       description: ID identifies the view, among a page's views and
-                        in each user's preferences.
+                        in each user's views.
                       type: string
                     labelColumns:
                       description: LabelColumns are the label keys shown as columns.
