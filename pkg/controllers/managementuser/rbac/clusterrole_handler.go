@@ -29,7 +29,7 @@ func newClusterRoleHandler(r *manager) *crHandler {
 //
 // In a nested Rancher setup, the same physical cluster can be managed as a downstream cluster by one
 // Rancher install while also being the local cluster of another. A ClusterRole created by a different
-// install (identified by the clusterRoleOwnerInstallUUID annotation) is not in this install's
+// install (identified by the clusterRoleOwnerInstallUUIDLabel label) is not in this install's
 // RoleTemplate management plane and must be left alone, even if the owning RoleTemplate can't be
 // found locally.
 func (c *crHandler) sync(key string, obj *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
@@ -43,7 +43,7 @@ func (c *crHandler) sync(key string, obj *rbacv1.ClusterRole) (*rbacv1.ClusterRo
 	}
 
 	installUUID := settings.InstallUUID.Get()
-	if ownerInstallUUID, ok := obj.Annotations[clusterRoleOwnerInstallUUID]; ok && ownerInstallUUID != installUUID {
+	if ownerInstallUUID, ok := obj.Labels[clusterRoleOwnerInstallUUIDLabel]; ok && ownerInstallUUID != installUUID {
 		logrus.Tracef("[cluster-clusterrole-sync] installUUID=%s cluster=%s: clusterRole %q is owned by roleTemplate %q from a different Rancher install (installUUID=%s), skipping",
 			installUUID, c.clusterName, obj.Name, owner, ownerInstallUUID)
 		return obj, nil

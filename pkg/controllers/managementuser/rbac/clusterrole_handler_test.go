@@ -43,7 +43,7 @@ func TestClusterRoleHandlerSync(t *testing.T) {
 			},
 			expectDeletion: false,
 		},
-		"legacy ClusterRole (no install-uuid annotation), roleTemplate missing: deleted": {
+		"legacy ClusterRole (no install-uuid label), roleTemplate missing: deleted": {
 			obj: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "rt-missing-legacy",
@@ -56,11 +56,9 @@ func TestClusterRoleHandlerSync(t *testing.T) {
 		"own install-uuid, roleTemplate missing: deleted": {
 			obj: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "rt-missing-own",
-					Annotations: map[string]string{
-						clusterRoleOwner:            "rt-missing-own",
-						clusterRoleOwnerInstallUUID: "own-install-uuid",
-					},
+					Name:        "rt-missing-own",
+					Annotations: map[string]string{clusterRoleOwner: "rt-missing-own"},
+					Labels:      map[string]string{clusterRoleOwnerInstallUUIDLabel: "own-install-uuid"},
 				},
 			},
 			roleTemplates:  map[string]*v3.RoleTemplate{},
@@ -69,11 +67,9 @@ func TestClusterRoleHandlerSync(t *testing.T) {
 		"foreign install-uuid, roleTemplate missing: left alone": {
 			obj: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "rt-missing-foreign",
-					Annotations: map[string]string{
-						clusterRoleOwner:            "rt-missing-foreign",
-						clusterRoleOwnerInstallUUID: "foreign-install-uuid",
-					},
+					Name:        "rt-missing-foreign",
+					Annotations: map[string]string{clusterRoleOwner: "rt-missing-foreign"},
+					Labels:      map[string]string{clusterRoleOwnerInstallUUIDLabel: "foreign-install-uuid"},
 				},
 			},
 			roleTemplates:  map[string]*v3.RoleTemplate{},

@@ -37,12 +37,12 @@ const (
 	rtbOwnerLabel       = "authz.cluster.cattle.io/rtb-owner-updated"
 	rtbOwnerLabelLegacy = "authz.cluster.cattle.io/rtb-owner"
 	clusterRoleOwner    = "authz.cluster.cattle.io/clusterrole-owner"
-	// clusterRoleOwnerInstallUUID records which Rancher install created a RoleTemplate-owned ClusterRole.
+	// clusterRoleOwnerInstallUUIDLabel records which Rancher install created a RoleTemplate-owned ClusterRole.
 	// In a nested Rancher setup, the same physical cluster can be managed as a downstream cluster by one
 	// Rancher install while also being the local cluster of another. Without this, the local install's
 	// orphan ClusterRole sweep (cluster-clusterrole-sync) can delete ClusterRoles it did not create, because
 	// the owning RoleTemplate legitimately only exists in the other install's management plane.
-	clusterRoleOwnerInstallUUID      = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
+	clusterRoleOwnerInstallUUIDLabel = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
@@ -269,7 +269,7 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
 	installUUID := settings.InstallUUID.Get()
-	if ownerInstallUUID, ok := clusterRole.Annotations[clusterRoleOwnerInstallUUID]; ok && ownerInstallUUID != installUUID {
+	if ownerInstallUUID, ok := clusterRole.Labels[clusterRoleOwnerInstallUUIDLabel]; ok && ownerInstallUUID != installUUID {
 		logrus.Tracef("installUUID=%s cluster=%s: clusterRole %v is owned by a different Rancher install (installUUID=%s), skipping update",
 			installUUID, m.clusterName, clusterRole.Name, ownerInstallUUID)
 		return nil
@@ -278,7 +278,7 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 	// Backfill the install UUID on owned ClusterRoles created before it was introduced. Never overwrite
 	// an existing value, so that installs sharing a cluster can't fight over ownership.
 	_, owned := clusterRole.Annotations[clusterRoleOwner]
-	_, stamped := clusterRole.Annotations[clusterRoleOwnerInstallUUID]
+	_, stamped := clusterRole.Labels[clusterRoleOwnerInstallUUIDLabel]
 	needsStamp := owned && !stamped
 
 	if !needsStamp && equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
@@ -287,7 +287,10 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 	clusterRole = clusterRole.DeepCopy()
 	clusterRole.Rules = rt.Rules
 	if needsStamp {
-		clusterRole.Annotations[clusterRoleOwnerInstallUUID] = installUUID
+		if clusterRole.Labels == nil {
+			clusterRole.Labels = map[string]string{}
+		}
+		clusterRole.Labels[clusterRoleOwnerInstallUUIDLabel] = installUUID
 	}
 	logrus.Tracef("installUUID=%s cluster=%s: Updating clusterRole %v.",
 		installUUID, m.clusterName, clusterRole.Name)
@@ -309,8 +312,10 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rt.Name,
 			Annotations: map[string]string{
-				clusterRoleOwner:            rt.Name,
-				clusterRoleOwnerInstallUUID: settings.InstallUUID.Get(),
+				clusterRoleOwner: rt.Name,
+			},
+			Labels: map[string]string{
+				clusterRoleOwnerInstallUUIDLabel: settings.InstallUUID.Get(),
 			},
 		},
 		Rules: rt.Rules,
