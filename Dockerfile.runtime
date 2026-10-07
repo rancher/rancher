@@ -28,7 +28,7 @@ FROM registry.suse.com/bci/golang:1.26.8
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher145.2
-ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.36.5+k3s1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.15
@@ -54,7 +54,7 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.2-k3s1 \
+COPY --from=rancher/k3s:v1.36.5-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
