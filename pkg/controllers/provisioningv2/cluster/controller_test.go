@@ -259,7 +259,10 @@ func TestController_createNewCluster(t *testing.T) {
 	}, nil).AnyTimes()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			provClusterCache := fake.NewMockCacheInterface[*v1.Cluster](gomock.NewController(t))
+			provClusterCache.EXPECT().GetByIndex(ByCluster, gomock.Any()).Return(nil, nil).AnyTimes()
 			h := handler{
+				clusterCache:     provClusterCache,
 				mgmtClusterCache: clusterCache,
 				featureCache:     featureCache,
 			}

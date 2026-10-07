@@ -143,7 +143,11 @@ func TestFindMachineByClusterTokenRejectsATokenFromAPreviousCluster(t *testing.T
 		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-default-token"}},
 	}, nil)
 	// No other mock expectations: a rejected token must not create a machine request or resolve a cluster.
-	r := &RKE2ConfigServer{secretsCache: secretsCache, namespaceCache: newTestNamespaceCache(ctrl)}
+	r := &RKE2ConfigServer{
+		secretsCache:     secretsCache,
+		namespaceCache:   newTestNamespaceCache(ctrl),
+		mgmtClusterCache: fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Cluster](ctrl),
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer tok")
@@ -156,13 +160,17 @@ func TestFindMachineByClusterTokenRejectsATokenFromAPreviousCluster(t *testing.T
 
 func TestTokenNamespacePrefersAUsableToken(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	r := &RKE2ConfigServer{namespaceCache: newTestNamespaceCache(ctrl)}
+	mgmtClusterCache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Cluster](ctrl)
+	cluster := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abcde"}}
+	mgmtClusterCache.EXPECT().Get("c-abcde").Return(cluster, nil)
+	r := &RKE2ConfigServer{namespaceCache: newTestNamespaceCache(ctrl), mgmtClusterCache: mgmtClusterCache}
 
-	namespace, err := r.tokenNamespace([]*corev1.Secret{
+	namespace, got, err := r.tokenNamespace([]*corev1.Secret{
 		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-default-token"}},
 		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-abcde", Name: "crt-token-default-token"}},
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "c-abcde", namespace)
+	assert.Same(t, cluster, got, "the caller is classified by the cluster the token was checked against")
 }

@@ -1,12 +1,15 @@
 package nodesyncer
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -226,4 +229,42 @@ func TestReconcileAllSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T) {
 	}
 
 	assert.NoError(t, syncer.reconcileAll())
+}
+
+func TestNodeSyncerLeavesTheMachinesOfAClusterCreatedAgainUnderTheSameNameAlone(t *testing.T) {
+	mockClusterLister := new(MockClusterLister)
+	defer mockClusterLister.AssertExpectations(t)
+	mockClusterLister.On("Get", "", "c-m-test").Return(&v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-new"}}, nil)
+
+	// No machine client or cache: the new cluster's machines must not be looked up or updated.
+	syncer := &nodeSyncer{
+		clusterNamespace: "c-m-test",
+		nodesSyncer:      &nodesSyncer{clusterNamespace: "c-m-test", clusterUID: "uid-old", clusterLister: mockClusterLister},
+	}
+
+	_, err := syncer.sync("node-1", &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}})
+
+	assert.NoError(t, err)
+}
+
+func TestDrainLeavesTheMachineOfAClusterCreatedAgainUnderTheSameNameAlone(t *testing.T) {
+	mockClusterLister := new(MockClusterLister)
+	defer mockClusterLister.AssertExpectations(t)
+	mockClusterLister.On("Get", "", "c-m-test").Return(&v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-new"}}, nil)
+
+	// No machine client: the new cluster's machine must not be updated or requeued.
+	d := &nodeDrain{clusterName: "c-m-test", clusterUID: "uid-old", clusterLister: mockClusterLister, nodesToContext: map[string]context.CancelFunc{}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		d.drain(ctx, &v3.Node{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "m-1"}}, "node-1", cancel)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the drain should stop")
+	}
 }

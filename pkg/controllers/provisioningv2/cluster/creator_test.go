@@ -136,6 +136,7 @@ func TestCheckManagementClusterAdoptable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h, env := newCreatorTestHandler(t)
+			env.clusterCache.EXPECT().GetByIndex(ByCluster, "c-m-test").Return([]*v1.Cluster{cluster}, nil)
 			if tt.mgmt == nil {
 				env.mgmtClusterCache.EXPECT().Get("c-m-test").Return(nil, notFound("c-m-test"))
 			} else {
@@ -152,6 +153,35 @@ func TestCheckManagementClusterAdoptable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckManagementClusterAdoptableWaitsForTheProvisioningClusterThatHadTheName(t *testing.T) {
+	// A management cluster deleted on its own goes away before the provisioning cluster that created it,
+	// which still acts on the name until it is gone.
+	h, env := newCreatorTestHandler(t)
+	cluster := newV2ProvCluster()
+	previous := newV2ProvCluster()
+	previous.Name, previous.UID = "previous", "uid-previous"
+	deleting(&previous.ObjectMeta)
+	env.clusterCache.EXPECT().GetByIndex(ByCluster, "c-m-test").Return([]*v1.Cluster{previous, cluster}, nil)
+	env.clusters.EXPECT().EnqueueAfter("fleet-default", "foo", creatorRequeue)
+
+	err := h.checkManagementClusterAdoptable(cluster, "c-m-test")
+
+	assert.ErrorContains(t, err, "waiting for provisioning cluster fleet-default/previous, which has management cluster c-m-test, to be removed")
+}
+
+func TestCheckManagementClusterAdoptableIgnoresALiveProvisioningClusterWithTheName(t *testing.T) {
+	// Two live provisioning clusters naming the same management cluster are handled as before: the
+	// management cluster's creator decides.
+	h, env := newCreatorTestHandler(t)
+	cluster := newV2ProvCluster()
+	other := newV2ProvCluster()
+	other.Name, other.UID = "other", "uid-other"
+	env.clusterCache.EXPECT().GetByIndex(ByCluster, "c-m-test").Return([]*v1.Cluster{other}, nil)
+	env.mgmtClusterCache.EXPECT().Get("c-m-test").Return(nil, notFound("c-m-test"))
+
+	assert.NoError(t, h.checkManagementClusterAdoptable(cluster, "c-m-test"))
 }
 
 func TestOnProvisioningClusterRemoveWaitsForTheMachines(t *testing.T) {

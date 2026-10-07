@@ -52,25 +52,36 @@ func SecretTokenIndexValues(secret *corev1.Secret) []string {
 	return values
 }
 
-// TokenSecretUsable reports whether the token stored in secret can still be used to register with the
-// cluster named by its namespace. A cluster's token secrets live in a namespace named after the cluster,
-// and that namespace is deleted with the cluster, but not waited for: a new cluster can be created under
-// the same name while the old namespace, and the old cluster's tokens in it, are still being torn down.
-// Nothing new can be created in a terminating namespace, so any token found in one belongs to a cluster
-// that is gone.
+// TokenSecretCluster returns the cluster that the token stored in secret registers with: the cluster named
+// by the secret's namespace. It is read once, and callers must act on the returned object rather than look
+// the cluster up again, which could find a cluster that has since replaced it under the same name.
 //
-// A namespace that can't be found is not treated as stale: a namespace is only removed once everything
-// in it is, so the secret can't outlive it, and not finding it only means the namespace cache is behind
-// the secret cache. Rejecting then would turn a lagging cache into failed registrations.
-func TokenSecretUsable(secret *corev1.Secret, getNamespace func(name string) (*corev1.Namespace, error)) (bool, error) {
+// stale is true for a token left behind by a previous cluster with the same name. A cluster's token
+// secrets live in a namespace named after the cluster, which is deleted with it, and the cluster is only
+// removed once that namespace is gone. Nothing new can be created in a terminating namespace, so any token
+// found in one belongs to a cluster that is gone.
+//
+// A namespace that can't be found is not treated as stale: a secret can't outlive its namespace, so not
+// finding it only means the namespace cache is behind the secret cache. Rejecting then would turn a lagging
+// cache into failed registrations. If no cluster has the name, the returned cluster is nil and the token
+// isn't stale; callers decide whether they can act without a cluster.
+func TokenSecretCluster(secret *corev1.Secret, getNamespace func(name string) (*corev1.Namespace, error), getCluster func(name string) (*v3.Cluster, error)) (cluster *v3.Cluster, stale bool, err error) {
 	ns, err := getNamespace(secret.Namespace)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, false, fmt.Errorf("failed to get namespace %s of token secret %s: %w", secret.Namespace, secret.Name, err)
+	}
+	if err == nil && (ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating) {
+		return nil, true, nil
+	}
+
+	cluster, err = getCluster(secret.Namespace)
 	if apierrors.IsNotFound(err) {
-		return true, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("failed to get namespace %s of token secret %s: %w", secret.Namespace, secret.Name, err)
+		return nil, false, fmt.Errorf("failed to get cluster %s of token secret %s: %w", secret.Namespace, secret.Name, err)
 	}
-	return ns.DeletionTimestamp == nil && ns.Status.Phase != corev1.NamespaceTerminating, nil
+	return cluster, false, nil
 }
 
 func GetTokenFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) (string, error) {

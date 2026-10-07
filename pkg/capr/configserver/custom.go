@@ -40,14 +40,15 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 		return nil, err
 	}
 
-	namespace, err := r.tokenNamespace(secrets)
+	namespace, mgmtCluster, err := r.tokenNamespace(secrets)
 	if err != nil || namespace == "" {
 		return nil, err
 	}
 
 	data := dataFromHeaders(req)
 
-	lc, err := ResolveMgmtTokenCaller(r.mgmtClusterCache, r.capiClusterCache, namespace)
+	// Classify the caller by the cluster its token was checked against, not by a cluster found by name again.
+	lc, err := resolveTokenCaller(mgmtCluster, r.capiClusterCache, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -90,20 +91,21 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 }
 
 // tokenNamespace returns the namespace of the first token secret in secrets that can still be used to
-// register with its cluster, or "" if there is none. A token left behind by a previous cluster with the
+// register with its cluster, and the mgmt cluster it was checked against, or nil if its namespace has
+// none. The namespace is "" if there is no such secret. A token left behind by a previous cluster with the
 // same name is treated like an unknown token.
-func (r *RKE2ConfigServer) tokenNamespace(secrets []*corev1.Secret) (string, error) {
+func (r *RKE2ConfigServer) tokenNamespace(secrets []*corev1.Secret) (string, *v3.Cluster, error) {
 	for _, secret := range secrets {
-		usable, err := crt.TokenSecretUsable(secret, r.namespaceCache.Get)
+		cluster, stale, err := crt.TokenSecretCluster(secret, r.namespaceCache.Get, r.mgmtClusterCache.Get)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
-		if usable {
-			return secret.Namespace, nil
+		if !stale {
+			return secret.Namespace, cluster, nil
 		}
 		logrus.Infof("[rke2configserver] rejecting registration token that belongs to a previous cluster named %s", secret.Namespace)
 	}
-	return "", nil
+	return "", nil, nil
 }
 
 func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*capi.Machine, error) {

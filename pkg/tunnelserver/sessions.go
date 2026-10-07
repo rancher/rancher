@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,10 +22,28 @@ import (
 type SessionTracker struct {
 	mu    sync.Mutex
 	conns map[types.UID]map[*trackedConn]struct{}
+	// closed records when the sessions of each removed cluster were closed. A request authorized for the
+	// cluster before then can still be upgrading, and its connection is closed as soon as it is taken over.
+	// A UID is never used by another cluster, so remembering it can't affect other clusters.
+	closed map[types.UID]time.Time
+	now    func() time.Time
 }
 
+// closedClusterRetention is how long the UID of a removed cluster is remembered. Requests are authorized
+// right before their connection is taken over, so this only needs to outlast that, and any lag of the
+// caches the authorizers read.
+const closedClusterRetention = time.Hour
+
+// errClusterRemoved is returned to a tunnel request that was authorized for a cluster whose sessions have
+// since been closed.
+var errClusterRemoved = errors.New("the cluster was removed")
+
 func NewSessionTracker() *SessionTracker {
-	return &SessionTracker{conns: map[types.UID]map[*trackedConn]struct{}{}}
+	return &SessionTracker{
+		conns:  map[types.UID]map[*trackedConn]struct{}{},
+		closed: map[types.UID]time.Time{},
+		now:    time.Now,
+	}
 }
 
 // sessionIdentity is filled in by an authorizer with the cluster a tunnel request was authorized for.
@@ -92,7 +111,8 @@ func (t *SessionTracker) Handler(next http.Handler) http.Handler {
 }
 
 // CloseCluster ends the tunnel sessions this replica serves for the cluster with the given UID, and
-// returns how many it ended.
+// returns how many it ended. Sessions authorized for the cluster that are still being set up are ended as
+// soon as they are.
 func (t *SessionTracker) CloseCluster(uid types.UID) int {
 	if t == nil {
 		return 0
@@ -100,6 +120,13 @@ func (t *SessionTracker) CloseCluster(uid types.UID) int {
 	t.mu.Lock()
 	conns := t.conns[uid]
 	delete(t.conns, uid)
+	now := t.now()
+	for closedUID, at := range t.closed {
+		if now.Sub(at) > closedClusterRetention {
+			delete(t.closed, closedUID)
+		}
+	}
+	t.closed[uid] = now
 	t.mu.Unlock()
 
 	name := ""
@@ -115,13 +142,18 @@ func (t *SessionTracker) CloseCluster(uid types.UID) int {
 	return len(conns)
 }
 
-func (t *SessionTracker) add(conn *trackedConn) {
+// add tracks conn, unless the sessions of its cluster have been closed already, and reports whether it did.
+func (t *SessionTracker) add(conn *trackedConn) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if _, closed := t.closed[conn.clusterUID]; closed {
+		return false
+	}
 	if t.conns[conn.clusterUID] == nil {
 		t.conns[conn.clusterUID] = map[*trackedConn]struct{}{}
 	}
 	t.conns[conn.clusterUID][conn] = struct{}{}
+	return true
 }
 
 func (t *SessionTracker) remove(conn *trackedConn) {
@@ -155,8 +187,15 @@ func (w *hijackRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if uid == "" {
 		return conn, rw, nil
 	}
-	w.conn = &trackedConn{Conn: conn, clusterName: name, clusterUID: uid}
-	w.tracker.add(w.conn)
+	tracked := &trackedConn{Conn: conn, clusterName: name, clusterUID: uid}
+	if !w.tracker.add(tracked) {
+		// The cluster was removed while the request was being set up: its sessions have been closed, and
+		// this one would never be.
+		logrus.Infof("[tunnel-sessions] closing a tunnel session of removed cluster %s (uid %s)", name, uid)
+		_ = conn.Close()
+		return nil, nil, errClusterRemoved
+	}
+	w.conn = tracked
 	return conn, rw, nil
 }
 

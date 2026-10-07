@@ -132,6 +132,13 @@ func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.C
 }
 
 func (n *nodeSyncer) sync(key string, node *corev1.Node) (*corev1.Node, error) {
+	// The machines of a cluster created again under the same name are not this controller's, and
+	// needUpdate below can update them.
+	cluster, clusterErr := n.nodesSyncer.clusterLister.Get("", n.clusterNamespace)
+	if clusterErr == nil && !config.MatchesClusterUID(n.nodesSyncer.clusterUID, cluster) {
+		return nil, nil
+	}
+
 	needUpdate, err := n.needUpdate(key, node)
 	if err != nil {
 		return nil, err
@@ -144,17 +151,12 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (*corev1.Node, error) {
 		return nil, nil
 	}
 
-	cluster, err := n.nodesSyncer.clusterLister.Get("", n.clusterNamespace)
-	if err != nil {
+	if clusterErr != nil {
 		// if cluster no longer exists; nothing to sync
-		if apierrors.IsNotFound(err) {
+		if apierrors.IsNotFound(clusterErr) {
 			return nil, nil
 		}
-		return nil, err
-	}
-	if !config.MatchesClusterUID(n.nodesSyncer.clusterUID, cluster) {
-		// A cluster created again under the same name is not this controller's.
-		return nil, nil
+		return nil, clusterErr
 	}
 
 	var (

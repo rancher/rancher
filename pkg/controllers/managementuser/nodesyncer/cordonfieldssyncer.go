@@ -2,6 +2,7 @@ package nodesyncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -15,7 +16,7 @@ import (
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -114,7 +115,7 @@ func (d *nodeDrain) drainNode(key string, obj *v32.Node) (runtime.Object, error)
 
 func (d *nodeDrain) updateNode(node *v32.Node, updateFunc func(node *v32.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v32.Node, error) {
 	updatedObj, err := d.machines.Update(node)
-	if err != nil && errors.IsConflict(err) {
+	if err != nil && apierrors.IsConflict(err) {
 		// retrying twelve times, if conflict error still exists, give up
 		for i := 0; i < 12; i++ {
 			latestObj, err := d.machines.Get(node.Name, metav1.GetOptions{})
@@ -124,7 +125,7 @@ func (d *nodeDrain) updateNode(node *v32.Node, updateFunc func(node *v32.Node, o
 			}
 			updateFunc(latestObj, originalErr, kubeErr)
 			updatedObj, err = d.machines.Update(latestObj)
-			if err != nil && errors.IsConflict(err) {
+			if err != nil && apierrors.IsConflict(err) {
 				logrus.Debugf("nodeDrain: conflict error, will retry again %s", node.Spec.RequestedHostname)
 				time.Sleep(5 * time.Millisecond)
 				continue
@@ -145,9 +146,13 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v32.Node, nodeName string, c
 		default:
 		}
 
-		stopped := false
+		stopped, replaced := false, false
 		updatedObj, err := v32.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
 			kubeConfig, tokenName, err := d.getKubeConfig()
+			if errors.Is(err, errClusterReplaced) {
+				replaced = true
+				return obj, err
+			}
 			if err != nil {
 				logrus.Errorf("nodeDrain: error getting kubeConfig for node %s", obj.Name)
 				return obj, fmt.Errorf("error getting kubeConfig for node %s", obj.Name)
@@ -178,6 +183,13 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v32.Node, nodeName string, c
 			}
 			return nodeObj, nil
 		})
+		if replaced {
+			// The machine belongs to a cluster created again under the same name: leave it to that
+			// cluster's controllers.
+			logrus.Infof("nodeDrain: not draining node %s, cluster %s was created again since this controller started", nodeName, d.clusterName)
+			cancel()
+			return
+		}
 		kubeErr := err
 		if err != nil {
 			ignore, timeoutErr := ignoreErr(err.Error())
@@ -222,13 +234,17 @@ func (d *nodeDrain) resetDesiredNodeUnschedulable(obj *v32.Node) error {
 	return nil
 }
 
+// errClusterReplaced is returned when the cluster has been created again under the same name since the
+// controller started.
+var errClusterReplaced = errors.New("the cluster was created again since this controller started")
+
 func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, string, error) {
 	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
 		return nil, "", err
 	}
 	if !config.MatchesClusterUID(d.clusterUID, cluster) {
-		return nil, "", fmt.Errorf("cluster %s was created again since this controller started", d.clusterName)
+		return nil, "", errClusterReplaced
 	}
 	user, err := d.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {

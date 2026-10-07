@@ -2,19 +2,25 @@ package clustergc
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/rancher/norman/lifecycle"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 func TestCleanFinalizersGeneric(t *testing.T) {
@@ -161,4 +167,25 @@ func TestRemoveWaitsForTheUserControllersToStop(t *testing.T) {
 	assert.ErrorIs(t, err, generic.ErrSkip, "the finalizer should be kept")
 	assert.Same(t, cluster, obj)
 	assert.Equal(t, []string{"c-m-test"}, requeued)
+}
+
+func TestRemoveDoesNotWaitOnceTheRemovalMovedOnWithoutTheReport(t *testing.T) {
+	gc := &gcLifecycle{enqueueAfter: func(string, string, time.Duration) { t.Fatal("unexpected requeue") }}
+	cluster := &apisv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}}
+	apisv3.ClusterConditionUserControllersStopped.False(cluster)
+
+	// The API refuses every request, so the cleanup itself fails: what matters is that it was attempted.
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+	gc.mgmt = &config.ManagementContext{RESTConfig: rest.Config{Host: server.URL, QPS: 10000}}
+
+	_, err := gc.Remove(cluster)
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, generic.ErrSkip, "the cleanup should no longer wait")
+	assert.NotZero(t, requests.Load())
 }

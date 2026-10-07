@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -74,9 +75,10 @@ func cleanFinalizers(clusterName string, object *unstructured.Unstructured, dyna
 // remain on objects that no longer have handlers associated with them
 func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	// The finalizers belong to the cluster's user controllers, which add them back for as long as they
-	// run. Clean up only once the replica that owns the cluster reports them stopped, otherwise objects
-	// would be left with finalizers nothing removes, and the cluster's namespace would never go away.
-	if !apisv3.ClusterConditionUserControllersStopped.IsTrue(cluster) {
+	// run. Clean up only once the replica that owns the cluster reports them stopped, or the removal moved
+	// on without that report, otherwise objects would be left with finalizers nothing removes, and the
+	// cluster's namespace would never go away.
+	if !util.ConditionConcluded(cluster, apisv3.ClusterConditionUserControllersStopped) {
 		c.enqueueAfter("", cluster.Name, userControllersStoppedRequeue)
 		return cluster, generic.ErrSkip
 	}

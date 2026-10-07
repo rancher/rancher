@@ -2,6 +2,7 @@ package tunnelserver
 
 import (
 	"bufio"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -115,4 +116,39 @@ func TestSessionClusterWithoutATracker(t *testing.T) {
 	name, uid := SessionCluster(req)
 	assert.Empty(t, name)
 	assert.Empty(t, uid)
+}
+
+func TestCloseClusterEndsSessionsThatAreStillBeingSetUp(t *testing.T) {
+	// The request was authorized for the cluster before its sessions were closed, and takes over its
+	// connection only after.
+	tracker := NewSessionTracker()
+	tracker.CloseCluster("uid-1")
+	server, client := net.Pipe()
+	defer client.Close()
+	// Fail rather than hang if the connection is left open.
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(time.Second)))
+	identity := &sessionIdentity{clusterName: "c-m-test", clusterUID: "uid-1"}
+	w := &hijackRecorder{ResponseWriter: &hijackableWriter{ResponseRecorder: httptest.NewRecorder(), conn: server}, identity: identity, tracker: tracker}
+
+	_, _, err := w.Hijack()
+
+	assert.ErrorIs(t, err, errClusterRemoved)
+	_, err = client.Read(make([]byte, 1))
+	assert.ErrorIs(t, err, io.EOF, "the connection should be closed")
+	assert.Equal(t, 0, trackedCount(tracker, "uid-1"))
+}
+
+func TestCloseClusterForgetsRemovedClustersAfterAWhile(t *testing.T) {
+	tracker := NewSessionTracker()
+	now := time.Now()
+	tracker.now = func() time.Time { return now }
+	tracker.CloseCluster("uid-1")
+
+	now = now.Add(closedClusterRetention + time.Minute)
+	tracker.CloseCluster("uid-2")
+
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+	assert.NotContains(t, tracker.closed, types.UID("uid-1"))
+	assert.Contains(t, tracker.closed, types.UID("uid-2"))
 }

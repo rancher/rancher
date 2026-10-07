@@ -49,7 +49,8 @@ func TestGetClusterByToken(t *testing.T) {
 	cluster := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc"}}
 	clusterLister := &fakes.ClusterListerMock{
 		GetFunc: func(namespace, name string) (*apimgmtv3.Cluster, error) {
-			if name == "c-abc" {
+			switch name {
+			case "c-abc":
 				return cluster, nil
 			}
 			return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
@@ -269,4 +270,34 @@ func TestAuthorizeTunnelTracksTheSessionsCluster(t *testing.T) {
 			assert.Equal(t, tt.wantTracked, trackedUID)
 		})
 	}
+}
+
+func TestGetClusterByTokenReturnsTheClusterTheTokenWasCheckedAgainst(t *testing.T) {
+	// A second lookup could find a cluster that replaced the checked one under the same name, and the old
+	// cluster's token would be authorized for it.
+	checked := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc", UID: "uid-checked"}}
+	replacement := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc", UID: "uid-replacement"}}
+	lookups := 0
+	auth := &Authorizer{
+		secretIndexer: newTestSecretIndexer(t, tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")})),
+		clusterLister: &fakes.ClusterListerMock{
+			GetFunc: func(_, _ string) (*apimgmtv3.Cluster, error) {
+				lookups++
+				if lookups == 1 {
+					return checked, nil
+				}
+				return replacement, nil
+			},
+		},
+		namespaceLister: &corefakes.NamespaceListerMock{
+			GetFunc: func(_, name string) (*corev1.Namespace, error) {
+				return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+			},
+		},
+	}
+
+	got, err := auth.getClusterByToken("tok")
+
+	assert.NoError(t, err)
+	assert.Same(t, checked, got)
 }

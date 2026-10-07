@@ -407,20 +407,18 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 		if !ok {
 			continue
 		}
-		usable, err := clusterregistrationtoken.TokenSecretUsable(secret, t.getNamespace)
+		// The cluster the token was checked against is the one returned: looking it up again could find a
+		// cluster that has replaced it under the same name.
+		cluster, isStale, err := clusterregistrationtoken.TokenSecretCluster(secret, t.getNamespace, t.getCluster)
 		if err != nil {
 			return nil, err
 		}
-		if !usable {
+		if isStale {
 			stale = secret.Namespace
 			continue
 		}
-		cluster, err := t.clusterLister.Get("", secret.Namespace)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return nil, err
+		if cluster == nil {
+			continue
 		}
 		return cluster, nil
 	}
@@ -433,6 +431,10 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 
 func (t *Authorizer) getNamespace(name string) (*k8scorev1.Namespace, error) {
 	return t.namespaceLister.Get("", name)
+}
+
+func (t *Authorizer) getCluster(name string) (*v3.Cluster, error) {
+	return t.clusterLister.Get("", name)
 }
 
 func (t *Authorizer) secretTokenIndex(secret *k8scorev1.Secret) ([]string, error) {

@@ -80,7 +80,8 @@ const (
 	// the job could not be created.
 	ClusterConditionAgentUninstallScheduled condition.Cond = "AgentUninstallScheduled"
 	// ClusterConditionUserControllersStopped is set during cluster removal by the Rancher replica that
-	// owns the cluster, once it no longer runs the cluster's user controllers.
+	// owns the cluster, once it no longer runs the cluster's user controllers. It is False if no replica
+	// reported them stopped in time, for example because no replica could tell it owns the cluster.
 	ClusterConditionUserControllersStopped condition.Cond = "UserControllersStopped"
 
 	ClusterDriverImported = "imported"

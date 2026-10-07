@@ -53,27 +53,23 @@ func (a *clusterProxyAuthorizer) Authorize(req *http.Request) (string, bool, err
 	}
 
 	for _, secret := range secrets {
-		usable, err := crt.TokenSecretUsable(secret, a.namespaceCache.Get)
+		cluster, stale, err := crt.TokenSecretCluster(secret, a.namespaceCache.Get, a.clusterCache.Get)
 		if err != nil {
 			return "", false, err
 		}
-		if usable {
-			a.trackSession(req, secret.Namespace)
-			return Prefix + secret.Namespace, true, nil
+		if stale {
+			logrus.Debugf("[steve-proxy] rejecting registration token that belongs to a previous cluster named %s", secret.Namespace)
+			continue
 		}
-		logrus.Debugf("[steve-proxy] rejecting registration token that belongs to a previous cluster named %s", secret.Namespace)
+		if cluster == nil {
+			// The session must be tracked by the cluster's UID, so that it is ended once that cluster is
+			// gone, instead of serving the name for a cluster that replaces it.
+			logrus.Debugf("[steve-proxy] rejecting registration token of cluster %s, which can't be found", secret.Namespace)
+			continue
+		}
+		// Track the session for the cluster the token was checked against.
+		tunnelserver.SetSessionCluster(req, cluster.Name, cluster.UID)
+		return Prefix + cluster.Name, true, nil
 	}
 	return "", false, nil
-}
-
-// trackSession records the cluster the session is for, so that it is ended once the cluster is gone.
-// A token's namespace is named after its cluster. If the cluster can't be found, the session is left
-// untracked.
-func (a *clusterProxyAuthorizer) trackSession(req *http.Request, clusterName string) {
-	cluster, err := a.clusterCache.Get(clusterName)
-	if err != nil {
-		logrus.Debugf("[steve-proxy] not tracking the tunnel session of cluster %s: %v", clusterName, err)
-		return
-	}
-	tunnelserver.SetSessionCluster(req, cluster.Name, cluster.UID)
 }

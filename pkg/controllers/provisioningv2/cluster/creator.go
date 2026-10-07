@@ -61,13 +61,29 @@ func (h *handler) ensureManagementClusterFinalizer(cluster *v3.Cluster) (bool, e
 	return true, nil
 }
 
-// checkManagementClusterAdoptable returns an error if the management cluster named name exists and must
-// not be taken over by cluster: it is being deleted, or it was created by a different provisioning
-// cluster. A management cluster that wasn't created by any provisioning cluster can still be adopted.
+// checkManagementClusterAdoptable returns an error if the management cluster named name must not be taken
+// over or created by cluster: it is being deleted, it was created by a different provisioning cluster, or a
+// different provisioning cluster that still has it is being deleted. A management cluster that wasn't
+// created by any provisioning cluster can still be adopted.
 func (h *handler) checkManagementClusterAdoptable(cluster *v1.Cluster, name string) error {
 	if name == "" {
 		return nil
 	}
+
+	// A management cluster deleted on its own goes away before the provisioning cluster that created it,
+	// which still acts on the name until it is gone. The name is only free once it is.
+	claims, err := h.clusterCache.GetByIndex(ByCluster, name)
+	if err != nil {
+		return err
+	}
+	for _, other := range claims {
+		if other.UID == cluster.UID || other.DeletionTimestamp == nil {
+			continue
+		}
+		h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, creatorRequeue)
+		return fmt.Errorf("waiting for provisioning cluster %s/%s, which has management cluster %s, to be removed before creating it again", other.Namespace, other.Name, name)
+	}
+
 	existing, err := h.mgmtClusterCache.Get(name)
 	if apierrors.IsNotFound(err) {
 		return nil

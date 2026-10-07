@@ -44,6 +44,16 @@ const (
 	// userControllersStoppedRequeue is how often a cluster being removed is checked again while it waits
 	// for its user controllers to be reported stopped.
 	userControllersStoppedRequeue = 10 * time.Second
+
+	// reasonUnconfirmed is the reason for the UserControllersStopped condition when no replica reported
+	// the user controllers stopped in time.
+	reasonUnconfirmed = "Unconfirmed"
+
+	// userControllersStoppedTimeout is how long, from the agent uninstall being recorded, the replica that
+	// owns the cluster is given to report its user controllers stopped. Every replica stops them once the
+	// uninstall is recorded; the report only confirms it, and no replica can give it while none can tell
+	// that it owns the cluster, e.g. while the peers aren't ready. The removal then moves on.
+	userControllersStoppedTimeout = 2 * time.Minute
 )
 
 var (
@@ -105,9 +115,9 @@ func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error
 
 // Remove removes the cluster's role template bindings while the downstream cluster can be reached, then
 // uninstalls the Rancher agent from the downstream cluster where that is needed, then holds the cluster
-// until the replica that owns it reports its user controllers stopped. Every replica stops its
-// own controllers for the cluster once the agent uninstall has been recorded, see the
-// user-controllers-controller.
+// until the replica that owns it reports its user controllers stopped, or for at most
+// userControllersStoppedTimeout. Every replica stops its own controllers for the cluster once the agent
+// uninstall has been recorded, see the user-controllers-controller.
 func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	if obj == nil {
 		return obj, nil
@@ -155,13 +165,37 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 	// is recorded. Stopping here as well keeps this replica from waiting on its own informer.
 	c.Manager.Stop(obj)
 
-	if !v32.ClusterConditionUserControllersStopped.IsTrue(obj) {
-		// Reporting the controllers stopped updates the cluster, which brings it back here. The requeue
-		// only covers that update being missed.
-		c.clusters.Controller().EnqueueAfter("", obj.Name, userControllersStoppedRequeue)
-		return obj, generic.ErrSkip
+	if !util.ConditionConcluded(obj, v32.ClusterConditionUserControllersStopped) {
+		if !userControllersStoppedTimedOut(obj) {
+			// Reporting the controllers stopped updates the cluster, which brings it back here. The
+			// requeue covers that update being missed, and the timeout.
+			c.clusters.Controller().EnqueueAfter("", obj.Name, userControllersStoppedRequeue)
+			return obj, generic.ErrSkip
+		}
+		logrus.Warnf("[cluster-cleanup] no replica reported the user controllers of cluster [%s] stopped within %s, moving on with removing the cluster", obj.Name, userControllersStoppedTimeout)
+		message := fmt.Sprintf("no replica reported the user controllers stopped within %s; every replica stops them once the agent uninstall is recorded", userControllersStoppedTimeout)
+		if err := util.SetCondition(c.clusters, obj, v32.ClusterConditionUserControllersStopped, coreV1.ConditionFalse, reasonUnconfirmed, message); err != nil {
+			return obj, fmt.Errorf("[cluster-cleanup] recording unconfirmed user controllers stop for cluster [%s]: %w", obj.Name, err)
+		}
 	}
 	return nil, nil
+}
+
+// userControllersStoppedTimedOut reports whether the replica that owns cluster has had
+// userControllersStoppedTimeout to report its user controllers stopped, counted from the agent uninstall
+// being recorded. An uninstall that cluster doesn't show yet was only just recorded.
+func userControllersStoppedTimedOut(cluster *v3.Cluster) bool {
+	if !util.ConditionConcluded(cluster, v32.ClusterConditionAgentUninstallScheduled) {
+		return false
+	}
+	recorded, err := time.Parse(time.RFC3339, v32.ClusterConditionAgentUninstallScheduled.GetLastUpdated(cluster))
+	if err != nil {
+		if cluster.DeletionTimestamp == nil {
+			return false
+		}
+		recorded = cluster.DeletionTimestamp.Time
+	}
+	return time.Since(recorded) > userControllersStoppedTimeout
 }
 
 // scheduleAgentUninstall uninstalls the Rancher agent from the downstream cluster if it needs it, trying

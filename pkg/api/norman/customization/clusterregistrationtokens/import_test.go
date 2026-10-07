@@ -38,7 +38,11 @@ func TestIsValidTokenRejectsATokenFromAPreviousCluster(t *testing.T) {
 		NamespaceLister: newTestNamespaceLister(true),
 	}
 
-	assert.False(t, ch.isValidToken("cluster", "token"))
+	assert.False(t, ch.isValidToken(newTestCluster("cluster", metav1.Time{}), "token"))
+}
+
+func newTestCluster(name string, created metav1.Time) *apimgmtv3.Cluster {
+	return &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: name, CreationTimestamp: created}}
 }
 
 func TestIsValidTokenAcceptsATokenOfTheCurrentCluster(t *testing.T) {
@@ -47,8 +51,8 @@ func TestIsValidTokenAcceptsATokenOfTheCurrentCluster(t *testing.T) {
 		NamespaceLister: newTestNamespaceLister(false),
 	}
 
-	assert.True(t, ch.isValidToken("cluster", "token"))
-	assert.False(t, ch.isValidToken("other-cluster", "token"), "a token only belongs to the cluster named by its namespace")
+	assert.True(t, ch.isValidToken(newTestCluster("cluster", metav1.Time{}), "token"))
+	assert.False(t, ch.isValidToken(newTestCluster("other-cluster", metav1.Time{}), "token"), "a token only belongs to the cluster named by its namespace")
 }
 
 func newTestSecretIndexer(clusterID, token string) cache.Indexer {
@@ -67,7 +71,7 @@ func TestClusterImportHandler_ValidateAuthImage(t *testing.T) {
 	ch := &ClusterImport{
 		Clusters: &fakes.ClusterInterfaceMock{
 			GetFunc: func(name string, opts metav1.GetOptions) (*apimgmtv3.Cluster, error) {
-				return &apimgmtv3.Cluster{}, nil
+				return &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
 			},
 		},
 		SecretIndexer:   newTestSecretIndexer("cluster", "token"),

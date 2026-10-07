@@ -142,3 +142,52 @@ func TestRemoveKeepsTheTunnelWhileTheCreatingProvisioningClusterRemovesItsMachin
 	assert.ErrorIs(t, err, generic.ErrSkip, "it now waits for the user controllers to stop")
 	assert.True(t, v32.ClusterConditionAgentUninstallScheduled.IsTrue(env.stored))
 }
+
+// newUninstallRecordedCluster returns a cluster being removed whose agent uninstall was recorded ago.
+func newUninstallRecordedCluster(ago time.Duration) *v32.Cluster {
+	cluster := newRemoveTestCluster()
+	v32.ClusterConditionRoleTemplateBindingsRemoved.True(cluster)
+	v32.ClusterConditionAgentUninstallScheduled.True(cluster)
+	v32.ClusterConditionAgentUninstallScheduled.LastUpdated(cluster, time.Now().Add(-ago).Format(time.RFC3339))
+	return cluster
+}
+
+func TestRemoveWaitsForTheControllersToBeReportedStoppedForAWhile(t *testing.T) {
+	cluster := newUninstallRecordedCluster(userControllersStoppedTimeout - time.Minute)
+	lifecycle, env := newRemoveTestEnv(cluster.DeepCopy())
+
+	_, err := lifecycle.Remove(cluster)
+
+	assert.ErrorIs(t, err, generic.ErrSkip)
+	assert.Empty(t, env.clusters.UpdateStatusCalls())
+	assert.Len(t, env.controller.EnqueueAfterCalls(), 1)
+}
+
+func TestRemoveMovesOnWhenNoReplicaReportsTheControllersStopped(t *testing.T) {
+	// While no replica can tell it owns the cluster, e.g. while the peers aren't ready, none reports the
+	// controllers stopped. Every replica stops them once the uninstall is recorded, so the removal moves on.
+	cluster := newUninstallRecordedCluster(userControllersStoppedTimeout + time.Minute)
+	lifecycle, env := newRemoveTestEnv(cluster.DeepCopy())
+
+	obj, err := lifecycle.Remove(cluster)
+
+	require.NoError(t, err, "the finalizer should be removed")
+	assert.Nil(t, obj)
+	assert.True(t, v32.ClusterConditionUserControllersStopped.IsFalse(env.stored))
+	assert.Equal(t, reasonUnconfirmed, v32.ClusterConditionUserControllersStopped.GetReason(env.stored))
+	assert.Empty(t, env.controller.EnqueueAfterCalls())
+}
+
+func TestRemoveGivesTheControllersTheirTimeFromTheUninstallNotFromTheDeletion(t *testing.T) {
+	// A management cluster created by a provisioning cluster can wait long for its machines before the
+	// uninstall is recorded.
+	cluster := newRemoveTestCluster()
+	longAgo := metav1.NewTime(time.Now().Add(-time.Hour))
+	cluster.DeletionTimestamp = &longAgo
+	lifecycle, env := newRemoveTestEnv(cluster.DeepCopy())
+
+	_, err := lifecycle.Remove(cluster)
+
+	assert.ErrorIs(t, err, generic.ErrSkip, "the uninstall was only just recorded")
+	assert.Empty(t, v32.ClusterConditionUserControllersStopped.GetStatus(env.stored))
+}
