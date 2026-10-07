@@ -61,6 +61,9 @@ func fileSourceIndexKey(kind, namespace, name string) string {
 	return kind + "/" + namespace + "/" + name
 }
 
+// machineSelectorFileSourceIndexer indexes control planes by their referenced Secrets and
+// ConfigMaps so source changes can enqueue affected control planes without scanning them all,
+// even when authorization uses a label selector instead of explicit cluster names.
 func machineSelectorFileSourceIndexer(cp *rkev1.RKEControlPlane) ([]string, error) {
 	var keys []string
 	for _, msf := range cp.Spec.MachineSelectorFiles {

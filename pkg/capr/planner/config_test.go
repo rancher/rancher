@@ -24,35 +24,33 @@ import (
 )
 
 func TestClusterObjectNameAuthorized(t *testing.T) {
-	const annotation = "rke.cattle.io/object-authorized-for-clusters"
 	tests := []struct {
 		name        string
 		annotations map[string]string
 		clusterName string
 		want        bool
 	}{
-		{"listed cluster", map[string]string{annotation: "alpha,beta"}, "beta", true},
-		{"whitespace around names", map[string]string{annotation: "alpha, beta "}, "beta", true},
-		{"unlisted cluster", map[string]string{annotation: "alpha,beta"}, "gamma", false},
-		{"exact name only", map[string]string{annotation: "alpha,beta"}, "bet", false},
+		{"listed cluster", map[string]string{capr.AuthorizedObjectAnnotation: "alpha,beta"}, "beta", true},
+		{"whitespace around names", map[string]string{capr.AuthorizedObjectAnnotation: "alpha, beta "}, "beta", true},
+		{"unlisted cluster", map[string]string{capr.AuthorizedObjectAnnotation: "alpha,beta"}, "gamma", false},
+		{"exact name only", map[string]string{capr.AuthorizedObjectAnnotation: "alpha,beta"}, "bet", false},
 		{"missing annotation", nil, "alpha", false},
-		{"empty cluster name", map[string]string{annotation: "alpha"}, "", false},
+		{"empty cluster name", map[string]string{capr.AuthorizedObjectAnnotation: "alpha"}, "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: tt.annotations}}
-			assert.Equal(t, tt.want, clusterObjectNameAuthorized(secret, annotation, tt.clusterName))
+			assert.Equal(t, tt.want, clusterObjectNameAuthorized(secret, capr.AuthorizedObjectAnnotation, tt.clusterName))
 		})
 	}
 	t.Run("nil object", func(t *testing.T) {
 		var secret *corev1.Secret
-		assert.False(t, clusterObjectNameAuthorized(secret, annotation, "beta"))
+		assert.False(t, clusterObjectNameAuthorized(secret, capr.AuthorizedObjectAnnotation, "beta"))
 	})
 }
 
 func TestClusterObjectLabelSelectorAuthorized(t *testing.T) {
-	const annotation = capr.AuthorizedObjectSelectorAnnotation
 	tests := []struct {
 		name        string
 		annotations map[string]string
@@ -60,12 +58,12 @@ func TestClusterObjectLabelSelectorAuthorized(t *testing.T) {
 		want        bool
 	}{
 		{"missing annotation", nil, map[string]string{"env": "dev"}, false},
-		{"empty selector matches all", map[string]string{annotation: ""}, nil, true},
-		{"matching label", map[string]string{annotation: "env=dev"}, map[string]string{"env": "dev"}, true},
-		{"different label", map[string]string{annotation: "env=dev"}, map[string]string{"env": "prod"}, false},
-		{"set selector matches", map[string]string{annotation: "env in (dev,prod)"}, map[string]string{"env": "dev"}, true},
-		{"negative selector matches", map[string]string{annotation: "!restricted"}, nil, true},
-		{"invalid selector rejected", map[string]string{annotation: "env in ("}, map[string]string{"env": "dev"}, false},
+		{"empty selector matches all", map[string]string{capr.AuthorizedObjectSelectorAnnotation: ""}, nil, true},
+		{"matching label", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"}, map[string]string{"env": "dev"}, true},
+		{"different label", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"}, map[string]string{"env": "prod"}, false},
+		{"set selector matches", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env in (dev,prod)"}, map[string]string{"env": "dev"}, true},
+		{"negative selector matches", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "!restricted"}, nil, true},
+		{"invalid selector rejected", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env in ("}, map[string]string{"env": "dev"}, false},
 	}
 
 	for _, tt := range tests {

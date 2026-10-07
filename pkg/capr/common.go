@@ -78,7 +78,7 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
-	AuthorizedObjectSelectorAnnotation         = "rke.cattle.io/object-authorized-for-cluster-selector"
+	AuthorizedObjectSelectorAnnotation         = "rke.cattle.io/object-authorized-for-clusters-selector"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
 	SnapshotNameAnnotation      = "etcdsnapshot.rke.io/snapshot-name"
