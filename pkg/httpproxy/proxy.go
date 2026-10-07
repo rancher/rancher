@@ -61,16 +61,19 @@ var (
 	httpStart  = regexp.MustCompile("^http:/([^/])")
 	httpsStart = regexp.MustCompile("^https:/([^/])")
 	badHeaders = map[string]bool{
-		"host":                    true,
-		"transfer-encoding":       true,
-		"content-length":          true,
-		"x-api-auth-header":       true,
-		"x-api-cattleauth-header": true,
-		"cf-connecting-ip":        true,
-		"cf-ray":                  true,
+		"cf-connecting-ip":  true,
+		"cf-ray":            true,
+		"content-length":    true,
+		"host":              true,
+		"referer":           true,
+		"transfer-encoding": true,
 	}
 	badHeaderPrefixes = []string{
 		"impersonate-",
+		"sec-",
+		"x-api",
+		"x-forwarded",
+		"x-real",
 	}
 )
 
@@ -174,16 +177,18 @@ func (p *proxy) proxy(req *http.Request) error {
 			continue
 		}
 
-		copy := make([]string, len(value))
+		copiedValues := make([]string, len(value))
 		for i := range value {
-			copy[i] = strings.TrimPrefix(value[i], "rancher:")
+			copiedValues[i] = strings.TrimPrefix(value[i], "rancher:")
 		}
-		headerCopy[key] = copy
+		headerCopy[key] = copiedValues
 	}
 
 	req.Host = destURLHostname
 	req.URL = destURL
 	req.Header = headerCopy
+
+	replaceCookies(req)
 
 	if auth != "" { // non-empty AuthHeader is noop
 		req.Header.Set(AuthHeader, auth)
@@ -202,8 +207,6 @@ func (p *proxy) proxy(req *http.Request) error {
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
-
-	replaceCookies(req)
 
 	return nil
 }
@@ -499,17 +502,21 @@ func constructRegex(host string) *regexp.Regexp {
 	return regexp.MustCompile(str)
 }
 
-func isBadHeader(header string) bool {
-	header = strings.ToLower(header)
+func isBadHeader(headerKey string) bool {
+	headerKey = strings.ToLower(headerKey)
 
-	if badHeaders[header] {
+	if badHeaders[headerKey] {
 		return true
 	}
 
 	for _, prefix := range badHeaderPrefixes {
-		if strings.HasPrefix(header, prefix) {
+		if strings.HasPrefix(headerKey, prefix) {
 			return true
 		}
+	}
+
+	if strings.HasPrefix(headerKey, "x-") || strings.HasPrefix(headerKey, "sec-") {
+		return true
 	}
 
 	return false
