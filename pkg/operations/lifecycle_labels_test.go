@@ -8,36 +8,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func labeledPlanSecret(name string) corev1.Secret {
-	return corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "fleet-default", Labels: map[string]string{
+	return corev1.Secret{Name: name, Namespace: "fleet-default", Labels: map[string]string{
 		planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
 		planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
 		planv1alpha1.ClusterLifecycleNameLabel:  "c-abc",
 		planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
 		planv1alpha1.MachineLifecycleKindLabel:  "Node",
 		planv1alpha1.MachineLifecycleNameLabel:  "m-1",
-	}}}
+	}}
 }
 
 func TestLifecycleLabelsProblem(t *testing.T) {
-	clusterRef := &corev1.ObjectReference{APIVersion: "management.cattle.io/v3", Kind: "Cluster", Name: "c-abc"}
+	ustr := &unstructured.Unstructured{}
+	ustr.SetAPIVersion("management.cattle.io/v3")
+	ustr.SetKind("Cluster")
+	ustr.SetName("c-abc")
 
 	t.Run("labeled secrets pass", func(t *testing.T) {
 		a, b := labeledPlanSecret("a"), labeledPlanSecret("b")
-		assert.Empty(t, LifecycleLabelsProblem(clusterRef, []*corev1.Secret{&a, &b}))
+		assert.Empty(t, LifecycleLabelsProblem(ustr, []*corev1.Secret{&a, &b}))
 	})
 
 	t.Run("no secrets pass", func(t *testing.T) {
-		assert.Empty(t, LifecycleLabelsProblem(clusterRef, nil))
+		assert.Empty(t, LifecycleLabelsProblem(ustr, nil))
 	})
 
 	t.Run("only the group of the clusterRef's apiVersion is compared", func(t *testing.T) {
 		secret := labeledPlanSecret("a")
-		other := *clusterRef
-		other.APIVersion = "management.cattle.io/v4"
+		other := *ustr
+		other.SetAPIVersion("management.cattle.io/v4")
 		assert.Empty(t, LifecycleLabelsProblem(&other, []*corev1.Secret{&secret}))
 	})
 
@@ -58,7 +61,7 @@ func TestLifecycleLabelsProblem(t *testing.T) {
 			good, bad := labeledPlanSecret("good"), labeledPlanSecret("bad")
 			tc.mislabel(bad.Labels)
 
-			problem := LifecycleLabelsProblem(clusterRef, []*corev1.Secret{&good, &bad})
+			problem := LifecycleLabelsProblem(ustr, []*corev1.Secret{&good, &bad})
 			assert.Contains(t, problem, "machine-plan secret fleet-default/bad ")
 			assert.Contains(t, problem, tc.want)
 		})
@@ -67,24 +70,24 @@ func TestLifecycleLabelsProblem(t *testing.T) {
 	t.Run("the clusterRef must be usable", func(t *testing.T) {
 		secret := labeledPlanSecret("a")
 		assert.NotEmpty(t, LifecycleLabelsProblem(nil, []*corev1.Secret{&secret}))
-		assert.Contains(t, LifecycleLabelsProblem(&corev1.ObjectReference{APIVersion: "a/b/c"}, []*corev1.Secret{&secret}), "invalid apiVersion")
+		ustr := &unstructured.Unstructured{}
+		ustr.SetAPIVersion("a/b/c")
+		assert.Contains(t, LifecycleLabelsProblem(ustr, []*corev1.Secret{&secret}), "invalid apiVersion")
 	})
 }
 
 func TestCheckLifecycleLabels(t *testing.T) {
-	clusterRef := &corev1.ObjectReference{APIVersion: "management.cattle.io/v3", Kind: "Cluster", Name: "c-abc"}
-
 	t.Run("checks every secret of the cluster", func(t *testing.T) {
 		good, bad := labeledPlanSecret("good"), labeledPlanSecret("bad")
 		delete(bad.Labels, planv1alpha1.MachineLifecycleNameLabel)
 
-		problem, err := CheckLifecycleLabels(&fakeSecrets{items: []corev1.Secret{good, bad}}, testCluster(), "fleet-default", clusterRef)
+		problem, err := CheckLifecycleLabels(&fakeSecrets{items: []corev1.Secret{good, bad}}, testCluster(), "fleet-default")
 		require.NoError(t, err)
 		assert.Contains(t, problem, "fleet-default/bad")
 	})
 
 	t.Run("passes a labeled cluster", func(t *testing.T) {
-		problem, err := CheckLifecycleLabels(&fakeSecrets{items: []corev1.Secret{labeledPlanSecret("a")}}, testCluster(), "fleet-default", clusterRef)
+		problem, err := CheckLifecycleLabels(&fakeSecrets{items: []corev1.Secret{labeledPlanSecret("a")}}, testCluster(), "fleet-default")
 		require.NoError(t, err)
 		assert.Empty(t, problem)
 	})
@@ -92,7 +95,7 @@ func TestCheckLifecycleLabels(t *testing.T) {
 	// A failure to reach the secrets may pass on retry, so it is returned rather than rejecting the
 	// operation.
 	t.Run("returns a listing failure", func(t *testing.T) {
-		_, err := CheckLifecycleLabels(&fakeSecrets{listErr: errors.New("boom")}, testCluster(), "fleet-default", clusterRef)
+		_, err := CheckLifecycleLabels(&fakeSecrets{listErr: errors.New("boom")}, testCluster(), "fleet-default")
 		assert.Error(t, err)
 	})
 }

@@ -176,11 +176,9 @@ func (d *fakeDynamic) Enqueue(gvk schema.GroupVersionKind, namespace, name strin
 
 func newOp() *opv1alpha1.EncryptionKeyRotation {
 	return &opv1alpha1.EncryptionKeyRotation{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ekr-1",
-			Namespace: "fleet-default",
-			UID:       types.UID("ekr-uid"),
-		},
+		Name:      "ekr-1",
+		Namespace: "fleet-default",
+		UID:       types.UID("ekr-uid"),
 	}
 }
 
@@ -188,10 +186,8 @@ func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 	// Beacon ownership lives on Status.Owner; we keep the legacy BeaconOwnerLabel populated so
 	// reclaimStaleBeaconOwnerIfNeeded (which still reads the label) sees a consistent owner.
 	return &planv1alpha1.Beacon{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fleet-default",
-			Namespace: "fleet-default",
-		},
+		Name:      "fleet-default",
+		Namespace: "fleet-default",
 		Status: planv1alpha1.BeaconStatus{
 			Active: active,
 			Owner:  owner,
@@ -201,8 +197,7 @@ func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 
 func newScope(op *opv1alpha1.EncryptionKeyRotation, beacon *planv1alpha1.Beacon, adapter ops.Adapter) *scope {
 	cluster := &unstructured.Unstructured{}
-	cluster.SetAPIVersion("provisioning.cattle.io/v1")
-	cluster.SetKind("Cluster")
+	cluster.SetGroupVersionKind(ekrClusterGVK)
 	cluster.SetNamespace("fleet-default")
 	cluster.SetName("test")
 	return &scope{
@@ -728,8 +723,7 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 	if len(dynamic.enqueueCalls) != 1 {
 		t.Fatalf("expected one cluster enqueue, got %d", len(dynamic.enqueueCalls))
 	}
-	expectedGVK := schema.FromAPIVersionAndKind("provisioning.cattle.io/v1", "Cluster")
-	if dynamic.enqueueCalls[0].gvk != expectedGVK || dynamic.enqueueCalls[0].namespace != "fleet-default" || dynamic.enqueueCalls[0].name != "test" {
+	if dynamic.enqueueCalls[0].gvk != ekrClusterGVK || dynamic.enqueueCalls[0].namespace != "fleet-default" || dynamic.enqueueCalls[0].name != "test" {
 		t.Fatalf("unexpected enqueue call: %#v", dynamic.enqueueCalls[0])
 	}
 }

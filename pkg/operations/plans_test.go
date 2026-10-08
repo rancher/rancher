@@ -55,7 +55,9 @@ func testOwnerKey(uid string) string {
 
 func testCluster() *unstructured.Unstructured {
 	cluster := &unstructured.Unstructured{}
-	cluster.SetName("test-cluster")
+	cluster.SetAPIVersion("management.cattle.io/v3")
+	cluster.SetKind("Cluster")
+	cluster.SetName("c-abc")
 	cluster.SetNamespace("fleet-default")
 	return cluster
 }

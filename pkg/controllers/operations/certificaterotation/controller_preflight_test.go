@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -20,14 +19,13 @@ import (
 func preflightScope(adapter *stubAdapter) (*scope, *fakePlanSecrets) {
 	cluster := &unstructured.Unstructured{}
 	cluster.SetName("test")
+	cluster.SetGroupVersionKind(testClusterGVK)
 
 	op := newOp()
 	secrets := &fakePlanSecrets{items: []corev1.Secret{{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "cp-1", Namespace: "fleet-default", UID: "cp-1-uid",
-			Labels: lifecycleLabels(op, map[string]string{capr.ClusterNameLabel: "test", capr.ControlPlaneRoleLabel: "true"}),
-		},
-		Type: plan.SecretTypeMachinePlan,
+		Name: "cp-1", Namespace: "fleet-default", UID: "cp-1-uid",
+		Labels: lifecycleLabels(op, map[string]string{capr.ClusterNameLabel: "test", capr.ControlPlaneRoleLabel: "true"}),
+		Type:   plan.SecretTypeMachinePlan,
 	}}}
 	return &scope{
 		ownerKey:   testOwnerKey,
@@ -144,9 +142,9 @@ func TestStepHookPrefixFor(t *testing.T) {
 	assert.Equal(t, PreflightStepHookLabelPrefix, stepHookPrefixFor(opv1alpha1.CertificateRotationStepPreflight))
 	assert.Equal(t, RotateStepHookLabelPrefix, stepHookPrefixFor(opv1alpha1.CertificateRotationStepRotate))
 	assert.Empty(t, stepHookPrefixFor(""))
-	assert.True(t, ops.HasStepHookLabel(&opv1alpha1.CertificateRotation{ObjectMeta: metav1.ObjectMeta{
+	assert.True(t, ops.HasStepHookLabel(&opv1alpha1.CertificateRotation{
 		Labels: map[string]string{PreflightStepHookLabelPrefix + "x": "delegate"},
-	}}, stepHookPrefixFor(opv1alpha1.CertificateRotationStepPreflight)))
+	}, stepHookPrefixFor(opv1alpha1.CertificateRotationStepPreflight)))
 }
 
 // The operation webhook reads a cache, so a rotation can be admitted on a cluster an earlier

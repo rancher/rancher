@@ -225,12 +225,10 @@ func init() {
 
 func newOp() *opv1alpha1.CertificateRotation {
 	return &opv1alpha1.CertificateRotation{
-		ObjectMeta: metav1.ObjectMeta{
 			Name:       "rotation-1",
 			Namespace:  "fleet-default",
 			UID:        "rotation-1-uid",
 			Generation: 1,
-		},
 		Spec: opv1alpha1.CertificateRotationSpec{
 			OperationSpec: opv1alpha1.OperationSpec{
 				ClusterRef: &corev1.ObjectReference{

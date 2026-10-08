@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func preflightStatus() opv1alpha1.EncryptionKeyRotationStatus {
@@ -23,10 +22,8 @@ func preflightStatus() opv1alpha1.EncryptionKeyRotationStatus {
 
 func controlPlaneLeader() *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
 			Name: "cp-1", Namespace: "fleet-default",
 			Labels: map[string]string{capr.ClusterNameLabel: "test", capr.ControlPlaneRoleLabel: "true"},
-		},
 		Type: plan.SecretTypeMachinePlan,
 	}
 }
