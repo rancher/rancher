@@ -99,9 +99,6 @@ func (m *Manager) stopRecord(r *record) {
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
-	if cluster.DeletionTimestamp != nil {
-		return nil
-	}
 	// reload cluster, always use the cached one
 	cluster, err := m.clusterLister.Get("", cluster.Name)
 	if err != nil {

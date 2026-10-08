@@ -26,20 +26,23 @@ func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluste
 	if !ok {
 		return cluster, nil
 	}
+
 	provCluster, err := h.clusterCache.Get(namespace, name)
 	if apierrors.IsNotFound(err) {
 		return cluster, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
-	if provCluster.DeletionTimestamp != nil || provCluster.Status.ClusterName != cluster.Name {
+
+	if provCluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
+
 	uid := provCluster.UID
 	if err := h.clusters.Delete(provCluster.Namespace, provCluster.Name, &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsConflict(err) {
 		return nil, err
 	}
+
 	return cluster, nil
 }
 
