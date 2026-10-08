@@ -58,7 +58,7 @@ func IsExpired(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatu
 		return false
 	}
 
-	start := status.LastUpdated.Time
+	start := status.TerminatedAt.Time
 	elapsed := time.Since(start)
 
 	duration := time.Duration(spec.TTL) * time.Second

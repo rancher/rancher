@@ -280,7 +280,13 @@ func Status(secret *corev1.Secret) (*PlanStatus, error) {
 // again, once failedPlanRetryCooldown has passed since the last attempt.
 func (s *Store) retryFailedPlan(status *PlanStatus, writer string) (*PlanStatus, error) {
 	secret := status.Secret
-	if lastApply, err := time.Parse(time.UnixDate, string(secret.Data[lastApplyTimeKey])); err == nil && now().Before(lastApply.Add(failedPlanRetryCooldown)) {
+
+	now := now()
+
+	lastApply, err := time.Parse(time.UnixDate, string(secret.Data[lastApplyTimeKey]))
+
+	// if now is before last apply there is clearly an issue with timezones so attempt the retry immediately.
+	if err == nil && !now.Before(lastApply) && now.Before(lastApply.Add(failedPlanRetryCooldown)) {
 		return status, nil
 	}
 

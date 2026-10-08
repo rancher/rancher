@@ -68,7 +68,7 @@ func heldBeacon(owner string, delegates ...string) *planv1alpha1.Beacon {
 // plan-state. An empty writer leaves the plan unclaimed, standing in for one CAPR assigned.
 func planSecret(name, writer string, state planapi.PlanState) corev1.Secret {
 	secret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "fleet-default", UID: types.UID(name), Annotations: map[string]string{}},
+		Name: name, Namespace: "fleet-default", UID: types.UID(name), Annotations: map[string]string{},
 		Data: map[string][]byte{
 			planapi.PlanDataKey:  []byte(`{"instructions":[{"name":"rotate","command":"rke2"}]}`),
 			planapi.PlanStateKey: []byte(state),
@@ -109,7 +109,7 @@ func TestPlanDispatchedBy(t *testing.T) {
 	t.Run("claims nothing when there is nothing to read", func(t *testing.T) {
 		assert.False(t, PlanDispatchedBy(nil, ownerKey))
 		assert.False(t, PlanDispatchedBy(&corev1.Secret{}, ownerKey))
-		noPlan := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{planapi.PlanWriterAnnotation: ownerKey}}}
+		noPlan := &corev1.Secret{Annotations: map[string]string{planapi.PlanWriterAnnotation: ownerKey}}
 		assert.False(t, PlanDispatchedBy(noPlan, ownerKey), "a writer with no plan has nothing to claim")
 		owned := planSecret("node-a", ownerKey, planapi.PlanStatePending)
 		assert.False(t, PlanDispatchedBy(&owned, ""), "no operation, nothing to claim it")
@@ -411,9 +411,7 @@ func TestPlanFailureMessage(t *testing.T) {
 // Helper function to build a mock secret pointer
 func mockSecret(name string) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	}
 }
 

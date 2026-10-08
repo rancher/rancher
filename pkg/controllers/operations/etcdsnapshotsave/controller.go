@@ -176,7 +176,10 @@ func (h *handler) reconcileActive(op *opv1alpha1.ETCDSnapshotSave, status opv1al
 	}
 
 	if ops.Collectable(&op.Spec.OperationSpec, &status.OperationStatus) {
-		if err := h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{}); err != nil {
+		err := h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			return status, generic.ErrSkip
+		} else if err != nil {
 			return status, err
 		}
 
@@ -411,7 +414,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha
 
 			// The cluster is still settled as the phase requires: it is the cluster object that is
 			// written, not anything the beacon guards.
-			if err := ops.SettleCluster(a, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+			if err := ops.SettleCluster(a, &status.OperationStatus, requiresRestore(status)); err != nil {
 				return nil, status, err
 			}
 
@@ -457,7 +460,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
 			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("Beacon %s/%s not found", namespace, beaconName))
-			if err := ops.SettleCluster(a, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+			if err := ops.SettleCluster(a, &status.OperationStatus, requiresRestore(status)); err != nil {
 				return nil, status, err
 			}
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
@@ -553,7 +556,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 
 			opv1alpha1.PendingCondition.True(&status)
 			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+			opv1alpha1.PendingCondition.Message(&status, "waiting to acquire beacon")
 			return status, nil
 		}
 		s.beacon = acquired
@@ -911,9 +914,9 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
-// pastPointOfNoReturn reports whether the operation got past the step that pauses the cluster. A
+// requiresRestore reports whether the operation got past the step that pauses the cluster. A
 // save never pauses the cluster, so it never does. See ops.SettleCluster.
-func pastPointOfNoReturn(opv1alpha1.ETCDSnapshotSaveStatus) bool {
+func requiresRestore(opv1alpha1.ETCDSnapshotSaveStatus) bool {
 	return false
 }
 
@@ -982,7 +985,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 
 	// Leave the cluster as the phase requires before the beacon passes on, so the next operation finds
 	// it paused and whitelisted if this one stopped part-way through.
-	if err = ops.SettleCluster(s.adapter, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+	if err = ops.SettleCluster(s.adapter, &status.OperationStatus, requiresRestore(status)); err != nil {
 		return status, err
 	}
 

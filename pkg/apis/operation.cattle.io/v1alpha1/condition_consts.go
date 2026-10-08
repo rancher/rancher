@@ -112,11 +112,12 @@ const (
 	// that they have, so that the next operation does not start while they are still executing.
 	WaitingForPlansToStopReason = "WaitingForPlansToStop"
 
-	// HookAbandonedReason surfaces when an operation finished with a lifecycle hook label still on
-	// it, because there was never going to be a beacon to hand that hook's delegate: the cluster or
-	// the beacon went away first. The hook is not waited on, since nothing would ever satisfy it,
-	// and the label is reported here instead so the abandonment is visible rather than looking like
-	// a hook that simply never fired.
+	// HookAbandonedReason surfaces when an operation finished with the hook label for the terminal
+	// phase it ended in still on it, because it had no claim on a beacon left to hand that hook's
+	// delegate: the cluster or the beacon went away first, or the beacon was taken. The hook is not
+	// waited on, since nothing would ever satisfy it, and the label is reported here instead so the
+	// abandonment is visible rather than looking like a hook that simply never fired. Labels for
+	// steps, or for other phases, don't count.
 	HookAbandonedReason = "HookAbandoned"
 
 	// NotFailedReason surfaces when an operation has not failed.

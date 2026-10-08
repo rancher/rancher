@@ -40,3 +40,53 @@ func TestUpdateStatusKeepsTheWaitForPlansToStop(t *testing.T) {
 	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(status))
 	assert.Equal(t, opv1alpha1.FinishedReason, opv1alpha1.FinalizedCondition.GetReason(status))
 }
+
+// Once an operation has terminated, Finalized reports a hook as abandoned only when the label for
+// the terminal phase it ended in is still there: that is the hook terminal handling gives up on when
+// no claim on a beacon remains to delegate it on. A step hook's label, or another phase's, is left
+// behind by design once its moment has passed, and doesn't make a clean finish look abandoned.
+func TestUpdateStatus_ReportsOnlyTheTerminalPhasesHookAsAbandoned(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		labels      map[string]string
+		wantReason  string
+		wantMessage string
+	}{
+		"no hook labels": {
+			wantReason:  opv1alpha1.FinishedReason,
+			wantMessage: "Operation completed successfully",
+		},
+		"another phase's hook and a step hook": {
+			labels: map[string]string{
+				opv1alpha1.FailedPhaseHookLabelPrefix + "inspect": "failure-inspector",
+				"rotate.step.hook.operation.cattle.io/verify":     "step-delegate",
+			},
+			wantReason:  opv1alpha1.FinishedReason,
+			wantMessage: "Operation completed successfully",
+		},
+		"the terminal phase's own hook": {
+			labels: map[string]string{
+				opv1alpha1.SucceededPhaseHookLabelPrefix + "chain": "follow-up",
+				"rotate.step.hook.operation.cattle.io/verify":      "step-delegate",
+			},
+			wantReason:  opv1alpha1.HookAbandonedReason,
+			wantMessage: `Operation completed successfully; the Succeeded phase hook owed to "follow-up" was abandoned, no claim on the beacon remained to delegate it on`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			op := &metav1.ObjectMeta{Name: "op", Labels: tc.labels}
+			status := &opv1alpha1.OperationStatus{}
+			status.MarkSucceeded()
+			status.SetTerminated()
+
+			UpdateStatus(op, &opv1alpha1.OperationSpec{}, status)
+
+			assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(status))
+			assert.Equal(t, tc.wantReason, opv1alpha1.FinalizedCondition.GetReason(status))
+			assert.Equal(t, tc.wantMessage, opv1alpha1.FinalizedCondition.GetMessage(status))
+		})
+	}
+}

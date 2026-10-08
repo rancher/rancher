@@ -303,7 +303,10 @@ func (h *handler) reconcileActive(op *opv1alpha1.ETCDSnapshotRestore, status opv
 	}
 
 	if ops.Collectable(&op.Spec.OperationSpec, &status.OperationStatus) {
-		if err := h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{}); err != nil {
+		err := h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			return status, generic.ErrSkip
+		} else if err != nil {
 			return status, err
 		}
 
@@ -522,7 +525,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 
 			// The cluster is still settled as the phase requires: it is the cluster object that is
 			// written, not anything the beacon guards.
-			if err := ops.SettleCluster(a, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+			if err := ops.SettleCluster(a, &status.OperationStatus, requiresRestore(status)); err != nil {
 				return nil, status, err
 			}
 
@@ -568,7 +571,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
 			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("Beacon %s/%s not found", namespace, beaconName))
-			if err := ops.SettleCluster(a, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+			if err := ops.SettleCluster(a, &status.OperationStatus, requiresRestore(status)); err != nil {
 				return nil, status, err
 			}
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
@@ -737,7 +740,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 
 			opv1alpha1.PendingCondition.True(&status)
 			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+			opv1alpha1.PendingCondition.Message(&status, "waiting to acquire beacon")
 			return status, nil
 		}
 		s.beacon = acquired
@@ -769,7 +772,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 		return status, nil
 	}
 
-	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to shutdown", s.op.Namespace, s.op.Name)
+	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to preflight", s.op.Namespace, s.op.Name)
 
 	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
 	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepPreflight)
@@ -1000,11 +1003,11 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 	if reason, ok := validateRestoreMode(s.op.Spec.Args.RestoreMode, snapshotName, snapshot); !ok {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
 
-		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+		status.SetPhase(opv1alpha1.OperationPhaseRejected)
 
-		opv1alpha1.CanceledCondition.True(&status)
-		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-		opv1alpha1.CanceledCondition.Message(&status, reason)
+		opv1alpha1.RejectedCondition.True(&status)
+		opv1alpha1.RejectedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+		opv1alpha1.RejectedCondition.Message(&status, reason)
 
 		return status, nil
 	}
@@ -1097,7 +1100,7 @@ func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCD
 		return status, err
 	}
 	if reason != "" {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, reason)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
@@ -1463,7 +1466,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		} else if len(secrets) == 0 {
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, "no eligible controlplane leader for restore")
 
 			return status, nil
 		}
@@ -2094,11 +2097,11 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 	return status, nil
 }
 
-// pastPointOfNoReturn reports whether the operation got past the step that pauses the cluster,
+// requiresRestore reports whether the operation got past the step that pauses the cluster,
 // judged by its phase and step, which a terminal phase leaves in place: an operation that never left
 // Pending has no step, and one stopped in Preflight had not yet paused the cluster. See
 // ops.SettleCluster.
-func pastPointOfNoReturn(status opv1alpha1.ETCDSnapshotRestoreStatus) bool {
+func requiresRestore(status opv1alpha1.ETCDSnapshotRestoreStatus) bool {
 	return status.Step != "" && status.Step != opv1alpha1.ETCDSnapshotRestoreStepPreflight
 }
 
@@ -2167,7 +2170,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 
 	// Leave the cluster as the phase requires before the beacon passes on, so the next operation finds
 	// it paused and whitelisted if this one stopped part-way through.
-	if err = ops.SettleCluster(s.adapter, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+	if err = ops.SettleCluster(s.adapter, &status.OperationStatus, requiresRestore(status)); err != nil {
 		return status, err
 	}
 

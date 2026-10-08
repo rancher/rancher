@@ -75,5 +75,5 @@ const (
 // LifecycleHookLabelMarker is the substring shared by every phase-hook and step-hook label key.
 // Detecting it is enough to know "some delegate has posted a hook here" without enumerating every
 // registered prefix (an operation-type-specific step prefix declared in a controller package still
-// matches). See ops.HasActiveLifecycleHook.
+// matches).
 const LifecycleHookLabelMarker = ".hook.operation.cattle.io/"

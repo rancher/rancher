@@ -31,7 +31,7 @@ type ETCDSnapshotRestoreSpec struct {
 
 	// Args contains parameters for restoring an ETCD snapshot.
 	// Mutually exclusive with SnapshotRef.
-	// +optional
+	// +required
 	Args ETCDSnapshotRestoreArgs `json:"args,omitempty"`
 }
 

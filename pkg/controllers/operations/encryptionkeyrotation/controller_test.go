@@ -1079,7 +1079,7 @@ var terminalHandlers = map[string]struct {
 	cond   condition.Cond
 	hook   string
 }{
-	"aborted": {
+	"rejected": {
 		handle: (*handler).handleRejected,
 		cond:   opv1alpha1.RejectedCondition,
 		hook:   opv1alpha1.RejectedPhaseHookLabelPrefix,
@@ -1615,7 +1615,7 @@ func TestUpdateStatusTerminatedOutcome(t *testing.T) {
 			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.FailedCondition, opv1alpha1.RejectedCondition},
 		},
 		{
-			name:    "aborted",
+			name:    "rejected",
 			phase:   opv1alpha1.OperationPhaseRejected,
 			reason:  opv1alpha1.PreflightCheckFailedReason,
 			outcome: opv1alpha1.RejectedCondition,
@@ -2197,8 +2197,8 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 		wantFinalizedMessage string
 	}{
 		{
-			// Aborted called its own work off, so there is nothing a beacon would have wound down.
-			name:           "aborted finishes",
+			// Rejected called its own work off, so there is nothing a beacon would have wound down.
+			name:           "rejected finishes",
 			phase:          opv1alpha1.OperationPhaseRejected,
 			wantPhase:      opv1alpha1.OperationPhaseRejected,
 			wantTerminated: true,
@@ -2265,7 +2265,7 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantPhase:            opv1alpha1.OperationPhaseCanceled,
 			wantTerminated:       true,
 			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
-			wantFinalizedMessage: "lifecycle hooks were abandoned",
+			wantFinalizedMessage: `phase hook owed to "delegate-a" was abandoned`,
 		},
 		{
 			// Same for the Failed-phase hook of an operation the missing beacon has just failed.
@@ -2286,7 +2286,7 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantReason:           opv1alpha1.BeaconLostReason,
 			wantTerminated:       true,
 			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
-			wantFinalizedMessage: "lifecycle hooks were abandoned",
+			wantFinalizedMessage: `phase hook owed to "delegate-a" was abandoned`,
 		},
 	}
 

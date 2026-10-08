@@ -12,31 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// HasActiveLifecycleHook reports whether obj still carries at least one lifecycle-hook label
-// (phase or step), which is how a delegate says it has not finished: it signals completion by
-// removing the label.
-//
-// A terminated operation carrying one is an operation whose hook was abandoned — it was never going
-// to be handed the beacon, so the controller stopped waiting on it — and UpdateStatus reports that
-// on Finalized. Termination itself is what gates garbage collection, not this: see Collectable.
-//
-// Recognizes any label key containing opv1alpha1.LifecycleHookLabelMarker. That catches every phase
-// prefix and every step-level prefix declared by an operation controller package, so callers do not
-// have to enumerate them.
-func HasActiveLifecycleHook(obj metav1.Object) bool {
-	if obj == nil {
-		return false
-	}
-	for k := range obj.GetLabels() {
-		if strings.Contains(k, opv1alpha1.LifecycleHookLabelMarker) {
-			return true
-		}
-	}
-	return false
-}
-
 // LifecycleHookDelegate returns the hook identifier and the delegate named by the first label on obj
-// whose key begins with prefix, or "", "" when there is none.
+// whose key begins with prefix and whose value names a delegate, or "", "" when there is none.
 //
 // An empty prefix returns nothing rather than matching every label: a phase with no hook at all must
 // not be reported as having a delegate.
@@ -54,6 +31,10 @@ type Hook struct {
 }
 
 // hooksForPrefix returns all hooks for an operation, sorted lexicographically by the ID, and then the delegate.
+//
+// A label whose value is empty is not a hook: it names no delegate, so there is nothing to push onto
+// the beacon or to wait on. It is skipped rather than returned, so it can't stand in front of the hooks
+// after it, since the first hook is the one taken (see LifecycleHookDelegate).
 func hooksForPrefix(obj metav1.Object, prefix string) []Hook {
 	if obj == nil || prefix == "" {
 		return nil
@@ -62,7 +43,7 @@ func hooksForPrefix(obj metav1.Object, prefix string) []Hook {
 	hooks := []Hook{}
 	for k, v := range obj.GetLabels() {
 		if after, ok := strings.CutPrefix(k, prefix); ok {
-			if after == "" {
+			if after == "" || v == "" {
 				continue
 			}
 			hooks = append(hooks, Hook{

@@ -24,7 +24,7 @@ import (
 func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.OperationPhase, bool) {
 	previous := status.Phase
 
-	if IsTerminated(status) || status.Phase == opv1alpha1.OperationPhaseCanceled {
+	if IsTerminated(status) || IsTerminal(status.Phase) || status.Phase == opv1alpha1.OperationPhaseCanceled {
 		return previous, false
 	}
 
@@ -73,7 +73,7 @@ func CancelForRequest(spec *opv1alpha1.OperationSpec, status *opv1alpha1.Operati
 //
 // Termination is the condition that carries the weight. It is recorded only once nothing is owed —
 // the terminal phase hook was satisfied, or there was never anything to hand it, or it was
-// abandoned because no beacon remained to delegate it on — so an operation still waiting on a hook
+// abandoned because no claim on the beacon remained to delegate it on — so an operation still waiting on a hook
 // is not collectable, and one whose hook can never be answered does not sit around forever. Testing
 // the hook labels as well would reintroduce exactly that second case: a label nobody is coming back
 // to clear would pin the operation for good.
@@ -204,27 +204,36 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 
 	opv1alpha1.FinalizedCondition.True(status)
 
+	// The terminal phase's own hook label outliving termination is a hook that was abandoned rather
+	// than satisfied: terminal handling waits for that label to clear, and only gives up on it when the
+	// operation has no claim on a beacon left to delegate it on (the cluster or the beacon went away,
+	// or the beacon was taken). Only that phase's label counts. A step hook's label, or another
+	// phase's, is left behind by design once its moment has passed, and says nothing about how the
+	// operation finished.
+	abandoned := ""
+	if delegate := TerminalHookDelegate(op, status.Phase); delegate != "" {
+		abandoned = fmt.Sprintf("the %s phase hook owed to %q was abandoned, no claim on the beacon remained to delegate it on", status.Phase, delegate)
+	}
+
 	// An operation that left its cluster requiring a restore said so as it terminated (see
 	// MarkRestoreRequired), and nothing later would know to say it again, so the note is kept. It is
 	// what an observer most needs to know about the cluster, so an abandoned hook is added to it rather
 	// than taking its place.
 	if opv1alpha1.FinalizedCondition.GetReason(status) == opv1alpha1.RestoreRequiredReason {
 		message := fmt.Sprintf("%s; %s", summary, restoreRequiredNote)
-		if HasActiveLifecycleHook(op) {
-			message += "; lifecycle hooks were abandoned, no beacon remained to delegate them on"
+		if abandoned != "" {
+			message += "; " + abandoned
 		}
 		opv1alpha1.FinalizedCondition.Message(status, message)
 
 		return
 	}
 
-	// A hook label outliving termination is a hook that was abandoned rather than one that was
-	// satisfied: the only way to get here with one still set is for the beacon it would have been
-	// delegated on to have gone away first. Say so, rather than reporting the operation as having
-	// finished cleanly and leaving the label looking like a hook that never fired.
-	if HasActiveLifecycleHook(op) {
+	// Say so, rather than reporting the operation as having finished cleanly and leaving the label
+	// looking like a hook that never fired.
+	if abandoned != "" {
 		opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.HookAbandonedReason)
-		opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("%s; lifecycle hooks were abandoned, no beacon remained to delegate them on", summary))
+		opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("%s; %s", summary, abandoned))
 
 		return
 	}

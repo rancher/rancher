@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -732,24 +733,82 @@ func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/rke2.yaml"
 }
 
+// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKEControlPlane. CAPI's
+// Cluster name matches the RKE2ControlPlane name by convention.
 func (a *CAPRAdapter) PauseCluster(pause bool, whitelist WhitelistChange) error {
+	err := a.pauseCAPICluster(pause)
+	if err != nil {
+		return err
+	}
+
+	// Both the mgmt cluster and the provisioning cluster are whitelisted in order to allow the UI to key off either
+	// object
+	mgmtClusterName, err := a.whitelistProvisioningCluster(whitelist)
+	if err != nil {
+		return err
+	} else if mgmtClusterName == "" {
+		return errors.New("could not derive management cluster name")
+	}
+
+	err = a.whitelistManagementCluster(mgmtClusterName, whitelist)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// pauseCAPICluster updates the CAPI cluster's paused field to pause if not already set.
+func (a *CAPRAdapter) pauseCAPICluster(pause bool) error {
 	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
 	if err != nil {
 		return err
 	}
-	if heldByWhitelist(cluster.Annotations, pause, whitelist) {
-		return nil
-	}
 	cluster = cluster.DeepCopy()
 
 	pauseChanged := !ptr.Equal(cluster.Spec.Paused, &pause)
-	var whitelistChanged bool
-	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
-	if !pauseChanged && !whitelistChanged {
+	if !pauseChanged {
 		return nil
 	}
 
 	cluster.Spec.Paused = &pause
 	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
+}
+
+// whitelistProvisioningCluster whitelists the provisioning cluster object according to the desired WhitelistChange
+// strategy and returns the management cluster name for the cluster.
+func (a *CAPRAdapter) whitelistProvisioningCluster(whitelist WhitelistChange) (string, error) {
+	cluster, err := a.clients.Provisioning.Cluster().Get(a.controlPlane.Namespace, a.controlPlane.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	cluster = cluster.DeepCopy()
+
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !whitelistChanged {
+		return "", nil
+	}
+
+	_, err = a.clients.Provisioning.Cluster().Update(cluster)
+	return cluster.Status.ClusterName, err
+}
+
+// whitelistManagementCluster whitelists the management cluster object according to the desired WhitelistChange strategy.
+func (a *CAPRAdapter) whitelistManagementCluster(name string, whitelist WhitelistChange) error {
+	cluster, err := a.clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cluster = cluster.DeepCopy()
+
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !whitelistChanged {
+		return nil
+	}
+
+	_, err = a.clients.Mgmt.Cluster().Update(cluster)
 	return err
 }

@@ -103,37 +103,37 @@ func TestIsExpired(t *testing.T) {
 		{
 			name:    "negative TTL never expires",
 			spec:    &opv1alpha1.OperationSpec{TTL: -1},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: wayPast},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: wayPast},
 			expired: false,
 		},
 		{
 			name:    "TTL=0 expires immediately",
 			spec:    &opv1alpha1.OperationSpec{TTL: 0},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: now},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: now},
 			expired: true, // Any elapsed time > 0 exceeds TTL=0
 		},
 		{
 			name:    "elapsed < TTL not expired",
 			spec:    &opv1alpha1.OperationSpec{TTL: 60},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: past},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: past},
 			expired: false, // 10s < 60s
 		},
 		{
 			name:    "elapsed > TTL expired",
 			spec:    &opv1alpha1.OperationSpec{TTL: 5},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: past},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: past},
 			expired: true, // 10s > 5s
 		},
 		{
 			name:    "elapsed exactly at TTL edge (time.Since variability)",
 			spec:    &opv1alpha1.OperationSpec{TTL: 10},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: past},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: past},
 			expired: false, // ~10s elapsed, TTL=10s → not *strictly* greater
 		},
 		{
 			name:    "just started not expired",
 			spec:    &opv1alpha1.OperationSpec{TTL: 10},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: now},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: now},
 			expired: false,
 		},
 	}

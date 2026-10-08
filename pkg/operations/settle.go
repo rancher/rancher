@@ -8,7 +8,7 @@ import (
 )
 
 // SettleCluster leaves the cluster of an operation in a terminal phase paused and whitelisted, or
-// not, as that phase requires. pastPointOfNoReturn reports whether the operation got past the step
+// not, as that phase requires. requiresRestore reports whether the operation got past the step
 // that pauses the cluster, judged by the operation from its phase and step: a terminal phase leaves
 // both in place.
 //
@@ -17,9 +17,10 @@ import (
 //     restore unpauses the cluster for its restart, so one stopped from then on pauses it again. The
 //     operation reports this on Finalized with RestoreRequiredReason (see MarkRestoreRequired).
 //     Before the point of no return there is nothing to undo, so they leave the cluster as it is.
-//   - Rejected unpauses the cluster unless it carries a whitelist, whoever added it. Rejected is
-//     reached before the operation pauses, so normally there is nothing to undo; a whitelisted
-//     cluster was paused by an earlier operation and stays paused until a restore repairs it.
+//   - Rejected does nothing: an operation is only rejected before its point of no return, in its
+//     preflight or for a conflicting operation while Pending, so it never paused the cluster. Whatever
+//     pause the cluster has belongs to someone else (an earlier operation that left it requiring a
+//     restore, the operation it conflicted with, or a user) and is theirs to lift.
 //   - Succeeded does nothing here: an operation that paused the cluster unpaused it, and removed the
 //     whitelist, in the reconcile that marked it succeeded.
 //
@@ -30,27 +31,28 @@ import (
 // It is done once, before the operation terminates. Terminal handling runs again on every reconcile
 // until the operation is collected, and by then the cluster is no longer this operation's to change:
 // an admin may have removed the whitelist by hand, or a later operation paused the cluster.
-func SettleCluster(adapter Adapter, status *opv1alpha1.OperationStatus, pastPointOfNoReturn bool) error {
+func SettleCluster(adapter Adapter, status *opv1alpha1.OperationStatus, requiresRestore bool) error {
 	if status.IsTerminated() {
 		return nil
 	}
 
-	var err error
 	switch status.Phase {
 	case opv1alpha1.OperationPhaseFailed, opv1alpha1.OperationPhaseCanceled:
-		if !pastPointOfNoReturn {
-			return nil
-		}
-		if err = adapter.PauseCluster(true, WhitelistRestores); err == nil {
-			MarkRestoreRequired(status)
-		}
-	case opv1alpha1.OperationPhaseRejected:
-		err = adapter.PauseCluster(false, WhitelistKeepsPause)
-	}
-	if apierrors.IsNotFound(err) {
+	default:
 		return nil
 	}
-	return err
+	if !requiresRestore {
+		return nil
+	}
+
+	err := adapter.PauseCluster(true, WhitelistRestores)
+	if apierrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	MarkRestoreRequired(status)
+	return nil
 }
 
 // MarkRestoreRequired records on Finalized that the operation left its cluster paused and

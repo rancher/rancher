@@ -1217,7 +1217,7 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 		wantFinalizedMessage string
 	}{
 		{
-			name:           "aborted finishes",
+			name:           "rejected finishes",
 			phase:          opv1alpha1.OperationPhaseRejected,
 			wantPhase:      opv1alpha1.OperationPhaseRejected,
 			wantTerminated: true,
@@ -1275,7 +1275,7 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantPhase:            opv1alpha1.OperationPhaseCanceled,
 			wantTerminated:       true,
 			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
-			wantFinalizedMessage: "lifecycle hooks were abandoned",
+			wantFinalizedMessage: `phase hook owed to "delegate-a" was abandoned`,
 		},
 		{
 			// Same for the Failed-phase hook of an operation the missing beacon has just failed.
@@ -1296,7 +1296,7 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantReason:           opv1alpha1.BeaconLostReason,
 			wantTerminated:       true,
 			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
-			wantFinalizedMessage: "lifecycle hooks were abandoned",
+			wantFinalizedMessage: `phase hook owed to "delegate-a" was abandoned`,
 		},
 	}
 

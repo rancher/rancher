@@ -142,7 +142,7 @@ func HoldsBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
 // decide whether their own termination implies downstream work. Releasing a beacon held by anybody
 // else is a no-op, so the guard also spares the caller an update it does not need.
 func ReleaseBeaconIfHeld(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, expected string) (bool, error) {
-	if !HoldsBeacon(beacon, expected) {
+	if expected == "" || !HoldsBeacon(beacon, expected) {
 		return false, nil
 	}
 

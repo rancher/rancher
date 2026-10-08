@@ -608,26 +608,53 @@ func (a *CAPRKE2Adapter) KubeconfigPath(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/rke2.yaml"
 }
 
-// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane. CAPI's
-// Cluster name matches the RKE2ControlPlane name by convention. Mirrors CAPRAdapter.PauseCluster.
+// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane.
 func (a *CAPRKE2Adapter) PauseCluster(pause bool, whitelist WhitelistChange) error {
-	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	err := a.pauseCAPICluster(pause)
 	if err != nil {
 		return err
 	}
-	if heldByWhitelist(cluster.Annotations, pause, whitelist) {
-		return nil
+
+	err = a.whitelistManagementCluster(whitelist)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// pauseCAPICluster updates the CAPI cluster's paused field to pause if not already set.
+func (a *CAPRKE2Adapter) pauseCAPICluster(pause bool) error {
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.cluster.Namespace, a.cluster.Name)
+	if err != nil {
+		return err
 	}
 	cluster = cluster.DeepCopy()
 
 	pauseChanged := !ptr.Equal(cluster.Spec.Paused, &pause)
-	var whitelistChanged bool
-	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
-	if !pauseChanged && !whitelistChanged {
+	if !pauseChanged {
 		return nil
 	}
 
 	cluster.Spec.Paused = &pause
 	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
+}
+
+// whitelistManagementCluster whitelists the management cluster object according to the desired WhitelistChange strategy.
+func (a *CAPRKE2Adapter) whitelistManagementCluster(whitelist WhitelistChange) error {
+	cluster, err := a.clients.Mgmt.Cluster().Get(a.mgmtClusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cluster = cluster.DeepCopy()
+
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !whitelistChanged {
+		return nil
+	}
+
+	_, err = a.clients.Mgmt.Cluster().Update(cluster)
 	return err
 }

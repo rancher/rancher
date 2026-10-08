@@ -4,126 +4,11 @@ import (
 	"testing"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// TestHasActiveLifecycleHook covers the predicate UpdateStatus reports an abandoned hook from: a
-// false negative would let a terminated operation carrying a hook label look like it finished
-// cleanly, hiding from whoever set the label that their delegate never got its turn. Recognizing
-// the label is all it does — what gates garbage collection is termination, which is only recorded
-// once the hook is satisfied or provably unsatisfiable. See Collectable.
-func TestHasActiveLifecycleHook(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		labels map[string]string
-		want   bool
-	}{
-		{
-			name: "nil labels",
-			// obj with a nil GetLabels() must return false, matching the "no hook set" case
-			// (many controllers construct scratch objects with no labels at all).
-			labels: nil,
-			want:   false,
-		},
-		{
-			name:   "empty labels map",
-			labels: map[string]string{},
-			want:   false,
-		},
-		{
-			name: "only unrelated labels",
-			labels: map[string]string{
-				"app":                     "rancher",
-				"plan.cattle.io/owner":    "etcd-snapshot-save",
-				"management.cattle.io/x":  "y",
-				"rke.cattle.io/node-name": "node-1",
-			},
-			want: false,
-		},
-		{
-			name: "pending phase hook",
-			// Uses the actual exported prefix constant to catch drift if the string is ever
-			// renamed.
-			labels: map[string]string{opv1alpha1.PendingPhaseHookLabelPrefix + "test": "delegate-a"},
-			want:   true,
-		},
-		{
-			name:   "in-progress phase hook",
-			labels: map[string]string{opv1alpha1.InProgressPhaseHookLabelPrefix + "test": "delegate-a"},
-			want:   true,
-		},
-		{
-			name:   "aborted phase hook",
-			labels: map[string]string{opv1alpha1.RejectedPhaseHookLabelPrefix + "test": "delegate-a"},
-			want:   true,
-		},
-		{
-			name:   "canceled phase hook",
-			labels: map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "test": "delegate-a"},
-			want:   true,
-		},
-		{
-			name:   "failed phase hook",
-			labels: map[string]string{opv1alpha1.FailedPhaseHookLabelPrefix + "test": "delegate-a"},
-			want:   true,
-		},
-		{
-			name:   "succeeded phase hook",
-			labels: map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a"},
-			want:   true,
-		},
-		{
-			name: "step hook not exported by this package",
-			// Step prefixes live in the operation-controller packages (e.g. save.step.hook.…,
-			// rotate.step.hook.…). The predicate must still recognize them via the shared
-			// marker so a controller-defined step hook keeps its op alive.
-			labels: map[string]string{"save.step.hook.operation.cattle.io/my-hook": "delegate-a"},
-			want:   true,
-		},
-		{
-			name:   "arbitrary future step hook",
-			labels: map[string]string{"future-op.step.hook.operation.cattle.io/x": "d"},
-			want:   true,
-		},
-		{
-			name: "hook label mixed with unrelated labels",
-			labels: map[string]string{
-				"app": "rancher",
-				opv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a",
-				"rke.cattle.io/node-name":                         "node-1",
-			},
-			want: true,
-		},
-		{
-			name: "hook-marker substring appears in label VALUE only",
-			// The predicate checks label KEYS. A value containing the marker must NOT flip it.
-			labels: map[string]string{"unrelated": ".hook.operation.cattle.io/nope"},
-			want:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			obj := &metav1.ObjectMeta{Labels: tt.labels}
-			if got := HasActiveLifecycleHook(obj); got != tt.want {
-				t.Fatalf("HasActiveLifecycleHook(labels=%v) = %v, want %v", tt.labels, got, tt.want)
-			}
-		})
-	}
-
-	// Nil metav1.Object argument — production controllers should never pass nil, but the
-	// predicate must be defensive: any hypothetical caller receiving a nil (e.g. a client
-	// returning nil on cache miss) must not panic.
-	t.Run("nil object", func(t *testing.T) {
-		if HasActiveLifecycleHook(nil) {
-			t.Fatal("HasActiveLifecycleHook(nil) = true, want false")
-		}
-	})
-}
 
 // TestHasStepHookLabel covers the predicate handleInProgress uses to tell an intentional
 // step-scoped delegation from a beacon it has genuinely lost. The empty-prefix case is
@@ -161,6 +46,12 @@ func TestHasStepHookLabel(t *testing.T) {
 			name:   "empty prefix matches nothing",
 			labels: map[string]string{prefix + "my-hook": "delegate-a"},
 			prefix: "",
+		},
+		{
+			// It names no delegate, so nothing was pushed onto the beacon for it.
+			name:   "a step hook label with no delegate",
+			labels: map[string]string{prefix + "my-hook": ""},
+			prefix: prefix,
 		},
 	}
 
@@ -257,6 +148,12 @@ func TestHooksForPrefix(t *testing.T) {
 			},
 		},
 		{
+			name:   "a label naming no delegate is not a hook",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo/a": "", "foo/b": "bar"}},
+			prefix: "foo/",
+			want:   []Hook{{Id: "b", Delegate: "bar"}},
+		},
+		{
 			name:   "multiple matching prefix in order",
 			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo/a": "bar", "foo/b": "foo", "foo/c": "baz"}},
 			prefix: "foo/",
@@ -346,6 +243,50 @@ func TestCollectable(t *testing.T) {
 			if got := Collectable(tt.spec, tt.status); got != tt.want {
 				t.Fatalf("Collectable = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+// A hook label with an empty value is a valid label, but names no delegate. It must not hide the hooks
+// after it: the first hook is the one taken, so before empty values were skipped, a="" sorted ahead of
+// b and the operation went on as if it had no hook at all.
+func TestDelegateForHook_SkipsLabelsNamingNoDelegate(t *testing.T) {
+	t.Parallel()
+
+	prefix := opv1alpha1.SucceededPhaseHookLabelPrefix
+
+	for name, tc := range map[string]struct {
+		labels       map[string]string
+		wantDelegate string
+	}{
+		"an empty hook ahead of a real one": {
+			labels:       map[string]string{prefix + "a": "", prefix + "b": "follow-up"},
+			wantDelegate: "follow-up",
+		},
+		"only an empty hook": {
+			labels: map[string]string{prefix + "a": ""},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			obj := &metav1.ObjectMeta{Name: "op", Labels: tc.labels}
+			beacons := &fakeBeaconClient{}
+			beacon := &planv1alpha1.Beacon{Status: planv1alpha1.BeaconStatus{Active: true, Owner: "operation.cattle.io/ETCDSnapshotRestore/ns/op/uid"}}
+
+			_, delegate := LifecycleHookDelegate(obj, prefix)
+			assert.Equal(t, tc.wantDelegate, delegate)
+			assert.Equal(t, tc.wantDelegate, TerminalHookDelegate(obj, opv1alpha1.OperationPhaseSucceeded))
+
+			delegated, got, err := DelegateForHook(obj, beacon, beacons, prefix)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantDelegate != "", delegated)
+			if tc.wantDelegate == "" {
+				assert.Empty(t, beacons.statusUpdates, "there is no hook, so the beacon is left alone")
+				return
+			}
+			assert.Len(t, beacons.statusUpdates, 1)
+			assert.Equal(t, []string{tc.wantDelegate}, got.Status.Delegates)
 		})
 	}
 }

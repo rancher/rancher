@@ -34,34 +34,34 @@ func TestSettleCluster(t *testing.T) {
 	t.Parallel()
 
 	repause := []pauseCall{{true, WhitelistRestores}}
-	guardedUnpause := []pauseCall{{false, WhitelistKeepsPause}}
 
 	tests := []struct {
-		name                string
-		phase               opv1alpha1.OperationPhase
-		pastPointOfNoReturn bool
-		terminated          bool
-		err                 error
+		name            string
+		phase           opv1alpha1.OperationPhase
+		requiresRestore bool
+		terminated      bool
+		err             error
 
 		wantCalls           []pauseCall
 		wantErr             bool
 		wantRestoreRequired bool
 	}{
-		{name: "failed past the point of no return re-pauses and whitelists", phase: opv1alpha1.OperationPhaseFailed, pastPointOfNoReturn: true, wantCalls: repause, wantRestoreRequired: true},
-		{name: "canceled past the point of no return re-pauses and whitelists", phase: opv1alpha1.OperationPhaseCanceled, pastPointOfNoReturn: true, wantCalls: repause, wantRestoreRequired: true},
+		{name: "failed past the point of no return re-pauses and whitelists", phase: opv1alpha1.OperationPhaseFailed, requiresRestore: true, wantCalls: repause, wantRestoreRequired: true},
+		{name: "canceled past the point of no return re-pauses and whitelists", phase: opv1alpha1.OperationPhaseCanceled, requiresRestore: true, wantCalls: repause, wantRestoreRequired: true},
 		{name: "failed before the point of no return leaves the cluster", phase: opv1alpha1.OperationPhaseFailed},
 		{name: "canceled before the point of no return leaves the cluster", phase: opv1alpha1.OperationPhaseCanceled},
-		{name: "rejected unpauses unless whitelisted", phase: opv1alpha1.OperationPhaseRejected, wantCalls: guardedUnpause},
-		{name: "rejected is judged the same past the point of no return", phase: opv1alpha1.OperationPhaseRejected, pastPointOfNoReturn: true, wantCalls: guardedUnpause},
-		{name: "succeeded already settled the cluster", phase: opv1alpha1.OperationPhaseSucceeded, pastPointOfNoReturn: true},
-		{name: "a terminated operation no longer settles", phase: opv1alpha1.OperationPhaseCanceled, pastPointOfNoReturn: true, terminated: true},
-		{name: "a terminated rejection no longer unpauses", phase: opv1alpha1.OperationPhaseRejected, terminated: true},
+		// A rejected operation never paused the cluster, so whatever pause it has is someone else's: an
+		// earlier operation that left it requiring a restore, the operation it conflicted with, or a user.
+		{name: "rejected leaves the cluster alone", phase: opv1alpha1.OperationPhaseRejected},
+		{name: "rejected leaves the cluster alone whatever its step", phase: opv1alpha1.OperationPhaseRejected, requiresRestore: true},
+		{name: "succeeded already settled the cluster", phase: opv1alpha1.OperationPhaseSucceeded, requiresRestore: true},
+		{name: "a terminated operation no longer settles", phase: opv1alpha1.OperationPhaseCanceled, requiresRestore: true, terminated: true},
 		{
-			name: "a cluster object that is gone has nothing to settle", phase: opv1alpha1.OperationPhaseFailed, pastPointOfNoReturn: true,
+			name: "a cluster object that is gone has nothing to settle", phase: opv1alpha1.OperationPhaseFailed, requiresRestore: true,
 			err: apierrors.NewNotFound(schema.GroupResource{Group: "cluster.x-k8s.io", Resource: "clusters"}, "c"), wantCalls: repause,
 		},
 		{
-			name: "any other error is retried", phase: opv1alpha1.OperationPhaseCanceled, pastPointOfNoReturn: true,
+			name: "any other error is retried", phase: opv1alpha1.OperationPhaseCanceled, requiresRestore: true,
 			err: errors.New("apiserver is down"), wantCalls: repause, wantErr: true,
 		},
 	}
@@ -77,7 +77,7 @@ func TestSettleCluster(t *testing.T) {
 				status.SetTerminated()
 			}
 
-			err := SettleCluster(adapter, status, tt.pastPointOfNoReturn)
+			err := SettleCluster(adapter, status, tt.requiresRestore)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -110,7 +110,7 @@ func TestUpdateStatus_KeepsRestoreRequired(t *testing.T) {
 		},
 		"with an abandoned hook": {
 			labels:      map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "verify": "delegate-a"},
-			wantMessage: "Operation canceled; " + restoreRequiredNote + "; lifecycle hooks were abandoned, no beacon remained to delegate them on",
+			wantMessage: "Operation canceled; " + restoreRequiredNote + `; the Canceled phase hook owed to "delegate-a" was abandoned, no claim on the beacon remained to delegate it on`,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

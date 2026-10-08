@@ -12,9 +12,9 @@ import (
 )
 
 // Each terminal phase leaves the cluster as its phase, and the step the operation stopped in,
-// require: Rejected unpauses unless the cluster is whitelisted, Failed and Canceled past the point of
-// no return re-pause and whitelist restores (and say so on Finalized), and nothing else touches the
-// cluster. A restore passes its point of no return on leaving Preflight, and one stopped after it unpaused the
+// require: Failed and Canceled past the point of no return re-pause and whitelist restores (and say so
+// on Finalized), and nothing else touches the cluster. In particular Rejected doesn't: an operation is
+// only rejected before it pauses the cluster, so any pause the cluster has is someone else's. A restore passes its point of no return on leaving Preflight, and one stopped after it unpaused the
 // cluster for its restart pauses it again.
 //
 // Terminal handling runs again on every reconcile until the operation is collected, and by then the
@@ -62,8 +62,6 @@ func TestTerminalPhases_SettleTheCluster(t *testing.T) {
 				var wantWhitelist []ops.WhitelistChange
 				restoreRequired := false
 				switch {
-				case phase == opv1alpha1.OperationPhaseRejected:
-					wantPause, wantWhitelist = []bool{false}, []ops.WhitelistChange{ops.WhitelistKeepsPause}
 				case past && (phase == opv1alpha1.OperationPhaseFailed || phase == opv1alpha1.OperationPhaseCanceled):
 					wantPause, wantWhitelist = []bool{true}, []ops.WhitelistChange{ops.WhitelistRestores}
 					restoreRequired = true

@@ -137,6 +137,7 @@ type OperationStatus struct {
 	// An Operation which reached a terminal phase is not necessarily terminated: terminal handling
 	// may still be delegated to another controller. An Operation deleted before it is terminated is
 	// canceled, as the work it dispatched is no longer tracked by anything.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="terminatedAt cannot be changed once set"
 	// +optional
 	TerminatedAt metav1.Time `json:"terminatedAt,omitempty,omitzero"`
 
@@ -222,7 +223,7 @@ func (s *OperationStatus) markOutcome(phase OperationPhase, reason, message stri
 // The timestamp is only written on the first call so it keeps pointing at the moment terminal
 // handling actually completed, no matter how many times the operation is reconciled afterward.
 func (s *OperationStatus) SetTerminated() {
-	if !s.TerminatedAt.IsZero() {
+	if !s.TerminatedAt.IsZero() || !s.Phase.IsTerminal() {
 		return
 	}
 	s.TerminatedAt = metav1.Now()

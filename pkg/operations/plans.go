@@ -100,7 +100,7 @@ func StopDispatchedPlans(store *planapi.Store, secrets planapi.SecretClient, clu
 		return true, nil
 	}
 	if !planapi.AuthorizedForBeacon(beacon, ownerKey) {
-		return false, fmt.Errorf("cannot cancel the plans %s/%s dispatched while it has handed the beacon on to a delegate",
+		return false, fmt.Errorf("cannot cancel the plans %s/%s dispatched while beacon is held by delegate",
 			op.GetNamespace(), op.GetName())
 	}
 

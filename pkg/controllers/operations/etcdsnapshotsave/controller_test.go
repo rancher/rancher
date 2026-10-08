@@ -1627,8 +1627,7 @@ func TestOnChange_CancelRequestedCancelsInFlightOperation(t *testing.T) {
 // operation has reached a terminal phase but is still waiting on that phase's lifecycle hook, so it
 // is holding the beacon on a delegate's behalf — yet its work is over and its outcome asserted, so
 // there is nothing for a cancellation to stop. The request is declined and reported on the Canceled
-// condition, and the hook keeps the beacon; deleting the operation is what breaks that deadlock, as
-// TestOnChange_DeletionCancelsTerminalPhaseWaitingOnHook covers.
+// condition, and the hook keeps the beacon.
 func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
 	t.Parallel()
 
@@ -1659,36 +1658,6 @@ func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
 		"Finalized is what names the delegate holding the operation up")
 	for _, update := range beacons.statusUpdates {
 		assert.Equal(t, testOwnerKey, update.Status.Owner, "the beacon must stay with the operation and its delegate")
-	}
-}
-
-// TestOnChange_DeletionCancelsTerminalPhaseWaitingOnHook is the counterpart, and the reason cancel
-// and delete answer this window differently. A deleted operation has to release the beacon and
-// retire its finalizer whatever phase it is in — otherwise it would wait forever on a hook nothing
-// will answer, and never finish deleting — so deletion cancels where cancellation declines.
-func TestOnChange_DeletionCancelsTerminalPhaseWaitingOnHook(t *testing.T) {
-	t.Parallel()
-
-	op := withClusterRef(newDeletingOp(), "test")
-	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
-	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
-		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
-		Step:            opv1alpha1.ETCDSnapshotSaveStepRestart,
-	}
-
-	beacon := newBeacon(testOwnerKey, true)
-	beacon.Status.Delegates = []string{"delegate-a"}
-	h, _, beacons := newOnChangeHandler(beacon)
-
-	status, err := h.OnChange(op, op.Status)
-	assert.NoError(t, err)
-	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase)
-	assert.Equal(t, opv1alpha1.OperationDeletedReason, opv1alpha1.CanceledCondition.GetReason(&status))
-	assert.False(t, status.TerminatedAt.IsZero())
-	if assert.Len(t, beacons.statusUpdates, 1, "the beacon must be freed despite the abandoned hook") {
-		assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner)
-		assert.Empty(t, beacons.statusUpdates[0].Status.Delegates,
-			"the delegate the abandoned hook pushed must not be left on the beacon")
 	}
 }
 

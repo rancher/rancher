@@ -1638,22 +1638,6 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 			wantUpdate:    true,
 			wantWhitelist: restores,
 		},
-		{
-			// A rejected operation must not unpause a cluster an earlier operation left requiring a restore.
-			name:          "unpausing a whitelisted cluster with WhitelistKeepsPause does not write",
-			annotations:   map[string]string{anno: "true", whitelisted: restores},
-			pause:         false,
-			whitelist:     WhitelistKeepsPause,
-			wantPaused:    true,
-			wantWhitelist: restores,
-		},
-		{
-			name:        "unpausing a cluster without a whitelist with WhitelistKeepsPause unpauses it",
-			annotations: map[string]string{anno: "true"},
-			pause:       false,
-			whitelist:   WhitelistKeepsPause,
-			wantUpdate:  true,
-		},
 	}
 
 	for _, tt := range tests {
