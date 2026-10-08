@@ -43,7 +43,7 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	if req.Body != nil {
 		body, err = io.ReadAll(req.Body)
 		if err != nil {
-			return fmt.Errorf("awsv4.sign: awsv4.sign: error reading request body %v", err)
+			return fmt.Errorf("awsv4.sign: error reading request body %v", err)
 		}
 	}
 
