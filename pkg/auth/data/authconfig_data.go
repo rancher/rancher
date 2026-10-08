@@ -74,7 +74,8 @@ func deleteEmptyDisabledAuthConfigs(authConfigs authConfigDeleter, lister unstru
 			continue
 		}
 
-		if enabled, _ := item.Object["enabled"].(bool); enabled {
+		enabled, ok := item.Object["enabled"].(bool)
+		if !ok || enabled {
 			continue
 		}
 

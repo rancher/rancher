@@ -141,6 +141,7 @@ func GetAttributeValuesByName(search []*ldapv3.EntryAttribute, attributeName str
 }
 
 func AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUsername, defaultLoginDomain string, lConn ldapv3.Client) error {
+	logrus.Debug("Binding service account username password")
 	if serviceAccountPassword == "" {
 		return apierror.NewAPIError(validation.MissingRequired, "service account password not provided")
 	}
@@ -158,9 +159,7 @@ func AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserna
 }
 
 func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute, identifierAttribute string) (*v3.Principal, error) {
-	logrus.Debug("Binding service account username password")
 	var accountName, login, kind string
-
 	externalID := dnStr
 	externalIDType := scope
 

@@ -75,6 +75,22 @@ func TestDeleteEmptyDisabledAuthConfigs(t *testing.T) {
 			},
 			wantDeleted: nil,
 		},
+		"skips auth configs without enabled field": {
+			items: []unstructured.Unstructured{
+				func() unstructured.Unstructured {
+					item := newAuthConfigItem("github", false, nil)
+					delete(item.Object, "enabled")
+					return item
+				}(),
+			},
+			wantDeleted: nil,
+		},
+		"skips auth configs with invalid enabled field": {
+			items: []unstructured.Unstructured{
+				newAuthConfigItem("github", false, map[string]any{"enabled": "false"}),
+			},
+			wantDeleted: nil,
+		},
 		"skips auth configs with provider specific data": {
 			items: []unstructured.Unstructured{
 				newAuthConfigItem("github", false, map[string]any{"clientId": "some-id"}),
@@ -130,6 +146,7 @@ func newAuthConfigItem(name string, enabled bool, extraFields map[string]any) un
 	content := map[string]any{
 		"apiVersion":         "management.cattle.io/v3",
 		"kind":               "AuthConfig",
+		"enabled":            enabled,
 		"logoutAllSupported": false,
 		"metadata": map[string]any{
 			"annotations": map[string]any{
@@ -150,9 +167,6 @@ func newAuthConfigItem(name string, enabled bool, extraFields map[string]any) un
 		},
 	}
 
-	if enabled {
-		content["enabled"] = true
-	}
 	for k, v := range extraFields {
 		content[k] = v
 	}

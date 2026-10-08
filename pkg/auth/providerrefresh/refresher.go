@@ -65,10 +65,9 @@ type refresher struct {
 	maxAge                    time.Duration
 	extTokenStore             *exttokenstore.SystemStore
 	ensureAndGetUserAttribute func(userID string) (*apiv3.UserAttribute, bool, error)
-
-	configMapCache     wcorev1.ConfigMapCache
-	authConfigLister   v3.AuthConfigLister
-	isDisabledProvider func(providerName, configName string) (bool, error)
+	configMapCache            wcorev1.ConfigMapCache
+	authConfigLister          v3.AuthConfigLister
+	isDisabledProvider        func(providerName, configName string) (bool, error)
 }
 
 // configuredProvider identifies an AuthConfig and the provider that implements
