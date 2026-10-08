@@ -55,16 +55,16 @@ func TestTelemetryManager(t *testing.T) {
 
 	nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
 
-	secretController := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 
-	secretController.EXPECT().Get("aif-operator", "nvidia-registry", gomock.Any()).AnyTimes().DoAndReturn(func(_ context.Context, _ *corev1.Secret) (*corev1.Secret, error) {
+	secretCache.EXPECT().Get("aif-operator", "nvidia-registry").AnyTimes().DoAndReturn(func(_ context.Context, _ *corev1.Secret) (*corev1.Secret, error) {
 		return &corev1.Secret{}, nil
 	})
 
 	nodeCache.EXPECT().List(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(_ string, _ any) ([]*v3.Node, error) {
 		return []*v3.Node{}, nil
 	})
-	telG := NewTelemetryGatherer(clusterCache, nodeCache, secretController)
+	telG := NewTelemetryGatherer(clusterCache, nodeCache, secretCache)
 
 	manager := NewTelemetryExporterManager(telG, time.Millisecond)
 	assert.NotNil(manager)

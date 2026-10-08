@@ -12,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -264,26 +263,26 @@ type TelemetryGatherer struct {
 	clusterUUID    string
 	serverURL      string
 
-	nodeCache        v3ctrl.NodeCache
-	clusterCache     v3ctrl.ClusterCache
-	secretController wcorev1.SecretController
+	clusterCache v3ctrl.ClusterCache
+	secretCache  wcorev1.SecretCache
+	nodeCache    v3ctrl.NodeCache
 }
 
 func NewTelemetryGatherer(
 	clusterCache v3ctrl.ClusterCache,
 	nodeCache v3ctrl.NodeCache,
-	secretController wcorev1.SecretController,
+	secretCache wcorev1.SecretCache,
 ) TelemetryGatherer {
 	return TelemetryGatherer{
-		clusterCache:     clusterCache,
-		nodeCache:        nodeCache,
-		secretController: secretController,
+		clusterCache: clusterCache,
+		nodeCache:    nodeCache,
+		secretCache:  secretCache,
 	}
 }
 
 // isNVIDIAPresent checks if the nvidia-registry secret is created in the SUSE AI Factory namespace
 func (t *TelemetryGatherer) isNVIDIAPresent() bool {
-	_, err := t.secretController.Get("aif-operator", "nvidia-registry", metav1.GetOptions{})
+	_, err := t.secretCache.Get("aif-operator", "nvidia-registry")
 	return err == nil
 }
 
