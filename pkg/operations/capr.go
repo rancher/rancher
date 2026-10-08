@@ -741,13 +741,19 @@ func (a *CAPRAdapter) PauseCluster(pause bool, whitelist WhitelistChange) error 
 		return err
 	}
 
-	// Both the mgmt cluster and the provisioning cluster are whitelisted in order to allow the UI to key off either
-	// object
+	// Both the mgmt cluster, provisioning cluster, and RKEControlPlane are whitelisted in order to allow the UI to key
+	// off either object, and the backend to key off the RKEControlPlane. This is quite frankly a mess and should be
+	// revisited in a future release.
 	mgmtClusterName, err := a.whitelistProvisioningCluster(whitelist)
 	if err != nil {
 		return err
 	} else if mgmtClusterName == "" {
 		return errors.New("could not derive management cluster name")
+	}
+
+	err = a.whitelistControlPlane(whitelist)
+	if err != nil {
+		return err
 	}
 
 	err = a.whitelistManagementCluster(mgmtClusterName, whitelist)
@@ -793,6 +799,29 @@ func (a *CAPRAdapter) whitelistProvisioningCluster(whitelist WhitelistChange) (s
 
 	_, err = a.clients.Provisioning.Cluster().Update(cluster)
 	return cluster.Status.ClusterName, err
+}
+
+// whitelistControlPlane whitelists the RKEControlPlane object according to the desired WhitelistChange
+// strategy and returns the management cluster name for the cluster.
+func (a *CAPRAdapter) whitelistControlPlane(whitelist WhitelistChange) error {
+	controlPlane, err := a.clients.RKE.RKEControlPlane().Get(a.controlPlane.Namespace, a.controlPlane.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	controlPlane = controlPlane.DeepCopy()
+
+	var whitelistChanged bool
+	controlPlane.Annotations, whitelistChanged = ApplyWhitelistChange(controlPlane.Annotations, whitelist)
+	if !whitelistChanged {
+		return nil
+	}
+
+	controlPlane, err = a.clients.RKE.RKEControlPlane().Update(controlPlane)
+	if err != nil {
+		return err
+	}
+	a.controlPlane = controlPlane
+	return nil
 }
 
 // whitelistManagementCluster whitelists the management cluster object according to the desired WhitelistChange strategy.

@@ -80,7 +80,7 @@ func init() {
 // cluster shell — identified by the presence of both the capi-cluster-owner and -owner-ns
 // labels. Returns (nil, nil) when the labels are absent (caller should try the next dispatch).
 // One label present without the other is a misconfiguration and returns an error rather than
-// silently falling through — matches the identity-resolver behaviour in the config server.
+// silently falling through — matches the identity-resolver behavior in the config server.
 func turtlesCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) (Adapter, error) {
 	ownerName := cluster.Labels[capr.CAPIClusterOwnerLabel]
 	ownerNS := cluster.Labels[capr.CAPIClusterOwnerNSLabel]

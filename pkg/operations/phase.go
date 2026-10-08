@@ -46,7 +46,7 @@ func TerminalPhaseHookPrefix(phase opv1alpha1.OperationPhase) string {
 }
 
 // IsExpired returns true when the operation has lived longer than its TTL measured from its
-// status.LastUpdated timestamp. Expired terminal operations can be safely deleted because
+// status.TerminatedAt timestamp. Expired terminal operations can be safely deleted because
 // downstream controllers (system-agent, snapshotbackpopulate, etc.) have already seen the final
 // state.
 //
