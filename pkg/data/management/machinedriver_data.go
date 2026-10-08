@@ -19,25 +19,25 @@ import (
 )
 
 const (
-	AlibabaDriver      = driverdata.AlibabaDriver
-	Amazonec2driver    = driverdata.Amazonec2driver
-	Azuredriver        = driverdata.Azuredriver
-	DigitalOceandriver = driverdata.DigitalOceandriver
-	ExoscaleDriver     = driverdata.ExoscaleDriver
-	HarvesterDriver    = driverdata.HarvesterDriver
-	Linodedriver       = driverdata.Linodedriver
-	NutanixDriver      = driverdata.NutanixDriver
-	OCIDriver          = driverdata.OCIDriver
-	OTCDriver          = driverdata.OTCDriver
-	OpenstackDriver    = driverdata.OpenstackDriver
-	PacketDriver       = driverdata.PacketDriver
-	PhoenixNAPDriver   = driverdata.PhoenixNAPDriver
-	PodDriver          = driverdata.PodDriver
-	RackspaceDriver    = driverdata.RackspaceDriver
-	SoftLayerDriver    = driverdata.SoftLayerDriver
-	Vmwaredriver       = driverdata.Vmwaredriver
-	GoogleDriver       = driverdata.GoogleDriver
-	OutscaleDriver     = driverdata.OutscaleDriver
+	AlibabaDriver          = driverdata.AlibabaDriver
+	Amazonec2driver        = driverdata.Amazonec2driver
+	Azuredriver            = driverdata.Azuredriver
+	DigitalOceandriver     = driverdata.DigitalOceandriver
+	ExoscaleDriver         = driverdata.ExoscaleDriver
+	HarvesterDriver        = driverdata.HarvesterDriver
+	Linodedriver           = driverdata.Linodedriver
+	NutanixDriver          = driverdata.NutanixDriver
+	OCIDriver              = driverdata.OCIDriver
+	OpenTelekomCloudDriver = driverdata.OpenTelekomCloudDriver
+	OpenstackDriver        = driverdata.OpenstackDriver
+	PacketDriver           = driverdata.PacketDriver
+	PhoenixNAPDriver       = driverdata.PhoenixNAPDriver
+	PodDriver              = driverdata.PodDriver
+	RackspaceDriver        = driverdata.RackspaceDriver
+	SoftLayerDriver        = driverdata.SoftLayerDriver
+	Vmwaredriver           = driverdata.Vmwaredriver
+	GoogleDriver           = driverdata.GoogleDriver
+	OutscaleDriver         = driverdata.OutscaleDriver
 )
 
 type DriverDataConfig = driverdata.DriverDataConfig
@@ -116,7 +116,15 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(OpenstackDriver, "local://", "", "", nil, false, true, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(OTCDriver, "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/driver/0.3.3/docker-machine-driver-otc_0.3.3_linux_amd64.tar.gz", "", "2151670a96e3ee71aedcfb5a1b73804a4772c3f9ca7f714f2a572d3868a648d1", []string{"*.otc.t-systems.com"}, false, false, false, nil, management); err != nil {
+	opentelekomcloudDriverURL := fmt.Sprintf(
+		"https://github.com/opentelekomcloud/docker-machine-opentelekomcloud/releases/download/v2.2.1/docker-machine-driver-opentelekomcloud_2.2.1_linux_%s.tar.gz",
+		runtime.GOARCH,
+	)
+	opentelekomcloudDriverChecksum := "4c1b3dce8e595655460d3045abc2e75c113b41d0ecfc0667befec1edce49a03f"
+	if runtime.GOARCH == "arm64" {
+		opentelekomcloudDriverChecksum = "e4de66b9b8697c2d3343a3664e70f4d1dd50c154758e876ee22801b2f6d4cdb9"
+	}
+	if err := addMachineDriver(OpenTelekomCloudDriver, opentelekomcloudDriverURL, "", opentelekomcloudDriverChecksum, []string{"*.otc.t-systems.com"}, false, false, true, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, nil, management); err != nil {
@@ -143,6 +151,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 
 	deleteMachineDriver("pinganyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
 	deleteMachineDriver("aliyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
+	deleteMachineDriver("otc", "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/driver/0.3.3/", management.Management.NodeDrivers(""))
 
 	return nil
 }

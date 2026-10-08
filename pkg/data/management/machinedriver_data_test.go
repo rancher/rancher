@@ -186,6 +186,17 @@ func TestGetAnnotations(t *testing.T) {
 			driverName:          "testDriver",
 			expectedAnnotations: map[string]string{},
 		},
+		{
+			name:       "opentelekomcloud credential and file annotations",
+			driverName: OpenTelekomCloudDriver,
+			expectedAnnotations: map[string]string{
+				fileToFieldAliasesAnno:     "privateKeyFile:privateKeyFile,userDataFile:userDataFile",
+				"publicCredentialFields":   "accessKey,authUrl,domainId,domainName,projectId,projectName,region,username",
+				"privateCredentialFields":  "password,secretKey,token",
+				"passwordFields":           "password,secretKey,token",
+				"optionalCredentialFields": "accessKey,authUrl,domainId,domainName,password,projectId,projectName,region,secretKey,token,username",
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
