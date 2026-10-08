@@ -429,7 +429,7 @@ func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, err
 	// If the route has custom certificate settings, build a transport for it
 	if route.CABundle != "" {
 		decodeCABundleIfPossible(route)
-		transport, err := buildTransportForRoute(route, req.URL.Hostname())
+		transport, err := buildTransportForRoute(route)
 		if err != nil {
 			logrus.Warnf("httpproxy: failed to build transport for route: %v", err)
 			// Fall through to default transport
@@ -446,7 +446,7 @@ func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 // buildTLSConfigForRoute creates a complete TLS config based on route certificate settings.
 // It handles CA bundles, client certificates, server name indication, and verification options.
-func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute, requestHostname string) (*tls.Config, error) {
+func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute) (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
 
 	// Set up root CAs from CA bundle
@@ -470,8 +470,8 @@ func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute, requestHostname stri
 }
 
 // buildTransportForRoute creates an HTTP transport based on the route's certificate settings.
-func buildTransportForRoute(route *mgmt.ProxyEndpointRoute, requestHostname string) (*http.Transport, error) {
-	tlsConfig, err := buildTLSConfigForRoute(route, requestHostname)
+func buildTransportForRoute(route *mgmt.ProxyEndpointRoute) (*http.Transport, error) {
+	tlsConfig, err := buildTLSConfigForRoute(route)
 	if err != nil {
 		return nil, err
 	}
