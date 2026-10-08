@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 )
 
@@ -53,7 +54,7 @@ type ClusterConfigurationApplyConfiguration struct {
 	// container registries.
 	Registries *RegistryApplyConfiguration `json:"registries,omitempty"`
 	// ETCD contains the etcd snapshot configuration for the cluster.
-	ETCD *ETCDApplyConfiguration `json:"etcd,omitempty"`
+	ETCD *v3.ETCD `json:"etcd,omitempty"`
 	// Networking contains information regarding the desired networking stack
 	// of the cluster.
 	Networking *NetworkingApplyConfiguration `json:"networking,omitempty"`
@@ -142,8 +143,8 @@ func (b *ClusterConfigurationApplyConfiguration) WithRegistries(value *RegistryA
 // WithETCD sets the ETCD field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ETCD field is set to the value of the last call.
-func (b *ClusterConfigurationApplyConfiguration) WithETCD(value *ETCDApplyConfiguration) *ClusterConfigurationApplyConfiguration {
-	b.ETCD = value
+func (b *ClusterConfigurationApplyConfiguration) WithETCD(value v3.ETCD) *ClusterConfigurationApplyConfiguration {
+	b.ETCD = &value
 	return b
 }
 

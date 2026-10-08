@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	ops "github.com/rancher/rancher/pkg/operations"
 	"github.com/rancher/rancher/pkg/plan"
@@ -36,6 +37,10 @@ type stubAdapter struct {
 	settingsCalls     []string
 	dataDirErr        error
 	pauseCalls        []bool
+}
+
+func (a *stubAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	return nil
 }
 
 func (a *stubAdapter) RuntimeCommand() string { return a.runtime }
@@ -109,8 +114,8 @@ func (a *stubAdapter) FindOrElectLeader(string, ops.Filter) (*corev1.Secret, err
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "" }
 func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
-func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	return nil, nil, nil, nil
 }
 
 type fakeBeaconClient struct {
