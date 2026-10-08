@@ -46,8 +46,8 @@ the helper).
 
 ### Step 2: Write the summary
 
-Create a markdown file named `<test_file_name>_summary.md` (e.g.
-`default_roles_test_summary.md`). Use the structure below.
+Create a markdown file named `<test_file_name>_summary.md` in the same directory as the test
+file (e.g. `tests/e2e/rbac/default_roles_test_summary.md`). Use the structure below.
 
 ## Format
 
