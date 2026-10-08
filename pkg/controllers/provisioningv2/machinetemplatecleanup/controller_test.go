@@ -182,7 +182,7 @@ func Test_cleanupOrLabelObject(t *testing.T) {
 				&tt.obj,
 				metav1.CreateOptions{},
 			)
-			require.NoError(t, nil)
+			require.NoError(t, err)
 
 			// Clear create call.
 			dynamicClient.ClearActions()

@@ -413,12 +413,16 @@ func (h *handler) cleanupOrLabelObject(
 	}
 
 	uid := obj.GetUID()
+	rv := obj.GetResourceVersion()
 
 	logrus.Debugf("%s deleting %s/%s...", logPrefix, obj.GetNamespace(), obj.GetName())
 	err := client.Namespace(obj.GetNamespace()).Delete(h.ctx, obj.GetName(), v1.DeleteOptions{
 		Preconditions: &v1.Preconditions{
 			// Avoid issues with name reuse.
 			UID: &uid,
+
+			// This would prevent a delete on a last-minute adoption (as the owner references would change).
+			ResourceVersion: &rv,
 		},
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
