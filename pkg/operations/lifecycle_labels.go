@@ -19,7 +19,7 @@ import (
 // labels, so an operation checks them in its preflight, before it pauses the cluster or assigns
 // anything. Every secret of the cluster is checked, not only the ones a step acts on, since the fence
 // applies to every plan written to the cluster.
-func CheckLifecycleLabels(secrets planapi.SecretClient, cluster *unstructured.Unstructured, namespace string, clusterRef *corev1.ObjectReference) (string, error) {
+func CheckLifecycleLabels(secrets planapi.SecretClient, cluster *unstructured.Unstructured, namespace string) (string, error) {
 	collected, err := planapi.NewCollector(secrets, cluster, namespace).Collect()
 	if planapi.IsTransient(err) {
 		return "", err
@@ -27,7 +27,7 @@ func CheckLifecycleLabels(secrets planapi.SecretClient, cluster *unstructured.Un
 		return fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err), nil
 	}
 
-	return LifecycleLabelsProblem(clusterRef, collected), nil
+	return LifecycleLabelsProblem(cluster, collected), nil
 }
 
 // LifecycleLabelsProblem returns a description of the first of the given machine-plan secrets whose
@@ -36,19 +36,19 @@ func CheckLifecycleLabels(secrets planapi.SecretClient, cluster *unstructured.Un
 // The cluster labels (group, kind and name) must equal the cluster's. The machine labels must be
 // present and non-empty: which machine a plan belongs to isn't something the operation can check, but
 // a plan that belongs to none can't be held to one.
-func LifecycleLabelsProblem(clusterRef *corev1.ObjectReference, secrets []*corev1.Secret) string {
-	if clusterRef == nil {
+func LifecycleLabelsProblem(clusterObj *unstructured.Unstructured, secrets []*corev1.Secret) string {
+	if clusterObj == nil {
 		return "the operation has no clusterRef to check machine-plan secrets against"
 	}
-	groupVersion, err := schema.ParseGroupVersion(clusterRef.APIVersion)
+	groupVersion, err := schema.ParseGroupVersion(clusterObj.GetAPIVersion())
 	if err != nil {
-		return fmt.Sprintf("the operation's clusterRef has an invalid apiVersion %q: %v", clusterRef.APIVersion, err)
+		return fmt.Sprintf("the operation's clusterRef has an invalid apiVersion %q: %v", clusterObj.GetAPIVersion(), err)
 	}
 
 	cluster := []struct{ key, want string }{
 		{planv1alpha1.ClusterLifecycleGroupLabel, groupVersion.Group},
-		{planv1alpha1.ClusterLifecycleKindLabel, clusterRef.Kind},
-		{planv1alpha1.ClusterLifecycleNameLabel, clusterRef.Name},
+		{planv1alpha1.ClusterLifecycleKindLabel, clusterObj.GetKind()},
+		{planv1alpha1.ClusterLifecycleNameLabel, clusterObj.GetName()},
 	}
 	machine := []string{
 		planv1alpha1.MachineLifecycleGroupLabel,
