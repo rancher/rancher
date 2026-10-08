@@ -132,7 +132,7 @@ require (
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
-	github.com/rancher/shepherd v0.0.0-20261008151755-4016df39968f
+	github.com/rancher/shepherd v0.0.0-20261008164254-9b3e7ea78db5
 	github.com/rancher/steve v0.10.8
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260923180507-96eced818739
 	github.com/rancher/wrangler/v3 v3.8.0-rc.2
