@@ -56,7 +56,7 @@ jobs:
           COUNT="$(echo "$MATRIX" | jq '.include | length')"
 
           # Sanity cap against accidental fan-out
-          if [ "$COUNT" -gt 16 ]; then
+          if [ "$COUNT" -gt 18 ]; then
             echo "error: too many matrix entries ($COUNT)" >&2
             exit 1
           fi
