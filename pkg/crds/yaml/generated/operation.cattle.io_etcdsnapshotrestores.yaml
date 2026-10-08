@@ -177,6 +177,7 @@ spec:
                 format: int64
                 type: integer
             required:
+            - args
             - clusterRef
             type: object
           status:
@@ -282,6 +283,9 @@ spec:
                   canceled, as the work it dispatched is no longer tracked by anything.
                 format: date-time
                 type: string
+                x-kubernetes-validations:
+                - message: terminatedAt cannot be changed once set
+                  rule: self == oldSelf
             type: object
         required:
         - spec
