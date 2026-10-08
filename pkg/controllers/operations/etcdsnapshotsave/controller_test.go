@@ -1178,26 +1178,31 @@ var terminalHandlers = map[string]struct {
 	handle func(*handler, *scope, opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error)
 	cond   condition.Cond
 	hook   string
+	phase  opv1alpha1.OperationPhase
 }{
 	"aborted": {
 		handle: (*handler).handleRejected,
 		cond:   opv1alpha1.RejectedCondition,
 		hook:   opv1alpha1.RejectedPhaseHookLabelPrefix,
+		phase:  opv1alpha1.OperationPhaseRejected,
 	},
 	"canceled": {
 		handle: (*handler).handleCanceled,
 		cond:   opv1alpha1.CanceledCondition,
 		hook:   opv1alpha1.CanceledPhaseHookLabelPrefix,
+		phase:  opv1alpha1.OperationPhaseCanceled,
 	},
 	"failed": {
 		handle: (*handler).handleFailed,
 		cond:   opv1alpha1.FailedCondition,
 		hook:   opv1alpha1.FailedPhaseHookLabelPrefix,
+		phase:  opv1alpha1.OperationPhaseFailed,
 	},
 	"succeeded": {
 		handle: (*handler).handleSucceeded,
 		cond:   opv1alpha1.SucceededCondition,
 		hook:   opv1alpha1.SucceededPhaseHookLabelPrefix,
+		phase:  opv1alpha1.OperationPhaseSucceeded,
 	},
 }
 
@@ -1212,7 +1217,7 @@ func TestHandleTerminal_RecordsTermination(t *testing.T) {
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
 			s := newScope(newOp(), newBeacon(testOwnerKey, true), defaultAdapter())
 
-			got, err := tc.handle(h, s, opv1alpha1.ETCDSnapshotSaveStatus{})
+			got, err := tc.handle(h, s, terminalStatus(tc.phase))
 			assert.NoError(t, err)
 			assert.False(t, got.TerminatedAt.IsZero(),
 				"terminal handling completed (beacon released), so it must be recorded on the status")
@@ -1242,6 +1247,7 @@ func TestHandleTerminal_DelegatedDefersTermination(t *testing.T) {
 			// why the operation ended, so delegating must not overwrite it — the delegate is
 			// reported on Finalized by updateStatus instead.
 			status := opv1alpha1.ETCDSnapshotSaveStatus{}
+			status.SetPhase(tc.phase)
 			tc.cond.True(&status)
 			tc.cond.Reason(&status, opv1alpha1.PlanFailedReason)
 			tc.cond.Message(&status, "the operative detail")
@@ -1736,7 +1742,7 @@ func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
 			s := newScope(op, newBeacon("another-controller", true), defaultAdapter())
 
-			got, err := tc.handle(h, s, opv1alpha1.ETCDSnapshotSaveStatus{})
+			got, err := tc.handle(h, s, terminalStatus(tc.phase))
 			assert.NoError(t, err)
 			assert.False(t, got.TerminatedAt.IsZero(),
 				"with no beacon to release, terminal handling is trivially complete")
@@ -2258,4 +2264,11 @@ func TestHandleCanceled_HoldsBeaconUntilDispatchedPlansStop(t *testing.T) {
 func withDispatchedPlan(secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotSave) *corev1.Secret {
 	nodePlan := &planapi.Plan{OneTimeInstructions: []planapi.OneTimeInstruction{{Name: "work", Command: "rke2"}}}
 	return withAssignedPlan(secret, op, nodePlan, planapi.PlanStateInProgress)
+}
+
+// terminalStatus is the status a terminal phase handler is called with: the operation in that phase.
+func terminalStatus(phase opv1alpha1.OperationPhase) opv1alpha1.ETCDSnapshotSaveStatus {
+	status := opv1alpha1.ETCDSnapshotSaveStatus{}
+	status.SetPhase(phase)
+	return status
 }

@@ -91,6 +91,11 @@ func TestSetTerminatedIsWriteOnce(t *testing.T) {
 
 	status := &opv1alpha1.OperationStatus{}
 
+	// Only a terminal phase is terminated.
+	status.SetTerminated()
+	assert.True(t, status.TerminatedAt.IsZero(), "SetTerminated must not record termination outside a terminal phase")
+
+	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
 	status.SetTerminated()
 	first := status.TerminatedAt
 	assert.False(t, first.IsZero(), "SetTerminated must record a timestamp")

@@ -322,11 +322,12 @@ func TestTerminalHandler_OwningOperationReleasesBeaconAndLeavesClusterPaused(t *
 	for _, terminal := range []struct {
 		name         string
 		handler      func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
+		phase        opv1alpha1.OperationPhase
 		wantEnqueues int
 	}{
-		{"canceled", (*handler).handleCanceled, 0},
-		{"failed", (*handler).handleFailed, 0},
-		{"succeeded", (*handler).handleSucceeded, 1},
+		{"canceled", (*handler).handleCanceled, opv1alpha1.OperationPhaseCanceled, 0},
+		{"failed", (*handler).handleFailed, opv1alpha1.OperationPhaseFailed, 0},
+		{"succeeded", (*handler).handleSucceeded, opv1alpha1.OperationPhaseSucceeded, 1},
 	} {
 		t.Run(terminal.name, func(t *testing.T) {
 			adapter := &stubAdapter{}
@@ -335,7 +336,7 @@ func TestTerminalHandler_OwningOperationReleasesBeaconAndLeavesClusterPaused(t *
 			h := &handler{beacons: beacons, dynamic: dynamic}
 			s := terminalScope(adapter)
 
-			got, err := terminal.handler(h, s, opv1alpha1.CertificateRotationStatus{})
+			got, err := terminal.handler(h, s, terminalStatus(terminal.phase))
 			require.NoError(t, err)
 			assert.Empty(t, adapter.pauseCalls, "terminal handling must not unpause the cluster")
 			require.Len(t, beacons.statusUpdates, 1)
@@ -354,10 +355,11 @@ func TestTerminalHandler_NonOwnerLeavesBeaconUntouched(t *testing.T) {
 	for _, terminal := range []struct {
 		name    string
 		handler func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
+		phase   opv1alpha1.OperationPhase
 	}{
-		{"canceled", (*handler).handleCanceled},
-		{"failed", (*handler).handleFailed},
-		{"succeeded", (*handler).handleSucceeded},
+		{"canceled", (*handler).handleCanceled, opv1alpha1.OperationPhaseCanceled},
+		{"failed", (*handler).handleFailed, opv1alpha1.OperationPhaseFailed},
+		{"succeeded", (*handler).handleSucceeded, opv1alpha1.OperationPhaseSucceeded},
 	} {
 		t.Run(terminal.name, func(t *testing.T) {
 			adapter := &stubAdapter{}
@@ -369,7 +371,7 @@ func TestTerminalHandler_NonOwnerLeavesBeaconUntouched(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "rotation", Namespace: "fleet-default", UID: "newer-rotation-uid"},
 			})
 
-			_, err := terminal.handler(h, s, opv1alpha1.CertificateRotationStatus{})
+			_, err := terminal.handler(h, s, terminalStatus(terminal.phase))
 			require.NoError(t, err)
 			assert.Empty(t, adapter.pauseCalls)
 			assert.Empty(t, beacons.statusUpdates)
@@ -1536,11 +1538,12 @@ func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 	for name, tc := range map[string]struct {
 		handle func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
 		hook   string
+		phase  opv1alpha1.OperationPhase
 	}{
-		"succeeded": {(*handler).handleSucceeded, opv1alpha1.SucceededPhaseHookLabelPrefix},
-		"failed":    {(*handler).handleFailed, opv1alpha1.FailedPhaseHookLabelPrefix},
-		"rejected":  {(*handler).handleRejected, opv1alpha1.RejectedPhaseHookLabelPrefix},
-		"canceled":  {(*handler).handleCanceled, opv1alpha1.CanceledPhaseHookLabelPrefix},
+		"succeeded": {(*handler).handleSucceeded, opv1alpha1.SucceededPhaseHookLabelPrefix, opv1alpha1.OperationPhaseSucceeded},
+		"failed":    {(*handler).handleFailed, opv1alpha1.FailedPhaseHookLabelPrefix, opv1alpha1.OperationPhaseFailed},
+		"rejected":  {(*handler).handleRejected, opv1alpha1.RejectedPhaseHookLabelPrefix, opv1alpha1.OperationPhaseRejected},
+		"canceled":  {(*handler).handleCanceled, opv1alpha1.CanceledPhaseHookLabelPrefix, opv1alpha1.OperationPhaseCanceled},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -1551,11 +1554,18 @@ func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 			beacons := &fakeBeaconClient{beacon: s.beacon}
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
 
-			got, err := tc.handle(h, s, opv1alpha1.CertificateRotationStatus{})
+			got, err := tc.handle(h, s, terminalStatus(tc.phase))
 			require.NoError(t, err)
 			assert.False(t, got.TerminatedAt.IsZero(), "with no beacon to release, terminal handling is trivially complete")
 			assert.Empty(t, beacons.statusUpdates, "a beacon held by another controller must not be modified")
 			assert.Empty(t, beacons.updates)
 		})
 	}
+}
+
+// terminalStatus is the status a terminal phase handler is called with: the operation in that phase.
+func terminalStatus(phase opv1alpha1.OperationPhase) opv1alpha1.CertificateRotationStatus {
+	status := opv1alpha1.CertificateRotationStatus{}
+	status.SetPhase(phase)
+	return status
 }

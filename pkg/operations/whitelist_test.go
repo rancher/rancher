@@ -1,17 +1,18 @@
 package operations
 
 import (
+	"maps"
 	"testing"
 
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
+	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -43,61 +44,185 @@ func TestApplyWhitelistChange(t *testing.T) {
 	}
 }
 
-// The CAPR and CAPRKE2 adapters pause the CAPI Cluster and write its whitelist in the same update, so a
-// cluster can never be left paused by an operation without also recording that only a restore can
-// repair it, and write nothing when there is nothing to change.
+// The CAPR and CAPRKE2 adapters pause the CAPI Cluster, and write the whitelist to the objects operations
+// and the UI key off: the management Cluster for both, and for CAPR the provisioning Cluster and the
+// RKEControlPlane too. Each object is written only when its part changes, and a call that changes nothing
+// (re-asserting a pause, or unpausing for a restart with the whitelist unchanged) succeeds without writing.
 func TestCAPIAdapters_PauseCluster(t *testing.T) {
 	const whitelisted = opv1alpha1.WhitelistedAnnotation
 	const restores = opv1alpha1.ETCDSnapshotRestoreResource
 
-	adapters := map[string]func(*wrangler.CAPIContext) Adapter{
-		"CAPR": func(clients *wrangler.CAPIContext) Adapter {
-			return &CAPRAdapter{clients: clients, controlPlane: &rkev1.RKEControlPlane{ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "c"}}}
+	// whitelistedObject reads back the whitelist an object carries and how many times it was written.
+	type whitelistedObject struct {
+		name    string
+		writes  func() int
+		current func() map[string]string
+	}
+
+	type fixture struct {
+		adapter     Adapter
+		capi        *stubCAPIClusterController
+		whitelisted []whitelistedObject
+	}
+
+	mgmtCluster := func(annotations map[string]string) (*stubClusterController, whitelistedObject) {
+		clusters := &stubClusterController{clusters: map[string]*mgmtv3.Cluster{
+			"c-abc": {Name: "c-abc", Annotations: annotations},
+		}}
+		return clusters, whitelistedObject{
+			name:    "management Cluster",
+			writes:  func() int { return len(clusters.updates) },
+			current: func() map[string]string { return clusters.clusters["c-abc"].Annotations },
+		}
+	}
+
+	adapters := map[string]func(capiClusters *stubCAPIClusterController, annotations map[string]string) fixture{
+		"CAPR": func(capiClusters *stubCAPIClusterController, annotations map[string]string) fixture {
+			mgmt, mgmtObject := mgmtCluster(maps.Clone(annotations))
+			prov := &stubProvisioningClusterController{cluster: &provv1.Cluster{
+				Namespace: "fleet-default", Name: "c", Annotations: maps.Clone(annotations),
+				Status: provv1.ClusterStatus{ClusterName: "c-abc"},
+			}}
+			controlPlanes := &stubRKEControlPlaneController{controlPlane: &rkev1.RKEControlPlane{
+				Namespace: "fleet-default", Name: "c", Annotations: maps.Clone(annotations),
+			}}
+			clients := &wrangler.CAPIContext{
+				Context: &wrangler.Context{
+					Mgmt:         &stubMgmtInterface{clusters: mgmt},
+					Provisioning: stubProvisioningInterface{clusters: prov},
+					RKE:          &stubRKEInterface{controlPlanes: controlPlanes},
+				},
+				CAPI: &stubCAPIInterface{clusters: capiClusters},
+			}
+			return fixture{
+				adapter: &CAPRAdapter{clients: clients, controlPlane: &rkev1.RKEControlPlane{Namespace: "fleet-default", Name: "c"}},
+				capi:    capiClusters,
+				whitelisted: []whitelistedObject{
+					mgmtObject,
+					{
+						name:    "provisioning Cluster",
+						writes:  func() int { return len(prov.updates) },
+						current: func() map[string]string { return prov.cluster.Annotations },
+					},
+					{
+						name:    "RKEControlPlane",
+						writes:  func() int { return len(controlPlanes.updates) },
+						current: func() map[string]string { return controlPlanes.controlPlane.Annotations },
+					},
+				},
+			}
 		},
-		"CAPRKE2": func(clients *wrangler.CAPIContext) Adapter {
-			return &CAPRKE2Adapter{clients: clients, controlPlane: &controlplanev1beta2.RKE2ControlPlane{ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "c"}}}
+		"CAPRKE2": func(capiClusters *stubCAPIClusterController, annotations map[string]string) fixture {
+			mgmt, mgmtObject := mgmtCluster(maps.Clone(annotations))
+			clients := &wrangler.CAPIContext{
+				Context: &wrangler.Context{Mgmt: &stubMgmtInterface{clusters: mgmt}},
+				CAPI:    &stubCAPIInterface{clusters: capiClusters},
+			}
+			return fixture{
+				adapter: &CAPRKE2Adapter{
+					clients:         clients,
+					cluster:         &capi.Cluster{Namespace: "fleet-default", Name: "c"},
+					controlPlane:    &controlplanev1beta2.RKE2ControlPlane{Namespace: "fleet-default", Name: "c"},
+					mgmtClusterName: "c-abc",
+				},
+				capi:        capiClusters,
+				whitelisted: []whitelistedObject{mgmtObject},
+			}
 		},
 	}
 
 	tests := []struct {
-		name          string
-		paused        *bool
-		annotations   map[string]string
-		pause         bool
-		whitelist     WhitelistChange
-		wantUpdate    bool
-		wantWhitelist string
+		name        string
+		paused      *bool
+		annotations map[string]string
+		pause       bool
+		whitelist   WhitelistChange
+
+		wantPauseWrite     bool
+		wantWhitelistWrite bool
+		wantWhitelist      string
 	}{
-		{name: "pausing whitelists restores in the same write", pause: true, whitelist: WhitelistRestores, wantUpdate: true, wantWhitelist: restores},
-		{name: "whitelisting an already paused cluster still writes", paused: ptr.To(true), pause: true, whitelist: WhitelistRestores, wantUpdate: true, wantWhitelist: restores},
-		{name: "a paused, whitelisted cluster does not write", paused: ptr.To(true), annotations: map[string]string{whitelisted: restores}, pause: true, whitelist: WhitelistRestores, wantWhitelist: restores},
-		{name: "unpausing clears the whitelist in the same write", paused: ptr.To(true), annotations: map[string]string{whitelisted: restores}, pause: false, whitelist: WhitelistCleared, wantUpdate: true},
-		{name: "unpausing can leave the whitelist", paused: ptr.To(true), annotations: map[string]string{whitelisted: restores}, pause: false, whitelist: WhitelistUnchanged, wantUpdate: true, wantWhitelist: restores},
-		{name: "an unpaused cluster without a whitelist does not write", paused: ptr.To(false), pause: false, whitelist: WhitelistCleared},
+		{
+			name:               "pausing whitelists restores",
+			pause:              true,
+			whitelist:          WhitelistRestores,
+			wantPauseWrite:     true,
+			wantWhitelistWrite: true,
+			wantWhitelist:      restores,
+		},
+		{
+			name:               "whitelisting an already paused cluster writes only the whitelist",
+			paused:             new(true),
+			pause:              true,
+			whitelist:          WhitelistRestores,
+			wantWhitelistWrite: true,
+			wantWhitelist:      restores,
+		},
+		{
+			// Re-asserted on every reconcile of a rotation's Rotate step.
+			name:          "re-asserting the pause on a paused, whitelisted cluster writes nothing",
+			paused:        new(true),
+			annotations:   map[string]string{whitelisted: restores},
+			pause:         true,
+			whitelist:     WhitelistRestores,
+			wantWhitelist: restores,
+		},
+		{
+			name:               "unpausing clears the whitelist",
+			paused:             new(true),
+			annotations:        map[string]string{whitelisted: restores},
+			pause:              false,
+			whitelist:          WhitelistCleared,
+			wantPauseWrite:     true,
+			wantWhitelistWrite: true,
+		},
+		{
+			// The restore unpauses for its restart and keeps the whitelist until it succeeds.
+			name:           "unpausing can leave the whitelist",
+			paused:         new(true),
+			annotations:    map[string]string{whitelisted: restores},
+			pause:          false,
+			whitelist:      WhitelistUnchanged,
+			wantPauseWrite: true,
+			wantWhitelist:  restores,
+		},
+		{
+			name:      "an unpaused cluster without a whitelist writes nothing",
+			paused:    new(false),
+			pause:     false,
+			whitelist: WhitelistCleared,
+		},
 	}
 
-	for kind, newAdapter := range adapters {
+	for kind, newFixture := range adapters {
 		for _, tt := range tests {
 			t.Run(kind+"/"+tt.name, func(t *testing.T) {
-				clusters := &stubCAPIClusterController{cluster: &capi.Cluster{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "c", Annotations: tt.annotations},
-					Spec:       capi.ClusterSpec{Paused: tt.paused},
+				capiClusters := &stubCAPIClusterController{cluster: &capi.Cluster{
+					Namespace: "fleet-default", Name: "c",
+					Spec: capi.ClusterSpec{Paused: tt.paused},
 				}}
-				adapter := newAdapter(&wrangler.CAPIContext{CAPI: &stubCAPIInterface{clusters: clusters}})
+				fx := newFixture(capiClusters, tt.annotations)
 
-				require.NoError(t, adapter.PauseCluster(tt.pause, tt.whitelist))
+				require.NoError(t, fx.adapter.PauseCluster(tt.pause, tt.whitelist))
 
-				if !tt.wantUpdate {
-					assert.Empty(t, clusters.updates, "nothing to change, so nothing is written")
-					return
-				}
-				require.Len(t, clusters.updates, 1, "the pause and the whitelist are written in one update")
-				written := clusters.updates[0]
-				assert.Equal(t, ptr.To(tt.pause), written.Spec.Paused)
-				if tt.wantWhitelist == "" {
-					assert.NotContains(t, written.Annotations, whitelisted)
+				if tt.wantPauseWrite {
+					require.Len(t, fx.capi.updates, 1, "the CAPI Cluster's pause is written once")
+					assert.Equal(t, new(tt.pause), fx.capi.updates[0].Spec.Paused)
 				} else {
-					assert.Equal(t, tt.wantWhitelist, written.Annotations[whitelisted])
+					assert.Empty(t, fx.capi.updates, "the pause is already as asked, so the CAPI Cluster isn't written")
+				}
+
+				for _, object := range fx.whitelisted {
+					if tt.wantWhitelistWrite {
+						assert.Equal(t, 1, object.writes(), "%s: the whitelist is written once", object.name)
+					} else {
+						assert.Zero(t, object.writes(), "%s: the whitelist is already as asked, so it isn't written", object.name)
+					}
+					if tt.wantWhitelist == "" {
+						assert.NotContains(t, object.current(), whitelisted, "%s", object.name)
+					} else {
+						assert.Equal(t, tt.wantWhitelist, object.current()[whitelisted], "%s", object.name)
+					}
 				}
 			})
 		}

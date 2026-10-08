@@ -783,7 +783,9 @@ func (a *CAPRAdapter) pauseCAPICluster(pause bool) error {
 }
 
 // whitelistProvisioningCluster whitelists the provisioning cluster object according to the desired WhitelistChange
-// strategy and returns the management cluster name for the cluster.
+// strategy and returns the management cluster name for the cluster, whether or not the whitelist changed: a
+// PauseCluster call that changes nothing here (re-asserting a pause, or unpausing with WhitelistUnchanged) still
+// has the management cluster to settle.
 func (a *CAPRAdapter) whitelistProvisioningCluster(whitelist WhitelistChange) (string, error) {
 	cluster, err := a.clients.Provisioning.Cluster().Get(a.controlPlane.Namespace, a.controlPlane.Name, metav1.GetOptions{})
 	if err != nil {
@@ -794,7 +796,7 @@ func (a *CAPRAdapter) whitelistProvisioningCluster(whitelist WhitelistChange) (s
 	var whitelistChanged bool
 	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
 	if !whitelistChanged {
-		return "", nil
+		return cluster.Status.ClusterName, nil
 	}
 
 	_, err = a.clients.Provisioning.Cluster().Update(cluster)
@@ -802,7 +804,7 @@ func (a *CAPRAdapter) whitelistProvisioningCluster(whitelist WhitelistChange) (s
 }
 
 // whitelistControlPlane whitelists the RKEControlPlane object according to the desired WhitelistChange
-// strategy and returns the management cluster name for the cluster.
+// strategy.
 func (a *CAPRAdapter) whitelistControlPlane(whitelist WhitelistChange) error {
 	controlPlane, err := a.clients.RKE.RKEControlPlane().Get(a.controlPlane.Namespace, a.controlPlane.Name, metav1.GetOptions{})
 	if err != nil {
