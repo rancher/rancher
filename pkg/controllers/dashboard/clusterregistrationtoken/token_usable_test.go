@@ -53,7 +53,7 @@ func TestTokenSecretCluster(t *testing.T) {
 			name:         "namespace not found",
 			namespaceErr: namespaceNotFound,
 			cluster:      itsCluster,
-			wantCluster:  itsCluster,
+			wantStale:    true,
 		},
 		{
 			// No other cluster has the name: callers decide whether they can act without a cluster.

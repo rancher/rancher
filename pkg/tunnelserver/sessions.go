@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"maps"
 	"net"
 	"net/http"
 	"sync"
@@ -118,7 +119,7 @@ func (t *SessionTracker) CloseCluster(uid types.UID) int {
 		return 0
 	}
 	t.mu.Lock()
-	conns := t.conns[uid]
+	conns := maps.Clone(t.conns[uid])
 	delete(t.conns, uid)
 	now := t.now()
 	for closedUID, at := range t.closed {

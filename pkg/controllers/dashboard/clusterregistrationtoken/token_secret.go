@@ -67,20 +67,23 @@ func SecretTokenIndexValues(secret *corev1.Secret) []string {
 // isn't stale; callers decide whether they can act without a cluster.
 func TokenSecretCluster(secret *corev1.Secret, getNamespace func(name string) (*corev1.Namespace, error), getCluster func(name string) (*v3.Cluster, error)) (cluster *v3.Cluster, stale bool, err error) {
 	ns, err := getNamespace(secret.Namespace)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
+		return nil, true, nil
+	} else if err != nil {
 		return nil, false, fmt.Errorf("failed to get namespace %s of token secret %s: %w", secret.Namespace, secret.Name, err)
 	}
-	if err == nil && (ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating) {
+
+	if ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating {
 		return nil, true, nil
 	}
 
 	cluster, err = getCluster(secret.Namespace)
 	if apierrors.IsNotFound(err) {
 		return nil, false, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return nil, false, fmt.Errorf("failed to get cluster %s of token secret %s: %w", secret.Namespace, secret.Name, err)
 	}
+
 	return cluster, false, nil
 }
 

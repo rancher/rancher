@@ -100,10 +100,16 @@ func (m *Manager) stopRecord(r *record) {
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
 	// reload cluster, always use the cached one
+	uid := cluster.UID
 	cluster, err := m.clusterLister.Get("", cluster.Name)
 	if err != nil {
 		return err
 	}
+
+	if uid != cluster.UID {
+		return errors.New("mismatched cluster UID")
+	}
+
 	_, err = m.start(ctx, cluster, true, clusterOwner)
 	return err
 }

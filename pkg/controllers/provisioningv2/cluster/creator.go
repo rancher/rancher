@@ -126,23 +126,25 @@ func (h *handler) onProvisioningClusterRemove(_ string, cluster *v1.Cluster) (*v
 	return h.clusters.Update(cluster)
 }
 
-// removeCreatedManagementCluster deletes the management cluster cluster created, and reports whether it is
-// gone. A management cluster that cluster didn't create, or that moved to another fleet workspace, is left
+// removeCreatedManagementCluster deletes the management cluster this cluster created, and reports whether it is
+// gone. A management cluster that this cluster didn't create, or that moved to another fleet workspace, is left
 // alone.
 func (h *handler) removeCreatedManagementCluster(cluster *v1.Cluster) (bool, error) {
 	if cluster.Status.ClusterName == "" {
 		return true, nil
 	}
+
 	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
 	if apierrors.IsNotFound(err) {
 		return true, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return false, err
 	}
-	if !util.CreatedBy(mgmtCluster, util.ProvisioningClusterGVK, cluster.Namespace, cluster.Name) || cluster.Namespace != mgmtCluster.Spec.FleetWorkspaceName {
+
+	if !util.CreatedBy(mgmtCluster, util.ProvisioningClusterGVK, cluster.Namespace, cluster.Name) {
 		return true, nil
 	}
+
 	if mgmtCluster.DeletionTimestamp == nil {
 		logrus.Infof("[provisioningcluster] deleting management cluster %s created by provisioning cluster %s/%s", mgmtCluster.Name, cluster.Namespace, cluster.Name)
 		uid := mgmtCluster.UID
