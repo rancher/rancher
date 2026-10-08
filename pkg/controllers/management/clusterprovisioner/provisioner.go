@@ -521,7 +521,8 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 
 		// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
 		apimgmtv3.ClusterConditionUpdated.Unknown(cluster)
-		updatedCluster, err := p.Clusters.UpdateStatus(cluster)
+		var updatedCluster *apimgmtv3.Cluster
+		updatedCluster, err = p.Clusters.UpdateStatus(cluster)
 		if err != nil {
 			return cluster, fmt.Errorf("[reconcileCluster] Failed to update cluster [%s]: %v", cluster.Name, err)
 		}
@@ -557,7 +558,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 	}
 
 	saved := false
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return cluster, err
