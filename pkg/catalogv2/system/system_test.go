@@ -1,5 +1,7 @@
 package system
 
+//go:generate go tool -modfile ../../../gotools/mockgen/go.mod mockgen --build_flags=--mod=mod -package system -destination=./mock_system_test.go -source=./system.go ContentClient,OperationClient,HelmClient
+
 import (
 	"context"
 	"encoding/json"
