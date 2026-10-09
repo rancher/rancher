@@ -200,6 +200,11 @@ func (in *KubeconfigSpec) DeepCopyInto(out *KubeconfigSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PreferRancherProxy != nil {
+		in, out := &in.PreferRancherProxy, &out.PreferRancherProxy
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

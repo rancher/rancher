@@ -270,6 +270,12 @@ var (
 	// If set to false they run "rancher token" with the kubeconfig user entry name. Valid values are "true" and "false". An empty string means "false".
 	KubeconfigExecGetToken = NewSetting("kubeconfig-exec-get-token", "false")
 
+	// KubeconfigPreferRancherProxy determines whether kubeconfigs generated with the ext.cattle.io
+	// Kubeconfig API use the Rancher proxy context instead of the Authorized Cluster Endpoint (ACE)
+	// context as the current-context for clusters with ACE enabled. It applies when
+	// spec.preferRancherProxy is not set. Only "true" (case-insensitive) selects the proxy context.
+	KubeconfigPreferRancherProxy = NewSetting("kubeconfig-prefer-rancher-proxy", "false")
+
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
 	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
 
