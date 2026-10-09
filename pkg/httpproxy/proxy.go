@@ -546,16 +546,13 @@ func isOverlyBroad(pattern string) bool {
 	return targetLabel == "*" || targetLabel == "%"
 }
 
-// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool.
-// It combines the provided certificates with the system's root CAs.
+// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool
+// containing only the provided CA.
 func parseCACertificates(caBundle string) (*x509.CertPool, error) {
 	if err := validateCABundleSecurity(caBundle); err != nil {
 		return nil, err
 	}
-	caCertPool, err := x509.SystemCertPool()
-	if err != nil {
-		caCertPool = x509.NewCertPool()
-	}
+	caCertPool := x509.NewCertPool()
 
 	// Add the provided CA certificates to the pool
 	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
