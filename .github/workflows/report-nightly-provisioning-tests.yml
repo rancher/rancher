@@ -25,6 +25,8 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: 'false'
       - name: collect-runs
         id: collect
         run: bash .github/scripts/collect-nightly-provisioning-failure-bundles.sh
@@ -41,11 +43,18 @@ jobs:
   # AI Summaries should always be optional. A job that calls a reusable
   # workflow cannot set continue-on-error, so the analysis workflow
   # swallows its own failures and notify-slack runs regardless of what happens here.
+  #
+  # actions: write is only here because gh-aw always compiles a conclusion job that requests it,
+  # and a caller granting less fails the entire run at startup.
   analyze:
     needs: collect
+    permissions:
+      actions: write
+      contents: read
     if: needs.collect.outputs.any-failures == 'true'
-    uses: ./.github/workflows/nightly-prov-analysis.lock.yml
-    secrets: inherit
+    uses: $/.github/workflows/nightly-prov-analysis.lock.yml
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
   notify-slack:
     needs: [collect, analyze]
@@ -57,6 +66,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: 'false'
       - name: Fetch failure bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -84,7 +95,7 @@ jobs:
 
       - name: Get Webhook URL
         if: steps.generate.outputs.any-failures == 'true'
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           # none of this is setup yet, just a placeholder.
           secrets: |

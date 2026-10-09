@@ -46,6 +46,23 @@ tools:
 
 timeout-minutes: 10
 
+# The only output is the analysis artifact. Never create or comment on issues, including on
+# failures and noops. gh-aw auto-injects create-issue unless a non-system safe output is
+# configured, so upload-artifact is enabled purely to suppress that: it needs no token
+# permissions. Check the compiled lock file for create_issue after recompiling.
+safe-outputs:
+  upload-artifact:
+    max-uploads: 1
+    retention-days: 1
+  threat-detection: false
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  noop:
+    report-as-issue: false
+  missing-tool: false
+  missing-data: false
+  report-incomplete: false
+
 jobs:
   agent:
     # The analysis is additive. 
