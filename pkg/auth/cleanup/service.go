@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type extTokenStore interface {
@@ -140,7 +141,7 @@ func (s *Service) deleteClusterRoleTemplateBindings(provider string) error {
 	}
 
 	for _, b := range list {
-		if getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName) == provider {
+		if getProvidersFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName).Has(provider) {
 			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -158,7 +159,7 @@ func (s *Service) deleteGlobalRoleBindings(provider string) error {
 	}
 
 	for _, b := range list {
-		if getProviderNameFromPrincipalNames(b.GroupPrincipalName) == provider {
+		if getProvidersFromPrincipalNames(b.GroupPrincipalName).Has(provider) {
 			err := s.globalRoleBindingsClient.Delete(b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -176,7 +177,7 @@ func (s *Service) deleteProjectRoleTemplateBindings(provider string) error {
 	}
 
 	for _, b := range prtbs {
-		if getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName) == provider {
+		if getProvidersFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName).Has(provider) {
 			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -194,6 +195,8 @@ func (s *Service) deleteProjectRoleTemplateBindings(provider string) error {
 // A local admin (not necessarily the default admin) who had set up the provider will have two principal IDs,
 // but will also have a password.
 // This is how Rancher distinguishes fully external users from those who are external, too, but were once local.
+// Users who also have principal IDs from another provider are kept, as they can still log in through it,
+// and only the principal IDs of this provider are removed from them.
 func (s *Service) deleteUsers(provider string) error {
 	users, err := s.userClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -201,7 +204,14 @@ func (s *Service) deleteUsers(provider string) error {
 	}
 
 	for _, u := range users.Items {
-		if getProviderNameFromPrincipalNames(u.PrincipalIDs...) != provider {
+		providers := getProvidersFromPrincipalNames(u.PrincipalIDs...)
+		if !providers.Has(provider) {
+			continue
+		}
+		if providers.Len() > 1 {
+			if err := s.removeProviderPrincipals(&u, provider); err != nil {
+				return fmt.Errorf("failed to remove principal IDs of %s from user %s: %w", provider, u.Name, err)
+			}
 			continue
 		}
 		// A fully external user (who was never local) has no password.
@@ -261,6 +271,28 @@ func (s *Service) deleteExtTokens(provider string) error {
 	return nil
 }
 
+// removeProviderPrincipals takes a user who has principal IDs from several providers and removes
+// the ones that belong to the given provider.
+func (s *Service) removeProviderPrincipals(user *v3.User, provider string) error {
+	var principalIDs []string
+	for _, id := range user.PrincipalIDs {
+		if !getProvidersFromPrincipalNames(id).Has(provider) {
+			principalIDs = append(principalIDs, id)
+		}
+	}
+
+	user.PrincipalIDs = principalIDs
+	impClient, err := s.userClient.WithImpersonation(ranchercontrollers.WebhookImpersonation())
+	if err != nil {
+		return fmt.Errorf("impersonating webhook to remove user principals: %w", err)
+	}
+	_, err = impClient.Update(user)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 // resetLocalUser takes a user and removes all its principal IDs except that of the local user.
 // It updates the user so that it is effectively as it was before any auth provider had been enabled.
 func (s *Service) resetLocalUser(user *v3.User) error {
@@ -292,14 +324,16 @@ func (s *Service) resetLocalUser(user *v3.User) error {
 	return nil
 }
 
-// getProviderNameFromPrincipalNames tries to extract the provider name from any one string that represents
-// a user principal or group principal.
-func getProviderNameFromPrincipalNames(names ...string) string {
+// getProvidersFromPrincipalNames returns the set of non-local provider names extracted from
+// the given principal ID strings. Each principal has the form "<provider>_<type>://<id>",
+// where <type> is "user" or "group". Local principals are excluded from the result.
+func getProvidersFromPrincipalNames(names ...string) sets.Set[string] {
+	providers := sets.New[string]()
 	for _, name := range names {
 		parts := strings.Split(name, "_")
 		if len(parts) > 0 && parts[0] != "" && !strings.HasPrefix(parts[0], "local") {
-			return parts[0]
+			providers.Insert(parts[0])
 		}
 	}
-	return ""
+	return providers
 }
