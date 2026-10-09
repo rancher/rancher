@@ -182,7 +182,6 @@ func (p *ldapProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, 
 
 // searchKey can be user PrincipalID e.g. shibboleth_user://username with principalType of group for group search by user
 func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
-	// TODO: This will fail for cross-provider access.
 	configName, err := common.ConfigNameFromToken(token)
 	if err != nil {
 		return nil, err

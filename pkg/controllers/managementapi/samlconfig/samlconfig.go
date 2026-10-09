@@ -45,18 +45,16 @@ func newAuthProvider(apiContext *config.ScaledContext) *authProvider {
 }
 
 func (a *authProvider) sync(key string, config *v3.AuthConfig) (runtime.Object, error) {
-	samlConfig := &v32.SamlConfig{}
-	if key == "" {
-		return nil, nil
-	}
-
-	if config == nil || config.DeletionTimestamp != nil {
-		// Removing a config that isn't SAML is a no-op.
-		saml.RemoveSamlServiceProvider(key)
+	if key == "" || config == nil {
 		return nil, nil
 	}
 
 	if !slices.Contains(samlConfigTypes, config.Type) {
+		return nil, nil
+	}
+
+	if config.DeletionTimestamp != nil {
+		saml.RemoveSamlServiceProvider(key)
 		return nil, nil
 	}
 
@@ -75,6 +73,7 @@ func (a *authProvider) sync(key string, config *v3.AuthConfig) (runtime.Object, 
 		return nil, fmt.Errorf("failed to retrieve SamlConfig, cannot read k8s Unstructured data")
 	}
 	storedSamlConfigMap := u.UnstructuredContent()
+	samlConfig := &v32.SamlConfig{}
 	err = common.Decode(storedSamlConfigMap, samlConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode Azure Config: %w", err)

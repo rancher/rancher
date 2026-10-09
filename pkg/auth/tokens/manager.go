@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -532,7 +533,12 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, gr
 	// The secret is keyed by the AuthConfig name so that multiple configs of
 	// the same provider don't overwrite each other.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
-		err := m.CreateSecret(userID, secretKeyForPrincipal(userPrincipal), providerToken)
+		configName, _, _, err := common.SplitPrincipalID(userPrincipal.Name)
+		if err != nil {
+			return nil, "", err
+		}
+
+		err = m.CreateSecret(userID, configName, providerToken)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create secret: %s", err)
 		}
@@ -551,21 +557,6 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, gr
 			},
 		},
 	})
-}
-
-// secretKeyForPrincipal returns the AuthConfig name from the principal ID,
-// falling back to the provider name if the ID can't be parsed.
-func secretKeyForPrincipal(principal apiv3.Principal) string {
-	scheme, _, found := strings.Cut(principal.Name, ":")
-	if !found {
-		return principal.Provider
-	}
-	configName, _, found := strings.Cut(scheme, "_")
-	if !found || configName == "" {
-		return principal.Provider
-	}
-
-	return configName
 }
 
 func (m *Manager) UpdateToken(token *apiv3.Token) (*apiv3.Token, error) {

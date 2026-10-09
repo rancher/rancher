@@ -14,14 +14,16 @@ import (
 func TestSyncRemovesSamlServiceProvider(t *testing.T) {
 	now := metav1.Now()
 	tests := []struct {
-		name   string
-		config *v3.AuthConfig
+		name         string
+		config       *v3.AuthConfig
+		shouldRemove bool
 	}{
 		{
-			name: "deleted config",
+			name: "missing config with unknown type",
 		},
 		{
-			name: "config being deleted",
+			name:         "config being deleted",
+			shouldRemove: true,
 			config: &v3.AuthConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "okta-eu", DeletionTimestamp: &now},
 				Type:       client.OKTAConfigType,
@@ -29,7 +31,16 @@ func TestSyncRemovesSamlServiceProvider(t *testing.T) {
 			},
 		},
 		{
-			name: "disabled config",
+			name: "non-SAML config being deleted",
+			config: &v3.AuthConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: "okta-eu", DeletionTimestamp: &now},
+				Type:       client.GithubConfigType,
+				Enabled:    true,
+			},
+		},
+		{
+			name:         "disabled config",
+			shouldRemove: true,
 			config: &v3.AuthConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "okta-eu"},
 				Type:       client.OKTAConfigType,
@@ -49,7 +60,11 @@ func TestSyncRemovesSamlServiceProvider(t *testing.T) {
 			_, err := a.sync("okta-eu", tt.config)
 			require.NoError(t, err)
 
-			assert.NotContains(t, saml.SamlProviders, "okta-eu")
+			if tt.shouldRemove {
+				assert.NotContains(t, saml.SamlProviders, "okta-eu")
+			} else {
+				assert.Contains(t, saml.SamlProviders, "okta-eu")
+			}
 		})
 	}
 }

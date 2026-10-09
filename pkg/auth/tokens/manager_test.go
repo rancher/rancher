@@ -671,27 +671,3 @@ func (n *normanRecorder) Write(apiContext *types.APIContext, code int, obj any) 
 		})
 	}
 }
-
-func TestSecretKeyForPrincipal(t *testing.T) {
-	tests := map[string]struct {
-		principalName string
-		provider      string
-		want          string
-	}{
-		"default config":         {principalName: "github_user://1", provider: "github", want: "github"},
-		"named config":           {principalName: "github-eu_user://1", provider: "github", want: "github-eu"},
-		"underscore in id":       {principalName: "oidc-eu_user://a_b", provider: "oidc", want: "oidc-eu"},
-		"no type separator":      {principalName: "local://u-abc_d", provider: "local", want: "local"},
-		"unparseable falls back": {principalName: "garbage", provider: "github", want: "github"},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			principal := apiv3.Principal{
-				ObjectMeta: metav1.ObjectMeta{Name: tt.principalName},
-				Provider:   tt.provider,
-			}
-			assert.Equal(t, tt.want, secretKeyForPrincipal(principal))
-		})
-	}
-}

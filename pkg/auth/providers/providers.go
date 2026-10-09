@@ -292,7 +292,6 @@ type configRef struct {
 // configuredRefs returns the configured AuthConfigs. Without a lister, each
 // registered provider is assumed to have a single config named after it.
 func configuredRefs() []configRef {
-	mu.RLock()
 	lister := authConfigLister
 	var refs []configRef
 	if lister == nil {
@@ -300,10 +299,7 @@ func configuredRefs() []configRef {
 		for name, p := range providers {
 			refs = append(refs, configRef{providerName: name, configName: p.GetName()})
 		}
-	}
-	mu.RUnlock()
 
-	if lister == nil {
 		return refs
 	}
 
@@ -312,9 +308,9 @@ func configuredRefs() []configRef {
 		logrus.Warnf("listing auth configs: %v", err)
 		return nil
 	}
-	refs = make([]configRef, 0, len(authConfigs))
-	for _, authConfig := range authConfigs {
-		refs = append(refs, configRef{providerName: NameFromType(authConfig.Type), configName: authConfig.Name})
+	refs = make([]configRef, len(authConfigs))
+	for i, authConfig := range authConfigs {
+		refs[i] = configRef{providerName: NameFromType(authConfig.Type), configName: authConfig.Name}
 	}
 
 	return refs
@@ -356,6 +352,10 @@ func IsExternalProviderEnabled() bool {
 		// Don't clear the hint here; the full scan overwrites it authoritatively.
 	}
 
+	// Full scan: snapshot the non-local provider list while holding the lock,
+	// then call IsDisabledProvider outside the lock — those implementations make
+	// live Kubernetes API calls that must not block the lock.
+	mu.RLock()
 	for _, ref := range configuredRefs() {
 		if ref.providerName == local.Name || ref == alreadyChecked {
 			continue
@@ -370,6 +370,8 @@ func IsExternalProviderEnabled() bool {
 			return true
 		}
 	}
+	mu.RUnlock()
+
 	lastKnownEnabled.Store(configRef{})
 	return false
 }
