@@ -63,7 +63,7 @@ new template and pointing the MD to it.
 
 The cleanup routine will only execute periodically since it can do
 many apiserver calls, this is done by annotating provisioning clusters
-with with the timestamp of the next execution.
+with the timestamp of the next execution.
 
 The local provisioning cluster is used to track and clean up unowned
 objects. If it finds an owned template, it will also label it with the
@@ -270,7 +270,9 @@ func (h *handler) isLocal(cluster *provv1.Cluster) bool {
 }
 
 func (h *handler) shouldCleanup(cluster *provv1.Cluster) bool {
-	if cluster.Spec.RKEConfig == nil || cluster.Spec.RKEConfig.InfrastructureRef == nil {
+	if cluster.DeletionTimestamp != nil ||
+		cluster.Spec.RKEConfig == nil ||
+		cluster.Spec.RKEConfig.InfrastructureRef == nil {
 		return false
 	}
 
@@ -382,7 +384,7 @@ func (h *handler) cleanupOrLabelObjectsByGK(objectGK schema.GroupKind, label boo
 
 // If an object has no owner after a grace period, delete it. If it does
 // have an owner, add a label to it so it can be more easily found
-// by the the per-cluster cleanup function.
+// by the per-cluster cleanup function.
 func (h *handler) cleanupOrLabelObject(
 	obj *unstructured.Unstructured,
 	client dynamic.NamespaceableResourceInterface,
@@ -398,8 +400,9 @@ func (h *handler) cleanupOrLabelObject(
 	}
 
 	// Allow some time for the object to be adopted after creation, e.g. the UI
-	// might create first the object and then the provisionig cluster.
-	if obj.GetCreationTimestamp().Add(templateGracePeriod).After(now) {
+	// might create the object first and then the provisioning cluster.
+	if obj.GetCreationTimestamp().Add(templateGracePeriod).After(now) ||
+		obj.GetDeletionTimestamp() != nil {
 		return nil
 	}
 
@@ -412,7 +415,7 @@ func (h *handler) cleanupOrLabelObject(
 			// Avoid issues with name reuse.
 			UID: &uid,
 
-			// This would prevent a delete on a last-minute adoption (as the owner references would change).
+			// This would prevent a deletion on a last-minute adoption (as the owner references would change).
 			ResourceVersion: &rv,
 		},
 	})
@@ -515,7 +518,7 @@ func (h *handler) cleanupInfraMachineTemplates(cluster *provv1.Cluster, now time
 
 	// Here we can use the cache for CAPI clusters since all we need from it is
 	// to check the ownership chain from provisioning cluster to template, and
-	// we expect there to be a single capi cluster for a provisioning cluser.
+	// we expect there to be a single capi cluster for a provisioning cluster.
 	capiCluster, err := h.capiClusterCache.Get(cluster.Namespace, cluster.Name)
 	if err != nil {
 		return fmt.Errorf("looking for CAPI cluster: %w", err)
@@ -530,6 +533,7 @@ func (h *handler) cleanupInfraMachineTemplates(cluster *provv1.Cluster, now time
 
 		if ownerGV.Group == provv1.SchemeGroupVersion.Group && owner.Kind == "Cluster" && owner.UID == cluster.UID {
 			foundOwner = true
+			break
 		}
 	}
 
