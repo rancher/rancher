@@ -61,10 +61,8 @@ func SecretTokenIndexValues(secret *corev1.Secret) []string {
 // removed once that namespace is gone. Nothing new can be created in a terminating namespace, so any token
 // found in one belongs to a cluster that is gone.
 //
-// A namespace that can't be found is not treated as stale: a secret can't outlive its namespace, so not
-// finding it only means the namespace cache is behind the secret cache. Rejecting then would turn a lagging
-// cache into failed registrations. If no cluster has the name, the returned cluster is nil and the token
-// isn't stale; callers decide whether they can act without a cluster.
+// A namespace that can't be found is treated as stale: if callers want a stronger degree of certainty, prefer a client
+// over a cache.
 func TokenSecretCluster(secret *corev1.Secret, getNamespace func(name string) (*corev1.Namespace, error), getCluster func(name string) (*v3.Cluster, error)) (cluster *v3.Cluster, stale bool, err error) {
 	ns, err := getNamespace(secret.Namespace)
 	if apierrors.IsNotFound(err) {
