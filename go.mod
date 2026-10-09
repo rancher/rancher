@@ -118,8 +118,8 @@ require (
 	github.com/rancher/cluster-api-provider-rke2 v0.25.2
 	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.16.0-rc.2
-	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
-	github.com/rancher/fleet/pkg/helmvalues v0.16.1
+	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.6
+	github.com/rancher/fleet/pkg/helmvalues v0.17.0-alpha.6
 	github.com/rancher/gke-operator v1.16.0-rc.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
@@ -146,7 +146,7 @@ require (
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/text v0.42.0
@@ -166,7 +166,7 @@ require (
 	k8s.io/cli-runtime v0.37.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kube-aggregator v0.37.1
-	k8s.io/kube-openapi v0.0.0-20260821135717-be32def86098
+	k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 	k8s.io/kubectl v0.37.1
 	k8s.io/kubernetes v1.37.1
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
@@ -205,7 +205,6 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -260,7 +259,7 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fluxcd/cli-utils v1.2.2 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.6 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -271,18 +270,10 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v1.0.0 // indirect
 	github.com/go-openapi/jsonreference v1.0.0 // indirect
-	github.com/go-openapi/swag v0.28.0 // indirect
-	github.com/go-openapi/swag/cmdutils v0.28.0 // indirect
 	github.com/go-openapi/swag/conv v0.28.0 // indirect
-	github.com/go-openapi/swag/fileutils v0.28.0 // indirect
 	github.com/go-openapi/swag/jsonutils v0.28.0 // indirect
-	github.com/go-openapi/swag/loading v0.28.0 // indirect
-	github.com/go-openapi/swag/mangling v0.28.0 // indirect
-	github.com/go-openapi/swag/netutils v0.28.0 // indirect
 	github.com/go-openapi/swag/pools v0.28.0 // indirect
-	github.com/go-openapi/swag/stringutils v0.28.0 // indirect
 	github.com/go-openapi/swag/typeutils v0.28.0 // indirect
-	github.com/go-openapi/swag/yamlutils v0.28.0 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.13.0 // indirect
@@ -420,8 +411,9 @@ require (
 	modernc.org/sqlite v1.57.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.36.0 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
-	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
+	sigs.k8s.io/json v0.0.0-20260909141634-11ed52e25bc5 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v7 v7.0.0 // indirect
 )
