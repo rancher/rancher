@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
@@ -79,7 +80,7 @@ func init() {
 // cluster shell — identified by the presence of both the capi-cluster-owner and -owner-ns
 // labels. Returns (nil, nil) when the labels are absent (caller should try the next dispatch).
 // One label present without the other is a misconfiguration and returns an error rather than
-// silently falling through — matches the identity-resolver behaviour in the config server.
+// silently falling through — matches the identity-resolver behavior in the config server.
 func turtlesCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) (Adapter, error) {
 	ownerName := cluster.Labels[capr.CAPIClusterOwnerLabel]
 	ownerNS := cluster.Labels[capr.CAPIClusterOwnerNSLabel]
@@ -955,7 +956,7 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 //
 // The annotation is read straight off the object on every reconcile of the upgrade handler, so the
 // pause takes effect as soon as this returns.
-func (a *ImportedAdapter) PauseCluster(pause bool) error {
+func (a *ImportedAdapter) PauseCluster(pause bool, whitelist WhitelistChange) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Read through the client rather than trusting a.cluster: the operation holds its adapter
 		// across reconciles, and the annotation is the one field two steps of the same operation both
@@ -964,26 +965,31 @@ func (a *ImportedAdapter) PauseCluster(pause bool) error {
 		if err != nil {
 			return err
 		}
+		cluster = cluster.DeepCopy()
 
+		var pauseChanged bool
 		if pause {
-			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] == "true" {
-				return nil
+			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] != "true" {
+				if cluster.Annotations == nil {
+					cluster.Annotations = map[string]string{}
+				}
+				cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
+				pauseChanged = true
 			}
-			cluster = cluster.DeepCopy()
-			if cluster.Annotations == nil {
-				cluster.Annotations = map[string]string{}
-			}
-			cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
-		} else {
-			if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; !ok {
-				return nil
-			}
-			cluster = cluster.DeepCopy()
+		} else if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; ok {
 			delete(cluster.Annotations, importedclusterversionmanagement.VersionManagementPausedAnno)
+			pauseChanged = true
 		}
 
-		logrus.Infof("[operations] imported cluster %s: setting %s=%v", cluster.Name,
-			importedclusterversionmanagement.VersionManagementPausedAnno, pause)
+		var whitelistChanged bool
+		cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+		if !pauseChanged && !whitelistChanged {
+			return nil
+		}
+
+		logrus.Infof("[operations] imported cluster %s: setting %s=%v, %s=%q", cluster.Name,
+			importedclusterversionmanagement.VersionManagementPausedAnno, pause,
+			opv1alpha1.WhitelistedAnnotation, cluster.Annotations[opv1alpha1.WhitelistedAnnotation])
 
 		_, err = a.clients.Mgmt.Cluster().Update(cluster)
 		return err

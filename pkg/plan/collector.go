@@ -187,7 +187,7 @@ func Or(selectors ...Selector) Selector { return orSelector{selectors: selectors
 //	    WithValidator(planapi.AtLeast(1, capr.EtcdRoleLabel)).
 //	    Collect()
 //
-// Collector is not safe for concurrent use — build one per query.
+// Collector is not safe for concurrent use: build one per query.
 type Collector struct {
 	client      SecretClient
 	namespace   string
@@ -202,11 +202,11 @@ type Collector struct {
 // the given namespace.
 //
 // The cluster's name (via cluster.GetName()) is automatically AND-composed into every query as a
-// rke.cattle.io/cluster-name=<name> filter — callers do not need to pass it through WithLabels.
+// rke.cattle.io/cluster-name=<name> filter: callers do not need to pass it through WithLabels.
 //
 // Passing a nil cluster returns a Collector that matches every secret in the namespace (no
 // auto-filter), which is occasionally useful for cluster-list operations but is rarely what you
-// want — prefer passing the cluster object explicitly.
+// want: prefer passing the cluster object explicitly.
 func NewCollector(client SecretClient, cluster ClusterRef, namespace string) *Collector {
 	c := &Collector{
 		client:    client,
@@ -231,7 +231,7 @@ func (c *Collector) WithLabels(selectors ...Selector) *Collector {
 }
 
 // WithFilter adds a post-fetch predicate that runs against each candidate secret. Multiple
-// WithFilter calls AND together — a secret is kept only when every filter returns true.
+// WithFilter calls AND together: a secret is kept only when every filter returns true.
 //
 // Use WithFilter for conditions a label selector cannot express (annotations, data fields, or
 // "absent label means linux"-style defaults).
@@ -244,7 +244,7 @@ func (c *Collector) WithFilter(filter FilterFunc) *Collector {
 
 // WithSorter sets a SorterFunc applied to the final result set. Multiple WithSorter calls chain
 // in declaration order; later sorters re-sort the slice and so effectively break ties left by
-// earlier ones (sort.Slice is not stable — wrap with a stable sorter if you need ordering
+// earlier ones (sort.Slice is not stable: wrap with a stable sorter if you need ordering
 // guarantees beyond the last sorter).
 func (c *Collector) WithSorter(sorter SorterFunc) *Collector {
 	if sorter != nil {
@@ -417,7 +417,7 @@ func AtLeast(n int, labelKey string) Validator {
 // AtMost returns a Validator that fails when more than n secrets in the result carry the given
 // label set to "true". An empty labelKey checks the total count of the result set instead.
 //
-// Use AtMost to catch unexpected duplicates — e.g. more than one init node in a cluster:
+// Use AtMost to catch unexpected duplicates, e.g. more than one init node in a cluster:
 //
 //	c.WithValidator(planapi.AtMost(1, capr.InitNodeLabel))
 func AtMost(n int, labelKey string) Validator {

@@ -2,8 +2,12 @@ package operations
 
 import (
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +48,38 @@ func (s *stubSecretController) List(namespace string, opts metav1.ListOptions) (
 type stubCAPIInterface struct {
 	capicontrollers.Interface
 	machineCache generic.CacheInterface[*capi.Machine]
+	clusters     *stubCAPIClusterController
+}
+
+func (s *stubCAPIInterface) Cluster() capicontrollers.ClusterController {
+	return s.clusters
+}
+
+// stubCAPIClusterController serves one CAPI Cluster through its cache, and records every Update,
+// which it also makes the cluster the cache serves from then on.
+type stubCAPIClusterController struct {
+	capicontrollers.ClusterController
+	cluster *capi.Cluster
+	updates []*capi.Cluster
+}
+
+func (s *stubCAPIClusterController) Cache() generic.CacheInterface[*capi.Cluster] {
+	return &stubCAPIClusterCache{controller: s}
+}
+
+func (s *stubCAPIClusterController) Update(cluster *capi.Cluster) (*capi.Cluster, error) {
+	s.updates = append(s.updates, cluster.DeepCopy())
+	s.cluster = cluster.DeepCopy()
+	return cluster, nil
+}
+
+type stubCAPIClusterCache struct {
+	generic.CacheInterface[*capi.Cluster]
+	controller *stubCAPIClusterController
+}
+
+func (c *stubCAPIClusterCache) Get(_, _ string) (*capi.Cluster, error) {
+	return c.controller.cluster.DeepCopy(), nil
 }
 
 func (s *stubCAPIInterface) Machine() capicontrollers.MachineController {
@@ -114,4 +150,55 @@ type stubNodeController struct {
 
 func (s *stubNodeController) Cache() generic.CacheInterface[*mgmtv3.Node] {
 	return s.cache
+}
+
+// stubProvisioningClusterController serves a provisioning Cluster and records every Update. Serve it
+// through stubProvisioningInterface.
+type stubProvisioningClusterController struct {
+	provcontrollers.ClusterController
+	cluster *provv1.Cluster
+	updates []*provv1.Cluster
+}
+
+func (s *stubProvisioningClusterController) Get(namespace, name string, _ metav1.GetOptions) (*provv1.Cluster, error) {
+	if s.cluster == nil || s.cluster.Namespace != namespace || s.cluster.Name != name {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "provisioning.cattle.io", Resource: "clusters"}, name)
+	}
+	return s.cluster.DeepCopy(), nil
+}
+
+func (s *stubProvisioningClusterController) Update(cluster *provv1.Cluster) (*provv1.Cluster, error) {
+	s.updates = append(s.updates, cluster.DeepCopy())
+	s.cluster = cluster.DeepCopy()
+	return cluster, nil
+}
+
+// stubRKEInterface serves one RKEControlPlane through stubRKEControlPlaneController.
+type stubRKEInterface struct {
+	rkecontrollers.Interface
+	controlPlanes *stubRKEControlPlaneController
+}
+
+func (s *stubRKEInterface) RKEControlPlane() rkecontrollers.RKEControlPlaneController {
+	return s.controlPlanes
+}
+
+// stubRKEControlPlaneController serves an RKEControlPlane and records every Update.
+type stubRKEControlPlaneController struct {
+	rkecontrollers.RKEControlPlaneController
+	controlPlane *rkev1.RKEControlPlane
+	updates      []*rkev1.RKEControlPlane
+}
+
+func (s *stubRKEControlPlaneController) Get(namespace, name string, _ metav1.GetOptions) (*rkev1.RKEControlPlane, error) {
+	if s.controlPlane == nil || s.controlPlane.Namespace != namespace || s.controlPlane.Name != name {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "rke.cattle.io", Resource: "rkecontrolplanes"}, name)
+	}
+	return s.controlPlane.DeepCopy(), nil
+}
+
+func (s *stubRKEControlPlaneController) Update(controlPlane *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, error) {
+	s.updates = append(s.updates, controlPlane.DeepCopy())
+	s.controlPlane = controlPlane.DeepCopy()
+	return controlPlane, nil
 }

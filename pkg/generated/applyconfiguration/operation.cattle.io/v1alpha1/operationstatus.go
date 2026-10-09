@@ -30,19 +30,37 @@ import (
 // OperationStatus defines the observed state of an operation.
 type OperationStatusApplyConfiguration struct {
 	// Conditions represent the latest available observations of an operation's current state.
-	// Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, and Paused .
+	// Known condition types are Pending, InProgress, Succeeded, Failed, Rejected, Canceled,
+	// Finalized, and Paused.
+	// Succeeded, Failed, Rejected and Canceled report how the operation ended, and the one matching the
+	// terminal phase goes True as soon as that phase is reached. Finalized reports the separate
+	// question of whether the controller has finished with the operation (terminal phase hook
+	// satisfied, beacon released (see TerminatedAt)) and is True whenever any outcome condition is
+	// and that work is done, so an observer that only needs to know the operation is over can wait
+	// on it alone.
 	// Operations may have additional conditions of their own.
 	// Operations may also provide additional information in the form of messages.
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
 	// LastUpdated identifies when the phase of the Operation last transitioned.
 	// LastUpdated will also be updated during step transitions, if applicable.
 	LastUpdated *v1.Time `json:"lastUpdated,omitempty"`
+	// TerminatedAt identifies when the controller finished handling the terminal phase of the
+	// Operation, meaning nothing is owed on it any more. Ordinarily the terminal-phase lifecycle
+	// hook (if any) ran to completion and the beacon was released; it also covers an Operation with
+	// no beacon left to release, and one being deleted, whose hooks are abandoned along with it.
+	// It is set once and never cleared, and is only ever set on an Operation which has reached a
+	// terminal phase.
+	// An Operation which reached a terminal phase is not necessarily terminated: terminal handling
+	// may still be delegated to another controller. An Operation deleted before it is terminated is
+	// canceled, as the work it dispatched is no longer tracked by anything.
+	TerminatedAt *v1.Time `json:"terminatedAt,omitempty"`
 	// Phase represents the current phase of the Operation.
 	// A Pending operation is one that is currently waiting to acquire the beacon, active it, and begin execution.
 	// An InProgress operation is one that is currently executing.
 	// A Succeeded operation is one that completed successfully.
 	// A Failed operation is one that failed to complete successfully.
-	// A Canceled operation is one that was canceled by the user or system.
+	// A Rejected operation is one that called its own work off, having found it cannot proceed.
+	// A Canceled operation is one that was called off from outside, by the user or the system.
 	Phase *operationcattleiov1alpha1.OperationPhase `json:"phase,omitempty"`
 	// ObservedGeneration is the latest generation observed by the controller.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
@@ -69,6 +87,14 @@ func (b *OperationStatusApplyConfiguration) WithConditions(values ...genericcond
 // If called multiple times, the LastUpdated field is set to the value of the last call.
 func (b *OperationStatusApplyConfiguration) WithLastUpdated(value v1.Time) *OperationStatusApplyConfiguration {
 	b.LastUpdated = &value
+	return b
+}
+
+// WithTerminatedAt sets the TerminatedAt field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TerminatedAt field is set to the value of the last call.
+func (b *OperationStatusApplyConfiguration) WithTerminatedAt(value v1.Time) *OperationStatusApplyConfiguration {
+	b.TerminatedAt = &value
 	return b
 }
 

@@ -8,7 +8,7 @@ import (
 // Name specifies the name of the snapshot file.
 type ETCDSnapshotRestoreArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
-	// +optional
+	// +required
 	Name string `json:"name,omitempty"`
 
 	// RestoreMode names a key in the snapshot's restoreModes metadata, e.g. "kubernetesVersion" or
@@ -31,7 +31,7 @@ type ETCDSnapshotRestoreSpec struct {
 
 	// Args contains parameters for restoring an ETCD snapshot.
 	// Mutually exclusive with SnapshotRef.
-	// +optional
+	// +required
 	Args ETCDSnapshotRestoreArgs `json:"args,omitempty"`
 }
 
@@ -78,14 +78,6 @@ type ETCDSnapshotRestoreStatus struct {
 	Step ETCDSnapshotRestoreStep `json:"step,omitempty"`
 }
 
-func (s *ETCDSnapshotRestoreStatus) SetPhase(phase OperationPhase) {
-	if s.Phase == phase {
-		return
-	}
-	s.Phase = phase
-	s.LastUpdated = metav1.Now()
-}
-
 func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 	if s.Step == step {
 		return
@@ -100,7 +92,8 @@ func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 // +kubebuilder:resource:path=etcdsnapshotrestores,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
-// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
+// +kubebuilder:validation:XValidation:rule="!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) || !has(self.status.phase) || !(self.status.phase in ['Succeeded','Failed','Rejected','Canceled'])",message="cancel cannot be set once the operation has reached a terminal phase; delete the operation instead"
+// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Snapshot",type=string,JSONPath=".spec.args.name"
 // +kubebuilder:printcolumn:name="Mode",type=string,JSONPath=".spec.args.restoreMode"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"

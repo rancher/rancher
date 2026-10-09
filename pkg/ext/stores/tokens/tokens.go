@@ -1175,7 +1175,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		for {
 			select {
 			case <-ctx.Done():
-				// terminate if the context got cancelled on us
+				// terminate if the context got canceled on us
 				// the context also cancels the consumer, i.e. invokes Stop() on it.
 				return
 			case event, more := <-producer.ResultChan():

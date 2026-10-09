@@ -14,17 +14,6 @@ var (
 	errUnsupportedClusterType = fmt.Errorf("unsupported cluster type")
 )
 
-func init() {
-	RegisterAdapter(capiv1beta2.GroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, ustr *unstructured.Unstructured) (Adapter, error) {
-		cluster, err := clients.CAPI.Cluster().Cache().Get(ustr.GetNamespace(), ustr.GetName())
-		if err != nil {
-			return nil, err
-		}
-
-		return capiClusterAdapter(clients, cluster, "")
-	})
-}
-
 // capiClusterAdapter returns the appropriate Adapter for a CAPI Cluster based on its
 // controlPlaneRef: RKEControlPlane → CAPRAdapter, RKE2ControlPlane → CAPRKE2Adapter. Returns
 // (nil, nil) when the control-plane ref points at an unsupported kind (caller should treat this

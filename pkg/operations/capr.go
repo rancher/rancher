@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -732,16 +733,113 @@ func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/rke2.yaml"
 }
 
-func (a *CAPRAdapter) PauseCluster(pause bool) error {
+// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKEControlPlane. CAPI's
+// Cluster name matches the RKE2ControlPlane name by convention.
+func (a *CAPRAdapter) PauseCluster(pause bool, whitelist WhitelistChange) error {
+	err := a.pauseCAPICluster(pause)
+	if err != nil {
+		return err
+	}
+
+	// Both the mgmt cluster, provisioning cluster, and RKEControlPlane are whitelisted in order to allow the UI to key
+	// off either object, and the backend to key off the RKEControlPlane. This is quite frankly a mess and should be
+	// revisited in a future release.
+	mgmtClusterName, err := a.whitelistProvisioningCluster(whitelist)
+	if err != nil {
+		return err
+	} else if mgmtClusterName == "" {
+		return errors.New("could not derive management cluster name")
+	}
+
+	err = a.whitelistControlPlane(whitelist)
+	if err != nil {
+		return err
+	}
+
+	err = a.whitelistManagementCluster(mgmtClusterName, whitelist)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// pauseCAPICluster updates the CAPI cluster's paused field to pause if not already set.
+func (a *CAPRAdapter) pauseCAPICluster(pause bool) error {
 	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
 	if err != nil {
 		return err
 	}
-	if ptr.Equal(cluster.Spec.Paused, &pause) {
+	cluster = cluster.DeepCopy()
+
+	pauseChanged := !ptr.Equal(cluster.Spec.Paused, &pause)
+	if !pauseChanged {
 		return nil
 	}
-	cluster = cluster.DeepCopy()
+
 	cluster.Spec.Paused = &pause
 	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
+}
+
+// whitelistProvisioningCluster whitelists the provisioning cluster object according to the desired WhitelistChange
+// strategy and returns the management cluster name for the cluster, whether or not the whitelist changed: a
+// PauseCluster call that changes nothing here (re-asserting a pause, or unpausing with WhitelistUnchanged) still
+// has the management cluster to settle.
+func (a *CAPRAdapter) whitelistProvisioningCluster(whitelist WhitelistChange) (string, error) {
+	cluster, err := a.clients.Provisioning.Cluster().Get(a.controlPlane.Namespace, a.controlPlane.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	cluster = cluster.DeepCopy()
+
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !whitelistChanged {
+		return cluster.Status.ClusterName, nil
+	}
+
+	_, err = a.clients.Provisioning.Cluster().Update(cluster)
+	return cluster.Status.ClusterName, err
+}
+
+// whitelistControlPlane whitelists the RKEControlPlane object according to the desired WhitelistChange
+// strategy.
+func (a *CAPRAdapter) whitelistControlPlane(whitelist WhitelistChange) error {
+	controlPlane, err := a.clients.RKE.RKEControlPlane().Get(a.controlPlane.Namespace, a.controlPlane.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	controlPlane = controlPlane.DeepCopy()
+
+	var whitelistChanged bool
+	controlPlane.Annotations, whitelistChanged = ApplyWhitelistChange(controlPlane.Annotations, whitelist)
+	if !whitelistChanged {
+		return nil
+	}
+
+	controlPlane, err = a.clients.RKE.RKEControlPlane().Update(controlPlane)
+	if err != nil {
+		return err
+	}
+	a.controlPlane = controlPlane
+	return nil
+}
+
+// whitelistManagementCluster whitelists the management cluster object according to the desired WhitelistChange strategy.
+func (a *CAPRAdapter) whitelistManagementCluster(name string, whitelist WhitelistChange) error {
+	cluster, err := a.clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cluster = cluster.DeepCopy()
+
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !whitelistChanged {
+		return nil
+	}
+
+	_, err = a.clients.Mgmt.Cluster().Update(cluster)
 	return err
 }

@@ -30,12 +30,26 @@ import (
 // acceptable.
 type OperationSpecApplyConfiguration struct {
 	// ClusterRef is a reference to the Cluster this operation is associated with.
+	// It must name the cluster's apiVersion, kind and name, since the cluster is resolved, and access
+	// to it checked, from those. It cannot be changed once set: everything the operation does, and
+	// everything that serializes operations on a cluster, is keyed by it.
 	ClusterRef *v1.ObjectReference `json:"clusterRef,omitempty"`
 	// Paused indicates whether the operation is paused.
 	// When paused, the operation will halt execution.
 	Paused *bool `json:"paused,omitempty"`
 	// Cancel requests the operation to stop permanently. Unlike Paused, it is terminal and cannot be unset.
 	// Recover by deleting and recreating the operation.
+	// Paused takes precedence: a paused operation halts reconciliation entirely, so the cancellation
+	// is only observed once the pause is lifted.
+	// Canceling an operation which has already reached a terminal phase does nothing: there is no
+	// work left to call off, so the phase it ended in stands and the Canceled condition reports that
+	// the request was declined. Deleting such an operation does still stop it, which is the remedy
+	// for one whose terminal phase hook is never answered.
+	// Setting it on an operation already in a terminal phase is rejected outright, by a validation
+	// rule which has to live on each operation type rather than here: a rule on this field only sees
+	// the field, and deciding whether a cancellation can still take effect needs status.phase. The
+	// rule cannot close the race where an operation reaches a terminal phase between the request
+	// being admitted and the controller acting on it, which is why the controller declines it too.
 	Cancel *bool `json:"cancel,omitempty"`
 	// TTL is the time-to-live for the operation in seconds.
 	// This TTL is only enforced when the operation is not paused and has reached a terminal state.

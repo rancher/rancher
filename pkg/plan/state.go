@@ -47,6 +47,10 @@ const (
 )
 
 const (
+	// PlanDataKey is the Secret data key holding the plan the agent is to run, as assigned by
+	// Store.AssignPlan.
+	PlanDataKey = "plan"
+
 	// PlanCheckpointKey is the Secret data key holding the resume checkpoint.
 	PlanCheckpointKey = "plan-checkpoint"
 
@@ -63,6 +67,13 @@ const (
 	// The only valid values are "true" and "false".
 	PlanPausedAnnotation = "plan.cattle.io/paused"
 )
+
+// IsActive returns true when the agent may still act on the plan's one-time instructions: the plan
+// is waiting to be picked up, being run, or held part-way by a pause it will resume from. These are
+// the plans cancellation still has something to stop.
+func (s PlanState) IsActive() bool {
+	return s == PlanStatePending || s == PlanStateInProgress || s == PlanStatePaused
+}
 
 // IsTerminal returns true when the state is a terminal state (succeeded, failed, or canceled).
 // A terminal plan requires the orchestrator to write new plan content before the agent will

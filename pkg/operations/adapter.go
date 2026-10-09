@@ -201,7 +201,7 @@ type Adapter interface {
 	// has to come back on that same version rather than a minor ahead of the control plane it
 	// rejoins. Reinstalling is what makes a downgrade-on-restore work; the etcd snapshot restore does
 	// it once per node while the cluster is shut down. The legacy CAPR planner splits the same work
-	// between its restore plan and the full reconcile it runs afterwards (see
+	// between its restore plan and the full reconcile it runs afterward (see
 	// pkg/capr/planner/etcdrestore.go).
 	//
 	// secret identifies the node, which decides whether the server or the agent is installed, so
@@ -217,9 +217,15 @@ type Adapter interface {
 	// all expected nodes.
 	WaitForRegister() (bool, error)
 
-	// PauseCluster edits the related cluster object to indicate it should not be reconciled.
-	// This is intended to prevent other controllers from manipulating the cluster during sensitive operations.
-	PauseCluster(pause bool) error
+	// PauseCluster edits the related cluster object to indicate it should not be reconciled, or no
+	// longer needs to be, and applies whitelist to the cluster's operation whitelist in the same
+	// update. Pausing is intended to prevent other controllers from manipulating the cluster during
+	// sensitive operations.
+	//
+	// Writing the two together is what keeps a cluster from being left paused by an operation without
+	// also recording that only a restore can repair it: an operation pauses the cluster at its point of
+	// no return. See opv1alpha1.WhitelistedAnnotation.
+	PauseCluster(pause bool, whitelist WhitelistChange) error
 
 	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
 	RuntimeCommand() string

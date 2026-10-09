@@ -130,7 +130,9 @@ func RunCertificateRotationOperationTest(t *testing.T, clients *clients.Clients,
 		if op.Status.Phase == opv1alpha1.OperationPhaseFailed {
 			return false, fmt.Errorf("certificate rotation operation failed at step %q", op.Status.Step)
 		}
-		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded, nil
+		// Terminated, not just Succeeded: the beacon is released on the reconcile after the outcome is
+		// recorded, and an operation created before then is rejected as conflicting with this one.
+		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded && !op.Status.TerminatedAt.IsZero(), nil
 	})
 	if err != nil {
 		t.Logf(
@@ -382,6 +384,10 @@ func WaitForCertificateRotationSucceeded(t *testing.T, clients *clients.Clients,
 			return false, err
 		}
 		if len(beacon.Status.Delegates) > 0 {
+			return false, nil
+		}
+		// The next operation may only be created once this one has released the beacon.
+		if got.Status.TerminatedAt.IsZero() {
 			return false, nil
 		}
 

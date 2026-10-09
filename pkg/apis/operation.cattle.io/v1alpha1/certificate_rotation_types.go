@@ -28,6 +28,12 @@ type CertificateRotationSpec struct {
 type CertificateRotationStep string
 
 const (
+	// CertificateRotationStepPreflight indicates the step is checking that the rotation can proceed
+	// (that the cluster has nodes to rotate, and the services requested exist on them) before anything
+	// on the cluster is changed. The cluster is paused as the operation leaves this step, which is its
+	// point of no return: stopped before it, the rotation leaves nothing to repair.
+	CertificateRotationStepPreflight CertificateRotationStep = "Preflight"
+
 	// CertificateRotationStepRotate indicates the step is rotating certificates.
 	CertificateRotationStepRotate CertificateRotationStep = "Rotate"
 )
@@ -39,18 +45,9 @@ type CertificateRotationStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Rotate
+	// +kubebuilder:validation:Enum=Preflight;Rotate
 	// +optional
 	Step CertificateRotationStep `json:"step,omitempty"`
-}
-
-// SetPhase sets the status phase, updating LastUpdated only when the value changes.
-func (s *CertificateRotationStatus) SetPhase(phase OperationPhase) {
-	if s.Phase == phase {
-		return
-	}
-	s.Phase = phase
-	s.LastUpdated = metav1.Now()
 }
 
 // SetStep sets the status step, updating LastUpdated only when the value changes.
@@ -68,6 +65,7 @@ func (s *CertificateRotationStatus) SetStep(step CertificateRotationStep) {
 // +kubebuilder:resource:path=certificaterotations,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:validation:XValidation:rule="!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) || !has(self.status.phase) || !(self.status.phase in ['Succeeded','Failed','Rejected','Canceled'])",message="cancel cannot be set once the operation has reached a terminal phase; delete the operation instead"
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Services",type=string,JSONPath=".spec.args.services"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"

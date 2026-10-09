@@ -34,6 +34,32 @@ func TestIsPaused(t *testing.T) {
 	}
 }
 
+// --- cancel.go ------------------------------------------------------------------------------
+
+func TestIsCanceled(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		spec   *opv1alpha1.OperationSpec
+		expect bool
+	}{
+		{"cancel true", &opv1alpha1.OperationSpec{Cancel: true}, true},
+		{"cancel false", &opv1alpha1.OperationSpec{Cancel: false}, false},
+		{"zero-value spec", &opv1alpha1.OperationSpec{}, false},
+		// Cancel is reported independently of Paused; the caller applies the precedence between
+		// them (paused wins, so the cancellation waits for the pause to lift).
+		{"cancel and paused", &opv1alpha1.OperationSpec{Cancel: true, Paused: true}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsCanceled(tc.spec)
+			assert.Equal(t, tc.expect, got, "IsCanceled mismatch")
+		})
+	}
+}
+
 // --- phase.go -------------------------------------------------------------------------------
 
 func TestIsTerminal(t *testing.T) {
@@ -47,6 +73,7 @@ func TestIsTerminal(t *testing.T) {
 		{opv1alpha1.OperationPhaseInProgress, false},
 		{opv1alpha1.OperationPhaseSucceeded, true},
 		{opv1alpha1.OperationPhaseFailed, true},
+		{opv1alpha1.OperationPhaseRejected, true},
 		{opv1alpha1.OperationPhaseCanceled, true},
 		{"", false}, // empty phase is not terminal
 		{"Unknown", false},
@@ -76,37 +103,37 @@ func TestIsExpired(t *testing.T) {
 		{
 			name:    "negative TTL never expires",
 			spec:    &opv1alpha1.OperationSpec{TTL: -1},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: wayPast},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: wayPast},
 			expired: false,
 		},
 		{
 			name:    "TTL=0 expires immediately",
 			spec:    &opv1alpha1.OperationSpec{TTL: 0},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: now},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: now},
 			expired: true, // Any elapsed time > 0 exceeds TTL=0
 		},
 		{
 			name:    "elapsed < TTL not expired",
 			spec:    &opv1alpha1.OperationSpec{TTL: 60},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: past},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: past},
 			expired: false, // 10s < 60s
 		},
 		{
 			name:    "elapsed > TTL expired",
 			spec:    &opv1alpha1.OperationSpec{TTL: 5},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: past},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: past},
 			expired: true, // 10s > 5s
 		},
 		{
 			name:    "elapsed exactly at TTL edge (time.Since variability)",
 			spec:    &opv1alpha1.OperationSpec{TTL: 10},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: past},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: past},
 			expired: false, // ~10s elapsed, TTL=10s → not *strictly* greater
 		},
 		{
 			name:    "just started not expired",
 			spec:    &opv1alpha1.OperationSpec{TTL: 10},
-			status:  &opv1alpha1.OperationStatus{LastUpdated: now},
+			status:  &opv1alpha1.OperationStatus{TerminatedAt: now},
 			expired: false,
 		},
 	}

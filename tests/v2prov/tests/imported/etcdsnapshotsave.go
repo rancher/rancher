@@ -37,14 +37,8 @@ func WithSaveLabels(labels map[string]string) SnapshotSaveOption {
 	}
 }
 
-// RunETCDSnapshotSaveOperationTest creates an ETCDSnapshotSave operation targeting the given
-// clusterRef and waits for it to reach the Succeeded phase. This tests the operation.cattle.io/v1alpha1
-// ETCDSnapshotSave controller which manages snapshot lifecycle through beacons and plan secrets.
-// Pass options (e.g. WithSaveLabels) to mutate the operation object before creation — useful for
-// driving non-default code paths like lifecycle hooks.
-func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
-	t.Helper()
-
+// buildSnapshotSaveOp returns an ETCDSnapshotSave of the cluster clusterRef names, ready to create.
+func buildSnapshotSaveOp(namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
 	op := &opv1alpha1.ETCDSnapshotSave{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-snapshot-",
@@ -62,7 +56,18 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 		opt(op)
 	}
 
-	op, err := clients.Operation.ETCDSnapshotSave().Create(op)
+	return op
+}
+
+// RunETCDSnapshotSaveOperationTest creates an ETCDSnapshotSave operation targeting the given
+// clusterRef and waits for it to reach the Succeeded phase. This tests the operation.cattle.io/v1alpha1
+// ETCDSnapshotSave controller which manages snapshot lifecycle through beacons and plan secrets.
+// Pass options (e.g. WithSaveLabels) to mutate the operation object before creation — useful for
+// driving non-default code paths like lifecycle hooks.
+func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
+	t.Helper()
+
+	op, err := clients.Operation.ETCDSnapshotSave().Create(buildSnapshotSaveOp(namespace, clusterRef, opts...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +77,9 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 		if op.Status.Phase == opv1alpha1.OperationPhaseFailed {
 			return false, fmt.Errorf("etcd snapshot create operation failed at step %q", op.Status.Step)
 		}
-		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded, nil
+		// Terminated, not just Succeeded: the beacon is released on the reconcile after the outcome is
+		// recorded, and an operation created before then is rejected as conflicting with this one.
+		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded && !op.Status.TerminatedAt.IsZero(), nil
 	})
 	if err != nil {
 		handleError(t, clients, clusterRef.Name, err)
@@ -90,24 +97,7 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 func CreateETCDSnapshotSaveOp(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
 	t.Helper()
 
-	op := &opv1alpha1.ETCDSnapshotSave{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "test-snapshot-",
-			Namespace:    namespace,
-		},
-		Spec: opv1alpha1.ETCDSnapshotSaveSpec{
-			OperationSpec: opv1alpha1.OperationSpec{
-				ClusterRef: &clusterRef,
-				TTL:        60,
-			},
-		},
-	}
-
-	for _, opt := range opts {
-		opt(op)
-	}
-
-	op, err := clients.Operation.ETCDSnapshotSave().Create(op)
+	op, err := clients.Operation.ETCDSnapshotSave().Create(buildSnapshotSaveOp(namespace, clusterRef, opts...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,6 +232,10 @@ func WaitForSnapshotSaveSucceeded(t *testing.T, clients *clients.Clients, op *op
 		// Once Succeeded and the delegate chain is drained, the owning controller's next reconcile
 		// will release the beacon. We treat "delegate chain empty" as the success signal.
 		if len(beacon.Status.Delegates) > 0 {
+			return false, nil
+		}
+		// The next operation may only be created once this one has released the beacon.
+		if got.Status.TerminatedAt.IsZero() {
 			return false, nil
 		}
 		latestOp = got
