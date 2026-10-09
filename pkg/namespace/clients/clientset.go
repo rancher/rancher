@@ -1,4 +1,4 @@
-package namespace
+package clients
 
 import (
 	"context"
@@ -46,6 +46,6 @@ type wrapperClientsetNamespace struct {
 }
 
 func (n *wrapperClientsetNamespace) Create(ctx context.Context, ns *corev1.Namespace, opts metav1.CreateOptions) (*corev1.Namespace, error) {
-	ApplyLabelsAndAnnotations(ns)
+	handler(ns)
 	return n.NamespaceInterface.Create(ctx, ns, opts)
 }
