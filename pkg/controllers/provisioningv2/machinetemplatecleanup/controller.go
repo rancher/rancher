@@ -609,7 +609,8 @@ func (h *handler) cleanupInfraMachineTemplate(
 		return fmt.Errorf("unexpected owner for %s/%s", template.GetNamespace(), template.GetName())
 	}
 
-	if template.GetCreationTimestamp().Add(templateGracePeriod).After(now) {
+	if template.GetCreationTimestamp().Add(templateGracePeriod).After(now) ||
+		template.GetDeletionTimestamp() != nil {
 		return nil
 	}
 
