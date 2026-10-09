@@ -9,6 +9,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -87,18 +88,6 @@ func waitForBackpopulatedSnapshot(t *testing.T, clients *clients.Clients, cluste
 	return picked
 }
 
-// snapshotStorage is where a snapshot lives, which decides which of the ETCDSnapshot resources a
-// test restores from. A cluster configured for S3 produces two per snapshot — the distro writes the
-// file locally and then uploads it — and they are not interchangeable: only the S3 copy keeps its
-// extra metadata when a node other than the one that took it re-registers the snapshot, because for
-// S3 the metadata is stored in the bucket alongside the file rather than nowhere at all.
-type snapshotStorage string
-
-const (
-	snapshotStorageLocal snapshotStorage = "local"
-	snapshotStorageS3    snapshotStorage = "s3"
-)
-
 // waitForBackpopulatedSnapshotForStorage polls until a snapshot with the given storage has been
 // back-populated for the cluster, then returns the most recently created one.
 //
@@ -106,7 +95,7 @@ const (
 // additionally carries the node it was taken on, but an S3 one does not — snapshotbackpopulate owns
 // an S3 snapshot by the cluster, because any etcd node can pull it back out of the bucket, and the
 // restore controller elects any etcd machine for the same reason.
-func waitForBackpopulatedSnapshotForStorage(t *testing.T, clients *clients.Clients, clusterNamespace, clusterName string, storage snapshotStorage, createdAfter time.Time) *rkev1.ETCDSnapshot {
+func waitForBackpopulatedSnapshotForStorage(t *testing.T, clients *clients.Clients, clusterNamespace, clusterName string, storage snapshotbackpopulate.Storage, createdAfter time.Time) *rkev1.ETCDSnapshot {
 	t.Helper()
 
 	var picked *rkev1.ETCDSnapshot
@@ -122,7 +111,7 @@ func waitForBackpopulatedSnapshotForStorage(t *testing.T, clients *clients.Clien
 			if s.SnapshotFile.Name == "" {
 				continue
 			}
-			if (s.SnapshotFile.S3 != nil) != (storage == snapshotStorageS3) {
+			if (s.SnapshotFile.S3 != nil) != (storage == snapshotbackpopulate.S3) {
 				continue
 			}
 			if s.SnapshotFile.CreatedAt == nil || !s.SnapshotFile.CreatedAt.Time.After(createdAfter) {

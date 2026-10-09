@@ -76,6 +76,17 @@ type stubAdapter struct {
 	// installVersion, when set, is the Kubernetes version InstallInstruction installs. Empty means
 	// this cluster type does not manage its distro version.
 	installVersion string
+	// S3 rendering: clusterS3 is what ETCDSnapshotS3 reports, s3Args/s3Env/s3Files/s3Err are what
+	// ToS3ArgsEnvAndFiles returns, and the s3Requested/s3Prefix/s3SecretKeyInEnv fields capture
+	// what it was called with.
+	clusterS3        *rkev1.ETCDSnapshotS3
+	s3Args           []string
+	s3Env            []string
+	s3Files          []planapi.File
+	s3Err            error
+	s3Requested      *rkev1.ETCDSnapshotS3
+	s3Prefix         string
+	s3SecretKeyInEnv bool
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -162,9 +173,10 @@ func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret,
 	return nil, nil
 }
 
-// The six methods below complete the ops.Adapter contract for the stub. They are not exercised
-// by the snapshot-restore controller (which only consumes runtime/dataDir/serverUnit/probes/
-// kubectl+kubeconfig paths/plans), so each returns a static, runtime-appropriate value.
+// The methods below complete the ops.Adapter contract for the stub. Apart from S3 rendering they
+// are not exercised by the snapshot-restore controller (which only consumes
+// runtime/dataDir/serverUnit/probes/kubectl+kubeconfig paths/plans), so each returns a static,
+// runtime-appropriate value.
 func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
 	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml"
 }
@@ -177,9 +189,20 @@ func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, _ string) (ops.Comp
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
 func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
-func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []planapi.File) {
-	return nil, nil, nil
+
+// ToS3ArgsEnvAndFiles records the S3 spec it was handed so tests can assert the snapshot's own S3
+// block is what gets rendered, and returns whatever the stub was configured with.
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []planapi.File, error) {
+	a.s3Requested = s3
+	a.s3Prefix = prefix
+	a.s3SecretKeyInEnv = secretKeyInEnv
+	if a.s3Err != nil {
+		return nil, nil, nil, a.s3Err
+	}
+	return a.s3Args, a.s3Env, a.s3Files, nil
 }
+
+func (a *stubAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 { return a.clusterS3 }
 
 func newTestScope(adapter *stubAdapter, uid types.UID) *scope {
 	cluster := &unstructured.Unstructured{}
