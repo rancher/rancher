@@ -65,7 +65,7 @@ type fakeProvider struct {
 	getUserExtraAttributesFunc func(v3.Principal) map[string][]string
 }
 
-func (p *fakeProvider) IsDisabledProvider() (bool, error) {
+func (p *fakeProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, nil
 }
 
@@ -266,6 +266,30 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Equal(t, token.Name, resp.Extras[common.ExtraRequestTokenID][0])
 		require.Len(t, resp.Extras[common.ExtraRequestHost], 1)
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
+	})
+
+	t.Run("groups only include the token's auth provider", func(t *testing.T) {
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+			"other": {
+				Items: []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "other_group://98765",
+					},
+					PrincipalType: "group",
+					Provider:      "other",
+				}},
+			},
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+		assert.NotContains(t, resp.Groups, "other_group://98765")
 	})
 
 	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
@@ -632,6 +656,28 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		resp, err := authenticator.Authenticate(req)
 		require.ErrorIs(t, err, ErrMustAuthenticate)
 		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
+	})
+
+	t.Run("system users are not rejected by disabled auth providers", func(t *testing.T) {
+		oldPrincipalIDs := user.PrincipalIDs
+		oldUserPrincipal := token.UserPrincipal
+		oldDisabled := fakeProvider.disabled
+		defer func() {
+			user.PrincipalIDs = oldPrincipalIDs
+			token.UserPrincipal = oldUserPrincipal
+			fakeProvider.disabled = oldDisabled
+		}()
+
+		user.PrincipalIDs = []string{"system://provisioning/fleet-local/local"}
+		token.UserPrincipal.Name = user.PrincipalIDs[0]
+		fakeProvider.disabled = true
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
 		assert.False(t, userRefresher.called)
 	})
 }
@@ -1700,14 +1746,28 @@ func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
 				common.UserAttributeUserName:    {"alice-gh"},
 				"extra":                         {"value"},
 			},
+			"github-eu": {
+				common.UserAttributePrincipalID: {"github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice-eu"},
+			},
 		},
 	}
 
 	tests := []struct {
-		name         string
-		authProvider string
-		want         map[string][]string
+		name          string
+		authProvider  string
+		principalName string
+		want          map[string][]string
 	}{
+		{
+			name:          "token for a named config",
+			authProvider:  "github",
+			principalName: "github-eu_user://7",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice-eu"},
+			},
+		},
 		{
 			name:         "provider token",
 			authProvider: "okta",
@@ -1720,16 +1780,16 @@ func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
 			name:         "local token",
 			authProvider: "local",
 			want: map[string][]string{
-				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42"},
-				common.UserAttributeUserName:    {"alice@example.com", "alice-gh"},
+				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42", "github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice@example.com", "alice-gh", "alice-eu"},
 			},
 		},
 		{
 			name:         "token without provider",
 			authProvider: "",
 			want: map[string][]string{
-				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42"},
-				common.UserAttributeUserName:    {"alice@example.com", "alice-gh"},
+				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42", "github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice@example.com", "alice-gh", "alice-eu"},
 			},
 		},
 	}
@@ -1737,7 +1797,10 @@ func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			token := &apiv3.Token{AuthProvider: tt.authProvider}
+			token := &apiv3.Token{
+				AuthProvider:  tt.authProvider,
+				UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: tt.principalName}},
+			}
 
 			got := getUserExtraInfo(token, user, attribs)
 

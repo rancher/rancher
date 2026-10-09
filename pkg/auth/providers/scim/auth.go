@@ -2,6 +2,7 @@ package scim
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,12 +11,15 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/scimconfig"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var tokenSecretNamespace = namespace.GlobalNamespace
@@ -36,9 +40,10 @@ var tokenSecretNamespace = namespace.GlobalNamespace
 type tokenAuthenticator struct {
 	secretCache        wcorev1.SecretCache
 	secrets            wcorev1.SecretClient
-	isDisabledProvider func(provider string) (bool, error)
+	isDisabledProvider func(configName string) (bool, error)
 	expireTokensAfter  func() time.Duration
 	getConfig          func(provider string) scimconfig.Config
+	authConfigs        v3.AuthConfigInterface
 }
 
 // Authenticate implements the http middleware for tokenAuthenticator.
@@ -60,6 +65,7 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 		disabled, err := a.isDisabledProvider(provider)
+
 		if err != nil || disabled {
 			writeError(w, NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound)))
 			return
@@ -121,15 +127,18 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 }
 
 // NewTokenAuthenticator returns a new tokenAuthenticator instance.
-func NewTokenAuthenticator(wContext *wrangler.Context) *tokenAuthenticator {
-	cmCache := wContext.Core.ConfigMap().Cache()
-	return &tokenAuthenticator{
-		secretCache:        wContext.Core.Secret().Cache(),
-		secrets:            wContext.Core.Secret(),
-		isDisabledProvider: providers.IsDisabledProvider,
-		expireTokensAfter:  func() time.Duration { return settings.ExpireSCIMTokensAfter.GetDuration() },
-		getConfig:          func(provider string) scimconfig.Config { return scimconfig.Get(cmCache, provider) },
+func NewTokenAuthenticator(sContext *config.ScaledContext) *tokenAuthenticator {
+	cmCache := sContext.Wrangler.Core.ConfigMap().Cache()
+	ta := &tokenAuthenticator{
+		secretCache:       sContext.Wrangler.Core.Secret().Cache(),
+		secrets:           sContext.Wrangler.Core.Secret(),
+		authConfigs:       sContext.Management.AuthConfigs(""),
+		expireTokensAfter: func() time.Duration { return settings.ExpireSCIMTokensAfter.GetDuration() },
+		getConfig:         func(provider string) scimconfig.Config { return scimconfig.Get(cmCache, provider) },
 	}
+	ta.isDisabledProvider = ta.isDisabledProviderFromResource
+
+	return ta
 }
 
 // setAuditUser records the SCIM caller in the request's audit log entry, if audit logging is enabled.
@@ -147,4 +156,28 @@ func setAuditUser(r *http.Request, provider, tokenID string) {
 		"scim.cattle.io/provider": {provider},
 		"scim.cattle.io/token-id": {tokenID},
 	}
+}
+
+func (a *tokenAuthenticator) isDisabledProviderFromResource(provider string) (bool, error) {
+	// This gets the AuthConfig by name (which comes from the URL).
+	authConfigObj, err := a.authConfigs.ObjectClient().UnstructuredClient().Get(provider, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve AuthConfig %s: %w", provider, err)
+	}
+	u, ok := authConfigObj.(runtime.Unstructured)
+	if !ok {
+		return false, fmt.Errorf("failed to parse AuthConfig %s", provider)
+	}
+
+	// We could use .enabled from the unstructured content but instead this
+	// converts the type to a name to delegate the IsDisabledProvider check to
+	// the actual provider.
+	rawType, ok := u.UnstructuredContent()["type"].(string)
+	if !ok {
+		return false, fmt.Errorf("invalid AuthConfig %s missing type", provider)
+	}
+
+	providerName := providers.NameFromType(rawType)
+
+	return providers.IsDisabledProvider(providerName, provider)
 }

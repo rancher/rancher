@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -88,7 +89,6 @@ func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
 // If the verification succeed, creates a Token to access the provider.
 // It returns an error in case of failure.
 func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
-	var oidcConfig apiv3.OIDCConfig
 	oidcConfigApplyInput := &apiv3.OIDCApplyInput{}
 
 	if err := json.NewDecoder(request.Request.Body).Decode(oidcConfigApplyInput); err != nil {
@@ -96,19 +96,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 			fmt.Sprintf("[generic oidc] testAndApply: failed to parse body: %v", err))
 	}
 
-	oidcConfig = oidcConfigApplyInput.OIDCConfig
-	// set a default value for GroupSearchEnabled
-	// in case user input is nil for some reasons.
-	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
-		oidcConfig.GroupSearchEnabled = new(false)
-	}
-	// we need to set cognito:groups as GroupsClaim in order to be able to fetch groups from aws cognito
-	if oidcConfig.Type == client.CognitoConfigType {
-		oidcConfig.GroupsClaim = cognitoGroupsClaim
-	}
-	oidcLogin := &apiv3.OIDCLogin{
-		Code: oidcConfigApplyInput.Code,
-	}
+	oidcConfig, oidcLogin := o.configFromApplyInput(oidcConfigApplyInput)
 
 	if !validateScopes(oidcConfig.Scopes) {
 		return fmt.Errorf("scopes are invalid: scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
@@ -148,12 +136,39 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 
 	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return o.UserMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return o.UserMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: Failed to create or update userAttribute: %v", err))
 	}
 
 	return o.TokenMgr.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
+}
+
+// configFromApplyInput returns the OIDCConfig to apply and the OIDCLogin to
+// test it with from the testAndApply input.
+func (o *OpenIDCProvider) configFromApplyInput(input *apiv3.OIDCApplyInput) (apiv3.OIDCConfig, *apiv3.OIDCLogin) {
+	oidcConfig := input.OIDCConfig
+
+	// Clients that predate multiple AuthConfigs per provider don't send a
+	// configName, these configure the default AuthConfig for the provider.
+	oidcConfig.Name = cmp.Or(input.ConfigName, oidcConfig.Name, o.Name)
+
+	// set a default value for GroupSearchEnabled
+	// in case user input is nil for some reasons.
+	if oidcConfig.GroupSearchEnabled == nil {
+		oidcConfig.GroupSearchEnabled = new(false)
+	}
+	// we need to set cognito:groups as GroupsClaim in order to be able to fetch groups from aws cognito
+	if oidcConfig.Type == client.CognitoConfigType {
+		oidcConfig.GroupsClaim = cognitoGroupsClaim
+	}
+
+	oidcLogin := &apiv3.OIDCLogin{
+		GenericLogin: apiv3.GenericLogin{ConfigName: oidcConfig.Name},
+		Code:         input.Code,
+	}
+
+	return oidcConfig, oidcLogin
 }
 
 // validateScopes returns true if there are no commas in the scopes string and openid is included as a scope.

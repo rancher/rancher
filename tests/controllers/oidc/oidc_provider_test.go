@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -33,6 +34,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 	v1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
@@ -95,6 +97,25 @@ func (s *OIDCProviderSuite) SetupSuite() {
 			NonNamespace: true,
 			Status:       true,
 		},
+		crd.CRD{
+			// Token.UserPrincipal is tagged norman:"type=reference[principal]", which
+			// crd.CRD{SchemaObject: ...} turns into a plain "type: string" schema for
+			// userPrincipal. Since the real UserPrincipal value is a full embedded
+			// Principal object (with ObjectMeta), the apiserver's structural schema
+			// pruning strips everything under it - including userPrincipal.metadata.name,
+			// the principal ID - as unknown fields. Use an explicit open schema instead,
+			// matching how Rancher creates this CRD in production.
+			GVK: schema.GroupVersionKind{
+				Group:   "management.cattle.io",
+				Version: "v3",
+				Kind:    "Token",
+			},
+			NonNamespace: true,
+			Schema: &apiextv1.JSONSchemaProps{
+				Type:                   "object",
+				XPreserveUnknownFields: ptr.To(true),
+			},
+		},
 	)
 
 	// Create wrangler context
@@ -154,7 +175,7 @@ func (s *OIDCProviderSuite) SetupSuite() {
 			Kind:    "Secret",
 		})
 
-	// Create and start the OIDCCLient controller factory
+	// Create and start the OIDCClient controller factory
 	cf := s.wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
 		Group:    "management.cattle.io",
 		Version:  "v3",
@@ -194,6 +215,9 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeUser,
 		},
+		PrincipalIDs: []string{
+			fakeAuthProvider + "_user://9253000",
+		},
 	})
 	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.Mgmt.Token().Create(&apimgmtv3.Token{
@@ -204,16 +228,23 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 				tokens.UserIDLabel: fakeUser,
 			},
 		},
+		UserPrincipal: apimgmtv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fakeAuthProvider + "_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
 		AuthProvider: fakeAuthProvider,
 		Token:        fakeTokenValue,
 		UserID:       fakeUser,
-		Enabled:      ptr.To(true),
+		Enabled:      new(true),
 	})
 	assert.NoError(s.T(), err)
 
 	// mock auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	mockProvider.EXPECT().IsDisabledProvider(fakeAuthProvider).Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]providercommon.AuthProvider{fakeAuthProvider: mockProvider})
 
 	// create OIDC client
@@ -266,10 +297,14 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	require.NoError(s.T(), err)
 	req.Header.Set("Authorization", "Bearer "+fakeToken+":"+fakeTokenValue)
 	s.wg.Add(1)
+
 	res, err := http.DefaultClient.Do(req)
 	require.NoError(s.T(), err)
 	defer res.Body.Close()
-	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
+	b, err := io.ReadAll(res.Body)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), http.StatusOK, res.StatusCode, fmt.Sprintf("failed to get %v - %s", authURL, b))
 
 	// use a waitGroup to ensure the asserts inside the redirect function were executed.
 	go func() {

@@ -39,7 +39,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			DisplayName:   "Testing",
 			LoginName:     "testing",
 			PrincipalType: UserType,
-			Provider:      Name,
+			Provider:      ProviderName,
 		},
 	}
 
@@ -68,16 +68,26 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 		}
 		g := &keyCloakOIDCProvider{
 			oidc.OpenIDCProvider{
-				Name:     Name,
+				Name:     ProviderName,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
 			},
 		}
-		g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+		g.GetConfig = func(string) (*apiv3.OIDCConfig, error) {
 			return oidcConfig, nil
 		}
 
-		result, err := g.SearchPrincipals("user1", UserType, &apiv3.Token{})
+		token := &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "keycloakoidc_user://79ae051e-71e0-4340-84b6-bef34efb9196",
+				},
+				LoginName:     "developer",
+				PrincipalType: "user",
+			},
+		}
+
+		result, err := g.SearchPrincipals("user1", UserType, token)
 		require.NoError(t, err, "SearchPrincipals() returned an error")
 		assert.Equal(t, expectedResult, result)
 		assert.NotEmpty(t, createdSecret)
@@ -103,16 +113,26 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 		}
 		g := &keyCloakOIDCProvider{
 			oidc.OpenIDCProvider{
-				Name:     Name,
+				Name:     ProviderName,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
 			},
 		}
-		g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+		g.GetConfig = func(string) (*apiv3.OIDCConfig, error) {
 			return oidcConfig, nil
 		}
 
-		result, err := g.SearchPrincipals("user1", UserType, &apiv3.Token{})
+		token := &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "keycloakoidc_user://79ae051e-71e0-4340-84b6-bef34efb9196",
+				},
+				LoginName:     "developer",
+				PrincipalType: "user",
+			},
+		}
+
+		result, err := g.SearchPrincipals("user1", UserType, token)
 		require.NoError(t, err, "SearchPrincipals() returned an error")
 		assert.Equal(t, expectedResult, result)
 	})
@@ -149,21 +169,71 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 		}
 		g := &keyCloakOIDCProvider{
 			oidc.OpenIDCProvider{
-				Name:     Name,
+				Name:     ProviderName,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
 			},
 		}
-		g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+		g.GetConfig = func(string) (*apiv3.OIDCConfig, error) {
 			return oidcConfig, nil
 		}
+
 		result, err := g.SearchPrincipals("user1", UserType, &apiv3.Token{
 			ProviderInfo: map[string]string{
 				"access_token": fakeAccessTokenString,
 			},
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "keycloakoidc_user://79ae051e-71e0-4340-84b6-bef34efb9196",
+				},
+				LoginName:     "developer",
+				PrincipalType: "user",
+			},
 		})
 		require.NoError(t, err, "SearchPrincipals() returned an error")
 		assert.Equal(t, result, expectedResult)
+	})
+
+	t.Run("search results are prefixed with the config name from the token", func(t *testing.T) {
+		testSrv := newFakeKeycloakServer(t, privateKey, func(t *testing.T, r *http.Request) bool {
+			return true
+		})
+		oidcConfig := testOIDCConfig(testSrv.URL, func(o *v3.OIDCConfig) {
+			o.ClientAuthenticatedSearch = true
+		})
+		createTokenManager := &fakeTokenManager{
+			getSecretFunc: func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
+				return "", apierrors.NewNotFound(core.Resource("Secret"), "cattle-tokens/"+provider)
+			},
+			createSecretFunc: func(userID, provider, secret string) error {
+				return nil
+			},
+		}
+		g := &keyCloakOIDCProvider{
+			oidc.OpenIDCProvider{
+				Name:     ProviderName,
+				Type:     client.KeyCloakOIDCConfigType,
+				TokenMgr: createTokenManager,
+			},
+		}
+		g.GetConfig = func(name string) (*apiv3.OIDCConfig, error) {
+			assert.Equal(t, "keycloak-eu", name)
+			return oidcConfig, nil
+		}
+
+		result, err := g.SearchPrincipals("user1", UserType, &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "keycloak-eu_user://79ae051e-71e0-4340-84b6-bef34efb9196",
+				},
+				LoginName:     "developer",
+				PrincipalType: "user",
+			},
+		})
+		require.NoError(t, err, "SearchPrincipals() returned an error")
+		require.Len(t, result, 1)
+		assert.Equal(t, "keycloak-eu_user://9f3f3bab-1c7f-4f1e-970c-6bd2db77684b", result[0].Name)
+		assert.Equal(t, ProviderName, result[0].Provider)
 	})
 }
 
@@ -326,11 +396,15 @@ func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
 
 			token := &apiv3.Token{
 				UserID:       "test-user",
-				AuthProvider: Name,
+				AuthProvider: ProviderName,
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "keycloakoidc-eu_user://test-user"},
+				},
 			}
 
 			tokenMgr := &fakeTokenManager{
 				getSecretFunc: func(userID, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
+					assert.Equal(t, "keycloakoidc-eu", provider, "secret should be keyed by the config name")
 					return string(storedToken), nil
 				},
 			}
@@ -354,4 +428,31 @@ func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKeyCloakOIDCProviderGetPrincipalFromOtherConfig(t *testing.T) {
+	// GetConfig isn't set, so this fails if Keycloak is queried.
+	provider := &keyCloakOIDCProvider{
+		OpenIDCProvider: oidc.OpenIDCProvider{Name: ProviderName},
+	}
+	token := &v3.Token{
+		AuthProvider: ProviderName,
+		UserPrincipal: v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: "keycloakoidc_user://alice"},
+			LoginName:     "alice",
+			PrincipalType: UserType,
+			Provider:      ProviderName,
+		},
+	}
+
+	got, err := provider.GetPrincipal("keycloak-eu_user://bob", token)
+	require.NoError(t, err)
+
+	assert.Equal(t, apiv3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: "keycloak-eu_user://bob"},
+		DisplayName:   "bob",
+		LoginName:     "bob",
+		PrincipalType: UserType,
+		Provider:      ProviderName,
+	}, got)
 }

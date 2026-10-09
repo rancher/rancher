@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -14,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -43,14 +43,20 @@ type Provider struct {
 	userLister  v3.UserLister
 	userIndexer cache.Indexer
 	pwdVerifier PasswordVerifier
+	// authConfigLister is used to find the provider for the principals of
+	// external users. If nil, the AuthConfig name is used as the provider.
+	authConfigLister v3.AuthConfigLister
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, _ user.Manager) common.AuthProvider {
-	return NewProvider(
+	provider := NewProvider(
 		mgmtCtx.Management.Users("").Controller().Informer(),
 		mgmtCtx.Management.Users("").Controller().Lister(),
 		pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
 	)
+	provider.authConfigLister = mgmtCtx.Management.AuthConfigs("").Controller().Lister()
+
+	return provider
 }
 
 // NewProvider returns a Provider backed by informer's user cache. It registers
@@ -141,7 +147,8 @@ func (l *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, inpu
 	}
 
 	principalID := getLocalPrincipalID(user)
-	userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, nil)
+
+	userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, nil, Name)
 	userPrincipal.Me = true
 
 	return userPrincipal, []apiv3.Principal{}, "", nil
@@ -201,16 +208,12 @@ func (l *Provider) SearchPrincipals(searchKey, principalType string, token acces
 		return nil, nil
 	}
 
+	return l.searchUsers(searchKey, token, features.MultiAuthProviderCross.Enabled())
+}
+
+func (l *Provider) searchUsers(searchKey string, token accessor.TokenAccessor, searchAll bool) ([]apiv3.Principal, error) {
 	queryKey := strings.ToLower(searchKey)
-	var (
-		matched []*apiv3.User
-		err     error
-	)
-	if len(searchKey) > searchIndexDefaultLen {
-		matched, err = l.listAllUsers(queryKey)
-	} else {
-		matched, err = l.listUsersByIndex(queryKey)
-	}
+	matched, err := l.searchUserResources(searchKey, queryKey)
 	if err != nil {
 		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
 		return nil, err
@@ -218,18 +221,68 @@ func (l *Provider) SearchPrincipals(searchKey, principalType string, token acces
 
 	var principals []apiv3.Principal
 	for _, user := range matched {
-		if !isLocalUser(user) {
+		principalID, providerName, ok := l.searchPrincipalID(user, searchAll)
+		if !ok {
 			continue
 		}
 
-		principalID := getLocalPrincipalID(user)
-		principals = append(principals, l.toPrincipal("user", user.DisplayName, user.Username, principalID, token))
+		principals = append(principals, l.toPrincipal("user", user.DisplayName, user.Username, principalID, token, providerName))
 	}
 
 	return principals, nil
 }
 
-func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token accessor.TokenAccessor) apiv3.Principal {
+// searchPrincipalID returns the ID and provider name of the principal to
+// return in search results for user.
+//
+// When searching all users, this is the user's first principal that has a
+// parseable ID, so principals such as system:// are skipped. It returns false
+// if the user has no such principal and can't log in locally.
+func (l *Provider) searchPrincipalID(user *apiv3.User, searchAll bool) (string, string, bool) {
+	if searchAll {
+		for _, principalID := range user.PrincipalIDs {
+			configName, _, _, err := common.SplitPrincipalID(principalID)
+			if err != nil {
+				logrus.Debugf("SearchPrincipals local skipping principal %q of user %s: %v", principalID, user.Name, err)
+				continue
+			}
+
+			return principalID, l.providerNameForConfig(configName), true
+		}
+	}
+
+	if !isLocalUser(user) {
+		return "", "", false
+	}
+
+	return getLocalPrincipalID(user), Name, true
+}
+
+// providerNameForConfig returns the name of the provider for the AuthConfig
+// with the given name, falling back to the AuthConfig name if it can't be found.
+func (l *Provider) providerNameForConfig(configName string) string {
+	if configName == Name || l.authConfigLister == nil {
+		return configName
+	}
+
+	authConfig, err := l.authConfigLister.Get("", configName)
+	if err != nil {
+		logrus.Debugf("SearchPrincipals local getting AuthConfig %s: %v", configName, err)
+		return configName
+	}
+
+	return common.ProviderNameFromType(authConfig.Type)
+}
+
+func (l *Provider) searchUserResources(searchKey string, queryKey string) ([]*apiv3.User, error) {
+	if len(searchKey) > searchIndexDefaultLen {
+		return l.listAllUsers(queryKey)
+	}
+
+	return l.listUsersByIndex(queryKey)
+}
+
+func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token accessor.TokenAccessor, providerName string) apiv3.Principal {
 	if displayName == "" {
 		displayName = loginName
 	}
@@ -238,23 +291,22 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 		ObjectMeta:    metav1.ObjectMeta{Name: id},
 		DisplayName:   displayName,
 		LoginName:     loginName,
-		Provider:      Name,
+		Provider:      providerName,
 		PrincipalType: principalType,
 	}
 	if token != nil {
 		princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
 	}
+
 	return princ
 }
 
 func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	// id looks like local://u-12345
-	var name string
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
+	_, _, name, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return apiv3.Principal{}, err
 	}
-	name = strings.TrimPrefix(parts[1], "//")
 
 	user, err := l.userLister.Get("", name)
 	if err != nil {
@@ -262,11 +314,12 @@ func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	}
 
 	princID := getLocalPrincipalID(user)
-	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, token)
+	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, token, Name)
 	return princ, nil
 }
 
 func (l *Provider) listAllUsers(searchKey string) ([]*apiv3.User, error) {
+	logrus.Debugf("SearchPrincipals local listing all users and matching %s", searchKey)
 	allUsers, err := l.userLister.List("", labels.NewSelector())
 	if err != nil {
 		return nil, fmt.Errorf("listing users for search %q: %w", searchKey, err)
@@ -283,6 +336,7 @@ func (l *Provider) listAllUsers(searchKey string) ([]*apiv3.User, error) {
 }
 
 func (l *Provider) listUsersByIndex(searchKey string) ([]*apiv3.User, error) {
+	logrus.Debugf("SearchPrincipals local searching user index for %s", searchKey)
 	objs, err := l.userIndexer.ByIndex(userSearchIndex, searchKey)
 	if err != nil {
 		return nil, fmt.Errorf("indexing users for search %q: %w", searchKey, err)
@@ -296,6 +350,7 @@ func (l *Provider) listUsersByIndex(searchKey string) ([]*apiv3.User, error) {
 		}
 		matched = append(matched, user)
 	}
+
 	return matched, nil
 }
 
@@ -381,7 +436,7 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[str
 
 // IsDisabledProvider checks if the local auth provider is currently disabled in Rancher.
 // As of now, local provider can't be disabled, so this method always returns false and nil for the error.
-func (l *Provider) IsDisabledProvider() (bool, error) {
+func (l *Provider) IsDisabledProvider(_ string) (bool, error) {
 	return false, nil
 }
 

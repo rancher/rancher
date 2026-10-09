@@ -1,6 +1,7 @@
 package saml
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -41,23 +42,25 @@ func (s *Provider) testAndEnable(request *types.APIContext) error {
 			fmt.Sprintf("SAML: Failed to parse body: %v", err))
 	}
 
-	samlConfig, err := s.getSamlConfig()
+	// The action is performed on the AuthConfig resource being enabled.
+	configName := cmp.Or(request.ID, s.name)
+	samlConfig, err := s.getSamlConfig(configName)
 	if err != nil {
 		return err
 	}
 
 	logrus.Debug("SAML [testAndEnable]: Initializing SAML service provider")
-	err = InitializeSamlServiceProvider(samlConfig, s.name)
+	err = InitializeSamlServiceProvider(samlConfig, configName)
 	if err != nil {
 		return err
 	}
 
-	provider, ok := SamlProviders[s.name]
+	provider, ok := getSamlProvider(configName)
 	if !ok {
-		return fmt.Errorf("SAML [testAndEnable]: Provider %v not configured", s.name)
+		return fmt.Errorf("SAML [testAndEnable]: Provider %v not configured", configName)
 	}
 
-	logrus.Debugf("SAML [testAndEnable]: Setting clientState for SAML service provider %v", s.name)
+	logrus.Debugf("SAML [testAndEnable]: Setting clientState for SAML service provider %v", configName)
 
 	finalRedirectURL, err := validateFinalRedirectURL(samlLogin.FinalRedirectURL, provider.serviceProvider.MetadataURL.String())
 	if err != nil {

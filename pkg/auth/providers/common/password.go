@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/namespace"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,6 +92,29 @@ func ReadFromSecretData(secrets wcorev1.SecretController, secretInfo string) (ma
 		}
 	}
 	return nil, nil
+}
+
+// ProviderNameFromType returns the provider name for an AuthConfig type, e.g.
+// "githubConfig" -> "github".
+func ProviderNameFromType(t string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(strings.ToLower(t), "config"), "provider")
+}
+
+// SecretNamePrefix returns the prefix for the names of the Secrets that hold
+// values for an AuthConfig.
+//
+// The default AuthConfig for a type (named after its provider, e.g. "github")
+// keeps the type based prefix (e.g. "githubconfig") so that existing Secrets
+// continue to be used. Other AuthConfigs of the same type have their name
+// appended so that they don't overwrite each other's Secrets. Long prefixes
+// are shortened with a hash to keep the Secret names valid.
+func SecretNamePrefix(configName, configType string) string {
+	prefix := strings.ToLower(configType)
+	if configName == "" || configName == ProviderNameFromType(configType) {
+		return prefix
+	}
+
+	return name.SafeConcatName(prefix, strings.ToLower(configName))
 }
 
 // GetFullSecretName returns a formatted name for a secret associated with an auth provider,
