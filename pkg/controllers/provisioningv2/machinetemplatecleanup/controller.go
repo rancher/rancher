@@ -49,7 +49,8 @@ e.g. for CAPR+CAPA.
 
 It's not meant to be used as a general method of cleaning-up
 infrastructure machine templates and infrastructure clusters, and will
-only consider for deletion objects with a specific label.
+only consider for deletion objects with a specific label. This label
+is meant to be set by the UI.
 
 There are two situations that this controller covers:
 
