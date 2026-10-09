@@ -4,6 +4,6 @@ webhookVersion: 110.0.3+up0.11.3
 turtlesVersion: 110.0.2+up0.27.2
 cspAdapterMinVersion: 110.0.0+up10.0.0
 defaultShellVersion: rancher/shell:v0.8.2
-fleetVersion: 110.0.3+up0.16.3-alpha.2
+fleetVersion: 110.0.3+up0.16.3-beta.1
 defaultSccOperatorImage: rancher/scc-operator:v0.5.2
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
