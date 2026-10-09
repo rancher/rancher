@@ -13,9 +13,11 @@ import (
 
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/catalogv2/system/mocks"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/mock/gomock"
 	"helm.sh/helm/v4/pkg/action"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
@@ -408,7 +410,6 @@ func TestIsInstalledExactVersion(t *testing.T) {
 
 func TestInstall(t *testing.T) {
 	t.Parallel()
-	asserts := assert.New(t)
 	type testInput struct {
 		namespace            string
 		chartName            string
@@ -661,40 +662,55 @@ func TestInstall(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		if test.skip {
-			continue
-		}
-		UpgradeActionMatcher := mock.MatchedBy(func(r io.Reader) bool {
-			upgradeArgs := &types2.ChartUpgradeAction{}
-			_ = json.NewDecoder(r).Decode(upgradeArgs)
-			if test.input.exactVersion != "" {
-				asserts.Equal(true, upgradeArgs.Charts[0].Version == test.input.exactVersion, test.name)
+		t.Run(test.name, func(t *testing.T) {
+			if test.skip {
+				t.Skip()
 			}
-			if test.input.values["tolerations"] != nil {
-				tolExpected := test.input.values["tolerations"].([]v1.Toleration)
-				tol := upgradeArgs.Charts[0].Values["tolerations"].([]interface{})[0].(map[string]interface{})
-				asserts.Equal(true, (tol["value"] == tolExpected[0].Value) && (tol["key"] == tolExpected[0].Key), test.name)
-			}
-			return true
-		})
-		contentMock, opsMock, podsMock, settingsMock, helmMock, clusterRepoMock :=
-			&mocks.ContentClient{}, &mocks.OperationClient{}, &mocks.PodClient{}, &mocks.SettingController{}, &mocks.HelmClient{}, &mocks.ClusterRepoController{}
 
-		contentMock.On("Index", "", "rancher-charts", "", true).Return(test.mocks.indexOutput, test.mocks.indexError)
-		helmMock.On("ListReleases", test.input.namespace, test.input.releaseName, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError)
-		helmMock.On("ListReleases", test.input.namespace, test.input.releaseName, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback).Return(test.mocks.hasStatusOutput, test.mocks.hasStatusError)
-		opsMock.On("Upgrade", context.TODO(), installUser, "", "rancher-charts", UpgradeActionMatcher, test.input.installImageOverride).Return(test.mocks.upgradeOutput, test.mocks.upgradeError)
-		opsMock.On("AddCpTaintsToTolerations", []v1.Toleration(nil)).Return(test.input.cpTolerations, nil)
-		if test.mocks.podGetOutput != nil || test.mocks.podGetError != nil {
-			podsMock.On("Get", test.mocks.upgradeOutput.Status.PodNamespace, test.mocks.upgradeOutput.Status.PodName, metav1.GetOptions{}).Return(test.mocks.podGetOutput, test.mocks.podGetError)
-		}
-		manager, _ := NewManager(context.TODO(), contentMock, opsMock, podsMock, settingsMock, clusterRepoMock, helmMock)
-		err := manager.install(test.input.namespace, test.input.chartName, test.input.releaseName, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.takeOwnership, test.input.installImageOverride)
-		if test.expected == nil {
-			asserts.Nil(err, test.name)
-		} else {
-			assert.NotNil(t, err, test.name)
-			asserts.Equal(test.expected.Error(), err.Error(), test.name)
-		}
+			asserts := assert.New(t)
+			ctrl := gomock.NewController(t)
+			contentMock := NewMockContentClient(ctrl)
+			opsMock := NewMockOperationClient(ctrl)
+			helmMock := NewMockHelmClient(ctrl)
+			podsMock := fake.NewMockControllerInterface[*v1.Pod, *v1.PodList](ctrl)
+			settingsMock := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](ctrl)
+			clusterRepoMock := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+
+			UpgradeActionMatcher := mock.MatchedBy(func(r io.Reader) bool {
+				upgradeArgs := &types2.ChartUpgradeAction{}
+				_ = json.NewDecoder(r).Decode(upgradeArgs)
+				if test.input.exactVersion != "" {
+					asserts.Equal(true, upgradeArgs.Charts[0].Version == test.input.exactVersion, test.name)
+				}
+				if test.input.values["tolerations"] != nil {
+					tolExpected := test.input.values["tolerations"].([]v1.Toleration)
+					tol := upgradeArgs.Charts[0].Values["tolerations"].([]interface{})[0].(map[string]interface{})
+					asserts.Equal(true, (tol["value"] == tolExpected[0].Value) && (tol["key"] == tolExpected[0].Key), test.name)
+				}
+				return true
+			})
+
+			contentMock.EXPECT().Index("", "rancher-charts", "", true).Return(test.mocks.indexOutput, test.mocks.indexError)
+			helmMock.EXPECT().ListReleases(test.input.namespace, test.input.releaseName, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError).
+				AnyTimes() // mimics previous "mockery" behavior
+			helmMock.EXPECT().ListReleases(test.input.namespace, test.input.releaseName, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback).Return(test.mocks.hasStatusOutput, test.mocks.hasStatusError).
+				AnyTimes() // mimics previous "mockery" behavior
+			opsMock.EXPECT().Upgrade(context.TODO(), installUser, "", "rancher-charts", UpgradeActionMatcher, test.input.installImageOverride).Return(test.mocks.upgradeOutput, test.mocks.upgradeError).
+				AnyTimes() // mimics previous "mockery" behavior
+			opsMock.EXPECT().AddCpTaintsToTolerations([]v1.Toleration(nil)).Return(test.input.cpTolerations, nil).
+				AnyTimes() // mimics previous "mockery" behavior
+			if test.mocks.podGetOutput != nil || test.mocks.podGetError != nil {
+				podsMock.EXPECT().Get(test.mocks.upgradeOutput.Status.PodNamespace, test.mocks.upgradeOutput.Status.PodName, metav1.GetOptions{}).Return(test.mocks.podGetOutput, test.mocks.podGetError)
+			}
+			manager, _ := NewManager(context.TODO(), contentMock, opsMock, podsMock, settingsMock, clusterRepoMock, helmMock)
+			err := manager.install(test.input.namespace, test.input.chartName, test.input.releaseName, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.takeOwnership, test.input.installImageOverride)
+			if test.expected == nil {
+				asserts.Nil(err, test.name)
+			} else {
+				assert.NotNil(t, err, test.name)
+				asserts.Equal(test.expected.Error(), err.Error(), test.name)
+			}
+
+		})
 	}
 }
