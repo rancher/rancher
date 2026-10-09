@@ -692,7 +692,7 @@ func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, err
 		if controlPlaneLabelFound {
 			toAdd, _ := taints.GetToDiffTaints(allTaints, node.Spec.InternalNodeSpec.Taints)
 			for _, taintStr := range toAdd {
-				if !strings.HasPrefix(taintStr.Key, "node.kubernetes.io") {
+				if !taints.IsTransient(taintStr) {
 					logrus.Debugf("clusterDeploy: getControlPlaneTaints: toAdd: %v", toAdd)
 					allTaints = append(allTaints, taintStr)
 					continue
@@ -701,6 +701,7 @@ func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, err
 			}
 		}
 	}
+	taints.Sort(allTaints)
 	logrus.Debugf("clusterDeploy: getControlPlaneTaints: allTaints: %v", allTaints)
 
 	return allTaints, nil
