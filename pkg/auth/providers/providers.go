@@ -292,6 +292,9 @@ type configRef struct {
 // configuredRefs returns the configured AuthConfigs. Without a lister, each
 // registered provider is assumed to have a single config named after it.
 func configuredRefs() []configRef {
+	mu.RLock()
+	defer mu.RUnlock()
+
 	lister := authConfigLister
 	var refs []configRef
 	if lister == nil {
@@ -355,7 +358,6 @@ func IsExternalProviderEnabled() bool {
 	// Full scan: snapshot the non-local provider list while holding the lock,
 	// then call IsDisabledProvider outside the lock — those implementations make
 	// live Kubernetes API calls that must not block the lock.
-	mu.RLock()
 	for _, ref := range configuredRefs() {
 		if ref.providerName == local.Name || ref == alreadyChecked {
 			continue
@@ -370,7 +372,6 @@ func IsExternalProviderEnabled() bool {
 			return true
 		}
 	}
-	mu.RUnlock()
 
 	lastKnownEnabled.Store(configRef{})
 	return false
