@@ -118,8 +118,8 @@ require (
 	github.com/rancher/cluster-api-provider-rke2 v0.25.2
 	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.16.0-rc.2
-	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
-	github.com/rancher/fleet/pkg/helmvalues v0.16.1
+	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.6
+	github.com/rancher/fleet/pkg/helmvalues v0.17.0-alpha.6
 	github.com/rancher/gke-operator v1.16.0-rc.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
