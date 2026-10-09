@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -28,7 +29,6 @@ const (
 
 	templateGracePeriod = time.Hour
 	cleanupPeriod       = 12 * time.Hour
-	retryPeriod         = 15 * time.Minute
 	pageSize            = 100
 
 	logPrefix = "[capi-infra-cleanup]"
@@ -88,7 +88,7 @@ type handler struct {
 	machineDeploymentClient capicontrollers.MachineDeploymentClient
 	machineSetClient        capicontrollers.MachineSetClient
 
-	cleanupQueue chan (*provv1.Cluster)
+	cleanupQueue chan (struct{})
 
 	gkToGVR   map[schema.GroupKind]schema.GroupVersionResource
 	gkToGVRmu sync.Mutex
@@ -115,7 +115,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) error {
 		machineDeploymentClient: clients.CAPI.MachineDeployment(),
 		machineSetClient:        clients.CAPI.MachineSet(),
 
-		cleanupQueue: make(chan *provv1.Cluster, 5),
+		cleanupQueue: make(chan struct{}, 1),
 	}
 
 	var err error
@@ -213,7 +213,7 @@ func (h *handler) OnClusterChange(key string, cluster *provv1.Cluster) (*provv1.
 		return cluster, nil
 	}
 
-	if !(h.isLocal(cluster) || h.shouldCleanup(cluster)) {
+	if !h.isLocal(cluster) {
 		return cluster, nil
 	}
 
@@ -254,13 +254,9 @@ func (h *handler) OnClusterChange(key string, cluster *provv1.Cluster) (*provv1.
 	}
 
 	select {
-	case h.cleanupQueue <- cluster.DeepCopy():
+	case h.cleanupQueue <- struct{}{}:
 		logrus.Debugf("%s scheduled clean up for %s", logPrefix, key)
 	default:
-		// Try again in a shorter period. If this fails, we'll have to
-		// wait another full period.
-		logrus.Debugf("%s cleanup queue was busy for %s, retrying in %s", logPrefix, key, retryPeriod)
-		return h.updateNextCleanupTime(cluster, retryPeriod, now)
 	}
 
 	return cluster, nil
@@ -315,14 +311,9 @@ func (h *handler) cleanup() {
 		select {
 		case <-h.ctx.Done():
 			return
-		case cluster := <-h.cleanupQueue:
-			if h.isLocal(cluster) {
-				// Handle objects that haven't been adopted and
-				// label those that have.
-				h.cleanupOrLabelObjects()
-			} else {
-				h.cleanupOwnedObjectsByCluster(cluster)
-			}
+		case <-h.cleanupQueue:
+			h.cleanupOrLabelObjects()
+			h.cleanupOwnedObjects()
 		}
 	}
 }
@@ -469,17 +460,26 @@ func (h *handler) labelOwnedObject(obj *unstructured.Unstructured, client dynami
 	return err
 }
 
-func (h *handler) cleanupOwnedObjectsByCluster(cluster *provv1.Cluster) {
-	logrus.Infof("%s about to clean up templates for cluster %s/%s", logPrefix, cluster.Namespace, cluster.Name)
-
+func (h *handler) cleanupOwnedObjects() {
 	now := time.Now()
 
-	err := h.cleanupInfraMachineTemplates(cluster, now)
+	clusters, err := h.provClusterController.Cache().List("", labels.Everything())
 	if err != nil {
-		logrus.Errorf("%s cleaning up templates: %v", logPrefix, err)
+		logrus.Errorf("%s listing cached clusters: %v", logPrefix, err)
+		return
 	}
 
-	logrus.Infof("%s done", logPrefix)
+	for _, cluster := range clusters {
+		if !h.shouldCleanup(cluster) {
+			continue
+		}
+
+		logrus.Infof("%s about to clean up templates for cluster %s/%s", logPrefix, cluster.Namespace, cluster.Name)
+		err := h.cleanupInfraMachineTemplates(cluster, now)
+		if err != nil {
+			logrus.Errorf("%s cleaning up templates: %v", logPrefix, err)
+		}
+	}
 }
 
 func (h *handler) cleanupInfraMachineTemplates(cluster *provv1.Cluster, now time.Time) error {

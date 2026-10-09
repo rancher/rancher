@@ -25,7 +25,6 @@ func Test_cleanupOrLabelObject(t *testing.T) {
 	scheme := runtime.NewScheme()
 
 	h := &handler{
-		// TODO check
 		ctx: t.Context(),
 	}
 
@@ -508,8 +507,9 @@ func Test_cleanupInfraMachineTemplates(t *testing.T) {
 			h.dynamicClient = dynamicClient
 
 			infraClusterClient := dynamicClient.Resource(templateGVR).Namespace(namespace)
-			//TODO check context
-			infraClusterClient.Create(t.Context(), tt.obj, metav1.CreateOptions{})
+
+			_, err = infraClusterClient.Create(t.Context(), tt.obj, metav1.CreateOptions{})
+			require.NoError(t, err)
 
 			dynamicClient.ClearActions()
 
