@@ -12,6 +12,7 @@ import (
 	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	wcondition "github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +72,13 @@ const (
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
 	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
 	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
+
+	// ClusterConditionConnected is set when the cluster has successfully connected via the stv-cluster- session.
+	// This required the cluster agent to have deployed through
+	// [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy], as the initial manifest provided by the
+	// ClusterRegistrationToken (if used) has an empty feature set, and thus the steve aggregation server will not
+	// start.
+	ClusterConditionConnected = wcondition.Cond("Connected")
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -234,7 +242,7 @@ type ClusterStatus struct {
 	AppliedWebhookDeploymentCustomization      *WebhookDeploymentCustomization `json:"appliedWebhookDeploymentCustomization,omitempty"`
 
 	// ReadyReconciling indicates that the cluster's readiness state is currently being managed by provisioning controller.
-	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, Connected) should avoid updating Ready condition to prevent state flapping.
+	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, ClusterConditionConnected) should avoid updating Ready condition to prevent state flapping.
 	ReadyReconciling bool         `json:"readyReconciling,omitempty"`
 	Info             *ClusterInfo `json:"info,omitempty"`
 }
