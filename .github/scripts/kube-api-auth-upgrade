@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+VERSION=$KUBE_API_AUTH_VERSION
+# note: the pattern matches and removes the trailing `",`, requiring the replacement to add it back
+sed -i "s|rancher/kube-api-auth:v.\+$|rancher/kube-api-auth:${VERSION}\",|g" \
+    pkg/apis/management.cattle.io/v3/tools_system_images.go
