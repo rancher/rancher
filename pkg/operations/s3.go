@@ -170,12 +170,12 @@ func ResolveS3Target(secrets corecontrollers.SecretCache, s3, clusterS3 *rkev1.E
 		Folder:        first(s3.Folder, cred.Folder),
 		AccessKey:     cred.AccessKey,
 		SecretKey:     cred.SecretKey,
-		SkipSSLVerify: s3.SkipSSLVerify || cred.SkipSSLVerify,
+		SkipSSLVerify: cred.SkipSSLVerify || s3.SkipSSLVerify,
 		Retention:     s3.Retention,
 	}
 
 	if ca := first(s3.EndpointCA, cred.EndpointCA); ca != "" {
-		if ca == s3.EndpointCA && strings.HasSuffix(ca, ".crt") {
+		if ca == s3.EndpointCA && (strings.HasSuffix(ca, ".crt") || strings.HasSuffix(ca, ".pem")) {
 			// The S3 block recorded the path of the CA file that was used when the snapshot was
 			// taken rather than its content (this is what a snapshot backpopulated from a node's
 			// config looks like). Reference that path, and re-render the file when the credential
