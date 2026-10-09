@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	v4 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -117,7 +117,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 		}
 		return cluster, err
 	}
-	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
+	if !v4.ClusterConditionConnected.IsTrue(mgmtCluster) {
 		return cluster, nil
 	}
 
@@ -513,7 +513,7 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		}
 		return cluster, err
 	}
-	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
+	if !v4.ClusterConditionConnected.IsTrue(mgmtCluster) {
 		return cluster, nil
 	}
 

@@ -13,16 +13,11 @@ import (
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-)
-
-var (
-	Connected = condition.Cond("Connected")
 )
 
 func Register(ctx context.Context, wrangler *wrangler.Context) {
@@ -81,15 +76,15 @@ func (c *checker) hasSession(cluster *v3.Cluster) bool {
 		return false
 	}
 	defer func() {
-		io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_, _ = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 	}()
 	return resp.StatusCode == http.StatusOK
 }
 
 func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
-		if !Connected.IsTrue(cluster) {
+		if !v3.ClusterConditionConnected.IsTrue(cluster) {
 			return c.updateClusterConnectedCondition(cluster, true)
 		}
 		return nil
@@ -98,9 +93,9 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	hasSession := c.hasSession(cluster)
 	// The simpler condition of hasSession == Connected.IsTrue(cluster) is not
 	// used because it treats a non-existent conditions as False
-	if hasSession && Connected.IsTrue(cluster) {
+	if hasSession && v3.ClusterConditionConnected.IsTrue(cluster) {
 		return nil
-	} else if !hasSession && Connected.IsFalse(cluster) && v3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
+	} else if !hasSession && v3.ClusterConditionConnected.IsFalse(cluster) && v3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
 		return nil
 	}
 
@@ -120,12 +115,12 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 	if cluster == nil {
 		return fmt.Errorf("cluster cannot be nil")
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		latestCluster, err := c.clusters.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		Connected.SetStatusBool(latestCluster, connected)
+		v3.ClusterConditionConnected.SetStatusBool(latestCluster, connected)
 		if !connected && v3.ClusterConditionProvisioned.IsTrue(latestCluster) {
 			// For v2prov clusters, only update Ready when the condition is not being managed by the provisioner.
 			if !latestCluster.Status.ReadyReconciling {
