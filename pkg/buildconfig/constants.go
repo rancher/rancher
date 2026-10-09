@@ -13,5 +13,5 @@ const (
 	RemoteDialerProxyVersion  = "111.0.0+up0.9.0-rc.3"
 	Rke2ChartDefaultBranch    = "main"
 	TurtlesVersion            = "111.0.0+up0.28.0-rc.0"
-	WebhookVersion            = "111.0.0+up0.12.1-rc.9"
+	WebhookVersion            = "111.0.0+up0.12.1-rc.11"
 )
