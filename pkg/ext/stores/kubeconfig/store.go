@@ -427,10 +427,8 @@ func (s *Store) Create(
 
 	includeDefault := includeDefaultEntry(&kubeconfig.Spec)
 
-	if kubeconfig.Spec.PreferRancherProxy == nil {
-		kubeconfig.Spec.PreferRancherProxy = ptr.To(s.shouldPreferRancherProxy())
-	}
-	preferRancherProxy := *kubeconfig.Spec.PreferRancherProxy
+	preferRancherProxy := ptr.Deref(kubeconfig.Spec.PreferRancherProxy, s.shouldPreferRancherProxy())
+	kubeconfig.Spec.PreferRancherProxy = &preferRancherProxy
 
 	needsSharedToken := includeDefault
 	if !needsSharedToken {
