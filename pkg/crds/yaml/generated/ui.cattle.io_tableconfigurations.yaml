@@ -1,0 +1,219 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: tableconfigurations.ui.cattle.io
+spec:
+  group: ui.cattle.io
+  names:
+    kind: TableConfiguration
+    listKind: TableConfigurationList
+    plural: tableconfigurations
+    shortNames:
+    - tablecfg
+    singular: tableconfiguration
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: Type
+      type: string
+    - jsonPath: .spec.page
+      name: Page
+      type: string
+    - jsonPath: .spec.view.name
+      name: View
+      type: string
+    - jsonPath: .spec.views[*].name
+      name: Views
+      type: string
+    - jsonPath: .spec.defaultViewId
+      name: Default
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          TableConfiguration is a configuration of the UI's resource tables shared with every user. Each user's own
+          configuration is persisted elsewhere; this is the one everyone starts from.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec is the table configuration.
+            properties:
+              allIndex:
+                description: AllIndex is where the table's own tab sits among the
+                  saved ones. Missing means the front. Only for PAGE.
+                minimum: 0
+                type: integer
+              defaultViewId:
+                description: DefaultViewID is the id of the view selected when the
+                  page opens. Only for PAGE.
+                nullable: true
+                type: string
+              page:
+                description: |-
+                  Page is the location to apply customization. Could relate to a resource type (e.g.
+                  provisioning.cattle.io.cluster) or a specific name like 'home'.
+                minLength: 1
+                type: string
+                x-kubernetes-validations:
+                - message: page is immutable
+                  rule: self == oldSelf
+              type:
+                description: |-
+                  Type is PAGE for page level configuration, and the UI will load only one of these per page. VIEW
+                  contains a single table configuration, and the UI will supplement the page with these.
+                enum:
+                - PAGE
+                - VIEW
+                type: string
+                x-kubernetes-validations:
+                - message: type is immutable
+                  rule: self == oldSelf
+              view:
+                description: View is a saved table configuration (SavedView). Only
+                  for VIEW.
+                properties:
+                  columnOrder:
+                    description: ColumnOrder are the column ids in order. Missing
+                      or null means the table's own order.
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  columns:
+                    description: Columns are the column ids shown. Missing or null
+                      means the table's default columns.
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  groupBy:
+                    description: GroupBy is the field id to group by, or 'none' to
+                      turn off the table's default grouping.
+                    nullable: true
+                    type: string
+                  id:
+                    description: ID identifies the view, among a page's views and
+                      in each user's views.
+                    type: string
+                  labelColumns:
+                    description: LabelColumns are the label keys shown as columns.
+                    items:
+                      type: string
+                    type: array
+                  name:
+                    description: Name is the view's name, shown on its tab.
+                    type: string
+                  query:
+                    description: Query filters the table, as typed into its filter.
+                    type: string
+                  sort:
+                    description: Sort is the column the table is sorted by. Missing
+                      or null means the table's own sort.
+                    nullable: true
+                    type: string
+                  sortDescending:
+                    description: SortDescending sorts the table in descending order.
+                    type: boolean
+                required:
+                - id
+                - name
+                type: object
+              views:
+                description: Views are the page's saved table configurations, in tab
+                  order (SavedPage). Required for PAGE.
+                items:
+                  description: TableViewSaved is a saved table configuration.
+                  properties:
+                    columnOrder:
+                      description: ColumnOrder are the column ids in order. Missing
+                        or null means the table's own order.
+                      items:
+                        type: string
+                      nullable: true
+                      type: array
+                    columns:
+                      description: Columns are the column ids shown. Missing or null
+                        means the table's default columns.
+                      items:
+                        type: string
+                      nullable: true
+                      type: array
+                    groupBy:
+                      description: GroupBy is the field id to group by, or 'none'
+                        to turn off the table's default grouping.
+                      nullable: true
+                      type: string
+                    id:
+                      description: ID identifies the view, among a page's views and
+                        in each user's views.
+                      type: string
+                    labelColumns:
+                      description: LabelColumns are the label keys shown as columns.
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      description: Name is the view's name, shown on its tab.
+                      type: string
+                    query:
+                      description: Query filters the table, as typed into its filter.
+                      type: string
+                    sort:
+                      description: Sort is the column the table is sorted by. Missing
+                        or null means the table's own sort.
+                      nullable: true
+                      type: string
+                    sortDescending:
+                      description: SortDescending sorts the table in descending order.
+                      type: boolean
+                  required:
+                  - id
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - id
+                x-kubernetes-list-type: map
+            required:
+            - page
+            - type
+            type: object
+            x-kubernetes-validations:
+            - message: views is required when type is PAGE and not allowed when type
+                is VIEW
+              rule: 'self.type == ''PAGE'' ? has(self.views) : !has(self.views)'
+            - message: view is required when type is VIEW and not allowed when type
+                is PAGE
+              rule: 'self.type == ''VIEW'' ? has(self.view) : !has(self.view)'
+            - message: defaultViewId and allIndex are only allowed when type is PAGE
+              rule: self.type == 'PAGE' || (!has(self.defaultViewId) && !has(self.allIndex))
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources: {}
