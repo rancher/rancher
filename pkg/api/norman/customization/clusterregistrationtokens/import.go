@@ -81,6 +81,8 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	assetsImage := image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
+	features := systemtemplate.GetDesiredFeatures(cluster)
+
 	ops := &systemtemplate.TemplateOps{
 		AgentImage:     agentImage,
 		AuthImage:      authImage,
@@ -90,7 +92,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		URL:            url,
 		IsPreBootstrap: false,
 		Cluster:        cluster,
-		AgentFeatures:  nil,
+		AgentFeatures:  features,
 		Taints:         nil,
 		SecretLister:   ch.SecretLister,
 		PcExists:       false,
