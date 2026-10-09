@@ -46,6 +46,7 @@ var OriginMap = map[string]string{
 	"cluster-api-gcp-controller":                              "https://github.com/rancher/cluster-api-provider-gcp",
 	"cluster-api-provider-rke2-bootstrap":                     "https://github.com/rancher/cluster-api-provider-rke2",
 	"cluster-api-provider-rke2-controlplane":                  "https://github.com/rancher/cluster-api-provider-rke2",
+	"cluster-api-provider-rke2-extension":                     "https://github.com/rancher/cluster-api-provider-rke2",
 	"cluster-api-vsphere-controller":                          "https://github.com/rancher/cluster-api-provider-vsphere",
 	"eks-operator":                                            "https://github.com/rancher/eks-operator",
 	"externalip-webhook":                                      "https://github.com/rancher/externalip-webhook",
