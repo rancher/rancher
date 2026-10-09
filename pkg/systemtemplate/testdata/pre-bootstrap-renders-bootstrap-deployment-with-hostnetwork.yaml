@@ -162,7 +162,8 @@ spec:
       - effect: NoExecute
         key: "node-role.kubernetes.io/etcd"
         operator: "Exists"
-      - key: node.cloudprovider.kubernetes.io/uninitialized
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
         operator: "Exists"
       containers:
         - name: cluster-register
