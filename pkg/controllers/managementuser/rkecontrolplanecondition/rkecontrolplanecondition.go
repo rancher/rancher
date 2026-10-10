@@ -10,12 +10,15 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
@@ -30,16 +33,22 @@ type throttleState struct {
 
 type handler struct {
 	mgmtClusterName           string
+	mgmtClusterUID            types.UID
+	mgmtClusterCache          mgmtcontrollers.ClusterCache
 	downstreamAppClient       catalogv1.AppClient
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController
 	pendingEnqueues           sync.Map
 }
 
-func Register(ctx context.Context, mgmtClusterName string, downstreamAppClient catalogv1.AppClient,
-	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
+// Register registers the handler for the management cluster mgmtClusterName. If mgmtClusterUID is set, it
+// only handles the control plane of the management cluster with that UID, which mgmtClusterCache finds.
+func Register(ctx context.Context, mgmtClusterName string, mgmtClusterUID types.UID, mgmtClusterCache mgmtcontrollers.ClusterCache,
+	downstreamAppClient catalogv1.AppClient, rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
 
 	h := handler{
 		mgmtClusterName:           mgmtClusterName,
+		mgmtClusterUID:            mgmtClusterUID,
+		mgmtClusterCache:          mgmtClusterCache,
 		downstreamAppClient:       downstreamAppClient,
 		rkeControlPlaneController: rkeControlPlaneController,
 	}
@@ -63,6 +72,18 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 
 	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
 		return status, nil
+	}
+	if h.mgmtClusterUID != "" {
+		// The control plane of a cluster created again under the same name is not this controller's.
+		mgmtCluster, err := h.mgmtClusterCache.Get(h.mgmtClusterName)
+		if errors.IsNotFound(err) {
+			return status, nil
+		} else if err != nil {
+			return status, err
+		}
+		if !config.MatchesClusterUID(h.mgmtClusterUID, mgmtCluster) {
+			return status, nil
+		}
 	}
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()

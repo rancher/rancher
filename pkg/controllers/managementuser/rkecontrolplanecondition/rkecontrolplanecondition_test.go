@@ -6,6 +6,7 @@ import (
 	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -14,6 +15,7 @@ import (
 	"go.uber.org/mock/gomock"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -574,4 +576,60 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_handler_syncSystemUpgradeControllerConditionChecksTheManagementClusterUID(t *testing.T) {
+	setChartVersion := func(t *testing.T, version string) {
+		current := settings.SystemUpgradeControllerChartVersion.Get()
+		if err := settings.SystemUpgradeControllerChartVersion.Set(version); err != nil {
+			t.Fatalf("failed to set up: %v", err)
+		}
+		t.Cleanup(func() { _ = settings.SystemUpgradeControllerChartVersion.Set(current) })
+	}
+	controlPlane := &v1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{Name: controlPlaneName, Namespace: namespace.System},
+		Spec:       v1.RKEControlPlaneSpec{ClusterName: provClusterName, ManagementClusterName: mgmtClusterName},
+		Status:     v1.RKEControlPlaneStatus{AgentConnected: true},
+	}
+	newHandler := func(t *testing.T, uid types.UID) *handler {
+		ctrl := gomock.NewController(t)
+		clusterCache := fake.NewMockNonNamespacedCacheInterface[*mgmtv3.Cluster](ctrl)
+		clusterCache.EXPECT().Get(mgmtClusterName).Return(&mgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: mgmtClusterName, UID: uid}}, nil)
+		// No app client calls are expected unless a test sets them up.
+		return &handler{
+			mgmtClusterName:           mgmtClusterName,
+			mgmtClusterUID:            "uid-old",
+			mgmtClusterCache:          clusterCache,
+			downstreamAppClient:       fake.NewMockControllerInterface[*catalog.App, *catalog.AppList](ctrl),
+			rkeControlPlaneController: fake.NewMockControllerInterface[*v1.RKEControlPlane, *v1.RKEControlPlaneList](ctrl),
+		}
+	}
+
+	t.Run("a cluster created again under the same name", func(t *testing.T) {
+		setChartVersion(t, "")
+		h := newHandler(t, "uid-new")
+
+		got, err := h.syncSystemUpgradeControllerCondition(controlPlane, controlPlane.Status)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status := capr.SystemUpgradeControllerReady.GetStatus(&got); status != "" {
+			t.Errorf("the control plane of the new cluster must be left alone, got condition status %q", status)
+		}
+	})
+
+	t.Run("the cluster the handler was registered for", func(t *testing.T) {
+		setChartVersion(t, "")
+		h := newHandler(t, "uid-old")
+
+		got, err := h.syncSystemUpgradeControllerCondition(controlPlane, controlPlane.Status)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status := capr.SystemUpgradeControllerReady.GetStatus(&got); status != "False" {
+			t.Errorf("expected the condition to be set as before, got condition status %q", status)
+		}
+	})
 }
