@@ -1,15 +1,21 @@
 package mcmauthorizer
 
 import (
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -43,10 +49,21 @@ func TestGetClusterByToken(t *testing.T) {
 	cluster := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc"}}
 	clusterLister := &fakes.ClusterListerMock{
 		GetFunc: func(namespace, name string) (*apimgmtv3.Cluster, error) {
-			if name == "c-abc" {
+			switch name {
+			case "c-abc":
 				return cluster, nil
 			}
 			return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
+		},
+	}
+	// c-old is the namespace of a cluster that was deleted; its tokens are still being torn down.
+	namespaceLister := &corefakes.NamespaceListerMock{
+		GetFunc: func(_, name string) (*corev1.Namespace, error) {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+			if name == "c-old" {
+				ns.Status.Phase = corev1.NamespaceTerminating
+			}
+			return ns, nil
 		},
 	}
 
@@ -56,6 +73,7 @@ func TestGetClusterByToken(t *testing.T) {
 		token      string
 		wantResult *apimgmtv3.Cluster
 		wantErr    error
+		wantErrMsg string
 	}{
 		{
 			name: "current token matches",
@@ -97,16 +115,42 @@ func TestGetClusterByToken(t *testing.T) {
 			token:   "tok",
 			wantErr: ErrClusterNotFound,
 		},
+		{
+			name: "token from a previous cluster with the same name",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-old", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:      "tok",
+			wantErr:    ErrClusterNotFound,
+			wantErrMsg: "registration token belongs to a previous cluster named c-old",
+		},
+		{
+			name: "a stale match does not hide a usable one",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-old", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+				tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:      "tok",
+			wantResult: cluster,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auth := &Authorizer{
-				secretIndexer: newTestSecretIndexer(t, tt.secrets...),
-				clusterLister: clusterLister,
+				secretIndexer:   newTestSecretIndexer(t, tt.secrets...),
+				clusterLister:   clusterLister,
+				namespaceLister: namespaceLister,
 			}
 			got, err := auth.getClusterByToken(tt.token)
-			assert.Equal(t, tt.wantErr, err)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				if tt.wantErrMsg != "" {
+					assert.ErrorContains(t, err, tt.wantErrMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.wantResult, got)
 		})
 	}
@@ -168,4 +212,92 @@ func TestFormatAddress(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAuthorizeTunnelTracksTheSessionsCluster(t *testing.T) {
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-abc", UID: "uid-abc"},
+		// A driver that doesn't take its connection details from the agent, so authorizing doesn't
+		// update the cluster.
+		Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverAKS},
+	}
+	auth := &Authorizer{
+		secretIndexer: newTestSecretIndexer(t, tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")})),
+		clusterLister: &fakes.ClusterListerMock{
+			GetFunc: func(_, name string) (*apimgmtv3.Cluster, error) {
+				if name == "c-abc" {
+					return cluster, nil
+				}
+				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
+			},
+		},
+		namespaceLister: &corefakes.NamespaceListerMock{
+			GetFunc: func(_, name string) (*corev1.Namespace, error) {
+				return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+			},
+		},
+	}
+	params := base64.StdEncoding.EncodeToString([]byte(`{"cluster":{"address":"10.0.0.1:6443","token":"sa-token","caCert":"ca"}}`))
+
+	tests := []struct {
+		name        string
+		token       string
+		wantKey     string
+		wantOK      bool
+		wantTracked types.UID
+	}{
+		{name: "authorized", token: "tok", wantKey: "c-abc", wantOK: true, wantTracked: "uid-abc"},
+		{name: "rejected", token: "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v3/connect/register", nil)
+			req.Header.Set(Token, tt.token)
+			req.Header.Set(Params, params)
+
+			var (
+				key        string
+				ok         bool
+				trackedUID types.UID
+			)
+			tunnelserver.NewSessionTracker().Handler(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				key, ok, _ = auth.AuthorizeTunnel(r)
+				_, trackedUID = tunnelserver.SessionCluster(r)
+			})).ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, tt.wantKey, key)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantTracked, trackedUID)
+		})
+	}
+}
+
+func TestGetClusterByTokenReturnsTheClusterTheTokenWasCheckedAgainst(t *testing.T) {
+	// A second lookup could find a cluster that replaced the checked one under the same name, and the old
+	// cluster's token would be authorized for it.
+	checked := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc", UID: "uid-checked"}}
+	replacement := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc", UID: "uid-replacement"}}
+	lookups := 0
+	auth := &Authorizer{
+		secretIndexer: newTestSecretIndexer(t, tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")})),
+		clusterLister: &fakes.ClusterListerMock{
+			GetFunc: func(_, _ string) (*apimgmtv3.Cluster, error) {
+				lookups++
+				if lookups == 1 {
+					return checked, nil
+				}
+				return replacement, nil
+			},
+		},
+		namespaceLister: &corefakes.NamespaceListerMock{
+			GetFunc: func(_, name string) (*corev1.Namespace, error) {
+				return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+			},
+		},
+	}
+
+	got, err := auth.getClusterByToken("tok")
+
+	assert.NoError(t, err)
+	assert.Same(t, checked, got)
 }

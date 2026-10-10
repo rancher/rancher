@@ -71,13 +71,26 @@ func ResolveMgmtTokenCaller(
 ) (*LifecycleContext, error) {
 	mgmtCluster, err := mgmtClusterCache.Get(tokenNamespace)
 	if apierrors.IsNotFound(err) {
+		mgmtCluster, err = nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return resolveTokenCaller(mgmtCluster, capiClusterCache, tokenNamespace)
+}
+
+// resolveTokenCaller classifies a caller like ResolveMgmtTokenCaller, given the mgmt cluster the token's
+// namespace dereferenced to, or nil if there is none.
+func resolveTokenCaller(
+	mgmtCluster *apimgmtv3.Cluster,
+	capiClusterCache capicontrollers.ClusterCache,
+	tokenNamespace string,
+) (*LifecycleContext, error) {
+	if mgmtCluster == nil {
 		return &LifecycleContext{
 			Kind:            KindV2Prov,
 			TargetNamespace: tokenNamespace,
 		}, nil
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	// v2prov clusters (custom + node-driver) have a mgmt cluster *shell* stamped with the

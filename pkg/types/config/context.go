@@ -50,8 +50,10 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	k8sauthuser "k8s.io/apiserver/pkg/authentication/user"
 	k8dynamic "k8s.io/client-go/dynamic"
@@ -208,8 +210,11 @@ type Impersonator interface {
 }
 
 type UserContext struct {
-	Management        *ManagementContext
-	ClusterName       string
+	Management  *ManagementContext
+	ClusterName string
+	// ClusterUID is the UID of the management cluster this context is for. A cluster removed and created
+	// again under the same name is a different cluster, which this context must not act on.
+	ClusterUID        k8stypes.UID
 	RESTConfig        rest.Config
 	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
@@ -425,6 +430,18 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	context.Scheme = wrangler.Scheme
 
 	return context, err
+}
+
+// IsCluster reports whether cluster is the cluster this context is for: it has the same name and, if this
+// context knows it, the same UID.
+func (w *UserContext) IsCluster(cluster metav1.Object) bool {
+	return cluster.GetName() == w.ClusterName && MatchesClusterUID(w.ClusterUID, cluster)
+}
+
+// MatchesClusterUID reports whether cluster has the UID a controller was started for. A controller that
+// doesn't know the UID matches any cluster with its cluster's name.
+func MatchesClusterUID(uid k8stypes.UID, cluster metav1.Object) bool {
+	return uid == "" || cluster.GetUID() == uid
 }
 
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {

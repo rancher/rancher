@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -79,6 +80,7 @@ type dynamicClient interface {
 
 type handler struct {
 	clusterName string
+	clusterUID  types.UID
 
 	configMap        corecontrollers.ConfigMapClient
 	dynamic          dynamicClient
@@ -92,6 +94,7 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 
 	h := &handler{
 		clusterName:      userContext.ClusterName,
+		clusterUID:       userContext.ClusterUID,
 		configMap:        userContext.Corew.ConfigMap(),
 		dynamic:          userContext.Management.Wrangler.Dynamic,
 		provClusterCache: userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
@@ -121,7 +124,7 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	// The handler is registered per downstream cluster but watches every mgmt Cluster, so ignore
 	// the ones this agent is not responsible for.
-	if cluster == nil || cluster.Name != h.clusterName {
+	if cluster == nil || cluster.Name != h.clusterName || !config.MatchesClusterUID(h.clusterUID, cluster) {
 		return cluster, nil
 	}
 
@@ -211,6 +214,10 @@ func (h *handler) capiOwner() (*apimgmtv3.Cluster, string, string, error) {
 	}
 	if err != nil {
 		return nil, "", "", err
+	}
+	if !config.MatchesClusterUID(h.clusterUID, cluster) {
+		// A cluster created again under the same name is not this controller's.
+		return nil, "", "", nil
 	}
 
 	ownerName := cluster.Labels[capr.CAPIClusterOwnerLabel]

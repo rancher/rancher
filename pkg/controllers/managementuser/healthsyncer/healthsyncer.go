@@ -23,6 +23,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 )
@@ -50,6 +51,7 @@ type ClusterControllerLifecycle interface {
 type HealthSyncer struct {
 	ctx               context.Context
 	clusterName       string
+	clusterUID        types.UID
 	clusterLister     v3.ClusterLister
 	clusters          v3.ClusterInterface
 	componentStatuses generic.NonNamespacedClientInterface[*v1.ComponentStatus, *v1.ComponentStatusList]
@@ -60,6 +62,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	h := &HealthSyncer{
 		ctx:               ctx,
 		clusterName:       workload.ClusterName,
+		clusterUID:        workload.ClusterUID,
 		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
 		clusters:          workload.Management.Management.Clusters(""),
 		componentStatuses: workload.Corew.ComponentStatus(),
@@ -151,6 +154,11 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	oldCluster, err := h.getCluster()
 	if err != nil {
 		return err
+	}
+	if !config.MatchesClusterUID(h.clusterUID, oldCluster) {
+		// The cluster was removed and created again under the same name; this one isn't ours.
+		logrus.Debugf("Skip updating cluster health - cluster [%s] is not the cluster these controllers were started for", h.clusterName)
+		return nil
 	}
 	cluster := oldCluster.DeepCopy()
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {

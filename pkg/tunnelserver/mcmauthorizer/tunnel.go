@@ -22,6 +22,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -74,6 +75,7 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		KontainerDriverLister: context.Management.KontainerDrivers("").Controller().Lister(),
 		Secrets:               context.Core.Secrets(""),
 		SecretLister:          context.Core.Secrets("").Controller().Lister(),
+		namespaceLister:       context.Core.Namespaces("").Controller().Lister(),
 	}
 	// Registered through wrangler's Cache().AddIndexer (panics via
 	// utilruntime.Must on failure) instead of the raw informer's
@@ -98,6 +100,7 @@ type Authorizer struct {
 	KontainerDriverLister v3.KontainerDriverLister
 	Secrets               corev1.SecretInterface
 	SecretLister          corev1.SecretLister
+	namespaceLister       corev1.NamespaceLister
 }
 
 type Client struct {
@@ -110,6 +113,9 @@ type Client struct {
 
 func (t *Authorizer) AuthorizeTunnel(req *http.Request) (string, bool, error) {
 	client, ok, err := t.Authorize(req)
+	if ok && err == nil && client != nil && client.Cluster != nil {
+		tunnelserver.SetSessionCluster(req, client.Cluster.Name, client.Cluster.UID)
+	}
 	if client != nil && client.Node != nil {
 		return client.Cluster.Name + ":" + client.Node.Name, ok, err
 	} else if client != nil && client.Cluster != nil {
@@ -395,22 +401,40 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 		return nil, err
 	}
 
+	stale := ""
 	for _, obj := range secrets {
 		secret, ok := obj.(*k8scorev1.Secret)
 		if !ok {
 			continue
 		}
-		cluster, err := t.clusterLister.Get("", secret.Namespace)
+		// The cluster the token was checked against is the one returned: looking it up again could find a
+		// cluster that has replaced it under the same name.
+		cluster, isStale, err := clusterregistrationtoken.TokenSecretCluster(secret, t.getNamespace, t.getCluster)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
 			return nil, err
+		}
+		if isStale {
+			stale = secret.Namespace
+			continue
+		}
+		if cluster == nil {
+			continue
 		}
 		return cluster, nil
 	}
 
+	if stale != "" {
+		return nil, fmt.Errorf("%w: registration token belongs to a previous cluster named %s", ErrClusterNotFound, stale)
+	}
 	return nil, ErrClusterNotFound
+}
+
+func (t *Authorizer) getNamespace(name string) (*k8scorev1.Namespace, error) {
+	return t.namespaceLister.Get("", name)
+}
+
+func (t *Authorizer) getCluster(name string) (*v3.Cluster, error) {
+	return t.clusterLister.Get("", name)
 }
 
 func (t *Authorizer) secretTokenIndex(secret *k8scorev1.Secret) ([]string, error) {
