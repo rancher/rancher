@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -68,10 +69,14 @@ const (
 	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
 	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
 	crtTokensToSecretsMigratedKey                     = "crtTokensToSecretsMigrated"
+	clusterAutoscalerChartRepository                  = "cluster-autoscaler-chart-repository"
+	clusterAutoscalerImage                            = "cluster-autoscaler-image"
 )
 
 var (
-	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+	mgmtNameRegexp                               = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+	legacyClusterAutoscalerChartRepositoryRegexp = regexp.MustCompile(`^oci://[^/]+/rancher/charts/appco-kubernetes-cluster-autoscaler$`)
+	legacyClusterAutoscalerImageRegexp           = regexp.MustCompile(`^[^/]+/rancher/appco-kubernetes-cluster-autoscaler$`)
 )
 
 // tokenCollectionDeleter abstracts the interface to bulk deletion for tokens,
@@ -113,7 +118,62 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		return err
 	}
 
+	if err := migrateLegacyClusterAutoscalerSettings(wranglerContext); err != nil {
+		return err
+	}
+
 	return rkeResourcesCleanup(wranglerContext)
+}
+
+func migrateLegacyClusterAutoscalerSettings(w *wrangler.Context) error {
+	settingsToMigrate := []struct {
+		name    string
+		envName string
+		match   func(string) bool
+	}{
+		{
+			name:    clusterAutoscalerChartRepository,
+			envName: "CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY",
+			match:   legacyClusterAutoscalerChartRepositoryRegexp.MatchString,
+		},
+		{
+			name:    clusterAutoscalerImage,
+			envName: "CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE",
+			match:   legacyClusterAutoscalerImageRegexp.MatchString,
+		},
+	}
+
+	for _, setting := range settingsToMigrate {
+		if os.Getenv(setting.envName) != "" {
+			continue
+		}
+
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			obj, err := w.Mgmt.Setting().Get(setting.name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if !setting.match(obj.Value) {
+				return nil
+			}
+
+			obj = obj.DeepCopy()
+			obj.Value = ""
+			if obj.Source == "env" {
+				obj.Source = ""
+			}
+			_, err = w.Mgmt.Setting().Update(obj)
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("migrating legacy %s setting: %w", setting.name, err)
+		}
+	}
+
+	return nil
 }
 
 func migrateLocalUserPasswords(wranglerContext *wrangler.Context) error {
