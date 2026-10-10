@@ -165,6 +165,10 @@ func shouldInstall(cluster *apimgmtv3.Cluster) bool {
 		return false
 	}
 
+	if cluster.Status.Info.MachineProvider == "harvester" {
+		return false
+	}
+
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		return true
 	}
@@ -218,6 +222,19 @@ func (h *handler) clusterOwner(cluster *apimgmtv3.Cluster) (*corev1.ObjectRefere
 func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
+	}
+
+	// Imported Harvester clusters have their own system-agent which Rancher's conflicts with.
+	// Additionally, the required CAPI information is not exposed to Rancher.
+	if cluster.Status.Info.MachineProvider == "harvester" &&
+		cluster.Annotations["provisioning.cattle.io/administrated"] != "true" &&
+		(cluster.Annotations == nil || cluster.Annotations[day2OpsEnabledAnnotation] != "false") {
+		cluster := cluster.DeepCopy()
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		cluster.Annotations[day2OpsEnabledAnnotation] = "false"
+		return h.clusters.Update(cluster)
 	}
 
 	if !shouldInstall(cluster) {
