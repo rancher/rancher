@@ -307,6 +307,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, transport, true, false, er)
+	httpProxy.UseLocationHost = true
 	httpProxy.ServeHTTP(rw, req)
 }
 
@@ -333,6 +334,7 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	newReq := req.WithContext(req.Context())
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = &loc
+	newReq.Host = p.Location.Host
 
 	httpProxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: p.Location.Scheme, Host: p.Location.Host})
 	httpProxy.Transport = p.Transport
