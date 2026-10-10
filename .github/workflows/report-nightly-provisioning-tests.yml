@@ -1,0 +1,109 @@
+# Report Nightly Provisioning Tests summarizes the results of multiple nightly provisioning test workflows run
+# across different release branches. If any branch had failures, it posts a single Slack message via webhook
+# with one card per failing branch listing the failing jobs and a link to the run. Passing branches are omitted,
+# and nothing is posted at all if every branch passed.
+#
+# The AI analysis lives in nightly-prov-analysis.md, a GitHub Agentic Workflow (github/gh-aw) called here as
+# nightly-prov-analysis.lock.yml. It only produces the per-branch summaries; collecting the bundle and building
+# and posting the Slack payload stay in deterministic scripts.
+name: Report Nightly Provisioning Tests
+on:
+  schedule:
+    # Runs every weekday at 10:00 UTC
+    # (6AM EST, 3AM PST, 12PM CEST)
+    - cron: '0 10 * * 1-5'
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      any-failures: ${{ steps.collect.outputs.any-failures }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: 'false'
+      - name: collect-runs
+        id: collect
+        run: bash .github/scripts/collect-nightly-provisioning-failure-bundles.sh
+
+      # Upload the failure bundle as an artifact, so the agentic workflow can download it
+      - name: Upload failure bundle
+        if: steps.collect.outputs.any-failures == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-provisioning-failure-bundle
+          path: bundle.json
+          retention-days: 7
+
+  # AI Summaries should always be optional. A job that calls a reusable
+  # workflow cannot set continue-on-error, so the analysis workflow
+  # swallows its own failures and notify-slack runs regardless of what happens here.
+  #
+  # actions: write is only here because gh-aw always compiles a conclusion job that requests it,
+  # and a caller granting less fails the entire run at startup.
+  analyze:
+    needs: collect
+    permissions:
+      actions: write
+      contents: read
+    if: needs.collect.outputs.any-failures == 'true'
+    uses: $/.github/workflows/nightly-prov-analysis.lock.yml
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+
+  notify-slack:
+    needs: [collect, analyze]
+    if: always() && needs.collect.outputs.any-failures == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: 'false'
+      - name: Fetch failure bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nightly-provisioning-failure-bundle
+          path: .
+
+      # Absent when the analysis workflow failed or wrote nothing usable.
+      - name: Fetch analysis
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nightly-provisioning-analysis
+          path: analysis
+
+      - name: Generate Payload
+        id: generate
+        run: |
+          set -uo pipefail
+          if [ -f analysis/analysis.json ]; then
+            bash .github/scripts/nightly-provisioning-failures-slack-payload.sh bundle.json analysis/analysis.json
+          else
+            echo "No AI analysis available, posting without it"
+            bash .github/scripts/nightly-provisioning-failures-slack-payload.sh bundle.json
+          fi
+
+      - name: Get Webhook URL
+        if: steps.generate.outputs.any-failures == 'true'
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+        with:
+          # none of this is setup yet, just a placeholder.
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/slack/nightly-provisioning-tests/credentials webhookUrl | WEBHOOK_URL 
+
+      - name: Post failures to Slack
+        if: steps.generate.outputs.any-failures == 'true'
+        env:
+          SLACK_PAYLOAD: ${{ steps.generate.outputs.slack-payload }}
+        run: |
+          curl -sf -X POST -H 'Content-type: application/json' --data "$SLACK_PAYLOAD" "$WEBHOOK_URL"
