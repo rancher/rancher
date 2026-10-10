@@ -10,6 +10,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"helm.sh/helm/v4/pkg/action"
@@ -72,6 +73,19 @@ func TestStart(t *testing.T) {
 	}
 
 	manager.Start(ctx)
+}
+
+// installAll installs every chart and aggregates the errors. runSync dispatches installOne per
+// chart onto worker goroutines; this drives the same calls serially so the table test below can
+// assert on a single aggregated error.
+func installAll(m *Manager, charts map[desiredKey]map[string]interface{}, takeOwnership bool) error {
+	var errs []error
+	for key, values := range charts {
+		if err := m.installOne(key, values, takeOwnership); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return merr.NewErrors(errs...)
 }
 
 func TestInstallCharts(t *testing.T) {
@@ -535,7 +549,7 @@ func TestInstallCharts(t *testing.T) {
 				operation:     mockOperationClient,
 			}
 
-			err := manager.installCharts(test.desiredCharts, test.takeOwnership)
+			err := installAll(&manager, test.desiredCharts, test.takeOwnership)
 			if test.expectedErr == nil {
 				assert.NoError(t, err)
 			} else {
