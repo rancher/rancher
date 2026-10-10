@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -49,6 +50,39 @@ func SecretTokenIndexValues(secret *corev1.Secret) []string {
 		values = append(values, string(prev))
 	}
 	return values
+}
+
+// TokenSecretCluster returns the cluster that the token stored in secret registers with: the cluster named
+// by the secret's namespace. It is read once, and callers must act on the returned object rather than look
+// the cluster up again, which could find a cluster that has since replaced it under the same name.
+//
+// stale is true for a token left behind by a previous cluster with the same name. A cluster's token
+// secrets live in a namespace named after the cluster, which is deleted with it, and the cluster is only
+// removed once that namespace is gone. Nothing new can be created in a terminating namespace, so any token
+// found in one belongs to a cluster that is gone.
+//
+// A namespace that can't be found is treated as stale: if callers want a stronger degree of certainty, prefer a client
+// over a cache.
+func TokenSecretCluster(secret *corev1.Secret, getNamespace func(name string) (*corev1.Namespace, error), getCluster func(name string) (*v3.Cluster, error)) (cluster *v3.Cluster, stale bool, err error) {
+	ns, err := getNamespace(secret.Namespace)
+	if apierrors.IsNotFound(err) {
+		return nil, true, nil
+	} else if err != nil {
+		return nil, false, fmt.Errorf("failed to get namespace %s of token secret %s: %w", secret.Namespace, secret.Name, err)
+	}
+
+	if ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating {
+		return nil, true, nil
+	}
+
+	cluster, err = getCluster(secret.Namespace)
+	if apierrors.IsNotFound(err) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, fmt.Errorf("failed to get cluster %s of token secret %s: %w", secret.Namespace, secret.Name, err)
+	}
+
+	return cluster, false, nil
 }
 
 func GetTokenFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) (string, error) {

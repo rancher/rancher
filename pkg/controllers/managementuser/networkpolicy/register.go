@@ -61,7 +61,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	clusterHandler := &clusterHandler{cluster, pnpLister, podLister,
 		serviceLister, projectLister, mgmtClusters, pnps, npmgr, cluster.ClusterName}
 
-	clusterNetAnnHandler := &clusterNetAnnHandler{mgmtClusters, cluster.ClusterName}
+	clusterNetAnnHandler := &clusterNetAnnHandler{mgmtClusters, cluster.ClusterName, cluster.ClusterUID}
 
 	projects.Controller().AddClusterScopedHandler(ctx, "projectSyncer", cluster.ClusterName, ps.Sync)
 	pnps.AddClusterScopedHandler(ctx, "projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)

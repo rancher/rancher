@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -226,6 +227,12 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
+	}
+	if cluster.DeletionTimestamp != nil {
+		if skip, why := util.SkipDownstreamCleanupOnRemoval(cluster); skip {
+			logrus.Infof("Cluster %s is being removed and %s: not deleting downstream resources for PRTB %s.", clusterName, why, prtb.Name)
+			return nil
+		}
 	}
 
 	userContext, err := p.clusterManager.UserContext(cluster.Name)

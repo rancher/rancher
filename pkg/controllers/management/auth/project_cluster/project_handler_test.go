@@ -7,12 +7,15 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const clusterID = "test-cluster"
@@ -193,6 +196,8 @@ func TestRemove(t *testing.T) {
 	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
 	ns.EXPECT().Get(namespace.Name, metav1.GetOptions{}).Return(namespace, nil)
 	ns.EXPECT().Delete(project.Name, &metav1.DeleteOptions{})
+	// The namespace is gone by the time Remove checks, so it doesn't wait.
+	ns.EXPECT().Get(namespace.Name, metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, namespace.Name))
 
 	lifecycle := &projectLifecycle{
 		nsClient: ns,
@@ -234,6 +239,8 @@ func TestRemoveDifferentBackingNamespace(t *testing.T) {
 	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
 	ns.EXPECT().Get(namespace.Name, metav1.GetOptions{}).Return(namespace, nil)
 	ns.EXPECT().Delete(namespace.Name, &metav1.DeleteOptions{})
+	// The namespace is gone by the time Remove checks, so it doesn't wait.
+	ns.EXPECT().Get(namespace.Name, metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, namespace.Name))
 
 	Obj, err := lifecycle.Remove(project)
 	require.NoError(t, err)
@@ -276,4 +283,57 @@ func TestRemoveWithDeleteError(t *testing.T) {
 
 	// Since Remove returns the original project after deleting, assert the returned object equals original project
 	assert.Equal(t, project, Obj)
+}
+
+// newProjectRemoveTest returns a project of cluster c-m-test whose backing namespace is terminating, and a
+// lifecycle that finds it so.
+func newProjectRemoveTest(t *testing.T) (*projectLifecycle, *v3.Project, *fake.MockControllerInterface[*v3.Project, *v3.ProjectList], *fake.MockCacheInterface[*corev1.Secret], *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+	ctrl := gomock.NewController(t)
+	terminating := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-m-test-p-remove"},
+		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+	}
+	ns := fake.NewMockNonNamespacedClientInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+	ns.EXPECT().Get(terminating.Name, metav1.GetOptions{}).Return(terminating, nil).AnyTimes()
+	projects := fake.NewMockControllerInterface[*v3.Project, *v3.ProjectList](ctrl)
+	secretLister := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secrets := fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	project := &v3.Project{
+		ObjectMeta: metav1.ObjectMeta{Name: "p-remove", Namespace: "c-m-test"},
+		Spec:       v3.ProjectSpec{ClusterName: "c-m-test"},
+		Status:     v3.ProjectStatus{BackingNamespace: terminating.Name},
+	}
+	return &projectLifecycle{nsClient: ns, projects: projects, secretLister: secretLister, secrets: secrets}, project, projects, secretLister, secrets
+}
+
+func TestRemoveWaitsForTheBackingNamespaceToBeGone(t *testing.T) {
+	// The project's PRTBs live in its backing namespace: they must not outlive the project, and so its
+	// cluster.
+	lifecycle, project, projects, secretLister, _ := newProjectRemoveTest(t)
+	secretLister.EXPECT().List("c-m-test-p-remove", gomock.Any()).Return(nil, nil)
+	projects.EXPECT().EnqueueAfter("c-m-test", "p-remove", namespaceRemovedRequeue)
+
+	_, err := lifecycle.Remove(project)
+
+	assert.ErrorIs(t, err, generic.ErrSkip, "the finalizer should be kept")
+}
+
+func TestRemoveDropsTheFinalizerOfTheRemovedSecretsController(t *testing.T) {
+	// Its controller no longer exists, so the finalizer would keep the namespace, the project and the
+	// cluster forever.
+	lifecycle, project, projects, secretLister, secrets := newProjectRemoveTest(t)
+	secretLister.EXPECT().List("c-m-test-p-remove", gomock.Any()).Return([]*corev1.Secret{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test-p-remove", Name: "legacy", Finalizers: []string{"other", legacySecretFinalizer + "c-m-test"}}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test-p-remove", Name: "current", Finalizers: []string{"other"}}},
+	}, nil)
+	secrets.EXPECT().Update(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		assert.Equal(t, "legacy", secret.Name)
+		assert.Equal(t, []string{"other"}, secret.Finalizers)
+		return secret, nil
+	})
+	projects.EXPECT().EnqueueAfter("c-m-test", "p-remove", namespaceRemovedRequeue)
+
+	_, err := lifecycle.Remove(project)
+
+	assert.ErrorIs(t, err, generic.ErrSkip)
 }

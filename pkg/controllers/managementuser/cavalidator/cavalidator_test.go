@@ -144,3 +144,25 @@ func TestCAValidator_clusterConditionManipulation(t *testing.T) {
 		})
 	}
 }
+
+func TestCAValidatorSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	clusterCache := fake.NewMockNonNamespacedCacheInterface[*mgmtv3.Cluster](ctrl)
+	clusterCache.EXPECT().Get("c-m-test").Return(&mgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-new"}}, nil)
+	// No UpdateStatus is expected: the old cluster's CA must not be reported on the new cluster.
+	clusters := fake.NewMockNonNamespacedClientInterface[*mgmtv3.Cluster, *mgmtv3.ClusterList](ctrl)
+
+	cav := &CertificateAuthorityValidator{
+		clusterName:  "c-m-test",
+		clusterUID:   "uid-old",
+		clusterCache: clusterCache,
+		clusters:     clusters,
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "stv-aggregation", Namespace: namespace.System},
+		Data:       map[string][]byte{CacertsValid: []byte("false")},
+	}
+
+	_, err := cav.onStvAggregationSecret(secret.Namespace+"/"+secret.Name, secret)
+	assert.NoError(t, err)
+}

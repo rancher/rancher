@@ -293,6 +293,7 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 	if err != nil {
 		return 0, err
 	}
+	clusterContext.ClusterUID = cluster.UID
 
 	namespaces, err := clusterContext.Corew.Namespace().List(metav1.ListOptions{})
 	if err != nil {
