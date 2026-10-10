@@ -76,7 +76,11 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 		// defer registration of controllers which have CAPI clients or use CAPI caches
 		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
-			provisioningv2.Register(ctx, clients, kubeconfigManager)
+			err := provisioningv2.Register(ctx, clients, kubeconfigManager)
+			if err != nil {
+				return fmt.Errorf("failed to register deferred provv2 controllers: %w", err)
+			}
+
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
 					return fmt.Errorf("failed to register deferred capr controllers: %w", err)
