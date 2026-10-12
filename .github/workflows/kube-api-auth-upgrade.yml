@@ -5,6 +5,7 @@ on:
       kube_api_auth_version:
         type: string
         description: "kube api auth version to update"
+        required: true
       source_author:
         type: string
         description: "Username of the source for this workflow run"
@@ -24,6 +25,12 @@ jobs:
   kube-api-auth-upgrade:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate kube api auth version
+        run: |
+          if [[ ! "$KUBE_API_AUTH_VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "kube_api_auth_version must be a valid image tag (1-128 ASCII letters, digits, _, ., or -; first character alphanumeric or _)" >&2
+            exit 1
+          fi
       - name: Read App Secrets
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
