@@ -5,14 +5,14 @@ import (
 )
 
 // TableConfigurationType says what a TableConfiguration holds.
-// +kubebuilder:validation:Enum=PAGE;VIEW
+// +kubebuilder:validation:Enum=Page;View
 type TableConfigurationType string
 
 const (
 	// TableConfigurationTypePage holds page level configuration. The UI loads only one of these per page.
-	TableConfigurationTypePage TableConfigurationType = "PAGE"
+	TableConfigurationTypePage TableConfigurationType = "Page"
 	// TableConfigurationTypeView holds a single table configuration, and the UI supplements the page with these.
-	TableConfigurationTypeView TableConfigurationType = "VIEW"
+	TableConfigurationTypeView TableConfigurationType = "View"
 )
 
 // +genclient
@@ -22,7 +22,6 @@ const (
 // +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
 // +kubebuilder:printcolumn:name="Page",type="string",JSONPath=".spec.page"
 // +kubebuilder:printcolumn:name="View",type="string",JSONPath=".spec.view.name"
-// +kubebuilder:printcolumn:name="Views",type="string",JSONPath=".spec.views[*].name"
 // +kubebuilder:printcolumn:name="Default",type="string",JSONPath=".spec.defaultViewId"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -38,13 +37,13 @@ type TableConfiguration struct {
 	Spec TableConfigurationSpec `json:"spec"`
 }
 
-// TableConfigurationSpec is what is persisted. Either page level configuration (PAGE) or a single
-// table configuration (VIEW).
-// +kubebuilder:validation:XValidation:rule="self.type == 'PAGE' ? has(self.views) : !has(self.views)",message="views is required when type is PAGE and not allowed when type is VIEW"
-// +kubebuilder:validation:XValidation:rule="self.type == 'VIEW' ? has(self.view) : !has(self.view)",message="view is required when type is VIEW and not allowed when type is PAGE"
-// +kubebuilder:validation:XValidation:rule="self.type == 'PAGE' || (!has(self.defaultViewId) && !has(self.allIndex))",message="defaultViewId and allIndex are only allowed when type is PAGE"
+// TableConfigurationSpec is what is persisted. Either page level configuration (Page) or a single
+// table configuration (View).
+// +kubebuilder:validation:XValidation:rule="self.type == 'Page' ? has(self.views) : !has(self.views)",message="views is required when type is Page and not allowed when type is View"
+// +kubebuilder:validation:XValidation:rule="self.type == 'View' ? has(self.view) : !has(self.view)",message="view is required when type is View and not allowed when type is Page"
+// +kubebuilder:validation:XValidation:rule="self.type == 'Page' || (!has(self.defaultViewId) && !has(self.allIndex))",message="defaultViewId and allIndex are only allowed when type is Page"
 type TableConfigurationSpec struct {
-	// Type is PAGE for page level configuration, and the UI will load only one of these per page. VIEW
+	// Type is Page for page level configuration, and the UI will load only one of these per page. View
 	// contains a single table configuration, and the UI will supplement the page with these.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="type is immutable"
 	Type TableConfigurationType `json:"type"`
@@ -55,25 +54,25 @@ type TableConfigurationSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="page is immutable"
 	Page string `json:"page"`
 
-	// View is a saved table configuration (SavedView). Only for VIEW.
+	// View is a saved table configuration (SavedView). Only for View.
 	// +optional
 	View *TableViewSaved `json:"view,omitempty"`
 
-	// Views are the page's saved table configurations, in tab order (SavedPage). Required for PAGE.
+	// Views are the page's saved table configurations, in tab order (SavedPage). Required for Page.
 	// +optional
 	// +listType=map
 	// +listMapKey=id
 	Views []TableViewSaved `json:"views,omitempty"`
 
-	// DefaultViewID is the id of the view selected when the page opens. Only for PAGE.
+	// DefaultViewID is the id of the view selected when the page opens. Only for Page.
 	// +optional
 	// +nullable
 	DefaultViewID *string `json:"defaultViewId,omitempty"`
 
-	// AllIndex is where the table's own tab sits among the saved ones. Missing means the front. Only for PAGE.
+	// AllIndex is where the table's own tab sits among the saved ones. Missing means the front. Only for Page.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
-	AllIndex *int `json:"allIndex,omitempty"`
+	AllIndex *int32 `json:"allIndex,omitempty"`
 }
 
 // TableViewSaved is a saved table configuration.

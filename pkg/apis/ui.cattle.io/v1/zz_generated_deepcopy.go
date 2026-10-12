@@ -210,7 +210,7 @@ func (in *TableConfigurationSpec) DeepCopyInto(out *TableConfigurationSpec) {
 	}
 	if in.AllIndex != nil {
 		in, out := &in.AllIndex, &out.AllIndex
-		*out = new(int)
+		*out = new(int32)
 		**out = **in
 	}
 	return
