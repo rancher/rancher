@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 VERSION=$KUBE_API_AUTH_VERSION
+FILE=pkg/apis/management.cattle.io/v3/tools_system_images.go
+COUNT=$(grep -c "rancher/kube-api-auth:v.\+$" "$FILE" || true)
+if [ "$COUNT" != "1" ]; then
+    echo "expected exactly one kube-api-auth image declaration in $FILE, found $COUNT" >&2
+    exit 1
+fi
 # note: the pattern matches and removes the trailing `",`, requiring the replacement to add it back
-sed -i "s|rancher/kube-api-auth:v.\+$|rancher/kube-api-auth:${VERSION}\",|g" \
-    pkg/apis/management.cattle.io/v3/tools_system_images.go
+sed -i "s|rancher/kube-api-auth:v.\+$|rancher/kube-api-auth:${VERSION}\",|g" "$FILE"
