@@ -46,7 +46,7 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
       - name: Update kube api auth in files
-        run:  ./scripts/kube-api-auth-upgrade
+        run:  ./.github/scripts/kube-api-auth-upgrade
       - name: Check for repository changes
         id: changes
         run: |
