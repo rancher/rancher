@@ -32,8 +32,8 @@ jobs:
     steps:
       - name: Validate kube api auth version
         run: |
-          if [[ ! "$KUBE_API_AUTH_VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
-            echo "kube_api_auth_version must be a valid image tag (1-128 ASCII letters, digits, _, ., or -; first character alphanumeric or _)" >&2
+          if [[ ! "$KUBE_API_AUTH_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "kube_api_auth_version must have the form v<X>.<Y>.<Z>-rc.<N> (e.g. v0.16.0-rc.1)" >&2
             exit 1
           fi
       - name: Read App Secrets
