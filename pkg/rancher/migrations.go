@@ -56,6 +56,7 @@ const (
 	cleanupProvisioningClusterMgmtOnlyConditions      = "cleanupprovisioningclustermgmtonlyconditions"
 	migrateRKE2PrimeAnnotation                        = "migraterke2primeannotation"
 	migrateCRTTokensToSecrets                         = "migratecrtttokenstosecrets"
+	migrateLegacyClusterAutoscalerSettingsConfig      = "migratelegacyclusterautoscalersettings"
 	rancherVersionKey                                 = "rancherVersion"
 	projectsCreatedKey                                = "projectsCreated"
 	namespacesAssignedKey                             = "namespacesAssigned"
@@ -69,6 +70,7 @@ const (
 	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
 	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
 	crtTokensToSecretsMigratedKey                     = "crtTokensToSecretsMigrated"
+	legacyClusterAutoscalerSettingsMigratedKey        = "legacyClusterAutoscalerSettingsMigrated"
 	clusterAutoscalerChartRepository                  = "cluster-autoscaler-chart-repository"
 	clusterAutoscalerImage                            = "cluster-autoscaler-image"
 )
@@ -118,14 +120,23 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		return err
 	}
 
-	if err := migrateLegacyClusterAutoscalerSettings(wranglerContext); err != nil {
+	if err := migrateLegacyClusterAutoscalerSettings(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Setting()); err != nil {
 		return err
 	}
 
 	return rkeResourcesCleanup(wranglerContext)
 }
 
-func migrateLegacyClusterAutoscalerSettings(w *wrangler.Context) error {
+func migrateLegacyClusterAutoscalerSettings(configMapController controllerv1.ConfigMapController, settingController v3.SettingController) error {
+	cm, err := getConfigMap(configMapController, migrateLegacyClusterAutoscalerSettingsConfig)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[legacyClusterAutoscalerSettingsMigratedKey] == "true" {
+		return nil
+	}
+
 	settingsToMigrate := []struct {
 		name    string
 		envName string
@@ -149,7 +160,7 @@ func migrateLegacyClusterAutoscalerSettings(w *wrangler.Context) error {
 		}
 
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			obj, err := w.Mgmt.Setting().Get(setting.name, metav1.GetOptions{})
+			obj, err := settingController.Get(setting.name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
@@ -165,7 +176,7 @@ func migrateLegacyClusterAutoscalerSettings(w *wrangler.Context) error {
 			if obj.Source == "env" {
 				obj.Source = ""
 			}
-			_, err = w.Mgmt.Setting().Update(obj)
+			_, err = settingController.Update(obj)
 			return err
 		})
 		if err != nil {
@@ -173,7 +184,8 @@ func migrateLegacyClusterAutoscalerSettings(w *wrangler.Context) error {
 		}
 	}
 
-	return nil
+	cm.Data[legacyClusterAutoscalerSettingsMigratedKey] = "true"
+	return createOrUpdateConfigMap(configMapController, cm)
 }
 
 func migrateLocalUserPasswords(wranglerContext *wrangler.Context) error {
