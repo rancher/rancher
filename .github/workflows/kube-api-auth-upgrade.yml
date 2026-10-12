@@ -25,6 +25,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write # Vault access
 jobs:
   kube-api-auth-upgrade:
     runs-on: ubuntu-latest
