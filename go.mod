@@ -113,8 +113,8 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.94.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
-	github.com/rancher/aks-operator v1.16.0-rc.2
-	github.com/rancher/ali-operator v1.16.0-rc.1
+	github.com/rancher/aks-operator v1.16.0-rc.3
+	github.com/rancher/ali-operator v1.16.0-rc.2
 	github.com/rancher/apiserver v0.10.1
 	github.com/rancher/channelserver v0.12.1
 	github.com/rancher/cluster-api-provider-rke2 v0.25.2
@@ -122,7 +122,7 @@ require (
 	github.com/rancher/eks-operator v1.16.0-rc.2
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.6
 	github.com/rancher/fleet/pkg/helmvalues v0.17.0-alpha.6
-	github.com/rancher/gke-operator v1.16.0-rc.2
+	github.com/rancher/gke-operator v1.16.0-rc.3
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.10
@@ -345,7 +345,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/onsi/gomega v1.43.0 // indirect
+	github.com/onsi/gomega v1.44.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
