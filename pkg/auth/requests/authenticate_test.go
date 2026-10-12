@@ -292,6 +292,55 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.NotContains(t, resp.Groups, "other_group://98765")
 	})
 
+	t.Run("groups are correctly added", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+
+		configName := "test-eu"
+		token.UserPrincipal.Name = configName + "_user://12345"
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			configName: {
+				Items: []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: configName + "_group://56789",
+					},
+					PrincipalType: "group",
+					Provider:      fakeProvider.name,
+				}},
+			},
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, configName+"_group://56789")
+	})
+
+	t.Run("groups fall back to the token auth provider for an invalid principal", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldUserPrincipalIDs := user.PrincipalIDs
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			user.PrincipalIDs = oldUserPrincipalIDs
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+
+		token.UserPrincipal.Name = "invalid-principal"
+		token.UserPrincipal.Provider = "other-provider"
+		user.PrincipalIDs = []string{"system://test"}
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+	})
+
 	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
 		oldTokenLastUsedAt := token.LastUsedAt
 		defer func() {
