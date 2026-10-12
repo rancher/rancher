@@ -82,6 +82,7 @@ type autoscalerSuite struct {
 	helmOpCache                *fake.MockCacheInterface[*fleet.HelmOp]
 	dynamicClient              *mockDynamicGetter
 	client                     *mockControllerRuntimeClient
+	extTokenStore              *mockExtTokenStore
 	context                    context.Context
 }
 
@@ -113,6 +114,7 @@ func (s *autoscalerSuite) SetupTest() {
 	s.helmOpCache = fake.NewMockCacheInterface[*fleet.HelmOp](s.mockCtrl)
 	s.dynamicClient = &mockDynamicGetter{mockCtrl: s.mockCtrl}
 	s.client = &mockControllerRuntimeClient{}
+	s.extTokenStore = &mockExtTokenStore{}
 	s.context = context.Background()
 
 	s.withSettings(map[settings.Setting]string{
@@ -134,6 +136,7 @@ func (s *autoscalerSuite) SetupTest() {
 		userCache:                  s.userCache,
 		tokenClient:                s.tokenClient,
 		tokenCache:                 s.tokenCache,
+		extTokenStore:              s.extTokenStore,
 		secretClient:               s.secretClient,
 		secretCache:                s.secretCache,
 		helmOp:                     s.helmOp,
