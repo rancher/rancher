@@ -162,7 +162,7 @@ spec:
         operator: Exists
       initContainers:
       - name: rancher-charts-copy
-        image: 
+        image: ""
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: rancher-charts
