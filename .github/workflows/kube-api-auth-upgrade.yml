@@ -18,6 +18,10 @@ env:
   INPUT_SOURCE_AUTHOR: ${{ github.event.inputs.source_author }}
   INPUT_SOURCE_URL: ${{ github.event.inputs.source_url }}
 
+concurrency:
+  group: kube-api-auth-upgrade-${{ github.ref_name }}-${{ github.event.inputs.kube_api_auth_version }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
@@ -68,17 +72,24 @@ jobs:
       - name: Create branch, commit and push
         if: ${{ steps.changes.outputs.changes_exist == 'true' }}
         id: branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          BRANCH="githubaction-kube-api-auth-upgrade-$(date +%Y-%m-%d-%H-%M-%S)"
-          echo "::set-output name=branch::$BRANCH"
+          BRANCH="githubaction-kube-api-auth-upgrade-${GITHUB_REF_NAME}-${KUBE_API_AUTH_VERSION}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          if [ "$(gh pr list --repo "$GITHUB_REPOSITORY" --base "$GITHUB_REF_NAME" --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
+            echo "Open PR already exists for $BRANCH, skipping"
+            echo "pr_exists=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git checkout -b "$BRANCH"
           git commit -a -m "updated kube-api-auth to ${KUBE_API_AUTH_VERSION}"
-          git push origin "$BRANCH"
+          git push --force origin "$BRANCH"
 
       - name: Create Pull Request
-        if: ${{ steps.changes.outputs.changes_exist == 'true' }}
+        if: ${{ steps.changes.outputs.changes_exist == 'true' && steps.branch.outputs.pr_exists != 'true' }}
         id: cpr
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -119,7 +130,7 @@ jobs:
             console.log('Created new pull request');
             return pr.html_url;
       - name: Check outputs
-        if: ${{ steps.changes.outputs.changes_exist == 'true' }}
+        if: ${{ steps.changes.outputs.changes_exist == 'true' && steps.branch.outputs.pr_exists != 'true' }}
         env:
           CPR_RESULT: ${{ steps.cpr.outputs.result }}
         shell: bash
