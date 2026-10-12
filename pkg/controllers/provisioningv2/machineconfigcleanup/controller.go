@@ -2,6 +2,7 @@ package machineconfigcleanup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	v3apis "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -63,11 +64,11 @@ func (h *handler) onChange(_ string, obj *v3apis.ClusterRegistrationToken) (_ *v
 	}
 
 	token, err := crt.GetTokenFromSecret(h.secretCache, obj)
+	if errors.Is(err, crt.ErrTokenNotReady) {
+		return obj, nil
+	}
 	if err != nil {
 		return nil, err
-	}
-	if token == "" {
-		return obj, nil
 	}
 
 	if err := h.apply.
