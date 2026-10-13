@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,7 +32,7 @@ const (
 	searchIndexDefaultLen = 6
 )
 
-var invalidHash, _ = bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
+var invalidHash = make([]byte, 32)
 
 type PasswordVerifier interface {
 	VerifyPassword(user *apiv3.User, password string) error
