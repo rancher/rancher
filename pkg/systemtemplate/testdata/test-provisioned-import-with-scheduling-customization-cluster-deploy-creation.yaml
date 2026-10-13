@@ -175,7 +175,7 @@ spec:
       priorityClassName: cattle-cluster-agent-priority-class
       initContainers:
       - name: rancher-charts-copy
-        image: 
+        image: ""
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: rancher-charts
