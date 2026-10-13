@@ -20,11 +20,11 @@ func Add(ctx context.Context, wrangler *wrangler.Context, addLocal, removeLocal,
 		}
 	}
 	if addLocal {
-		if err := addLocalCluster(embedded, wrangler); err != nil {
+		if err := addLocalCluster(embedded, wrangler.Mgmt.Cluster(), wrangler.Core.Namespace()); err != nil {
 			return err
 		}
 	} else if removeLocal {
-		if err := removeLocalCluster(wrangler); err != nil {
+		if err := removeLocalCluster(wrangler.Mgmt.Cluster()); err != nil {
 			return err
 		}
 	}
