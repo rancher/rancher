@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/apiserver/pkg/handlers"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/api/steve/norman"
@@ -22,8 +23,12 @@ import (
 	steve "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/v3/pkg/schemas"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
+	authzv1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8srequest "k8s.io/apiserver/pkg/endpoints/request"
+	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context, userManager user.Manager) error {
@@ -59,6 +64,12 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 		})
 	}
 
+	authorizationClient, err := authorizationv1.NewForConfig(wrangler.RESTConfig)
+	if err != nil {
+		return err
+	}
+	subjectAccessReviews := authorizationClient.SubjectAccessReviews()
+
 	server.BaseSchemas.MustImportAndCustomize(GenerateKubeconfigOutput{}, nil)
 	server.SchemaFactory.AddTemplate(schema2.Template{
 		Group:     "management.cattle.io",
@@ -83,9 +94,47 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 				Output: "generateKubeconfigOutput",
 			}
 			schema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
-				// By pass authorization for local shell because the user might not have
-				// GET granted for local cluster
 				if request.Name == "local" && request.Link == "shell" && shellHandler != nil {
+					requestUser, ok := k8srequest.UserFrom(request.Request.Context())
+					if !ok || requestUser == nil || requestUser.GetName() == "" {
+						return types.APIObject{}, validation.Unauthorized
+					}
+
+					extra := make(map[string]authzv1.ExtraValue, len(requestUser.GetExtra()))
+					for key, values := range requestUser.GetExtra() {
+						extra[key] = authzv1.ExtraValue(values)
+					}
+
+					review, err := subjectAccessReviews.Create(
+						request.Request.Context(),
+						&authzv1.SubjectAccessReview{
+							Spec: authzv1.SubjectAccessReviewSpec{
+								User:   requestUser.GetName(),
+								UID:    requestUser.GetUID(),
+								Groups: requestUser.GetGroups(),
+								Extra:  extra,
+								ResourceAttributes: &authzv1.ResourceAttributes{
+									Verb:      "get",
+									Group:     "management.cattle.io",
+									Version:   "v3",
+									Resource:  "clusters",
+									Name:      "local",
+									Namespace: "",
+								},
+							},
+						},
+						metav1.CreateOptions{},
+					)
+					if err != nil {
+						return types.APIObject{}, err
+					}
+					if !review.Status.Allowed || review.Status.Denied ||
+						review.Status.EvaluationError != "" {
+						return types.APIObject{}, apierror.NewAPIError(
+							validation.PermissionDenied,
+							"not authorized to access the local cluster shell",
+						)
+					}
 					shellHandler.ServeHTTP(request.Response, request.Request)
 					return types.APIObject{}, validation.ErrComplete
 				}
