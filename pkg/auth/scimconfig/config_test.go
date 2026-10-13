@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -114,6 +115,10 @@ func TestDefault(t *testing.T) {
 	assert.Equal(t, GroupIDDisplayName, cfg.GroupIDAttribute)
 	assert.Equal(t, 0, cfg.RateLimitRequestsPerSecond)
 	assert.Equal(t, defaultRateLimitBurst, cfg.RateLimitBurst)
+}
+
+func TestNamespace(t *testing.T) {
+	assert.Equal(t, namespace.GlobalNamespace, Namespace)
 }
 
 func TestGet(t *testing.T) {

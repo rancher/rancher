@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy"
@@ -454,6 +455,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
+	}
+	if features.SCIM.Enabled() {
+		scim.DeleteLegacyTokens(r.Wrangler.Core.Secret())
 	}
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
