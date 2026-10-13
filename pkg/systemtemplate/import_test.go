@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -21,6 +22,8 @@ import (
 )
 
 var update = flag.Bool("update", false, "update snapshot files with current test outputs")
+
+const administratedAnn = imported.AdministratedAnnotation
 
 func TestSystemTemplate_systemtemplate(t *testing.T) {
 	mockSecrets := map[string]*corev1.Secret{}
@@ -59,7 +62,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name: "test-provisioned-import",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+					Name:        "test-prov",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -91,7 +95,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			pcExists: false,
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+					Name:        "test-prov",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -121,7 +126,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			pcExists: true,
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+					Name:        "test-prov",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -150,7 +156,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name: "test-provisioned-import-custom-agent",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+					Name:        "test-prov",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "testing-rke2",
@@ -172,7 +179,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name: "test-rancher-namespace-options-enabled",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+					Name:        "test-namespace-options",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -199,7 +207,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name: "test-rancher-namespace-options-enabled-no-labels",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+					Name:        "test-namespace-options",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -224,7 +233,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name: "test-rancher-namespace-options-enabled-no-annotations",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+					Name:        "test-namespace-options",
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -285,7 +295,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name: "provisioned cluster name does not get system default pull secrets env var",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "c-m-abc12", // does NOT match MgmtNameRegexp
+					Name:        "c-m-abc12", // does NOT match MgmtNameRegexp
+					Annotations: map[string]string{administratedAnn: "true"},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "test-prov-no-system-secrets",
@@ -387,7 +398,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "pre-bootstrap renders bootstrap deployment with hostNetwork",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-preboot"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-preboot",
+					Annotations: map[string]string{administratedAnn: "true"},
+				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "test-preboot",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},

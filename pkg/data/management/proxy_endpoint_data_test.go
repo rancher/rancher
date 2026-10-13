@@ -189,7 +189,53 @@ func TestCreateOrDisableEndpoint(t *testing.T) {
 			setup: func(controller *fake.MockNonNamespacedControllerInterface[*v3.ProxyEndpoint, *v3.ProxyEndpointList], cache *fake.MockNonNamespacedCacheInterface[*v3.ProxyEndpoint]) {
 				controller.EXPECT().Cache().Return(cache)
 				cache.EXPECT().Get("test-endpoint").Return(&updatedTestEndpoint, nil)
+				// The update re-reads from the live client, not the cache, so that a retry
+				// after a conflict does not keep working from the copy that lost.
+				controller.EXPECT().Get("test-endpoint", gomock.Any()).Return(&updatedTestEndpoint, nil)
 				controller.EXPECT().Update(gomock.Any()).Return(&v3.ProxyEndpoint{}, nil)
+			},
+		},
+		{
+			// The regression: AddProxyEndpointData is called both from the fatal-on-error startup
+			// seeding path and from the proxysettings Setting handler, so the two race during
+			// startup. An unretried conflict here killed Rancher.
+			name:      "retries the update on conflict",
+			endpoints: []v3.ProxyEndpoint{testEndpoint},
+			disabled:  false,
+			setup: func(controller *fake.MockNonNamespacedControllerInterface[*v3.ProxyEndpoint, *v3.ProxyEndpointList], cache *fake.MockNonNamespacedCacheInterface[*v3.ProxyEndpoint]) {
+				controller.EXPECT().Cache().Return(cache)
+				cache.EXPECT().Get("test-endpoint").Return(&updatedTestEndpoint, nil)
+
+				gomock.InOrder(
+					controller.EXPECT().Get("test-endpoint", gomock.Any()).Return(&updatedTestEndpoint, nil),
+					controller.EXPECT().Update(gomock.Any()).Return(nil, errors.NewConflict(schema.GroupResource{Resource: "proxyendpoints"}, "test-endpoint", fmt.Errorf("the object has been modified"))),
+					controller.EXPECT().Get("test-endpoint", gomock.Any()).Return(&updatedTestEndpoint, nil),
+					controller.EXPECT().Update(gomock.Any()).Return(&v3.ProxyEndpoint{}, nil),
+				)
+			},
+		},
+		{
+			// Skipping the write when nothing changed is what keeps the two writers from
+			// contending in the first place.
+			name:      "does not write when the routes already match",
+			endpoints: []v3.ProxyEndpoint{testEndpoint},
+			disabled:  false,
+			setup: func(controller *fake.MockNonNamespacedControllerInterface[*v3.ProxyEndpoint, *v3.ProxyEndpointList], cache *fake.MockNonNamespacedCacheInterface[*v3.ProxyEndpoint]) {
+				controller.EXPECT().Cache().Return(cache)
+				cache.EXPECT().Get("test-endpoint").Return(&testEndpoint, nil)
+				controller.EXPECT().Get("test-endpoint", gomock.Any()).Return(&testEndpoint, nil)
+				// No Update expectation: gomock fails the test if one happens.
+			},
+		},
+		{
+			// Disabled concurrently between the cache read and the live read.
+			name:      "tolerates the endpoint being deleted mid-update",
+			endpoints: []v3.ProxyEndpoint{testEndpoint},
+			disabled:  false,
+			setup: func(controller *fake.MockNonNamespacedControllerInterface[*v3.ProxyEndpoint, *v3.ProxyEndpointList], cache *fake.MockNonNamespacedCacheInterface[*v3.ProxyEndpoint]) {
+				controller.EXPECT().Cache().Return(cache)
+				cache.EXPECT().Get("test-endpoint").Return(&updatedTestEndpoint, nil)
+				controller.EXPECT().Get("test-endpoint", gomock.Any()).Return(nil, errors.NewNotFound(schema.GroupResource{}, "test-endpoint"))
 			},
 		},
 		{
