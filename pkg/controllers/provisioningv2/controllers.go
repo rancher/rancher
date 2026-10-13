@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetworkspace"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/harvestercleanup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/machineconfigcleanup"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/machinetemplatecleanup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/managedchart"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/provisioningcluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/provisioninglog"
@@ -26,16 +27,24 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 	cluster.EarlyRegister(ctx, clients, kubeconfigManager)
 }
 
-func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) error {
 	cluster.Register(ctx, clients, kubeconfigManager)
 	if features.MCM.Enabled() {
 		secret.Register(ctx, clients)
 	}
+
 	provisioningcluster.Register(ctx, clients)
 	provisioninglog.Register(ctx, clients)
 	machineconfigcleanup.Register(ctx, clients)
 
+	err := machinetemplatecleanup.Register(ctx, clients)
+	if err != nil {
+		return err
+	}
+
 	if features.Harvester.Enabled() {
 		harvestercleanup.Register(ctx, clients)
 	}
+
+	return nil
 }

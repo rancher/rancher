@@ -31,6 +31,7 @@ func init() {
 }
 
 type Interface interface {
+	CertificateRotation() CertificateRotationController
 	ETCDSnapshotRestore() ETCDSnapshotRestoreController
 	ETCDSnapshotSave() ETCDSnapshotSaveController
 	EncryptionKeyRotation() EncryptionKeyRotationController
@@ -44,6 +45,10 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 
 type version struct {
 	controllerFactory controller.SharedControllerFactory
+}
+
+func (v *version) CertificateRotation() CertificateRotationController {
+	return generic.NewController[*v1alpha1.CertificateRotation, *v1alpha1.CertificateRotationList](schema.GroupVersionKind{Group: "operation.cattle.io", Version: "v1alpha1", Kind: "CertificateRotation"}, "certificaterotations", true, v.controllerFactory)
 }
 
 func (v *version) ETCDSnapshotRestore() ETCDSnapshotRestoreController {

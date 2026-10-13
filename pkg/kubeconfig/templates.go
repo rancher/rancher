@@ -24,11 +24,24 @@ users:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
       args:
+{{- if .ExecUser }}
+        - auth
+        - get-token
+{{- else }}
         - token
+{{- end }}
         - --server={{.Host}}
+{{- if not .ExecUser }}
         - --user={{.User}}
+{{- end }}
 {{- if .EndpointEnabled }}
         - --cluster={{.ClusterID}}
+{{- end }}
+{{- with .ExecUser }}
+        - --user-id={{.ID}}
+{{- if .AuthProvider }}
+        - --auth-provider={{.AuthProvider}}
+{{- end }}
 {{- end }}
       command: rancher
 {{- end }}
@@ -76,11 +89,24 @@ users:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
       args:
+{{- if $.ExecUser }}
+        - auth
+        - get-token
+{{- else }}
         - token
+{{- end }}
         - --server={{.Host}}
+{{- if not $.ExecUser }}
         - --user={{.Name}}
+{{- end }}
 {{- if ne .ClusterID "" }}
         - --cluster={{.ClusterID}}
+{{- end }}
+{{- with $.ExecUser }}
+        - --user-id={{.ID}}
+{{- if .AuthProvider }}
+        - --auth-provider={{.AuthProvider}}
+{{- end }}
 {{- end }}
       command: rancher
 {{- end }}

@@ -9,8 +9,10 @@ const (
 	FreeIpaConfigFieldConnectionTimeout               = "connectionTimeout"
 	FreeIpaConfigFieldCreated                         = "created"
 	FreeIpaConfigFieldCreatorID                       = "creatorId"
+	FreeIpaConfigFieldDisplayName                     = "displayName"
 	FreeIpaConfigFieldEnabled                         = "enabled"
 	FreeIpaConfigFieldGroupDNAttribute                = "groupDNAttribute"
+	FreeIpaConfigFieldGroupIDAttribute                = "groupIDAttribute"
 	FreeIpaConfigFieldGroupMemberMappingAttribute     = "groupMemberMappingAttribute"
 	FreeIpaConfigFieldGroupMemberUserAttribute        = "groupMemberUserAttribute"
 	FreeIpaConfigFieldGroupNameAttribute              = "groupNameAttribute"
@@ -35,6 +37,7 @@ const (
 	FreeIpaConfigFieldUUID                            = "uuid"
 	FreeIpaConfigFieldUserDisabledBitMask             = "userDisabledBitMask"
 	FreeIpaConfigFieldUserEnabledAttribute            = "userEnabledAttribute"
+	FreeIpaConfigFieldUserIDAttribute                 = "userIDAttribute"
 	FreeIpaConfigFieldUserLoginAttribute              = "userLoginAttribute"
 	FreeIpaConfigFieldUserLoginFilter                 = "userLoginFilter"
 	FreeIpaConfigFieldUserMemberAttribute             = "userMemberAttribute"
@@ -53,8 +56,10 @@ type FreeIpaConfig struct {
 	ConnectionTimeout               int64             `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 	Created                         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName                     string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled                         bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupDNAttribute                string            `json:"groupDNAttribute,omitempty" yaml:"groupDNAttribute,omitempty"`
+	GroupIDAttribute                string            `json:"groupIDAttribute,omitempty" yaml:"groupIDAttribute,omitempty"`
 	GroupMemberMappingAttribute     string            `json:"groupMemberMappingAttribute,omitempty" yaml:"groupMemberMappingAttribute,omitempty"`
 	GroupMemberUserAttribute        string            `json:"groupMemberUserAttribute,omitempty" yaml:"groupMemberUserAttribute,omitempty"`
 	GroupNameAttribute              string            `json:"groupNameAttribute,omitempty" yaml:"groupNameAttribute,omitempty"`
@@ -79,6 +84,7 @@ type FreeIpaConfig struct {
 	UUID                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserDisabledBitMask             int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
+	UserIDAttribute                 string            `json:"userIDAttribute,omitempty" yaml:"userIDAttribute,omitempty"`
 	UserLoginAttribute              string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
 	UserLoginFilter                 string            `json:"userLoginFilter,omitempty" yaml:"userLoginFilter,omitempty"`
 	UserMemberAttribute             string            `json:"userMemberAttribute,omitempty" yaml:"userMemberAttribute,omitempty"`

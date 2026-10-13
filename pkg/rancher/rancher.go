@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy"
@@ -63,6 +64,7 @@ import (
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/steve/pkg/sqlcache/informer/factory"
+	steveui "github.com/rancher/steve/pkg/ui"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/k8scheck"
 	"github.com/rancher/wrangler/v3/pkg/unstructured"
@@ -381,6 +383,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		telG := telemetry.NewTelemetryGatherer(
 			wranglerContext.Mgmt.Cluster().Cache(),
 			wranglerContext.Mgmt.Node().Cache(),
+			wranglerContext.Core.Secret().Cache(),
 		)
 		telemetryManager = telemetry.NewTelemetryExporterManager(telG, time.Second*10)
 	}
@@ -391,6 +394,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Handler: responsewriter.Chain{
 			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
+			steveui.CSP(settings.UICSPPolicyValue),
 			responsewriter.NoCache,
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
@@ -451,6 +455,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
+	}
+	if features.SCIM.Enabled() {
+		scim.DeleteLegacyTokens(r.Wrangler.Core.Secret())
 	}
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err

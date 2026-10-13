@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -41,23 +42,20 @@ func (p *ldapProvider) actionHandler(actionName string, action *types.Action, re
 }
 
 func (p *ldapProvider) testAndApply(request *types.APIContext) error {
-	var input map[string]any
-	var err error
-	input, err = handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
+	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		p.testAndApplyInputType))
-
 	if err != nil {
 		return err
 	}
 
 	configApplyInput := &v3.LdapTestAndApplyInput{}
-
 	if err := common.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 
 	config := &configApplyInput.LdapConfig
+	config.Name = p.testAndApplyConfigName(configApplyInput)
 
 	login := &v3.BasicLogin{
 		Username: configApplyInput.Username,
@@ -122,6 +120,22 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 	if config.GroupMemberMappingAttribute != "" && !ldap.IsValidAttr(config.GroupMemberMappingAttribute) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberMappingAttribute")
 	}
+	if config.UserIDAttribute != "" && !ldap.IsValidAttr(config.UserIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userIDAttribute")
+	}
+	if config.GroupIDAttribute != "" && !ldap.IsValidAttr(config.GroupIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIDAttribute")
+	}
+
+	storedLDAPConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), config.Name)
+	if err != nil {
+		return err
+	}
+	if storedLDAPConfig.Enabled && configApplyInput.Enabled {
+		if err := validateIDAttributesUnchanged(storedLDAPConfig, config); err != nil {
+			return err
+		}
+	}
 
 	if config.UserLoginFilter != "" {
 		if _, err := ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
@@ -164,7 +178,7 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}
@@ -172,8 +186,18 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via LDAP Configuration", request)
 }
 
+// testAndApplyConfigName returns the name of the AuthConfig that the input
+// applies to.
+//
+// The embedded LdapConfig has its own Name, so the input's ConfigName has to be
+// read explicitly. Clients that don't send a ConfigName apply to the config
+// named in the body, or the default config for the provider.
+func (p *ldapProvider) testAndApplyConfigName(input *v3.LdapTestAndApplyInput) string {
+	return cmp.Or(input.ConfigName, input.LdapConfig.Name, p.providerName)
+}
+
 func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
-	storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), config.Name)
 	if err != nil {
 		return err
 	}
@@ -189,7 +213,7 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 
 	field := strings.ToLower(client.LdapConfigFieldServiceAccountPassword)
 	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
-		field, strings.ToLower(config.Type))
+		field, common.SecretNamePrefix(config.Name, config.Type))
 	if err != nil {
 		return err
 	}
@@ -200,6 +224,18 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// validateIDAttributesUnchanged rejects changes to the principal identifier attributes of an enabled provider.
+// Changing them would orphan every binding that references the old principal names.
+func validateIDAttributesUnchanged(stored, incoming *v3.LdapConfig) error {
+	if incoming.UserIDAttribute != stored.UserIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "userIDAttribute cannot be changed on an enabled provider")
+	}
+	if incoming.GroupIDAttribute != stored.GroupIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "groupIDAttribute cannot be changed on an enabled provider")
 	}
 	return nil
 }

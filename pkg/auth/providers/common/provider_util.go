@@ -2,7 +2,9 @@ package common
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -46,6 +48,14 @@ func stringToK8sTimeHookFunc() mapstructure.DecodeHookFunc {
 	}
 }
 
+// userExtraAttributes are the ExtraByProvider keys that are sent as user extras.
+var userExtraAttributes = map[string]bool{UserAttributePrincipalID: true, UserAttributeUserName: true}
+
+// IsValidUserExtraAttribute reports whether key is a recognized extra attribute for user propagation.
+func IsValidUserExtraAttribute(key string) bool {
+	return userExtraAttributes[strings.ToLower(key)]
+}
+
 // GetCommonUserExtraAttributes is a helper containing the default
 // implementation of the `GetUserExtraAttributes` provider interface method.
 func GetCommonUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
@@ -66,4 +76,16 @@ func SamePrincipal(me, other v3.Principal) bool {
 		me.LoginName == other.LoginName &&
 		me.PrincipalType == other.PrincipalType
 
+}
+
+// MergeUserExtraAttributes returns a copy of stored with each key in update set to the update's value.
+// Keys update doesn't have keep their stored value.
+func MergeUserExtraAttributes(stored, update map[string][]string) map[string][]string {
+	merged := maps.Clone(stored)
+	if merged == nil {
+		merged = make(map[string][]string, len(update))
+	}
+	maps.Copy(merged, update)
+
+	return merged
 }

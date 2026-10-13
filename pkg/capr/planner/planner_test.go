@@ -2,8 +2,10 @@ package planner
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +24,55 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+func TestMinorPlanChangeDetectedForPreBootstrapClusterAgentManifest(t *testing.T) {
+	manifestPath := "/var/lib/rancher/rke2/server/manifests/rancher/cluster-agent.yaml"
+
+	oldPlan := plan.NodePlan{
+		Files: []plan.File{{
+			Content: base64.StdEncoding.EncodeToString([]byte("kind: Deployment\nmetadata:\n  name: cattle-cluster-agent\n")),
+			Path:    manifestPath,
+			Dynamic: true,
+			Minor:   true,
+		}},
+	}
+	newPlan := plan.NodePlan{
+		Files: []plan.File{{
+			Content: base64.StdEncoding.EncodeToString([]byte("kind: Deployment\nmetadata:\n  name: cattle-cluster-agent-bootstrap\nspec:\n  template:\n    spec:\n      containers:\n      - env:\n        - name: CATTLE_PREBOOTSTRAP\n")),
+			Path:    manifestPath,
+			Dynamic: true,
+			Minor:   true,
+		}},
+	}
+
+	assert.True(t, minorPlanChangeDetected(oldPlan, newPlan))
+}
+
+func TestAddManifestsUsesPreBootstrapManifest(t *testing.T) {
+	controlPlane := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			KubernetesVersion: "v1.28.8+rke2r1",
+		},
+	}
+	bootstrapManifest := plan.File{
+		Content: base64.StdEncoding.EncodeToString([]byte("prebootstrap manifest")),
+		Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/cluster-agent.yaml"),
+		Dynamic: true,
+		Minor:   true,
+	}
+	planner := Planner{
+		retrievalFunctions: InfoFunctions{
+			GetBootstrapManifests: func(plane *rkev1.RKEControlPlane) ([]plan.File, error) {
+				return []plan.File{bootstrapManifest}, nil
+			},
+		},
+	}
+
+	nodePlan, err := planner.addManifests(plan.NodePlan{}, controlPlane, createTestPlanEntry("linux"))
+
+	assert.NoError(t, err)
+	assert.Equal(t, []plan.File{bootstrapManifest}, nodePlan.Files)
+}
 
 type mockPlanner struct {
 	planner                       *Planner

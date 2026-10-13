@@ -316,6 +316,10 @@ type AuthConfig struct {
 	// Currently only the SAML providers do, with their `Single Log Out` flow.
 	LogoutAllSupported bool `json:"logoutAllSupported,omitempty"`
 
+	// DisplayName is the user friendly name shown in the UI.
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
+
 	Status AuthConfigStatus `json:"status"`
 }
 
@@ -389,6 +393,8 @@ type GithubConfigApplyInput struct {
 	GithubConfig GithubConfig `json:"githubConfig,omitempty"`
 	Code         string       `json:"code,omitempty"`
 	Enabled      bool         `json:"enabled,omitempty"`
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +genclient
@@ -431,6 +437,9 @@ type GithubAppConfigApplyInput struct {
 	GithubConfig GithubAppConfig `json:"githubConfig,omitempty"`
 	Code         string          `json:"code,omitempty"`
 	Enabled      bool            `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -454,6 +463,9 @@ type GoogleOauthConfigApplyInput struct {
 	GoogleOauthConfig GoogleOauthConfig `json:"googleOauthConfig,omitempty"`
 	Code              string            `json:"code,omitempty"`
 	Enabled           bool              `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -490,8 +502,9 @@ type AzureADConfigTestOutput struct {
 }
 
 type AzureADConfigApplyInput struct {
-	Config AzureADConfig `json:"config,omitempty"`
-	Code   string        `json:"code,omitempty"`
+	Config     AzureADConfig `json:"config,omitempty"`
+	Code       string        `json:"code,omitempty"`
+	ConfigName string        `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -526,6 +539,8 @@ type ActiveDirectoryConfig struct {
 	GroupMemberMappingAttribute  string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
 	ConnectionTimeout            int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
+	UserIDAttribute              string   `json:"userIDAttribute,omitempty"`
+	GroupIDAttribute             string   `json:"groupIDAttribute,omitempty"`
 }
 
 func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
@@ -534,6 +549,9 @@ func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...stri
 		c.UserLoginAttribute,
 		c.UserNameAttribute,
 		c.UserEnabledAttribute,
+	}
+	if c.UserIDAttribute != "" {
+		userSearchAttributes = append(userSearchAttributes, c.UserIDAttribute)
 	}
 	return append(userSearchAttributes, searchAttributes...)
 }
@@ -545,6 +563,9 @@ func (c *ActiveDirectoryConfig) GetGroupSearchAttributes(searchAttributes ...str
 		c.GroupNameAttribute,
 		c.GroupSearchAttribute,
 	}
+	if c.GroupIDAttribute != "" {
+		groupSeachAttributes = append(groupSeachAttributes, c.GroupIDAttribute)
+	}
 	return append(groupSeachAttributes, searchAttributes...)
 }
 
@@ -553,6 +574,9 @@ type ActiveDirectoryTestAndApplyInput struct {
 	Username              string                `json:"username"`
 	Password              string                `json:"password"`
 	Enabled               bool                  `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 type LdapFields struct {
@@ -584,6 +608,8 @@ type LdapFields struct {
 	ConnectionTimeout               int64    `json:"connectionTimeout,omitempty"               norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"              norman:"default=false"`
 	SearchUsingServiceAccount       bool     `json:"searchUsingServiceAccount"       norman:"default=false"`
+	UserIDAttribute                 string   `json:"userIDAttribute,omitempty"`
+	GroupIDAttribute                string   `json:"groupIDAttribute,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -602,6 +628,9 @@ func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []strin
 		c.UserNameAttribute,
 		c.UserEnabledAttribute,
 	}
+	if c.UserIDAttribute != "" {
+		userSearchAttributes = append(userSearchAttributes, c.UserIDAttribute)
+	}
 	return append(userSearchAttributes, searchAttributes...)
 }
 
@@ -613,6 +642,9 @@ func (c *LdapConfig) GetGroupSearchAttributes(searchAttributes ...string) []stri
 		c.GroupNameAttribute,
 		c.GroupSearchAttribute,
 	}
+	if c.GroupIDAttribute != "" {
+		groupSeachAttributes = append(groupSeachAttributes, c.GroupIDAttribute)
+	}
 	return append(groupSeachAttributes, searchAttributes...)
 }
 
@@ -620,6 +652,9 @@ type LdapTestAndApplyInput struct {
 	LdapConfig `json:"ldapConfig,omitempty"`
 	Username   string `json:"username"`
 	Password   string `json:"password" norman:"type=password,required"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 type OpenLdapConfig struct {
@@ -704,7 +739,8 @@ type PingConfig struct {
 }
 
 type ADFSConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type KeyCloakConfig struct {
@@ -795,6 +831,9 @@ type OIDCApplyInput struct {
 	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
 	Code       string     `json:"code,omitempty"`
 	Enabled    bool       `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName"`
 }
 
 // +genclient

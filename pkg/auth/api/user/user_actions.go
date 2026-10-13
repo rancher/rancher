@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -9,18 +10,20 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type PasswordUpdater interface {
 	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
-	UpdatePassword(userId string, newPassword string) error
+	SetPassword(user *apiv3.User, newPassword string) error
 }
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -163,7 +166,14 @@ func (h *Handler) setPassword(request *types.APIContext) error {
 	if !ok {
 		return errors.New("failed to get userId")
 	}
-	if err := h.PwdChanger.UpdatePassword(userId, newPass); err != nil {
+	user, err := h.UserClient.Get(userId, v1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("user %s not found", userId))
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get user %s: %w", userId, err)
+	}
+	if err := h.PwdChanger.SetPassword(user, newPass); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 

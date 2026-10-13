@@ -304,3 +304,20 @@ func newMocks(t *testing.T) *testMocks {
 		mockCache:   mockIndexer,
 	}
 }
+
+func TestClusterHandlerSyncSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T) {
+	mocks := newMocks(t)
+	// No calls are expected: the old cluster's controller must not sync the global admins of the new one.
+	h := &clusterHandler{
+		clusterName:   "c-m-test",
+		clusterUID:    "uid-old",
+		clusters:      mocks.mockCluster,
+		userCRB:       mocks.mockInt,
+		userCRBLister: mocks.mockLister,
+		grbIndexer:    mocks.mockCache,
+	}
+
+	_, err := h.sync("c-m-test", &v32.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-new"}})
+
+	require.NoError(t, err)
+}

@@ -34,7 +34,7 @@ based on cluster.Annotations[netPolAnnotation] and sets status if successful
 
 func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
-		cluster.Name != ch.clusterNamespace ||
+		cluster.Name != ch.clusterNamespace || !ch.cluster.IsCluster(cluster) ||
 		!v32.ClusterConditionReady.IsTrue(cluster) {
 		return nil, nil
 	}

@@ -107,8 +107,8 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Conf
 			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
 		}
 		configs = map[string]*config.Config{
-			"k3s":  config.NewConfigNoLoad(ctx, "k3s", getChannelServerArg(), "rancher", "", urls),
-			"rke2": config.NewConfigNoLoad(ctx, "rke2", getChannelServerArg(), "rancher", "", urls),
+			"k3s":  config.NewConfigNoLoad(ctx, "k3s", getChannelServerArg(), "rancher", config.GithubToken(""), urls),
+			"rke2": config.NewConfigNoLoad(ctx, "rke2", getChannelServerArg(), "rancher", config.GithubToken(""), urls),
 		}
 		for name, cfg := range configs {
 			if err := cfg.LoadConfig(ctx); err != nil {

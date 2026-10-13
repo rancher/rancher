@@ -99,22 +99,16 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 }
 
 func (h *handler) OnChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	if op == nil {
-		return status, nil
-	}
-	if op.DeletionTimestamp != nil {
-		return status, nil
-	}
-	if ops.IsPaused(&op.Spec.OperationSpec) {
-		logrus.Debugf("[encryptionkeyrotation] %s/%s: skipping paused operation", op.Namespace, op.Name)
-		return status, nil
-	}
-
 	status, err := h.onChange(op, status)
 	if err != nil {
 		return status, err
 	}
 	status = updateStatus(op, status)
+
+	// Paused operations resume on a spec change; skip TTL cleanup and polling until then.
+	if ops.IsPaused(&op.Spec.OperationSpec) {
+		return status, nil
+	}
 
 	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
@@ -139,6 +133,17 @@ func (h *handler) OnChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 }
 
 func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	if op == nil {
+		return status, nil
+	}
+	if op.DeletionTimestamp != nil {
+		return status, nil
+	}
+	if ops.IsPaused(&op.Spec.OperationSpec) {
+		logrus.Debugf("[encryptionkeyrotation] %s/%s: skipping paused operation", op.Namespace, op.Name)
+		return status, nil
+	}
+
 	if status.Phase == "" {
 		status.Phase = opv1alpha1.OperationPhasePending
 		status.LastUpdated = metav1.Now()
@@ -911,6 +916,15 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 	logrus.Tracef("[encryptionkeyrotation] %s/%s: updating conditions", op.Namespace, op.Name)
 
 	status.ObservedGeneration = op.Generation
+	if op.Spec.Paused {
+		opv1alpha1.PausedCondition.True(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.PausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "Operation is paused")
+	} else {
+		opv1alpha1.PausedCondition.False(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.NotPausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "")
+	}
 
 	if status.Phase == opv1alpha1.OperationPhasePending {
 		opv1alpha1.PendingCondition.True(&status)

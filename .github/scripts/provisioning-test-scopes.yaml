@@ -56,10 +56,13 @@ explicit:
     meta:
       branches:
         - main
-        # - release/v2.15 uncomment once the nightly workflow has been backported
+        - release/v2.15
     tests:
-      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+      # Give restore and lifecycle-hook tests separate package timeout budgets.
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetE_Imported.*$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetE_Imported.*$' }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
       - { dist: rke2, regex: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
       - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance
@@ -68,8 +71,10 @@ explicit:
       - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation_Service_Argument|ImportedCertificateRotation_Mixed_Role_Service_Argument)$', cpus: 8 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation_Service_Argument|ImportedCertificateRotation_RKE2_TLS_Args|ImportedCertificateRotation_Mixed_Role_Service_Argument)$' }
       - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
       - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 # This field could also track scopes for repos
@@ -149,7 +154,6 @@ scopes:
             - 'github.com/rancher/norman'
       - path: '^build.yaml'
         substrings:
-          - 'turtlesVersion:'
           - 'fleetVersion:'
           - 'webhookVersion:'
       - path: "^pkg/settings/setting.go"
@@ -177,7 +181,8 @@ scopes:
       - '^pkg/controllers/capr/etcdmgmt/'             # also imported
       - '^pkg/controllers/capr/machinedrain/'         # also basic
       - '^pkg/rkecerts/'
-      - '^pkg/operations/'
+      - '^pkg/controllers/operations/'                # also imported
+      - '^pkg/operations/'                            # also imported
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     file-paths:
@@ -193,6 +198,8 @@ scopes:
       - '^pkg/controllers/capr/unmanaged/'
       - '^pkg/controllers/capr/bootstraptoken/'       # also basic
       - '^pkg/controllers/capr/etcdmgmt/'             # also operations
+      - '^pkg/controllers/operations/'                # also operations
+      - '^pkg/operations/'                            # also imported
       - '^pkg/capr/configserver/'                     # also basic
       - '^tests/v2prov/tests/imported/'
     file-paths:
@@ -200,8 +207,10 @@ scopes:
     tests:
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', cpus: 8 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', parallelism: 3 }
 
   prebootstrap:
     package-paths:
@@ -214,6 +223,9 @@ scopes:
       - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 
 full:
+  - path: '^build.yaml'
+    substrings:
+      - 'turtlesVersion:'
   - path: '^go.mod$'
     substrings:
       - 'github.com/rancher/cluster-api-provider-rke2'
@@ -225,6 +237,7 @@ full:
       - 'sigs.k8s.io/'
   - '^pkg/controllers/capr/controllers.go'
   - '^pkg/controllers/provisioningv2/controllers.go'
+  - '^pkg/capr/common.go'
   - '^pkg/capr/planner/'
   - '^pkg/plan/'
   - '^pkg/controllers/capr/planner/'

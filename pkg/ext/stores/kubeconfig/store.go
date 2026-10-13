@@ -54,6 +54,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
@@ -77,6 +78,7 @@ const (
 	DescriptionField         = "description"
 	TTLField                 = "ttl"
 	IncludeDefaultEntryField = "include-default-entry"
+	PreferRancherProxyField  = "prefer-rancher-proxy"
 	StatusConditionsField    = "status-conditions"
 	StatusSummaryField       = "status-summary"
 	StatusTokensField        = "status-tokens"
@@ -143,7 +145,10 @@ type Store struct {
 	getMaxTTL           func() (int64, error)
 	getServerURL        func() string
 	shouldGenerateToken func() bool
-	tableConverter      rest.TableConvertor
+	shouldExecGetToken  func() bool
+	// shouldPreferRancherProxy returns the value of the kubeconfig-prefer-rancher-proxy setting.
+	shouldPreferRancherProxy func() bool
+	tableConverter           rest.TableConvertor
 }
 
 // New creates a new instance of [Store].
@@ -167,6 +172,12 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		getServerURL:    settings.ServerURL.Get,
 		shouldGenerateToken: func() bool {
 			return strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
+		},
+		shouldExecGetToken: func() bool {
+			return strings.EqualFold(settings.KubeconfigExecGetToken.Get(), "true")
+		},
+		shouldPreferRancherProxy: func() bool {
+			return strings.EqualFold(settings.KubeconfigPreferRancherProxy.Get(), "true")
 		},
 		tableConverter: printerstorage.TableConvertor{
 			TableGenerator: printers.NewTableGenerator().With(printHandler),
@@ -416,6 +427,9 @@ func (s *Store) Create(
 
 	includeDefault := includeDefaultEntry(&kubeconfig.Spec)
 
+	preferRancherProxy := ptr.Deref(kubeconfig.Spec.PreferRancherProxy, s.shouldPreferRancherProxy())
+	kubeconfig.Spec.PreferRancherProxy = &preferRancherProxy
+
 	needsSharedToken := includeDefault
 	if !needsSharedToken {
 		for _, c := range clusters {
@@ -485,6 +499,14 @@ func (s *Store) Create(
 			}
 			return ""
 		}(),
+	}
+
+	if s.shouldExecGetToken() {
+		// User entries without a token, including those of a dry run, run "rancher auth get-token".
+		data.ExecUser = &kconfig.ExecUser{
+			ID:           userInfo.GetName(),
+			AuthProvider: authToken.GetAuthProvider(),
+		}
 	}
 
 	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
@@ -644,7 +666,7 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if currentContext == cluster.Name {
+					if !preferRancherProxy && currentContext == cluster.Name {
 						data.CurrentContext = fqdnName
 					}
 
@@ -684,7 +706,7 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
+					if !preferRancherProxy && !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
 						data.CurrentContext = nodeName // Set the current context to the first ready control plane node.
 						isCurrentContextSet = true
 					}
@@ -800,6 +822,10 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 
 	if kubeconfig.Spec.IncludeDefaultEntry != nil {
 		configMap.Data[IncludeDefaultEntryField] = strconv.FormatBool(*kubeconfig.Spec.IncludeDefaultEntry)
+	}
+
+	if kubeconfig.Spec.PreferRancherProxy != nil {
+		configMap.Data[PreferRancherProxyField] = strconv.FormatBool(*kubeconfig.Spec.PreferRancherProxy)
 	}
 
 	// Note: Value should never be persisted!
@@ -1016,6 +1042,14 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 			return nil, fmt.Errorf("error parsing includeDefaultEntry for %s: %w", configMap.Name, err)
 		}
 		kubeconfig.Spec.IncludeDefaultEntry = &boolVal
+	}
+
+	if v, ok := configMap.Data[PreferRancherProxyField]; ok {
+		boolVal, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing preferRancherProxy for %s: %w", configMap.Name, err)
+		}
+		kubeconfig.Spec.PreferRancherProxy = &boolVal
 	}
 
 	kubeconfig.Status.Summary = configMap.Data[StatusSummaryField]
@@ -1773,8 +1807,19 @@ func (s *Store) Update(
 	if oldKubeconfig.Spec.TTL != newKubeconfig.Spec.TTL {
 		return nil, false, apierrors.NewBadRequest("spec.ttl is immutable")
 	}
+	if newKubeconfig.Spec.IncludeDefaultEntry == nil {
+		// A request without the field keeps the stored value, so older clients can still update.
+		newKubeconfig.Spec.IncludeDefaultEntry = oldKubeconfig.Spec.IncludeDefaultEntry
+	}
 	if !reflect.DeepEqual(oldKubeconfig.Spec.IncludeDefaultEntry, newKubeconfig.Spec.IncludeDefaultEntry) {
 		return nil, false, apierrors.NewBadRequest("spec.includeDefaultEntry is immutable")
+	}
+	if newKubeconfig.Spec.PreferRancherProxy == nil {
+		// A request without the field keeps the stored value, so older clients can still update.
+		newKubeconfig.Spec.PreferRancherProxy = oldKubeconfig.Spec.PreferRancherProxy
+	}
+	if !reflect.DeepEqual(oldKubeconfig.Spec.PreferRancherProxy, newKubeconfig.Spec.PreferRancherProxy) {
+		return nil, false, apierrors.NewBadRequest("spec.preferRancherProxy is immutable")
 	}
 
 	newKubeconfig.UID = oldKubeconfig.UID // Make sure UID is preserved.
@@ -1880,8 +1925,10 @@ var (
 	pathKConfigDescriptionField         = fieldpath.MakePathOrDie("spec", "description")
 	pathKConfigTTLField                 = fieldpath.MakePathOrDie("spec", "ttl")
 	pathKConfigIncludeDefaultEntryField = fieldpath.MakePathOrDie("spec", "includeDefaultEntry")
+	pathKConfigPreferRancherProxyField  = fieldpath.MakePathOrDie("spec", "preferRancherProxy")
 
 	pathCMIncludeDefaultEntryField = fieldpath.MakePathOrDie("data", "include-default-entry")
+	pathCMPreferRancherProxyField  = fieldpath.MakePathOrDie("data", "prefer-rancher-proxy")
 
 	mapFromConfigMap = extcommon.MapSpec{
 		pathCMData.String():                     nil,
@@ -1890,6 +1937,7 @@ var (
 		pathCMDescriptionField.String():         pathKConfigDescriptionField,
 		pathCMTTLField.String():                 pathKConfigTTLField,
 		pathCMIncludeDefaultEntryField.String(): pathKConfigIncludeDefaultEntryField,
+		pathCMPreferRancherProxyField.String():  pathKConfigPreferRancherProxyField,
 		pathCMStatusConditionsField.String():    nil,
 		pathCMStatusSummaryField.String():       nil,
 		pathCMStatusTokensField.String():        nil,
@@ -1902,5 +1950,6 @@ var (
 		pathKConfigDescriptionField.String():         pathCMDescriptionField,
 		pathKConfigTTLField.String():                 pathCMTTLField,
 		pathKConfigIncludeDefaultEntryField.String(): pathCMIncludeDefaultEntryField,
+		pathKConfigPreferRancherProxyField.String():  pathCMPreferRancherProxyField,
 	}
 )

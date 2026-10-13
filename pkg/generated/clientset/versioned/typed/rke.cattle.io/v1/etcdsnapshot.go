@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	applyconfigurationrkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type ETCDSnapshotInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.ETCDSnapshotList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.ETCDSnapshot, err error)
+	Apply(ctx context.Context, eTCDSnapshot *applyconfigurationrkecattleiov1.ETCDSnapshotApplyConfiguration, opts metav1.ApplyOptions) (result *rkecattleiov1.ETCDSnapshot, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, eTCDSnapshot *applyconfigurationrkecattleiov1.ETCDSnapshotApplyConfiguration, opts metav1.ApplyOptions) (result *rkecattleiov1.ETCDSnapshot, err error)
 	ETCDSnapshotExpansion
 }
 
 // eTCDSnapshots implements ETCDSnapshotInterface
 type eTCDSnapshots struct {
-	*gentype.ClientWithList[*rkecattleiov1.ETCDSnapshot, *rkecattleiov1.ETCDSnapshotList]
+	*gentype.ClientWithListAndApply[*rkecattleiov1.ETCDSnapshot, *rkecattleiov1.ETCDSnapshotList, *applyconfigurationrkecattleiov1.ETCDSnapshotApplyConfiguration]
 }
 
 // newETCDSnapshots returns a ETCDSnapshots
 func newETCDSnapshots(c *RkeV1Client, namespace string) *eTCDSnapshots {
 	return &eTCDSnapshots{
-		gentype.NewClientWithList[*rkecattleiov1.ETCDSnapshot, *rkecattleiov1.ETCDSnapshotList](
+		gentype.NewClientWithListAndApply[*rkecattleiov1.ETCDSnapshot, *rkecattleiov1.ETCDSnapshotList, *applyconfigurationrkecattleiov1.ETCDSnapshotApplyConfiguration](
 			"etcdsnapshots",
 			c.RESTClient(),
 			scheme.ParameterCodec,

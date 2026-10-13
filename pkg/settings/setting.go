@@ -14,6 +14,7 @@ import (
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	steveui "github.com/rancher/steve/pkg/ui"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -126,8 +127,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.16.0-rc.1/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.5/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.16.0-rc.4/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.8/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -159,7 +160,7 @@ var (
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher146-rc.4")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher146-rc.6")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -265,6 +266,16 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
+	// KubeconfigExecGetToken determines whether kubeconfigs without a token run "rancher auth get-token" with the user id and auth provider.
+	// If set to false they run "rancher token" with the kubeconfig user entry name. Valid values are "true" and "false". An empty string means "false".
+	KubeconfigExecGetToken = NewSetting("kubeconfig-exec-get-token", "false")
+
+	// KubeconfigPreferRancherProxy determines whether kubeconfigs generated with the ext.cattle.io
+	// Kubeconfig API use the Rancher proxy context instead of the Authorized Cluster Endpoint (ACE)
+	// context as the current-context for clusters with ACE enabled. It applies when
+	// spec.preferRancherProxy is not set. Only "true" (case-insensitive) selects the proxy context.
+	KubeconfigPreferRancherProxy = NewSetting("kubeconfig-prefer-rancher-proxy", "false")
+
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
 	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
 
@@ -281,11 +292,11 @@ var (
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
 	RancherTurtlesVersion = NewSetting("rancher-turtles-version", buildconfig.TurtlesVersion)
 
-	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
+	// ClusterAutoscalerChartRepository optionally overrides the chart repository for the cluster autoscaler. It
 	// can be an OCI image path or a regular helm repo.
 	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
 
-	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
+	// ClusterAutoscalerImage optionally overrides the image repository for the cluster autoscaler.
 	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
@@ -332,11 +343,14 @@ var (
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
 	UICustomLinks = NewSetting("ui-custom-links", "")
 
+	// UICSPPolicy is the Content-Security-Policy served with the UI. Set it to override or extend the default policy, or to "none" to send no header at all.
+	UICSPPolicy = NewSetting("ui-csp-policy", steveui.DefaultCSPPolicy)
+
 	// UIDashboardPath path within Rancher Manager where the dashboard files are found.
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 
 	// UIDashboardIndex depends on ui-offline-preferred, use this version of the dashboard instead of the one contained in Rancher Manager.
-	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
+	UIDashboardIndex = NewSetting("ui-dashboard-index", getFromEnvOrDefault("CATTLE_UI_DASHBOARD_INDEX", "https://releases.rancher.com/dashboard/latest/index.html"))
 
 	// UIDashboardHarvesterLegacyPlugin depending on ui-offline-preferred and if a Harvester Cluster does not contain it's own Harvester plugin, use this version of the plugin instead.
 	UIDashboardHarvesterLegacyPlugin = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
@@ -400,6 +414,10 @@ var (
 
 	// UIContentEndpoint - configure custom endpoint for UI Dynamic Content data
 	UIContentEndpoint = NewSetting("ui-content-endpoint", "")
+
+	// UIAppCoEnabled - configure whether the UI shows SUSE Application Collection features
+	// ("true" always, "false" never, "" falls back to the system-catalog setting)
+	UIAppCoEnabled = NewSetting("ui-appco-enabled", "")
 
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.
@@ -467,6 +485,18 @@ func FullShellImage() string {
 // FullSCCOperatorImage returns the full private registry name of the rancher shell image.
 func FullSCCOperatorImage() string {
 	return PrefixPrivateRegistry(SCCOperatorImage.Get())
+}
+
+// UICSPPolicyValue returns the Content-Security-Policy to serve with the UI. A
+// setting falls back to its default when its value is empty, so "none" rather
+// than an empty value is what turns the header off.
+func UICSPPolicyValue() string {
+	value := UICSPPolicy.Get()
+	if strings.EqualFold(strings.TrimSpace(value), "none") {
+		return ""
+	}
+
+	return value
 }
 
 // PrefixPrivateRegistry prefixes the given image name with the stored private registry path.
@@ -655,6 +685,14 @@ func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
 // GetEnvKey will return the given string formatted as a rancher environmental variable.
 func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
+}
+
+func getFromEnvOrDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+
+	return defaultVal
 }
 
 func getMetadataConfig() string {

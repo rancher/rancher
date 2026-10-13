@@ -323,6 +323,7 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 	}
 	if retriable && err != nil {
 		newStatus.NumberOfRetries++
+		logrus.Errorf("error while downloading repo %s: %v", repository.Name, err)
 		if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
 			newStatus.NumberOfRetries = 0
 			newStatus.NextRetryAt = metav1.Time{}
@@ -333,6 +334,7 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 		return r.setConditionWithInterval(repository, err, newStatus, &backoff, interval)
 	}
 	if err != nil || index == nil {
+		logrus.Errorf("error while downloading repo %s: %v", repository.Name, err)
 		return setErrorCondition(repository, err, newStatus, interval, repoCondition, r.clusterRepos)
 	}
 

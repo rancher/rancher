@@ -2,6 +2,7 @@ package imported
 
 import (
 	"fmt"
+	"path"
 	"testing"
 	"time"
 
@@ -36,6 +37,10 @@ type importedClusterFixture struct {
 	// execKubectl runs a shell command on the init node with KUBECONFIG/PATH pre-exported so the
 	// caller can just write `kubectl ...` without re-deriving the distro paths.
 	execKubectl func(t *testing.T, cmd string) (string, error)
+	// kubectlEnv is the "KUBECONFIG=... PATH=$PATH:..." prefix resolved for the init node's
+	// effective runtime binary location, so later helpers (e.g. rotation recovery) don't have to
+	// re-derive it and risk assuming the default data directory.
+	kubectlEnv string
 }
 
 // setUpImportedCluster brings up an imported cluster end-to-end so a test can move straight to its
@@ -54,6 +59,17 @@ type importedClusterFixture struct {
 func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool) *importedClusterFixture {
 	t.Helper()
 
+	return setUpImportedClusterAtVersion(t, clients, displayName, pools, defaults.SomeK8sVersion)
+}
+
+// setUpImportedClusterAtVersion is setUpImportedCluster with the distro version pinned, for tests
+// that need to bring a cluster up on one version and then move it to another.
+//
+// opts, when supplied, is passed through to cluster.NewImportedClusterPods — used by the restore-mode
+// tests to point the cluster's etcd snapshots at an object store.
+func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool, k8sVersion string, opts ...cluster.ImportedClusterOptions) *importedClusterFixture {
+	t.Helper()
+
 	ns, err := namespace.Random(clients)
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +80,7 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 		t.Fatal(err)
 	}
 
-	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, defaults.SomeK8sVersion, pools, nil, registryCACert)
+	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, k8sVersion, pools, nil, registryCACert, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,9 +114,14 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 
 	// Build the env prefix once — every kubectl invocation inside the imported cluster needs
 	// KUBECONFIG and the rke2/k3s binary directory on PATH.
-	distro := capr.GetRuntime(defaults.SomeK8sVersion)
+	distro := capr.GetRuntime(k8sVersion)
 	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", distro, distro)
-	binDir := fmt.Sprintf("/var/lib/rancher/%s/bin", distro)
+	var binDir string
+	if distro == capr.RuntimeRKE2 {
+		binDir = path.Join(initNodeDataDirFromPools(distro, pools), "bin")
+	} else {
+		binDir = "/usr/local/bin"
+	}
 	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
 
 	execKubectl := func(t *testing.T, cmd string) (string, error) {
@@ -142,7 +163,23 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 			Name:       mgmtCluster.Name,
 		},
 		execKubectl: execKubectl,
+		kubectlEnv:  kubectlEnv,
 	}
+}
+
+// initNodeDataDirFromPools returns the configured data directory of the bootstrap etcd pool (the
+// first pool with ETCD: true and Quantity > 0, matching cluster.NewImportedClusterPods' init-node
+// selection), or the runtime default when that pool sets none.
+func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) string {
+	for _, pool := range pools {
+		if pool.ETCD && pool.Quantity > 0 {
+			if pool.DistroDataDir != "" {
+				return pool.DistroDataDir
+			}
+			break
+		}
+	}
+	return fmt.Sprintf("/var/lib/rancher/%s", distro)
 }
 
 func handleError(t *testing.T, clients *clients.Clients, name string, err error) {

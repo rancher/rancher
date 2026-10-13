@@ -168,7 +168,7 @@ func (s *Server) OnLeader(ctx context.Context) error {
 		Wrangler:   s.scaledContext.Wrangler,
 	}
 
-	if err := data.AuthConfigs(management); err != nil {
+	if err := data.AuthConfigs(management.Management.AuthConfigs("")); err != nil {
 		return fmt.Errorf("failed to add authconfig data: %v", err)
 	}
 

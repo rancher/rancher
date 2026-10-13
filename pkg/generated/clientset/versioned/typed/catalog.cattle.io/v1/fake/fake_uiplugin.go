@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	catalogcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/catalog.cattle.io/v1"
+	typedcatalogcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeUIPlugins implements UIPluginInterface
 type fakeUIPlugins struct {
-	*gentype.FakeClientWithList[*v1.UIPlugin, *v1.UIPluginList]
+	*gentype.FakeClientWithListAndApply[*v1.UIPlugin, *v1.UIPluginList, *catalogcattleiov1.UIPluginApplyConfiguration]
 	Fake *FakeCatalogV1
 }
 
-func newFakeUIPlugins(fake *FakeCatalogV1, namespace string) catalogcattleiov1.UIPluginInterface {
+func newFakeUIPlugins(fake *FakeCatalogV1, namespace string) typedcatalogcattleiov1.UIPluginInterface {
 	return &fakeUIPlugins{
-		gentype.NewFakeClientWithList[*v1.UIPlugin, *v1.UIPluginList](
+		gentype.NewFakeClientWithListAndApply[*v1.UIPlugin, *v1.UIPluginList, *catalogcattleiov1.UIPluginApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("uiplugins"),

@@ -17,6 +17,144 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+func TestLegacyClusterAutoscalerSettingValues(t *testing.T) {
+	tests := map[string]struct {
+		value      string
+		chartMatch bool
+		imageMatch bool
+	}{
+		"registry host": {
+			value:      "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler",
+			imageMatch: true,
+		},
+		"registry port": {
+			value:      "registry.example.com:5000/rancher/appco-kubernetes-cluster-autoscaler",
+			imageMatch: true,
+		},
+		"chart repository": {
+			value:      "oci://registry.example.com/rancher/charts/appco-kubernetes-cluster-autoscaler",
+			chartMatch: true,
+		},
+		"custom repository": {
+			value: "oci://registry.example.com/custom/cluster-autoscaler",
+		},
+		"tagged image": {
+			value: "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler:v1",
+		},
+		"extra path": {
+			value: "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler/extra",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := legacyClusterAutoscalerChartRepositoryRegexp.MatchString(test.value); got != test.chartMatch {
+				t.Fatalf("chart match = %v, want %v", got, test.chartMatch)
+			}
+			if got := legacyClusterAutoscalerImageRegexp.MatchString(test.value); got != test.imageMatch {
+				t.Fatalf("image match = %v, want %v", got, test.imageMatch)
+			}
+		})
+	}
+}
+
+func TestMigrateLegacyClusterAutoscalerSettings(t *testing.T) {
+	originalVersion := rancherversion.Version
+	rancherversion.Version = "v1.0.0"
+	t.Cleanup(func() {
+		rancherversion.Version = originalVersion
+	})
+
+	newConfigMapController := func(ctrl *gomock.Controller) (*fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList], *fake.MockCacheInterface[*corev1.ConfigMap]) {
+		configMaps := fake.NewMockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		cache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+		configMaps.EXPECT().Cache().Return(cache)
+		return configMaps, cache
+	}
+
+	t.Run("skips a completed migration", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		settings := fake.NewMockNonNamespacedControllerInterface[*apiv3.Setting, *apiv3.SettingList](ctrl)
+		cache.EXPECT().Get(cattleNamespace, migrateLegacyClusterAutoscalerSettingsConfig).Return(&corev1.ConfigMap{
+			Data: map[string]string{legacyClusterAutoscalerSettingsMigratedKey: "true"},
+		}, nil)
+
+		require.NoError(t, migrateLegacyClusterAutoscalerSettings(configMaps, settings))
+	})
+
+	t.Run("clears legacy settings and records completion", func(t *testing.T) {
+		t.Setenv("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY", "")
+		t.Setenv("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE", "")
+
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		settings := fake.NewMockNonNamespacedControllerInterface[*apiv3.Setting, *apiv3.SettingList](ctrl)
+		cache.EXPECT().Get(cattleNamespace, migrateLegacyClusterAutoscalerSettingsConfig).Return(nil, nil)
+
+		chart := &apiv3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterAutoscalerChartRepository},
+			Value:      "oci://registry.example.com/rancher/charts/appco-kubernetes-cluster-autoscaler",
+			Source:     "env",
+		}
+		image := &apiv3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterAutoscalerImage},
+			Value:      "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler",
+		}
+		settings.EXPECT().Get(clusterAutoscalerChartRepository, metav1.GetOptions{}).Return(chart, nil)
+		settings.EXPECT().Update(&apiv3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterAutoscalerChartRepository},
+		})
+		settings.EXPECT().Get(clusterAutoscalerImage, metav1.GetOptions{}).Return(image, nil)
+		settings.EXPECT().Update(&apiv3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterAutoscalerImage},
+		})
+		configMaps.EXPECT().Create(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      migrateLegacyClusterAutoscalerSettingsConfig,
+				Namespace: cattleNamespace,
+			},
+			Data: map[string]string{legacyClusterAutoscalerSettingsMigratedKey: "true"},
+		})
+
+		require.NoError(t, migrateLegacyClusterAutoscalerSettings(configMaps, settings))
+	})
+
+	t.Run("retains custom and environment-configured settings", func(t *testing.T) {
+		t.Setenv("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY", "oci://configured.example.com/charts")
+		t.Setenv("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE", "")
+
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		settings := fake.NewMockNonNamespacedControllerInterface[*apiv3.Setting, *apiv3.SettingList](ctrl)
+		cache.EXPECT().Get(cattleNamespace, migrateLegacyClusterAutoscalerSettingsConfig).Return(nil, nil)
+		settings.EXPECT().Get(clusterAutoscalerImage, metav1.GetOptions{}).Return(&apiv3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterAutoscalerImage},
+			Value:      "registry.example.com/custom/autoscaler",
+		}, nil)
+		configMaps.EXPECT().Create(gomock.Any())
+
+		require.NoError(t, migrateLegacyClusterAutoscalerSettings(configMaps, settings))
+	})
+
+	t.Run("does not record completion when updating a setting fails", func(t *testing.T) {
+		t.Setenv("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY", "")
+		t.Setenv("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE", "")
+
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		settings := fake.NewMockNonNamespacedControllerInterface[*apiv3.Setting, *apiv3.SettingList](ctrl)
+		cache.EXPECT().Get(cattleNamespace, migrateLegacyClusterAutoscalerSettingsConfig).Return(nil, nil)
+		settings.EXPECT().Get(clusterAutoscalerChartRepository, metav1.GetOptions{}).Return(&apiv3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterAutoscalerChartRepository},
+			Value:      "oci://registry.example.com/rancher/charts/appco-kubernetes-cluster-autoscaler",
+		}, nil).AnyTimes()
+		settings.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed")).AnyTimes()
+
+		require.Error(t, migrateLegacyClusterAutoscalerSettings(configMaps, settings))
+	})
+}
+
 func TestForceUpgradeLogout(t *testing.T) {
 
 	const (
@@ -227,7 +365,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 type extDeletionStub struct {
 	count int
 	t     *testing.T
-	err error
+	err   error
 }
 
 func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {

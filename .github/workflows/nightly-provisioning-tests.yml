@@ -17,6 +17,18 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
+  build-chart:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: $/.github/actions/rancher-chart/build
   build-server:
     strategy:
       matrix:
@@ -34,7 +46,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
+        uses: $/.github/actions/build-images/server
   build-agent:
     strategy:
       matrix:
@@ -52,7 +64,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: $/.github/actions/build-images/agent
   build-installer:
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -63,9 +75,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Verify installer Dockerfile build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./package/Dockerfile.installer
@@ -80,13 +92,13 @@ jobs:
   integration-tests:
     permissions:
       contents: read
-    needs: [build-server, build-agent]
-    uses: ./.github/workflows/integration-tests.yml
+    needs: [build-server, build-chart, build-agent]
+    uses: $/.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
     needs: [build-server, build-agent]
-    uses: ./.github/workflows/provisioning-tests.yml
+    uses: $/.github/workflows/provisioning-tests.yml
     with:
       EXPLICIT_SCOPES: "nightly"
 
@@ -111,7 +123,7 @@ jobs:
           persist-credentials: false
 
       - name: Publish Test Results
-        uses: ./.github/actions/publish-provisioning-test-results
+        uses: $/.github/actions/publish-provisioning-test-results
         with:
           commit: ${{ github.sha }}
           event-name: ${{ github.event_name }}

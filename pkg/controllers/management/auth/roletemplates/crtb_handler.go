@@ -9,6 +9,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/features"
@@ -526,6 +527,12 @@ func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBind
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
+	}
+	if cluster.DeletionTimestamp != nil {
+		if skip, why := util.SkipDownstreamCleanupOnRemoval(cluster); skip {
+			logrus.Infof("Cluster %s is being removed and %s: not deleting downstream resources for CRTB %s.", clusterName, why, crtb.Name)
+			return nil
+		}
 	}
 
 	userContext, err := c.clusterManager.UserContext(cluster.Name)

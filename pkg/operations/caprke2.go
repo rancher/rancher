@@ -1,11 +1,14 @@
 package operations
 
 import (
+	"encoding/base64"
 	"fmt"
 	"path"
+	"strings"
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -21,6 +24,11 @@ import (
 	"k8s.io/utils/ptr"
 	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+// CAPRKE2EndpointCAPath is where the CAPRKE2 bootstrap provider writes the S3 endpoint CA it
+// resolves from EndpointCASecret. Operations render the same path so their s3-endpoint-ca argument
+// points at the file that is already on the node.
+const CAPRKE2EndpointCAPath = "/etc/rancher/rke2/etcd-s3-ca.crt"
 
 // CAPRKE2Adapter implements the Adapter interface for clusters provisioned via the upstream
 // cluster-api-provider-rke2 (CAPRKE2) project — i.e. a CAPI `Cluster` whose `controlPlaneRef`
@@ -73,13 +81,166 @@ func (a *CAPRKE2Adapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{Object: ustr}, nil
 }
 
-// ToS3ArgsEnvAndFiles returns the S3 args/env/files that should be appended to an etcd-snapshot
-// save operation for this cluster. CAPRKE2 does not yet model S3 snapshot configuration on the
-// RKE2ControlPlane in a form that the operations controllers consume, so this is a no-op for now
-// — matching CAPRAdapter's current TODO state (see pkg/operations/capr.go:58-61). When CAPRKE2
-// gains a typed S3 backup config, port the equivalent of CAPRAdapter.ToS3ArgsEnvAndFiles here.
-func (a *CAPRKE2Adapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+// RestoreTarget returns the RKE2ControlPlane for its resource key. ClusterObject returns the CAPI
+// Cluster, which carries none of the cluster's configuration — the RKE2ControlPlane holds the
+// Kubernetes version and server config a restore writes back. Fetched dynamically because CAPRKE2's
+// CRDs only exist once turtles is enabled, so there is no generated typed cache for them.
+func (a *CAPRKE2Adapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceRKE2ControlPlane {
+		return nil, nil
+	}
+
+	obj, err := a.clients.Dynamic.Get(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane"), a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured for RKE2ControlPlane %s/%s, got %T",
+			a.controlPlane.Namespace, a.controlPlane.Name, obj)
+	}
+
+	return ustr, nil
+}
+
+func (a *CAPRKE2Adapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	_, err := a.clients.Dynamic.Update(obj)
+	return err
+}
+
+// WaitForRestoreTarget always reports ready. The RKE2ControlPlane is itself the restore target, so
+// there is no intermediate object to render before the restored configuration takes effect —
+// unlike CAPR, where the RKEControlPlane is regenerated from the provv1.Cluster a restore writes to.
+func (a *CAPRKE2Adapter) WaitForRestoreTarget() (bool, error) {
+	return true, nil
+}
+
+// InstallInstruction installs RKE2 at the RKE2ControlPlane's version. The image is Rancher's
+// system-agent installer, resolved against the global system-default-registry: CAPRKE2 models no
+// per-cluster registry the way an RKEControlPlane's machineGlobalConfig does.
+func (a *CAPRKE2Adapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {
+	if a.controlPlane.Spec.Version == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(
+		a.controlPlane.Spec.Version,
+		dataDir,
+		nil,
+		nil,
+		secret,
+	), true
+}
+
+// ETCDSnapshotS3 returns the location half of the RKE2ControlPlane's etcd S3 backup config.
+//
+// CAPRKE2 keeps the access key, secret key, and endpoint CA in secrets referenced from the backup
+// config rather than in a Rancher cloud credential, and those references cannot be expressed in
+// the shared ETCDSnapshotS3 type. They are resolved in ToS3ArgsEnvAndFiles instead, so a caller
+// which only needs to know *where* snapshots go can use this, and a caller which needs to reach
+// the bucket must go through ToS3ArgsEnvAndFiles.
+func (a *CAPRKE2Adapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	s3 := a.etcdBackupS3()
+	if s3 == nil {
+		return nil
+	}
+
+	return &rkev1.ETCDSnapshotS3{
+		Endpoint: s3.Endpoint,
+		Bucket:   s3.Bucket,
+		Region:   s3.Region,
+		Folder:   s3.Folder,
+		// CAPRKE2 inverts the flag: verification is opt-in, and the zero value skips it.
+		SkipSSLVerify: !s3.EnforceSSLVerify,
+	}
+}
+
+// ToS3ArgsEnvAndFiles renders the S3 args/env/files for the location described by s3, falling back
+// to the control plane's own backup config. Unlike CAPR and imported clusters there is no cloud
+// credential to resolve: the access key and secret key come from the secret named by
+// S3CredentialSecret (empty when the cluster relies on IAM authentication instead), and the
+// endpoint CA from the secret named by EndpointCASecret, rendered to the path CAPRKE2 itself uses
+// so the argument matches the file the bootstrap provider already wrote.
+func (a *CAPRKE2Adapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	clusterS3 := a.ETCDSnapshotS3()
+	if s3 == nil {
+		s3 = clusterS3
+	}
+	if !S3Enabled(s3) {
+		return nil, nil, nil, nil
+	}
+
+	target := &S3Target{
+		Bucket:        s3.Bucket,
+		Endpoint:      s3.Endpoint,
+		Region:        s3.Region,
+		Folder:        s3.Folder,
+		SkipSSLVerify: s3.SkipSSLVerify,
+		Retention:     s3.Retention,
+	}
+
+	if clusterS3 != nil {
+		if target.Bucket == "" {
+			target.Bucket = clusterS3.Bucket
+		}
+		if target.Endpoint == "" {
+			target.Endpoint = clusterS3.Endpoint
+		}
+		if target.Region == "" {
+			target.Region = clusterS3.Region
+		}
+		if target.Folder == "" {
+			target.Folder = clusterS3.Folder
+		}
+	}
+
+	backup := a.etcdBackupS3()
+
+	if backup != nil && backup.S3CredentialSecret != nil {
+		secret, err := a.secretForReference(backup.S3CredentialSecret)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to lookup s3 credential secret for cluster %s/%s: %w", a.cluster.Namespace, a.cluster.Name, err)
+		}
+		target.AccessKey = string(secret.Data["aws_access_key_id"])
+		target.SecretKey = string(secret.Data["aws_secret_access_key"])
+	}
+
+	switch {
+	case backup != nil && backup.EndpointCASecret != nil:
+		secret, err := a.secretForReference(backup.EndpointCASecret)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to lookup s3 endpoint CA secret for cluster %s/%s: %w", a.cluster.Namespace, a.cluster.Name, err)
+		}
+		ca, ok := secret.Data["ca.pem"]
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("s3 endpoint CA secret %s/%s for cluster %s/%s is missing the ca.pem key", secret.Namespace, secret.Name, a.cluster.Namespace, a.cluster.Name)
+		}
+		target.EndpointCAPath = CAPRKE2EndpointCAPath
+		target.EndpointCAContent = base64.StdEncoding.EncodeToString(ca)
+	case strings.HasSuffix(s3.EndpointCA, ".crt"), strings.HasSuffix(s3.EndpointCA, ".pem"):
+		// The snapshot recorded the path of a CA placed on the node outside of CAPRKE2's control.
+		// Reference it, but leave the file to whoever put it there.
+		target.EndpointCAPath = s3.EndpointCA
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
+}
+
+// etcdBackupS3 returns the RKE2ControlPlane's etcd S3 backup config, if any.
+func (a *CAPRKE2Adapter) etcdBackupS3() *controlplanev1beta2.EtcdS3 {
+	return a.controlPlane.Spec.ServerConfig.Etcd.BackupConfig.S3
+}
+
+// secretForReference resolves an object reference to a secret, defaulting an empty namespace to
+// the CAPI cluster's namespace.
+func (a *CAPRKE2Adapter) secretForReference(ref *corev1.ObjectReference) (*corev1.Secret, error) {
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = a.cluster.Namespace
+	}
+	return a.clients.Core.Secret().Cache().Get(namespace, ref.Name)
 }
 
 // LoopbackAddress returns the loopback host used when constructing probes. CAPRKE2 has no
@@ -203,6 +364,20 @@ func (a *CAPRKE2Adapter) ServerUnit() string {
 	return "rke2-server"
 }
 
+// RuntimeService returns the systemd unit responsible for RKE2 on the node represented by
+// secret: ServerUnit on control-plane/etcd nodes, or the RKE2 agent unit on worker-only nodes.
+func (a *CAPRKE2Adapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
+// DistroServices returns the RKE2 service identifiers exposed on the node represented by secret.
+func (a *CAPRKE2Adapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
 // extraArgsFor returns the ExtraArgs slice for the named control-plane component, or nil when
 // the component is unset on the RKE2ControlPlane spec. The result is passed into
 // renderSecureProbe (which accepts `any`) to drive --secure-port / --tls-cert-file / --cert-dir
@@ -224,6 +399,27 @@ func (a *CAPRKE2Adapter) extraArgsFor(component string) []string {
 		}
 	}
 	return nil
+}
+
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings from CAPRKE2
+// control-plane extra args.
+func (a *CAPRKE2Adapter) ComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	var settings ComponentTLSSettings
+	for _, arg := range a.extraArgsFor(component) {
+		key, value, ok := strings.Cut(arg, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings, nil
 }
 
 // RenderProbes renders the per-role probe set for a machine-plan secret. Mirrors the structure of
@@ -259,7 +455,10 @@ func (a *CAPRKE2Adapter) RenderProbes(secret *corev1.Secret, supervisor bool) (m
 		probes[probeName] = AllProbes[probeName]
 	}
 
-	dataDir := a.DistroDataDirectory(secret)
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
 	loopbackAddress := a.LoopbackAddress(secret)
 
 	// Supervisor probe has a multi-arg URL format; build separately so the standard format
@@ -312,7 +511,7 @@ func (a *CAPRKE2Adapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 // back to the first sorted candidate.
 func (a *CAPRKE2Adapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
 	secrets := a.clients.Core.Secret()
-	candidates, err := plan.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
+	candidates, err := plan.NewCollector(secrets, a.cluster, a.cluster.Namespace).
 		WithFilter(plan.FilterFunc(filter)).
 		WithSorter(plan.DefaultSorter()).
 		Collect()
@@ -425,54 +624,56 @@ func (a *CAPRKE2Adapter) clearLeaderAnnotation(secret *corev1.Secret, operation 
 //  2. Read the Machine's bootstrap configRef to find the bootstrap RKE2Config object.
 //  3. Read `RKE2Config.Spec.AgentConfig.DataDir`.
 //
-// If any step fails (machine still bootstrapping, configRef not yet populated, etc.) we log and
-// fall back to the runtime default `/var/lib/rancher/rke2`. The interface signature doesn't
-// allow returning an error, and returning the default is the only safe behaviour for callers
-// that may invoke this method during reconciles where the cluster is still settling.
-func (a *CAPRKE2Adapter) DistroDataDirectory(secret *corev1.Secret) string {
-	if dir := a.bootstrapDataDir(secret); dir != "" {
-		return dir
+// If any step fails, this returns an error so the caller can retry later rather than guessing a
+// path. Only once the lookup succeeds and AgentConfig.DataDir is empty do we return the runtime
+// default `/var/lib/rancher/rke2`.
+func (a *CAPRKE2Adapter) DistroDataDirectory(secret *corev1.Secret) (string, error) {
+	dir, err := a.bootstrapDataDir(secret)
+	if err != nil {
+		return "", fmt.Errorf("resolving bootstrap data directory: %w", err)
 	}
-	return path.Join("/var/lib/rancher", capr.RuntimeRKE2)
+	if dir != "" {
+		return dir, nil
+	}
+	return path.Join("/var/lib/rancher", capr.RuntimeRKE2), nil
 }
 
-// bootstrapDataDir resolves Secret → CAPI Machine → RKE2Config → AgentConfig.DataDir. Returns
-// the empty string on any miss; callers should fall back to the runtime default.
-func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) string {
+func (a *CAPRKE2Adapter) DistroManifestPaths(dataDir string) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
+}
+
+// bootstrapDataDir resolves Secret → CAPI Machine → RKE2Config → AgentConfig.DataDir. An empty
+// string is only ever returned alongside a nil error once the RKE2Config was actually read and
+// its AgentConfig.DataDir was empty. Any failure to resolve or read the configuration — including
+// a machine with no complete bootstrap ConfigRef yet — is returned as an error so the caller
+// retries later instead of treating an unresolved configuration as "no custom data dir".
+func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) (string, error) {
 	if secret == nil {
-		return ""
+		return "", fmt.Errorf("secret is nil")
 	}
 	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
-		return ""
+		return "", fmt.Errorf("secret %s/%s has no machine lifecycle labels", secret.Namespace, secret.Name)
 	}
 	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
 	if err != nil {
-		logrus.Errorf("[caprke2] error resolving machine lifecycle labels on secret %s/%s: %v", secret.Namespace, secret.Name, err)
-		return ""
+		return "", fmt.Errorf("resolving machine lifecycle labels on secret %s/%s: %w", secret.Namespace, secret.Name, err)
 	}
 
 	machine, err := a.clients.CAPI.Machine().Cache().Get(ref.Namespace, ref.Name)
 	if err != nil {
-		// During early bootstrap the machine may not yet exist in cache; suppress NotFound
-		// from logs so cold-start reconciles aren't noisy.
-		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("[caprke2] error fetching CAPI Machine %s/%s: %v", ref.Namespace, ref.Name, err)
-		}
-		return ""
+		return "", fmt.Errorf("fetching CAPI Machine %s/%s: %w", ref.Namespace, ref.Name, err)
 	}
 
 	configRef := machine.Spec.Bootstrap.ConfigRef
 	if configRef.Name == "" || configRef.Kind == "" || configRef.APIGroup == "" {
-		// Machine has not been linked to a bootstrap object yet.
-		return ""
+		return "", fmt.Errorf("machine %s/%s has an incomplete or missing bootstrap ConfigRef", machine.Namespace, machine.Name)
 	}
 	// CAPRKE2's bootstrap kind is "RKE2Config" under bootstrap.cluster.x-k8s.io. If a future
-	// CAPI version returns a different kind for this machine, bail out — we cannot know how to
-	// read DataDir from an arbitrary bootstrap object.
+	// CAPI version returns a different kind for this machine, we cannot know how to read
+	// DataDir from an arbitrary bootstrap object.
 	if configRef.APIGroup != bootstrapv1beta2.GroupVersion.Group || configRef.Kind != "RKE2Config" {
-		logrus.Debugf("[caprke2] machine %s/%s bootstrap configRef is %s/%s (not RKE2Config), falling back to default data-dir",
+		return "", fmt.Errorf("machine %s/%s bootstrap configRef is %s/%s (not RKE2Config)",
 			machine.Namespace, machine.Name, configRef.APIGroup, configRef.Kind)
-		return ""
 	}
 
 	// The bootstrap RKE2Config is namespaced; ContractVersionedObjectReference omits namespace
@@ -480,22 +681,17 @@ func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) string {
 	gvk := bootstrapv1beta2.GroupVersion.WithKind("RKE2Config")
 	obj, err := a.clients.Dynamic.Get(gvk, machine.Namespace, configRef.Name)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("[caprke2] error fetching bootstrap RKE2Config %s/%s: %v", machine.Namespace, configRef.Name, err)
-		}
-		return ""
+		return "", fmt.Errorf("fetching bootstrap RKE2Config %s/%s: %w", machine.Namespace, configRef.Name, err)
 	}
 	ustr, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		logrus.Errorf("[caprke2] expected *unstructured.Unstructured for RKE2Config %s/%s, got %T", machine.Namespace, configRef.Name, obj)
-		return ""
+		return "", fmt.Errorf("expected *unstructured.Unstructured for RKE2Config %s/%s, got %T", machine.Namespace, configRef.Name, obj)
 	}
 	rke2Config := &bootstrapv1beta2.RKE2Config{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(ustr.Object, rke2Config); err != nil {
-		logrus.Errorf("[caprke2] converting RKE2Config %s/%s from unstructured: %v", machine.Namespace, configRef.Name, err)
-		return ""
+		return "", fmt.Errorf("converting RKE2Config %s/%s from unstructured: %w", machine.Namespace, configRef.Name, err)
 	}
-	return rke2Config.Spec.AgentConfig.DataDir
+	return rke2Config.Spec.AgentConfig.DataDir, nil
 }
 
 // ProvisioningDataDirectory returns the per-operation data directory. CAPRKE2 has no field for
@@ -506,8 +702,12 @@ func (a *CAPRKE2Adapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 
 // KubectlPath returns the kubectl binary path for this cluster's runtime — RKE2 ships kubectl
 // under the data-dir's bin/ subdirectory.
-func (a *CAPRKE2Adapter) KubectlPath(secret *corev1.Secret) string {
-	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+func (a *CAPRKE2Adapter) KubectlPath(secret *corev1.Secret) (string, error) {
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dataDir, "bin", "kubectl"), nil
 }
 
 // KubeconfigPath returns the on-host admin kubeconfig path.
@@ -515,10 +715,11 @@ func (a *CAPRKE2Adapter) KubeconfigPath(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/rke2.yaml"
 }
 
-// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane. CAPI's
-// Cluster name matches the RKE2ControlPlane name by convention. Mirrors CAPRAdapter.PauseCluster.
+// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane.
+// Uses a.cluster since CAPI-native control plane objects do not necessarily have the
+// same name as the CAPI-native cluster object.
 func (a *CAPRKE2Adapter) PauseCluster(pause bool) error {
-	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.cluster.Namespace, a.cluster.Name)
 	if err != nil {
 		return err
 	}

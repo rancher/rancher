@@ -8,6 +8,7 @@ const (
 	GoogleOauthConfigFieldAnnotations                  = "annotations"
 	GoogleOauthConfigFieldCreated                      = "created"
 	GoogleOauthConfigFieldCreatorID                    = "creatorId"
+	GoogleOauthConfigFieldDisplayName                  = "displayName"
 	GoogleOauthConfigFieldEnabled                      = "enabled"
 	GoogleOauthConfigFieldHostname                     = "hostname"
 	GoogleOauthConfigFieldLabels                       = "labels"
@@ -31,6 +32,7 @@ type GoogleOauthConfig struct {
 	Annotations                  map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created                      string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                    string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName                  string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled                      bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Hostname                     string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	Labels                       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`

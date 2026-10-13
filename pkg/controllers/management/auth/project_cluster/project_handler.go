@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -12,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +26,11 @@ const (
 	ProjectCreateController = "mgmt-project-rbac-create"
 	// The name of the project remove controller
 	ProjectRemoveController = "mgmt-project-rbac-remove"
+
+	// legacySecretFinalizer is the finalizer, followed by the cluster name, of the project-scoped secrets
+	// controller removed in v2.12. The user controllers remove it from project-scoped secrets, but one left on
+	// a secret, e.g. of a cluster that hasn't connected since, would keep the project's namespace forever.
+	legacySecretFinalizer = "clusterscoped.controller.cattle.io/secretsController_"
 )
 
 type projectLifecycle struct {
@@ -39,6 +46,8 @@ type projectLifecycle struct {
 	systemAccountManager systemaccount.SystemAccountManager
 	crClient             rbacv1.ClusterRoleController
 	roleController       rbacv1.RoleController
+	secretLister         corev1.SecretCache
+	secrets              corev1.SecretClient
 }
 
 // NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
@@ -56,6 +65,8 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		systemAccountManager: systemaccount.NewManager(management),
 		crClient:             management.Wrangler.RBAC.ClusterRole(),
 		roleController:       management.Wrangler.RBAC.Role(),
+		secretLister:         management.Wrangler.Core.Secret().Cache(),
+		secrets:              management.Wrangler.Core.Secret(),
 	}
 }
 
@@ -137,10 +148,50 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 	return obj, nil
 }
 
-// Remove deletes all backing resources created by the project
+// Remove deletes all backing resources created by the project, and waits for its backing namespace to be
+// gone, with everything in it. The project's PRTBs live there: they must not outlive the project, and so
+// its cluster, whose namespace holds the project. A cluster created again under the same name would
+// otherwise find them.
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	backingNamespace := obj.GetProjectBackingNamespace()
-	return obj, deleteNamespace(ProjectRemoveController, backingNamespace, l.nsClient)
+	if err := deleteNamespace(ProjectRemoveController, backingNamespace, l.nsClient); err != nil {
+		return obj, err
+	}
+
+	if _, err := l.nsClient.Get(backingNamespace, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+		if err != nil {
+			return obj, err
+		}
+		if err := l.removeLegacySecretFinalizers(obj, backingNamespace); err != nil {
+			return obj, err
+		}
+		logrus.Infof("[%s] Waiting for namespace %s of project %s/%s to be removed", ProjectRemoveController, backingNamespace, obj.Namespace, obj.Name)
+		l.projects.EnqueueAfter(obj.Namespace, obj.Name, namespaceRemovedRequeue)
+		return obj, generic.ErrSkip
+	}
+	return obj, nil
+}
+
+// removeLegacySecretFinalizers removes legacySecretFinalizer from the secrets in the project's backing
+// namespace. Nothing else would: its controller no longer exists.
+func (l *projectLifecycle) removeLegacySecretFinalizers(project *apisv3.Project, backingNamespace string) error {
+	finalizer := legacySecretFinalizer + project.Spec.ClusterName
+	secrets, err := l.secretLister.List(backingNamespace, labels.Everything())
+	if err != nil {
+		return err
+	}
+	for _, secret := range secrets {
+		i := slices.Index(secret.Finalizers, finalizer)
+		if i < 0 {
+			continue
+		}
+		secret = secret.DeepCopy()
+		secret.Finalizers = slices.Delete(secret.Finalizers, i, i+1)
+		if _, err := l.secrets.Update(secret); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("[%s] failed to remove finalizer %s from secret %s/%s: %w", ProjectRemoveController, finalizer, secret.Namespace, secret.Name, err)
+		}
+	}
+	return nil
 }
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object, nsName string) (runtime.Object, error) {

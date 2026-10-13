@@ -242,6 +242,66 @@ func Test_Render(t *testing.T) {
 			},
 			failMsg: "takeOwnership true and serverSide true should resolve correctly to server-side=true without duplication",
 		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test-wait-true",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"wait": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--wait=watcher", "test-wait-true", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "wait true should translate to --wait=watcher for Helm v4",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test-wait-false",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"wait": false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "test-wait-false", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "wait false should omit --wait flag, allowing Helm v4 to use its default (hookOnly)",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test-wait-omitted",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"namespace": "default",
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--namespace=default", "test-wait-omitted", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "wait field omitted should not add --wait flag, allowing Helm v4 to use its default (hookOnly)",
+		},
 	}
 
 	for _, testCase := range testCases {

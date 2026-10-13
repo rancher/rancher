@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"time"
 
 	"encoding/json"
 	"fmt"
@@ -32,6 +33,10 @@ const (
 	ClusterCreateController = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
 	// The name of the cluster remove controller
 	ClusterRemoveController = "mgmt-cluster-rbac-remove"
+
+	// namespaceRemovedRequeue is how often a cluster being removed is checked again while it waits for its
+	// namespace to be gone.
+	namespaceRemovedRequeue = 10 * time.Second
 )
 
 var (
@@ -44,7 +49,7 @@ var (
 )
 
 type clusterLifecycle struct {
-	clusterClient      v3.ClusterClient
+	clusterClient      v3.ClusterController
 	crtbLister         v3.ClusterRoleTemplateBindingCache
 	crtbClient         v3.ClusterRoleTemplateBindingController
 	nsLister           corev1.NamespaceCache
@@ -169,7 +174,21 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 		l.deleteSystemProject(obj, ClusterRemoveController),
 		deleteNamespace(ClusterRemoveController, obj.Name, l.nsClient),
 	)
-	return obj, returnErr
+	if returnErr != nil {
+		return obj, returnErr
+	}
+
+	// Wait for the namespace to be gone, with everything in it: a cluster created again under the same name
+	// must not find the old cluster's registration tokens, bindings and projects there.
+	if _, err := l.nsClient.Get(obj.Name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+		if err != nil {
+			return obj, err
+		}
+		logrus.Infof("[%s] Waiting for namespace %s of cluster %s to be removed", ClusterRemoveController, obj.Name, obj.Name)
+		l.clusterClient.EnqueueAfter(obj.Name, namespaceRemovedRequeue)
+		return obj, generic.ErrSkip
+	}
+	return obj, nil
 }
 
 func (l *clusterLifecycle) createDefaultProject(obj runtime.Object) (runtime.Object, error) {

@@ -13,14 +13,14 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // The four Test_Imported_Operation_SetE_CAPRKE2Docker* tests below exercise the same operations
-// (ETCDSnapshotSave → ETCDSnapshotRestore → EncryptionKeyRotation) against progressively larger
-// CAPRKE2 topologies:
+// (CertificateRotation → ETCDSnapshotSave → ETCDSnapshotRestore → EncryptionKeyRotation) against
+// progressively larger CAPRKE2 topologies:
 //
 //   - SingleServer      — 1 control-plane, 0 workers (smallest smoke)
 //   - OneServerOneAgent — 1 control-plane, 1 worker  (mixed roles, minimum for MachineDeployment)
@@ -78,10 +78,10 @@ func Test_Imported_Operation_SetE_CAPRKE2DockerOperations_ThreeServersThreeAgent
 	})
 }
 
-// runCAPRKE2OperationsTest brings up a CAPRKE2 cluster with the supplied topology, then walks the
-// three operations (save → restore → encryption-key rotation). The proof-of-restore check writes a
-// ConfigMap to the downstream cluster before the save, deletes it after, and asserts it comes back
-// after the restore.
+// runCAPRKE2OperationsTest brings up a CAPRKE2 cluster with the supplied topology, then walks
+// certificate rotation, snapshot save/restore, and encryption-key rotation. The proof-of-restore
+// check writes a ConfigMap to the downstream cluster before the save, deletes it after, and
+// asserts it comes back after the restore.
 func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	if os.Getenv("V2PROV_TEST_CAPRKE2") != "true" {
 		t.Skip("V2PROV_TEST_CAPRKE2 not set; skipping CAPRKE2 + Docker operations test (local-only)")
@@ -103,31 +103,43 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	t.Logf("CAPI cluster ready: namespace=%s name=%s mgmtV3Name=%s controlPlaneReplicas=%d workerReplicas=%d",
 		fx.Namespace, fx.ClusterName, fx.MgmtClusterName, opts.Replicas, opts.WorkerReplicas)
 
-	// Downstream client used for the configmap proof-of-restore. Built once from the CAPI
-	// kubeconfig secret; survives restore so long as the API server returns within our poll window.
-	downstream, err := fx.DownstreamClient(cs)
-	if err != nil {
-		t.Fatalf("building downstream client: %v", err)
-	}
+	// --- CertificateRotation ---
+	// Run first, before snapshot save/restore. Reaching Succeeded plus the downstream API check
+	// below proves the operation completed and the CAPRKE2 cluster's API server recovered enough
+	// to continue with normal Day2 operations — it does not collect certificate before/after
+	// evidence, so it does not prove certificate metadata actually changed.
+	// Use the explicit waiter because it also waits for the Beacon delegate chain to clear.
+	// SnapshotSave runs next and must acquire that same Beacon.
+	crOp := CreateCertificateRotationOp(t, cs, fx.Namespace, capiClusterRef)
+	crOp = WaitForCertificateRotationSucceeded(t, cs, crOp, fx.Namespace, fx.ClusterName)
+	t.Logf("certificate rotation operation %s/%s completed", crOp.Namespace, crOp.Name)
 
 	// --- ETCDSnapshotSave ---
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "caprke2-restore-cm-" + strings.ToLower(name.Hex(time.Now().String(), 10)),
-			Namespace: "default",
-		},
-		Data: map[string]string{"test": "wow"},
+	// Confirm the API is usable before placing state in the snapshot. This ConfigMap is deleted
+	// before restore and then read back afterward as the restore proof.
+	cmName := "caprke2-restore-cm-" + strings.ToLower(name.Hex(time.Now().String(), 10))
+	var createErr error
+	err = utilwait.PollUntilContextTimeout(cs.Ctx, 5*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+		machineName := pickCAPRKE2InitMachineName(t, cs, fx)
+		_, err := cluster.RunCAPRKE2Kubectl(ctx, machineName,
+			"-n", "default", "create", "configmap", cmName, "--from-literal=test=wow")
+		createErr = err
+		// A previous attempt may have created the ConfigMap before its command timed out.
+		return err == nil || strings.Contains(err.Error(), "AlreadyExists"), nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for downstream API recovery before creating proof-of-restore configmap %s: %v (last error: %v)", cmName, err, createErr)
 	}
-	if _, err := downstream.CoreV1().ConfigMaps("default").Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("creating proof-of-restore configmap %s: %v", cm.Name, err)
-	}
+	t.Logf("downstream API recovered after certificate rotation; created proof-of-restore configmap %s", cmName)
 
+	// Keep selection scoped to the snapshot created by this test run.
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
 	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.Namespace, capiClusterRef)
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
-	// One snapshot file per etcd (control-plane) node. Workers do not run etcd.
-	waitForSnapshots(t, cs, fx.Namespace, fx.ClusterName, snapshotsValidAfter, int(opts.Replicas))
+	// For Turtles-imported CAPRKE2, snapshotbackpopulate writes snapshots to the management-cluster
+	// mirror namespace. Expect one snapshot file per etcd (control-plane) node; workers do not run etcd.
+	waitForSnapshots(t, cs, fx.MgmtClusterName, fx.MgmtClusterName, snapshotsValidAfter, int(opts.Replicas))
 
 	// --- ETCDSnapshotRestore ---
 	// Snapshots are labeled `rke.cattle.io/node-name = <CAPI Machine name>` (for CAPRKE2 the
@@ -136,15 +148,18 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	// single etcd node's snapshot, so any one control-plane machine is a valid pick.
 	initMachineName := pickCAPRKE2InitMachineName(t, cs, fx)
 	t.Logf("using CAPI machine %s as init-node identifier for snapshot lookup", initMachineName)
-	snapshot := waitForBackpopulatedSnapshot(t, cs, fx.Namespace, fx.ClusterName, initMachineName, snapshotsValidAfter)
+	// Select the matching snapshot from the Turtles management-cluster mirror namespace.
+	snapshot := waitForBackpopulatedSnapshot(t, cs, fx.MgmtClusterName, fx.MgmtClusterName, initMachineName, snapshotsValidAfter)
 	if snapshot.SnapshotFile.Name == "" {
 		t.Fatalf("back-populated snapshot %s has empty SnapshotFile.Name", snapshot.Name)
 	}
 	t.Logf("using snapshot %s (file=%s)", snapshot.Name, snapshot.SnapshotFile.Name)
 
 	// Delete the configmap so the post-restore check is meaningful.
-	if err := downstream.CoreV1().ConfigMaps("default").Delete(context.TODO(), cm.Name, metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("deleting proof-of-restore configmap %s: %v", cm.Name, err)
+	machineName := pickCAPRKE2InitMachineName(t, cs, fx)
+	if _, err := cluster.RunCAPRKE2Kubectl(cs.Ctx, machineName,
+		"-n", "default", "delete", "configmap", cmName, "--ignore-not-found"); err != nil {
+		t.Fatalf("deleting proof-of-restore configmap %s: %v", cmName, err)
 	}
 
 	// Single-server CAPRKE2 clusters restore against the raw on-disk snapshot file name;
@@ -158,28 +173,19 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 
 	// Poll the configmap back into existence. The apiserver bounces during a restore so the first
 	// few Get calls may transiently fail before settling.
-	var (
-		gotValue string
-		getErr   error
-	)
-	for i := 0; i < 60; i++ {
-		got, err := downstream.CoreV1().ConfigMaps("default").Get(context.TODO(), cm.Name, metav1.GetOptions{})
-		if err == nil {
-			gotValue = got.Data["test"]
-			getErr = nil
-			if gotValue == "wow" {
-				break
-			}
-		} else {
-			getErr = err
+	var gotValue string
+	err = utilwait.PollUntilContextTimeout(cs.Ctx, 5*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		machineName := pickCAPRKE2InitMachineName(t, cs, fx)
+		output, err := cluster.RunCAPRKE2Kubectl(ctx, machineName,
+			"-n", "default", "get", "configmap", cmName, "-o", "jsonpath={.data.test}")
+		if err != nil {
+			return false, nil
 		}
-		time.Sleep(5 * time.Second)
-	}
-	if getErr != nil {
-		t.Fatalf("get configmap %s failed after restore: %v", cm.Name, getErr)
-	}
-	if gotValue != "wow" {
-		t.Fatalf("expected configmap %s value restored to %q, got %q", cm.Name, "wow", gotValue)
+		gotValue = strings.TrimSpace(string(output))
+		return gotValue == "wow", nil
+	})
+	if err != nil {
+		t.Fatalf("get configmap %s did not restore to %q after restore: %v (last value: %q)", cmName, "wow", err, gotValue)
 	}
 
 	// --- EncryptionKeyRotation ---

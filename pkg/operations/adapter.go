@@ -4,8 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -18,6 +21,7 @@ const (
 	SecurePortArgument  = "secure-port"
 	CertDirArgument     = "cert-dir"
 	TLSCertFileArgument = "tls-cert-file"
+	TLSPrivateKeyFile   = "tls-private-key-file"
 
 	ETCDProbeName                  = "etcd"
 	KubeAPIServerProbeName         = "kube-apiserver"
@@ -41,6 +45,26 @@ const (
 
 	OperationLeaderAnnotation = "rke.cattle.io/operation-leader"
 )
+
+// ComponentTLSSettings captures the TLS-related runtime arguments used by the
+// scheduler and controller-manager secure probes and certificate cleanup logic.
+type ComponentTLSSettings struct {
+	SecurePort        string
+	TLSCertFile       string
+	TLSPrivateKeyFile string
+}
+
+// ManifestPaths identifies runtime-owned static and generated manifest locations.
+type ManifestPaths struct {
+	StaticPodManifestDirectory string
+	GeneratedManifestDirectory string
+	GeneratedManifestPatterns  []string
+}
+
+// HasCompleteTLSConfig reports whether both cert and key paths are explicitly configured.
+func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
+	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
+}
 
 var (
 	AllProbes = map[string]plan.Probe{
@@ -146,6 +170,50 @@ type Adapter interface {
 	// will create an operation for the management cluster object, but the true object is the CAPI cluster.
 	ClusterObject() (*unstructured.Unstructured, error)
 
+	// RestoreTarget returns the live object that resourceKey addresses for this cluster type, where
+	// resourceKey is one of the keys an etcd snapshot's `resources` metadata is published under
+	// (e.g. "cluster.provisioning.cattle.io"). Returns (nil, nil) when this cluster type has no
+	// such object, which makes any restore mode selecting it unavailable.
+	//
+	// This is deliberately not ClusterObject: the object whose configuration a restore writes back
+	// is not the one the operation controllers plan against. For v2prov it is the provv1.Cluster,
+	// because the provisioner regenerates the RKEControlPlane from it; for CAPRKE2 it is the
+	// RKE2ControlPlane, which the CAPI Cluster ClusterObject returns does not carry.
+	RestoreTarget(resourceKey string) (*unstructured.Unstructured, error)
+
+	// UpdateRestoreTarget persists modifications made to an object returned by RestoreTarget.
+	UpdateRestoreTarget(obj *unstructured.Unstructured) error
+
+	// WaitForRestoreTarget reports whether the objects derived from the restore target have caught
+	// up with its current spec. A restore writes cluster configuration onto the restore target, but
+	// the node plans a restore then runs are built from objects rendered off it, so acting before
+	// that rendering has happened would use the pre-restore configuration.
+	//
+	// Returns true when there is nothing to wait for, either because the derived objects are current
+	// or because this cluster type renders nothing off its restore target.
+	WaitForRestoreTarget() (bool, error)
+
+	// InstallInstruction returns the instruction that installs the distro at the Kubernetes version
+	// the cluster is currently configured for, without starting it. Returns false when this cluster
+	// type's distro version is not managed by Rancher and so cannot be reinstalled.
+	//
+	// A restore of a snapshot taken on an older Kubernetes version has to run against that version's
+	// binary — a newer server cannot `--cluster-reset` onto older etcd data — and every other node
+	// has to come back on that same version rather than a minor ahead of the control plane it
+	// rejoins. Reinstalling is what makes a downgrade-on-restore work; the etcd snapshot restore does
+	// it once per node while the cluster is shut down. The legacy CAPR planner splits the same work
+	// between its restore plan and the full reconcile it runs afterwards (see
+	// pkg/capr/planner/etcdrestore.go).
+	//
+	// secret identifies the node, which decides whether the server or the agent is installed, so
+	// callers must pass the plan secret of the node the instruction is destined for.
+	//
+	// dataDir is passed in rather than resolved from secret because the caller has already resolved
+	// it for the rest of the plan it is assembling: this keeps the install and the instructions
+	// around it pointed at the same directory, and avoids repeating a lookup that can fail (see
+	// DistroDataDirectory).
+	InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool)
+
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
 	// all expected nodes.
 	WaitForRegister() (bool, error)
@@ -160,8 +228,24 @@ type Adapter interface {
 	// ServerUnit returns the systemd unit name for a distro server node.
 	ServerUnit() string
 
+	// RuntimeService returns the runtime service to restart on the node represented by secret:
+	// the server service on control-plane/etcd nodes, or the runtime agent service on worker-only
+	// nodes.
+	RuntimeService(secret *corev1.Secret) string
+
+	// DistroServices returns the logical RKE2/K3s certificate-rotation service identifiers
+	// available on this node. These are not a list of every physical host
+	// service: on worker nodes, a server-related identifier means the worker's runtime agent must
+	// restart after the related server-side rotation, not that the server itself runs there. The
+	// result depends on the runtime (RKE2 or K3s) and on the node's worker, control-plane, and
+	// etcd roles.
+	DistroServices(secret *corev1.Secret) []string
+
 	// DistroDataDirectory returns the path to the RKE2/K3s data-dir on the host machine.
-	DistroDataDirectory(secret *corev1.Secret) string
+	DistroDataDirectory(secret *corev1.Secret) (string, error)
+
+	// DistroManifestPaths returns runtime-owned manifest locations for dataDir.
+	DistroManifestPaths(dataDir string) ManifestPaths
 
 	// ProvisioningDataDirectory returns the path to the data directory used for operations.
 	// Scripts created for commands are typically stored here.
@@ -177,8 +261,14 @@ type Adapter interface {
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
 
+	// ComponentTLSSettings returns the effective scheduler/controller-manager TLS argument
+	// settings configured for the node represented by secret. Callers can use these settings to
+	// match component probes to their configured certificate and secure port, and to avoid
+	// clobbering an explicitly configured TLS pair during cleanup.
+	ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error)
+
 	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
-	KubectlPath(secret *corev1.Secret) string
+	KubectlPath(secret *corev1.Secret) (string, error)
 
 	// KubeconfigPath returns the path to the kubeconfig file on the host relative to the machine-plan secret.
 	KubeconfigPath(secret *corev1.Secret) string
@@ -197,7 +287,84 @@ type Adapter interface {
 
 	LoopbackAddress(secret *corev1.Secret) string
 
-	ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File)
+	// ETCDSnapshotS3 returns the cluster's own etcd snapshot S3 configuration, or nil when the
+	// cluster does not snapshot to S3.
+	//
+	// For CAPR and imported clusters this is the S3 block of the cluster spec verbatim. CAPRKE2
+	// models S3 with secret references rather than a cloud credential, so its adapter returns the
+	// location fields only — credentials are resolved by ToS3ArgsEnvAndFiles, never here.
+	ETCDSnapshotS3() *rkev1.ETCDSnapshotS3
+
+	// ToS3ArgsEnvAndFiles renders the distro arguments, environment variables, and plan files
+	// needed to reach the S3 location described by s3, which is either the S3 block recorded on a
+	// snapshot being restored or (typically via ETCDSnapshotS3) the cluster's own configuration.
+	// A nil s3 falls back to the cluster's configuration entirely.
+	//
+	// Credentials always come from the cluster's configuration, because a snapshot only ever
+	// records where it was written, never how to authenticate.
+	//
+	// prefix is prepended to each argument name ("etcd-" yields --etcd-s3-bucket). Set
+	// secretKeyInEnv to keep the secret key out of the command line of anything that runs as an
+	// instruction; leave it unset when the arguments are folded into a config file.
+	ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error)
+}
+
+// DistroServices returns the logical RKE2/K3s certificate-rotation service identifiers available
+// to the node described by secret for the given runtime. Every Adapter delegates here: service
+// availability is a property of the installed distro and the node's roles, not of how the cluster
+// is managed. These identifiers are not a list of every physical host service: on
+// worker nodes, a server-related identifier means the worker's runtime agent must restart after
+// the related server-side certificate rotation, not that the server itself runs there.
+//
+// The role groupings are the ones certificate rotation already applies — workers restart their
+// agent for the shared runtime certificates, control-plane nodes own the API server components,
+// and etcd nodes own etcd. Only the server and controller identifiers are runtime-specific, so an
+// RKE2 node never reports a K3s service name and a K3s node never reports an RKE2 one.
+func DistroServices(runtime string, secret *corev1.Secret) []string {
+	serverService, controllerService := capr.RuntimeK3S+"-server", capr.RuntimeK3S+"-controller"
+	if runtime == capr.RuntimeRKE2 {
+		serverService, controllerService = capr.RuntimeRKE2+"-server", capr.RuntimeRKE2+"-controller"
+	}
+
+	available := map[string]struct{}{}
+	add := func(services ...string) {
+		for _, service := range services {
+			available[service] = struct{}{}
+		}
+	}
+
+	if IsWorker(secret) {
+		// Workers restart their runtime agent when any of these shared runtime
+		// certificates are rotated, so they can reconnect to the server.
+		add(serverService, "api-server", "kubelet", "kube-proxy", "auth-proxy")
+	}
+	if IsControlPlane(secret) {
+		add(serverService, controllerService, "api-server", "kubelet", "kube-proxy", "auth-proxy",
+			"controller-manager", "scheduler", "admin", "cloud-controller", "supervisor")
+	}
+	if IsEtcd(secret) {
+		add(serverService, "etcd", "kubelet", "supervisor")
+	}
+
+	services := make([]string, 0, len(available))
+	for service := range available {
+		services = append(services, service)
+	}
+	sort.Strings(services)
+	return services
+}
+
+// DistroManifestPaths returns runtime-owned manifest locations for a resolved
+// runtime data directory.
+func DistroManifestPaths(runtime, dataDir string) ManifestPaths {
+	if runtime != capr.RuntimeRKE2 {
+		return ManifestPaths{}
+	}
+	return ManifestPaths{
+		StaticPodManifestDirectory: path.Join(dataDir, "agent", "pod-manifests"),
+		GeneratedManifestDirectory: path.Join(dataDir, "server", "manifests"),
+		GeneratedManifestPatterns:  []string{"rke2-*.yaml"},
+	}
 }
 
 // NewAdapter returns an Adapter for the given cluster object.

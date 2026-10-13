@@ -130,17 +130,23 @@ func TestSearchPrincipals(t *testing.T) {
 	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(true).AnyTimes()
 
 	config := &apiv3.GithubConfig{
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "github",
+			},
+		},
 		Hostname: srvURL.Host,
 	}
 
 	provider := Provider{
 		githubClient: &GClient{httpClient: srv.Client()},
-		getConfig:    func() (*apiv3.GithubConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
 		tokenMGR:     &fakeTokensManager{},
 	}
 
-	token := apiv3.Token{
+	token := &apiv3.Token{
+		AuthProvider: config.GetName(),
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "github_user://9253000",
@@ -151,7 +157,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for groups and users.
-	found, err := provider.SearchPrincipals("dev", "", &token)
+	found, err := provider.SearchPrincipals("dev", "", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +201,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for groups only.
-	found, err = provider.SearchPrincipals("dev", "group", &token)
+	found, err = provider.SearchPrincipals("dev", "group", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +219,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for users only.
-	found, err = provider.SearchPrincipals("dev", "user", &token)
+	found, err = provider.SearchPrincipals("dev", "user", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,11 +324,16 @@ func TestSearchPrincipalsExt(t *testing.T) {
 
 	config := &apiv3.GithubConfig{
 		Hostname: srvURL.Host,
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "github",
+			},
+		},
 	}
 
 	provider := Provider{
 		githubClient: &GClient{httpClient: srv.Client()},
-		getConfig:    func() (*apiv3.GithubConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
 		tokenMGR:     &fakeTokensManager{},
 	}
@@ -333,6 +344,7 @@ func TestSearchPrincipalsExt(t *testing.T) {
 				Name:          "github_user://9253000",
 				LoginName:     "developer",
 				PrincipalType: "user",
+				Provider:      config.GetName(),
 			},
 		},
 	}

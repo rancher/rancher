@@ -123,7 +123,7 @@ func TestAuthEndpoint(t *testing.T) {
 					Return(nil, errors.NewNotFound(schema.GroupResource{}, "token not found"))
 				// but an ext token
 				fakePrincipal := ext.TokenPrincipal{
-					Name:        "world",
+					Name:        "local://u-1234a",
 					Provider:    "local", // ext token reader checks for provider, cannot be empty
 					DisplayName: "myself",
 					LoginName:   "hello",
@@ -783,7 +783,7 @@ func TestAuthEndpoint(t *testing.T) {
 
 	// register auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	mockProvider.EXPECT().IsDisabledProvider("local").Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]common.AuthProvider{"local": mockProvider})
 	t.Cleanup(func() { providers.SetProviders(nil) })
 

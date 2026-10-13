@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -25,6 +26,8 @@ import (
 var (
 	started bool
 )
+
+const preBootstrapEnvVar = "CATTLE_PREBOOTSTRAP"
 
 func Run(ctx context.Context) error {
 	if err := setupSteveAggregation(ctx); err != nil {
@@ -70,7 +73,7 @@ type handler struct {
 }
 
 func (h *handler) startRancher() {
-	if features.ProvisioningPreBootstrap.Enabled() {
+	if isPreBootstrap() {
 		logrus.Debugf("not starting embedded rancher due to pre-bootstrap...")
 		return
 	}
@@ -180,4 +183,8 @@ func setupSteveAggregation(ctx context.Context) error {
 			},
 			Data: data,
 		})
+}
+
+func isPreBootstrap() bool {
+	return strings.EqualFold(os.Getenv(preBootstrapEnvVar), "true")
 }

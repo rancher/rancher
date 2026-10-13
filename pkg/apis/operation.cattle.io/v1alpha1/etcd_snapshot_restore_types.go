@@ -8,8 +8,19 @@ import (
 // Name specifies the name of the snapshot file.
 type ETCDSnapshotRestoreArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
-	// +optional
+	// +required
 	Name string `json:"name,omitempty"`
+
+	// RestoreMode names a key in the snapshot's restoreModes metadata, e.g. "kubernetesVersion" or
+	// "all". The set of modes a given snapshot offers is published on the snapshot as the
+	// etcdsnapshot.rke.io/restore-mode-options annotation. Empty or "none" restores etcd without
+	// touching cluster configuration.
+	//
+	// Deliberately unvalidated: a downstream cluster may declare modes this Rancher does not know
+	// about.
+	// +kubebuilder:validation:MaxLength=63
+	// +optional
+	RestoreMode string `json:"restoreMode,omitempty"`
 }
 
 // ETCDSnapshotRestoreSpec defines the desired state of ETCDSnapshotRestore.
@@ -20,7 +31,7 @@ type ETCDSnapshotRestoreSpec struct {
 
 	// Args contains parameters for restoring an ETCD snapshot.
 	// Mutually exclusive with SnapshotRef.
-	// +optional
+	// +required
 	Args ETCDSnapshotRestoreArgs `json:"args,omitempty"`
 }
 
@@ -30,6 +41,11 @@ type ETCDSnapshotRestoreStep string
 const (
 	// ETCDSnapshotRestoreStepPreflight indicates the step is performing preflight checks to determine if the operation will succeed.
 	ETCDSnapshotRestoreStepPreflight ETCDSnapshotRestoreStep = "Preflight"
+
+	// ETCDSnapshotRestoreStepRestoreClusterConfig indicates the step is applying the requested
+	// restore mode, i.e. writing the cluster configuration captured in the snapshot back onto the
+	// object that owns the cluster.
+	ETCDSnapshotRestoreStepRestoreClusterConfig ETCDSnapshotRestoreStep = "RestoreClusterConfig"
 
 	// ETCDSnapshotRestoreStepShutdown indicates the step is shutting down the cluster.
 	ETCDSnapshotRestoreStepShutdown ETCDSnapshotRestoreStep = "Shutdown"
@@ -57,7 +73,7 @@ type ETCDSnapshotRestoreStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Preflight;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster
+	// +kubebuilder:validation:Enum=Preflight;RestoreClusterConfig;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster
 	// +optional
 	Step ETCDSnapshotRestoreStep `json:"step,omitempty"`
 }
@@ -86,6 +102,7 @@ func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
 // +kubebuilder:printcolumn:name="Snapshot",type=string,JSONPath=".spec.args.name"
+// +kubebuilder:printcolumn:name="Mode",type=string,JSONPath=".spec.args.restoreMode"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Step",type=string,JSONPath=".spec.step"

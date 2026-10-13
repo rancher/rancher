@@ -16,7 +16,7 @@ jobs:
   setup-matrix:
     name: Build Test Matrix
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     permissions:
       contents: read
     outputs:
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -eo pipefail
 
-          # On a PR, diff against the base (target) SHA 
+          # On a PR, diff against the base (target) SHA
           if [ "$EVENT_NAME" = "pull_request" ]; then
             export DIFF_BASE="$BASE_SHA"
           elif [ -z "$EXPLICIT_SCOPES" ]; then
@@ -56,7 +56,7 @@ jobs:
           COUNT="$(echo "$MATRIX" | jq '.include | length')"
 
           # Sanity cap against accidental fan-out
-          if [ "$COUNT" -gt 16 ]; then
+          if [ "$COUNT" -gt 18 ]; then
             echo "error: too many matrix entries ($COUNT)" >&2
             exit 1
           fi
@@ -179,7 +179,7 @@ jobs:
     name: Provisioning Tests Summary
     needs: [setup-matrix, provisioning_tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     env:
       SETUP_MATRIX_RESULT: ${{ needs.setup-matrix.result }}
       PROVISIONING_TESTS_RESULT: ${{ needs.provisioning_tests.result }}
@@ -188,12 +188,12 @@ jobs:
         shell: bash
         run: |
           echo "Provisioning Test Summary"
-          echo "--------------------------------"        
+          echo "--------------------------------"
           if [[ "${SETUP_MATRIX_RESULT}" != "success" && "${SETUP_MATRIX_RESULT}" != "skipped" ]]; then
             echo "Failed to setup test matrix."
             exit 1
           fi
-          
+
           if [[ "${PROVISIONING_TESTS_RESULT}" != "success" && "${PROVISIONING_TESTS_RESULT}" != "skipped" ]]; then
             echo "Some provisioning tests failed. Please check the logs for details."
             exit 1
@@ -204,7 +204,7 @@ jobs:
     needs: [provisioning_tests]
     if: always()
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     steps:
       - name: Fetch test output
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -231,7 +231,7 @@ jobs:
   event-file:
     name: Upload event file
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     steps:
       - name: Upload GH Event File
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

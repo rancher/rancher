@@ -1,6 +1,7 @@
 package activedirectory
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
@@ -25,7 +25,7 @@ func (p *adProvider) formatter(apiContext *types.APIContext, resource *types.Raw
 }
 
 func (p *adProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, p.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, p.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -53,6 +53,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	config := &configApplyInput.ActiveDirectoryConfig
+	config.Name = cmp.Or(configApplyInput.ConfigName, config.Name, ProviderName)
 
 	login := &v32.BasicLogin{
 		Username: configApplyInput.Username,
@@ -114,6 +115,22 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 	if config.GroupMemberMappingAttribute != "" && !ldap.IsValidAttr(config.GroupMemberMappingAttribute) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberMappingAttribute")
 	}
+	if config.UserIDAttribute != "" && !ldap.IsValidAttr(config.UserIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userIDAttribute")
+	}
+	if config.GroupIDAttribute != "" && !ldap.IsValidAttr(config.GroupIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIDAttribute")
+	}
+
+	storedADConfig, _, err := p.getActiveDirectoryConfig(config.Name)
+	if err != nil {
+		return err
+	}
+	if storedADConfig.Enabled && configApplyInput.Enabled {
+		if err := validateIDAttributesUnchanged(storedADConfig, config); err != nil {
+			return err
+		}
+	}
 
 	if config.UserLoginFilter != "" {
 		if _, err := ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
@@ -156,7 +173,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}
@@ -165,7 +182,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {
-	storedConfig, _, err := p.getActiveDirectoryConfig()
+	storedConfig, _, err := p.getActiveDirectoryConfig(config.GetName())
 	if err != nil {
 		return err
 	}
@@ -175,7 +192,7 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 	config.ObjectMeta = storedConfig.ObjectMeta
 
 	field := strings.ToLower(client.ActiveDirectoryConfigFieldServiceAccountPassword)
-	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, strings.ToLower(convert.ToString(config.Type)))
+	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, common.SecretNamePrefix(config.Name, config.Type))
 	if err != nil {
 		return err
 	}
@@ -186,6 +203,18 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// validateIDAttributesUnchanged rejects changes to the principal identifier attributes of an enabled provider.
+// Changing them would orphan every binding that references the old principal names.
+func validateIDAttributesUnchanged(stored, incoming *v32.ActiveDirectoryConfig) error {
+	if incoming.UserIDAttribute != stored.UserIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "userIDAttribute cannot be changed on an enabled provider")
+	}
+	if incoming.GroupIDAttribute != stored.GroupIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "groupIDAttribute cannot be changed on an enabled provider")
 	}
 	return nil
 }

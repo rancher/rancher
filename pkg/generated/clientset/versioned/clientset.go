@@ -34,7 +34,7 @@ import (
 )
 
 type Interface interface {
-	Discovery() discovery.DiscoveryInterface
+	Discovery() discovery.DiscoveryInterfaces
 	CatalogV1() catalogv1.CatalogV1Interface
 	OperationV1alpha1() operationv1alpha1.OperationV1alpha1Interface
 	ProvisioningV1() provisioningv1.ProvisioningV1Interface
@@ -85,7 +85,7 @@ func (c *Clientset) UpgradeV1() upgradev1.UpgradeV1Interface {
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterfaces {
 	if c == nil {
 		return nil
 	}

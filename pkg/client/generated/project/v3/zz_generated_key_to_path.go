@@ -5,10 +5,12 @@ const (
 	KeyToPathFieldKey  = "key"
 	KeyToPathFieldMode = "mode"
 	KeyToPathFieldPath = "path"
+	KeyToPathFieldUser = "user"
 )
 
 type KeyToPath struct {
 	Key  string `json:"key,omitempty" yaml:"key,omitempty"`
 	Mode *int64 `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Path string `json:"path,omitempty" yaml:"path,omitempty"`
+	User *int64 `json:"user,omitempty" yaml:"user,omitempty"`
 }

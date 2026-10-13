@@ -87,6 +87,8 @@ type logEntry struct {
 
 	RequestBody  map[string]any `json:"requestBody,omitempty"`
 	ResponseBody map[string]any `json:"responseBody,omitempty"`
+
+	scim bool // Whether the request was marked by [CaptureSCIMRequest].
 }
 
 func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
@@ -150,6 +152,7 @@ func newLog(
 	respTimestamp string,
 	rawBody []byte,
 	userName string,
+	scim *scimRecord,
 ) *logEntry {
 	log := &logEntry{
 		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
@@ -162,6 +165,8 @@ func newLog(
 
 		RequestTimestamp:  reqTimestamp,
 		ResponseTimestamp: respTimestamp,
+
+		scim: scim.marked,
 	}
 
 	if verbosity.Request.Headers {
@@ -169,7 +174,12 @@ func newLog(
 	}
 
 	// Attempt req body prep
-	if verbosity.Request.Body && req.Header.Get("Content-Type") == contentTypeJSON && len(rawBody) > 0 {
+	if log.scim {
+		// SCIM entries log what the handler read, not rawBody.
+		if verbosity.Request.Body && isLoggableJSON(req.Header.Get("Content-Type"), true) {
+			log.RequestBody = scim.requestBody()
+		}
+	} else if verbosity.Request.Body && req.Header.Get("Content-Type") == contentTypeJSON && len(rawBody) > 0 {
 		if err := json.Unmarshal(rawBody, &log.RequestBody); err != nil {
 			log.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
@@ -190,7 +200,7 @@ func newLog(
 }
 
 func (l *logEntry) prepareResponseBody(resHeaders http.Header, body []byte) {
-	if resHeaders.Get("Content-Type") == contentTypeJSON && len(body) > 0 {
+	if isLoggableJSON(resHeaders.Get("Content-Type"), l.scim) && len(body) > 0 {
 		decompressed, err := decompressResponse(resHeaders.Get("Content-Encoding"), body)
 		if err != nil {
 			l.ResponseBody = map[string]any{

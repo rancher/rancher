@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/rancher/internal/http/route"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/customization/aks"
 	"github.com/rancher/rancher/pkg/api/norman/customization/alibaba"
@@ -45,12 +46,13 @@ import (
 func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
-		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
+		connectHandler = scaledContext.Wrangler.TunnelSessions.Handler(scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer)
 		clusterImport  = clusterregistrationtokens.ClusterImport{
 			Clusters:     scaledContext.Management.Clusters(""),
 			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
 			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
-			SecretIndexer: scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
+			SecretIndexer:   scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
+			NamespaceLister: scaledContext.Core.Namespaces("").Controller().Lister(),
 		}
 	)
 
@@ -109,8 +111,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		return h
 	}
 	saAuthed := http.NewServeMux()
-	saAuthed.Handle("/k8s/clusters/{clusterID}/", saAuthedMW(k8sProxy))
-	saAuthed.Handle("/k8s/proxy/{clusterID}/", saAuthedMW(k8sProxy))
+	route.HandleSubtree(saAuthed, "/k8s/clusters/{clusterID}", saAuthedMW(k8sProxy))
+	route.HandleSubtree(saAuthed, "/k8s/proxy/{clusterID}", saAuthedMW(k8sProxy))
 
 	unauthed.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" && parse.MatchNotBrowser(r) {
@@ -130,23 +132,23 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 			http.NotFound(w, r)
 		}
 	})
-	unauthed.Handle("GET /v3/settings/cacerts", managementAPI)
-	unauthed.Handle("GET /v3/settings/first-login", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-banners", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-issues", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-pl", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-brand", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-default-landing", managementAPI)
+	unauthed.Handle("GET /v3/settings/cacerts", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/first-login", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-banners", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-issues", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-pl", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-brand", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-default-landing", readOnly(managementAPI))
 	unauthed.Handle("/rancherversion", version.NewVersionHandler())
 	unauthed.Handle("/v1-k3s-release/", channelserver)
 	unauthed.Handle("/v1-rke2-release/", channelserver)
-	unauthed.Handle("/v1-saml/", saml.AuthHandler())
+	route.HandleSubtree(unauthed, "/v1-saml", saml.AuthHandler())
 	if features.V3Public.Enabled() {
-		unauthed.Handle("/v3-public/", v3PublicAPI)
+		route.HandleSubtree(unauthed, "/v3-public", v3PublicAPI)
 	}
-	unauthed.Handle("/v1-public/", v1PublicAPI)
+	route.HandleSubtree(unauthed, "/v1-public", v1PublicAPI)
 	if features.SCIM.Enabled() {
-		unauthed.Handle(fmt.Sprint(scim.URLPrefix, "/"), scim.NewHandler(scaledContext))
+		route.HandleSubtree(unauthed, scim.URLPrefix, scim.NewHandler(scaledContext))
 	}
 
 	// Setup middlewares for the metrics route.
@@ -190,7 +192,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.Handle("POST /v3/tokenreview", authedMW(&webhook.TokenReviewer{}))
 	authed.Handle(supportconfigs.Endpoint, authedMW(&supportConfigGenerator))
 	authed.Handle("/meta/proxy/", authedMW(metaProxy))
-	authed.Handle("/v3/", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	route.HandleSubtree(authed, "/v3", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v3/identit") || strings.HasPrefix(r.URL.Path, "/v3/token") {
 			tokenAPI.ServeHTTP(w, r)
 		} else {
@@ -214,4 +216,20 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		nextHandler = next
 		return limitingHandler(unauthed)
 	}, nil
+}
+
+// readOnly strips Norman's method-override query params (_method and
+// action=remove) before delegating to h. These routes are served without any
+// authentication or access-control middleware, so they must never be
+// reinterpreted as a write regardless of query string or request body.
+func readOnly(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Has("_method") || q.Get("action") == "remove" {
+			q.Del("_method")
+			q.Del("action")
+			r.URL.RawQuery = q.Encode()
+		}
+		h.ServeHTTP(w, r)
+	})
 }

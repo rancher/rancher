@@ -10,8 +10,10 @@ const (
 	ActiveDirectoryConfigFieldCreated                      = "created"
 	ActiveDirectoryConfigFieldCreatorID                    = "creatorId"
 	ActiveDirectoryConfigFieldDefaultLoginDomain           = "defaultLoginDomain"
+	ActiveDirectoryConfigFieldDisplayName                  = "displayName"
 	ActiveDirectoryConfigFieldEnabled                      = "enabled"
 	ActiveDirectoryConfigFieldGroupDNAttribute             = "groupDNAttribute"
+	ActiveDirectoryConfigFieldGroupIDAttribute             = "groupIDAttribute"
 	ActiveDirectoryConfigFieldGroupMemberMappingAttribute  = "groupMemberMappingAttribute"
 	ActiveDirectoryConfigFieldGroupMemberUserAttribute     = "groupMemberUserAttribute"
 	ActiveDirectoryConfigFieldGroupNameAttribute           = "groupNameAttribute"
@@ -36,6 +38,7 @@ const (
 	ActiveDirectoryConfigFieldUUID                         = "uuid"
 	ActiveDirectoryConfigFieldUserDisabledBitMask          = "userDisabledBitMask"
 	ActiveDirectoryConfigFieldUserEnabledAttribute         = "userEnabledAttribute"
+	ActiveDirectoryConfigFieldUserIDAttribute              = "userIDAttribute"
 	ActiveDirectoryConfigFieldUserLoginAttribute           = "userLoginAttribute"
 	ActiveDirectoryConfigFieldUserLoginFilter              = "userLoginFilter"
 	ActiveDirectoryConfigFieldUserNameAttribute            = "userNameAttribute"
@@ -54,8 +57,10 @@ type ActiveDirectoryConfig struct {
 	Created                      string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                    string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultLoginDomain           string            `json:"defaultLoginDomain,omitempty" yaml:"defaultLoginDomain,omitempty"`
+	DisplayName                  string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled                      bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupDNAttribute             string            `json:"groupDNAttribute,omitempty" yaml:"groupDNAttribute,omitempty"`
+	GroupIDAttribute             string            `json:"groupIDAttribute,omitempty" yaml:"groupIDAttribute,omitempty"`
 	GroupMemberMappingAttribute  string            `json:"groupMemberMappingAttribute,omitempty" yaml:"groupMemberMappingAttribute,omitempty"`
 	GroupMemberUserAttribute     string            `json:"groupMemberUserAttribute,omitempty" yaml:"groupMemberUserAttribute,omitempty"`
 	GroupNameAttribute           string            `json:"groupNameAttribute,omitempty" yaml:"groupNameAttribute,omitempty"`
@@ -80,6 +85,7 @@ type ActiveDirectoryConfig struct {
 	UUID                         string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserDisabledBitMask          int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute         string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
+	UserIDAttribute              string            `json:"userIDAttribute,omitempty" yaml:"userIDAttribute,omitempty"`
 	UserLoginAttribute           string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
 	UserLoginFilter              string            `json:"userLoginFilter,omitempty" yaml:"userLoginFilter,omitempty"`
 	UserNameAttribute            string            `json:"userNameAttribute,omitempty" yaml:"userNameAttribute,omitempty"`

@@ -29,6 +29,7 @@ func newMockUserControllersController(t *testing.T, starter *simpleControllerSta
 type simpleControllerStarter struct {
 	startCalled bool
 	stopCalled  bool
+	stopped     []*v3.Cluster
 }
 
 func (s *simpleControllerStarter) Start(_ context.Context, c *v3.Cluster, _ bool) error {
@@ -39,8 +40,9 @@ func (s *simpleControllerStarter) Start(_ context.Context, c *v3.Cluster, _ bool
 	return nil
 }
 
-func (s *simpleControllerStarter) Stop(_ *v3.Cluster) {
+func (s *simpleControllerStarter) Stop(c *v3.Cluster) {
 	s.stopCalled = true
+	s.stopped = append(s.stopped, c)
 }
 
 func TestAnnotationFailsToBeSaved(t *testing.T) {

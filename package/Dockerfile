@@ -32,8 +32,7 @@ FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
-FROM registry.suse.com/bci/bci-micro:16.0 AS final
-RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
+FROM registry.suse.com/bci/bci-nano:16.0 AS final
 
 # Temporary build stage image
 FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
@@ -45,8 +44,11 @@ RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os
 
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
+    # Early install coreutils-single (smaller size), otherwise coreutils will be transitively installed
+    zypper --installroot /chroot -n in --no-recommends coreutils-single && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates ca-certificates-mozilla findutils xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
+      catatonit curl util-linux ca-certificates findutils xz gzip tar gawk vim-small openssh-clients \
+      ca-certificates-mozilla `# the -prebuilt package in the base image is not sufficient, as we are running update-ca-certificates in the entrypoint`
 
 
 FROM chroot-builder AS chroot-builder-server
@@ -59,14 +61,19 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
       sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+    zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
+    zypper --installroot /chroot -n in -r pkgs kubectl-1.37 && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+# The symbolic link target has no /chroot prefix.
+RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 
 
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.6 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.27.2 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
@@ -78,7 +85,7 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
-# Main stage using bci-micro as the base image
+# Main stage using bci-nano as the base image
 FROM final AS base
 # Copy binaries and configuration files from builder to micro
 COPY --from=chroot-builder-server /chroot/ /
@@ -120,23 +127,23 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.4
-ENV CATTLE_MACHINE_CHECKSUM_amd64=1d961c67b3dfe0d7d7bdcae1256b96277f5948cf48e68a8c2eebd60baf9b9bc7
-ENV CATTLE_MACHINE_CHECKSUM_arm64=8e85bf417ace7a43b0f8b04ceb10065c8d92ddcd295ea9707018956b0202b2c5
-ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.6
+ENV CATTLE_MACHINE_CHECKSUM_amd64=3222b0595ad7d6bfd60b3d36fa332bb9438fef095991223d858e4629b1a83b71
+ENV CATTLE_MACHINE_CHECKSUM_arm64=9d5048f6d9520a2d8d5279681e8b2d5aa583af4aa39af5350159a63895cde315
+ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION=v3.6.12
-ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
-ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
+ENV CATTLE_ETCD_VERSION=v3.7.2
+ENV CATTLE_ETCD_CHECKSUM_amd64=3a3679bc51a4ee9d30bccea1da7cd4fe62c6fc1d2ca1255068d2c53bf3026135
+ENV CATTLE_ETCD_CHECKSUM_arm64=5e3ff99d428fabfcefdc95348f6560d1efe835f7b2d1ab3334fe0831076966b7
 # For displaying Helm version in the UI only.
-ENV CATTLE_HELM_VERSION=v4.2.0
+ENV CATTLE_HELM_VERSION=v4.3.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.9
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=159ec4d8c0d9dae8e322e7ddff64c0a5837c3dc209ae2e345128d4d5cb32279d
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=32a2d906bae047884c30dfd5370f83458edfc77e016b631dcdd46c9f98610951
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.1.0
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=52e1b502e7c63b144ab54ca6d6043562aa5f9ab92d01d3f0d4407952221f9157
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=000db720e9e4524de03b0219a10d9cc0904bff8f65ff37ce6da77577085ecddb
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.5
-ENV CATTLE_WINS_AGENT_CHECKSUM=48ff26bd222f577f8963a019287d5611d5337c3b90f9bd76cc07145b7c5e5dc2
+ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.8
+ENV CATTLE_WINS_AGENT_CHECKSUM=9ce585756f26da0a34e7811f5e88eafa550b680738d80f167e6bf64fc9adf32c
 ENV CATTLE_WINS_AGENT_CHECKSUM_install=551ab55e30f0fad203bedbee819662e198ba567f76cd0d31f71fc07dc309d45a
 ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=af543484cfd5c72556dedc677569e3eec5c537b011f9c96ca8974be6090869f7
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -145,10 +152,10 @@ ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.1
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=bfec66bf7146bd17a1c88b4fa789fe844db23ccf41a0ee210960b2f3663c53cf
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=fd88313c2a7a3374f0e28421499ce3f270594072515dc595b33af60701a9d8f8
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8dbf0013663a08c31d31e8ebff4d94a6ac8fc6e986091356c23bd3ea165e7e01
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.4
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=16747b7b4ee35cbc74f3fb8ea89ee43eb882d216a0b36f26cd2faf840c3f64a6
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=f6b5751f793f2895fa51077c2e7e1d91ce148c768f97481ca1724ff2c3a6e61d
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8df0997866ffa6f913751e083fbebdad3e219238ab1fa5e8ab33cca095a6e834
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -156,7 +163,7 @@ ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE=rancher/system-agent-installer-
 # make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=110.0.0
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=111.0.0
 
 # AKS,EKS,GKE Operator charts versions
 ARG CATTLE_AKS_OPERATOR_VERSION
@@ -198,7 +205,7 @@ RUN case "${ARCH}" in \
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.4-k3s1 \
+COPY --from=rancher/k3s:v1.37.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -357,7 +364,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -479,7 +486,7 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
 ENTRYPOINT ["entrypoint.sh"]
 
 
-# Main stage using bci-micro as the base image.
+# Main stage using bci-nano as the base image.
 FROM final AS agent
 
 # Copy binaries and configuration files from zypper to micro.
@@ -491,22 +498,6 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/mount --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
-
-ARG ARCH
-ENV KUBECTL_VERSION=v1.36.0
-ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
-ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
-
-RUN case "${ARCH}" in \
-        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
-        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
-    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
-    sha256sum -c kubectl.sha256 && \
-    rm kubectl.sha256 && \
-    chmod +x /usr/bin/kubectl
 
 LABEL io.cattle.agent=true
 

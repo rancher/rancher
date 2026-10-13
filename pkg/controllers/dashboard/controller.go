@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/privateregistry"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/webhookchart"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/proxysettings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
@@ -40,6 +41,9 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		clients.Admission.ValidatingWebhookConfiguration(),
 		clients.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, clients)
+	if err := webhookchart.Register(ctx, clients, registryOverride); err != nil {
+		return err
+	}
 	if err := systemcharts.Register(ctx, clients, registryOverride); err != nil {
 		return err
 	}
@@ -72,7 +76,11 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 		// defer registration of controllers which have CAPI clients or use CAPI caches
 		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
-			provisioningv2.Register(ctx, clients, kubeconfigManager)
+			err := provisioningv2.Register(ctx, clients, kubeconfigManager)
+			if err != nil {
+				return fmt.Errorf("failed to register deferred provv2 controllers: %w", err)
+			}
+
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
 					return fmt.Errorf("failed to register deferred capr controllers: %w", err)
@@ -90,6 +98,8 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
 		rkecontrolplanecondition.Register(ctx,
 			"local",
+			"",
+			nil,
 			clients.Catalog.App(),
 			clients.RKE.RKEControlPlane())
 	}

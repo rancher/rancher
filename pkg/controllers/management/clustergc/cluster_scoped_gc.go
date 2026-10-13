@@ -3,11 +3,15 @@ package clustergc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -17,16 +21,22 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// userControllersStoppedRequeue is how often a cluster being removed is checked again while it waits for
+// its user controllers to be reported stopped.
+const userControllersStoppedRequeue = 10 * time.Second
+
 func Register(ctx context.Context, management *config.ManagementContext) {
 	gc := &gcLifecycle{
-		mgmt: management,
+		mgmt:         management,
+		enqueueAfter: management.Management.Clusters("").Controller().EnqueueAfter,
 	}
 
 	management.Management.Clusters("").AddLifecycle(ctx, "cluster-scoped-gc", gc)
 }
 
 type gcLifecycle struct {
-	mgmt *config.ManagementContext
+	mgmt         *config.ManagementContext
+	enqueueAfter func(namespace, name string, after time.Duration)
 }
 
 func (c *gcLifecycle) Create(obj *v3.Cluster) (runtime.Object, error) {
@@ -64,6 +74,15 @@ func cleanFinalizers(clusterName string, object *unstructured.Unstructured, dyna
 // Remove check all objects that have had a cluster scoped finalizer added to them to ensure dangling finalizers do not
 // remain on objects that no longer have handlers associated with them
 func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
+	// The finalizers belong to the cluster's user controllers, which add them back for as long as they
+	// run. Clean up only once the replica that owns the cluster reports them stopped, or the removal moved
+	// on without that report, otherwise objects would be left with finalizers nothing removes, and the
+	// cluster's namespace would never go away.
+	if !util.ConditionConcluded(cluster, apisv3.ClusterConditionUserControllersStopped) {
+		c.enqueueAfter("", cluster.Name, userControllersStoppedRequeue)
+		return cluster, generic.ErrSkip
+	}
+
 	RESTconfig := c.mgmt.RESTConfig
 	// due to the large number of api calls, temporary raise the burst limit in order to reduce client throttling
 	RESTconfig.Burst = 25

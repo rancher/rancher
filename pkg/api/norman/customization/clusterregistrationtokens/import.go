@@ -7,6 +7,8 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -22,9 +24,10 @@ import (
 )
 
 type ClusterImport struct {
-	Clusters      v3.ClusterInterface
-	SecretLister  v1.SecretLister
-	SecretIndexer k8scache.Indexer
+	Clusters        v3.ClusterInterface
+	SecretLister    v1.SecretLister
+	SecretIndexer   k8scache.Indexer
+	NamespaceLister v1.NamespaceLister
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
@@ -50,7 +53,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		return
 	}
 
-	if !ch.isValidToken(clusterID, token) {
+	if !ch.isValidToken(cluster, token) {
 		resp.WriteHeader(http.StatusBadRequest)
 		resp.Write([]byte("cluster not found or invalid token"))
 		return
@@ -111,7 +114,10 @@ func validateAuthImage(authImage string) error {
 	return err
 }
 
-func (ch *ClusterImport) isValidToken(clusterID, token string) bool {
+// isValidToken reports whether token registers with cluster. The token is checked against cluster itself,
+// the cluster the manifest is rendered for, and not against a cluster looked up by name again.
+func (ch *ClusterImport) isValidToken(cluster *apimgmtv3.Cluster, token string) bool {
+	clusterID := cluster.Name
 	objs, err := ch.SecretIndexer.ByIndex(mcmauthorizer.SecretTokenIndex, token)
 	if err != nil {
 		logrus.Errorf("[cluster-registration-tokens] CRT token secret index lookup failed: %v", err)
@@ -119,9 +125,24 @@ func (ch *ClusterImport) isValidToken(clusterID, token string) bool {
 	}
 	for _, obj := range objs {
 		secret, ok := obj.(*corev1.Secret)
-		if ok && secret.Namespace == clusterID {
+		if !ok || secret.Namespace != clusterID {
+			continue
+		}
+		validated, stale, err := clusterregistrationtoken.TokenSecretCluster(secret, ch.getNamespace, func(string) (*apimgmtv3.Cluster, error) {
+			return cluster, nil
+		})
+		if err != nil {
+			logrus.Errorf("[cluster-registration-tokens] %v", err)
+			return false
+		}
+		if !stale && validated != nil {
 			return true
 		}
+		logrus.Infof("[cluster-registration-tokens] rejecting registration token that belongs to a previous cluster named %s", clusterID)
 	}
 	return false
+}
+
+func (ch *ClusterImport) getNamespace(name string) (*corev1.Namespace, error) {
+	return ch.NamespaceLister.Get("", name)
 }

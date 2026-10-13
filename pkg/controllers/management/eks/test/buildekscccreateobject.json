@@ -59,6 +59,7 @@
     "generatedNodeRole": "",
     "managedLaunchTemplateID": "",
     "managedLaunchTemplateVersions": null,
+    "message": "",
     "networkFieldsSource": "",
     "phase": "",
     "securityGroups": null,

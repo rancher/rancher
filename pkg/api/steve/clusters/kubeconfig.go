@@ -39,6 +39,7 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		apiRequest.WriteError(validation.Unauthorized)
 		return
 	}
+
 	var tokenKey string
 	var err error
 	generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
@@ -47,6 +48,20 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		if err != nil {
 			apiRequest.WriteError(err)
 			return
+		}
+	}
+
+	var execUser *kubeconfig.ExecUser
+	execGetToken := strings.EqualFold(settings.KubeconfigExecGetToken.Get(), "true")
+	if !generateToken && execGetToken {
+		authToken, err := k.authToken.TokenFromRequest(req)
+		if err != nil {
+			apiRequest.WriteError(err)
+			return
+		}
+		execUser = &kubeconfig.ExecUser{
+			ID:           userName.GetName(),
+			AuthProvider: authToken.GetAuthProvider(),
 		}
 	}
 
@@ -61,7 +76,7 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			host = apiRequest.Request.Host
 		}
 	}
-	cfg, err := kubeconfig.ForTokenBased(apiRequest.Name, apiRequest.Name, host, tokenKey)
+	cfg, err := kubeconfig.ForTokenBased(apiRequest.Name, apiRequest.Name, host, tokenKey, execUser)
 	if err != nil {
 		apiRequest.WriteError(err)
 		return

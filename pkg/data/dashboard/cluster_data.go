@@ -4,16 +4,18 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
+func addLocalCluster(embedded bool, clusters mgmtcontrollers.ClusterClient, namespaces corecontrollers.NamespaceClient) error {
 	c := &v32.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
@@ -35,12 +37,12 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 
 	var err error
 	err = wait.PollImmediateInfinite(100*time.Millisecond, func() (bool, error) {
-		temporaryCluster, err := wrangler.Mgmt.Cluster().Create(c)
+		temporaryCluster, err := clusters.Create(c)
 		if err == nil {
 			c = temporaryCluster
 			return true, nil
 		} else if apierrors.IsAlreadyExists(err) {
-			temporaryCluster, err = wrangler.Mgmt.Cluster().Get("local", v1.GetOptions{})
+			temporaryCluster, err = clusters.Get("local", v1.GetOptions{})
 			if err == nil {
 				c = temporaryCluster
 				return true, nil
@@ -63,13 +65,20 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 				Status: corev1.ConditionTrue,
 			},
 		}
-		c, err = wrangler.Mgmt.Cluster().UpdateStatus(c)
+		c, err = clusters.UpdateStatus(c)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = wrangler.Core.Namespace().Create(&corev1.Namespace{
+	// The "local" namespace is the cluster namespace of the local cluster and holds its
+	// namespaced management.cattle.io resources. A downstream cluster (MCMAgent enabled)
+	// does not need this namespace.
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
+
+	_, err = namespaces.Create(&corev1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
 			OwnerReferences: []v1.OwnerReference{
@@ -98,8 +107,8 @@ func hasReadyCondition(conditions []v32.ClusterCondition) bool {
 	return false
 }
 
-func removeLocalCluster(wrangler *wrangler.Context) error {
+func removeLocalCluster(clusters mgmtcontrollers.ClusterClient) error {
 	// Ignore error
-	_ = wrangler.Mgmt.Cluster().Delete("local", &v1.DeleteOptions{})
+	_ = clusters.Delete("local", &v1.DeleteOptions{})
 	return nil
 }

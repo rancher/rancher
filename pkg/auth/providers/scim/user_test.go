@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func TestBoolUnmarshalJSON(t *testing.T) {
@@ -90,11 +93,11 @@ func TestListUsersPagination(t *testing.T) {
 
 	// Create 5 users with names that will sort as: u-aaa, u-bbb, u-ccc, u-ddd, u-eee.
 	users := []*v3.User{
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-eee"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-ddd"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}, PrincipalIDs: []string{provider + "_user://u-ccc"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}, PrincipalIDs: []string{provider + "_user://u-aaa"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-eee"}, PrincipalIDs: []string{provider + "_user://u-eee"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}, PrincipalIDs: []string{provider + "_user://u-bbb"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-ddd"}, PrincipalIDs: []string{provider + "_user://u-ddd"}},
 	}
 
 	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -235,7 +238,8 @@ func TestListUsersPaginationConsistency(t *testing.T) {
 	users := make([]*v3.User, 10)
 	for i := 0; i < 10; i++ {
 		users[i] = &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("u-%03d", i)},
+			ObjectMeta:   metav1.ObjectMeta{Name: fmt.Sprintf("u-%03d", i)},
+			PrincipalIDs: []string{provider + "_user://" + fmt.Sprintf("u-%03d", i)},
 		}
 	}
 
@@ -313,9 +317,9 @@ func TestListUsersWithFilter(t *testing.T) {
 	provider := "okta"
 
 	users := []*v3.User{
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}, PrincipalIDs: []string{provider + "_user://u-aaa"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}, PrincipalIDs: []string{provider + "_user://u-bbb"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}, PrincipalIDs: []string{provider + "_user://u-ccc"}},
 	}
 
 	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -369,9 +373,9 @@ func TestListUsersWithExternalIdFilter(t *testing.T) {
 	provider := "azuread"
 
 	users := []*v3.User{
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}, PrincipalIDs: []string{provider + "_user://u-aaa"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}, PrincipalIDs: []string{provider + "_user://u-bbb"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}, PrincipalIDs: []string{provider + "_user://u-ccc"}},
 	}
 
 	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -422,12 +426,12 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		users := []*v3.User{
-			{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}, PrincipalIDs: []string{provider + "_user://u-aaa"}},
 			{
 				ObjectMeta:   metav1.ObjectMeta{Name: "u-system"},
 				PrincipalIDs: []string{"system://local"}, // System user.
 			},
-			{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}, PrincipalIDs: []string{provider + "_user://u-bbb"}},
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -525,8 +529,9 @@ func TestGetUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		userMGR := mocks.NewMockManager(ctrl)
@@ -586,8 +591,9 @@ func TestGetUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &disabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &disabled,
 		}, nil)
 
 		userMGR := mocks.NewMockManager(ctrl)
@@ -694,8 +700,9 @@ func TestGetUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		userMGR := mocks.NewMockManager(ctrl)
@@ -728,8 +735,9 @@ func TestGetUser(t *testing.T) {
 		enabled := true
 
 		user := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			Enabled:      &enabled,
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
 		}
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(user, nil).AnyTimes()
@@ -773,8 +781,9 @@ func TestGetUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil).AnyTimes()
 
 		attr := &v3.UserAttribute{
@@ -825,13 +834,13 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "John Doe").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-abc123"},
+			PrincipalIDs: []string{"local://u-abc123", provider + "_user://john.doe"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			[]v3.Principal{},
 			map[string][]string{
 				"username":    {"john.doe"},
 				"externalid":  {"ext-12345"},
@@ -898,17 +907,18 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser("okta_user://jane.doe", "jane.doe").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-def456"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-def456"},
+			PrincipalIDs: []string{"local://u-def456", provider + "_user://jane.doe"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-def456",
 			provider,
-			[]v3.Principal{},
 			map[string][]string{
 				"username":    {"jane.doe"},
 				"externalid":  {"ext-67890"},
 				"principalid": {"okta_user://jane.doe"},
+				"email":       {""},
 			},
 		).Return(nil)
 
@@ -944,7 +954,8 @@ func TestCreateUser(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-existing"},
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-existing"},
+			PrincipalIDs: []string{"local://u-existing", provider + "_user://john.doe"},
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1106,13 +1117,13 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "john.doe").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-abc123"},
+			PrincipalIDs: []string{"local://u-abc123", provider + "_user://john.doe"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			gomock.Any(),
 			gomock.Any(),
 		).Return(fmt.Errorf("failed to create attributes"))
 
@@ -1151,13 +1162,13 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "john.doe").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-abc123"},
+			PrincipalIDs: []string{"local://u-abc123", provider + "_user://john.doe"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			gomock.Any(),
 			gomock.Any(),
 		).Return(nil)
 
@@ -1188,9 +1199,10 @@ func TestCreateUser(t *testing.T) {
 		disabled := false
 
 		disabledUser := &v3.User{
-			ObjectMeta:  metav1.ObjectMeta{Name: disabledUserID},
-			Enabled:     &disabled,
-			DisplayName: "Old Name",
+			ObjectMeta:   metav1.ObjectMeta{Name: disabledUserID},
+			PrincipalIDs: []string{"local://" + disabledUserID, provider + "_user://ext-shared"},
+			Enabled:      &disabled,
+			DisplayName:  "Old Name",
 		}
 
 		existingAttr := &v3.UserAttribute{
@@ -1229,8 +1241,8 @@ func TestCreateUser(t *testing.T) {
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1272,9 +1284,10 @@ func TestCreateUser(t *testing.T) {
 		disabled := false
 
 		disabledUser := &v3.User{
-			ObjectMeta:  metav1.ObjectMeta{Name: disabledUserID},
-			Enabled:     &disabled,
-			DisplayName: "Old Name",
+			ObjectMeta:   metav1.ObjectMeta{Name: disabledUserID},
+			PrincipalIDs: []string{"local://" + disabledUserID, provider + "_user://ext-shared"},
+			Enabled:      &disabled,
+			DisplayName:  "Old Name",
 		}
 
 		existingAttr := &v3.UserAttribute{
@@ -1312,8 +1325,8 @@ func TestCreateUser(t *testing.T) {
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1347,8 +1360,9 @@ func TestCreateUser(t *testing.T) {
 
 		disabled := false
 		disabledUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-disabled"},
-			Enabled:    &disabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-disabled"},
+			PrincipalIDs: []string{"local://u-disabled", provider + "_user://old.name"},
+			Enabled:      &disabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1369,10 +1383,11 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser(provider+"_user://new.name", "new.name").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-newuser"},
+			PrincipalIDs: []string{"local://u-newuser", provider + "_user://new.name"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1404,7 +1419,8 @@ func TestCreateUser(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		activeUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-active"},
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-active"},
+			PrincipalIDs: []string{"local://u-active", provider + "_user://ext-shared"},
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1424,8 +1440,8 @@ func TestCreateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1452,7 +1468,8 @@ func TestCreateUser(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-other"},
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-other"},
+			PrincipalIDs: []string{"local://u-other", provider + "_user://some.user"},
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1472,17 +1489,18 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser(gomock.Any(), gomock.Any()).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-newuser"},
+			PrincipalIDs: []string{"local://u-newuser", provider + "_user://new.user"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userMGR:            userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1504,7 +1522,8 @@ func TestCreateUser(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-existing"},
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-existing"},
+			PrincipalIDs: []string{"local://u-existing", provider + "_user://other.user"},
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1524,10 +1543,11 @@ func TestCreateUser(t *testing.T) {
 		enabled := true
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureUser("okta_user://new.user", "new.user").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-newuser"},
+			PrincipalIDs: []string{"local://u-newuser", provider + "_user://new.user"},
+			Enabled:      &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1549,6 +1569,226 @@ func TestCreateUser(t *testing.T) {
 	})
 }
 
+func TestCreateUserMatchingExternalID(t *testing.T) {
+	const (
+		provider   = "okta"
+		userID     = "u-alice"
+		externalID = "ext-alice"
+	)
+
+	tests := []struct {
+		name            string
+		mode            string
+		enabled         bool
+		loggedIn        bool
+		principalID     string
+		storedUserName  string
+		payloadUserName string
+		wantCode        int
+		wantDetail      string
+		wantEnsure      string
+		wantReprovision bool
+		wantActive      bool
+	}{
+		{
+			name:            "externalId mode, active user who logged in with a different login name",
+			mode:            scimconfig.UserIDExternalID,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice.login",
+			payloadUserName: "alice",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://" + externalID,
+			wantActive:      true,
+		},
+		{
+			name:            "userName mode, active user who logged in with a different login name",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice.login",
+			payloadUserName: "alice",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://alice",
+			wantActive:      true,
+		},
+		{
+			name:            "externalId mode, active user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDExternalID,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "User with username alice already exists",
+		},
+		{
+			name:            "userName mode, active user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "User with username alice already exists",
+		},
+		{
+			name:            "externalId mode, active user who never logged in, new userName",
+			mode:            scimconfig.UserIDExternalID,
+			enabled:         true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice",
+			payloadUserName: "alice.new",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "Active user with externalId " + externalID + " already exists",
+		},
+		{
+			name:            "userName mode, active user who never logged in, new userName",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			principalID:     provider + "_user://alice.new",
+			storedUserName:  "alice",
+			payloadUserName: "alice.new",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "Active user with externalId " + externalID + " already exists",
+		},
+		{
+			name:            "userName mode, active user who logged in, userName differs from the login name and the principal",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice.login",
+			payloadUserName: "alice.other",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "Active user with externalId " + externalID + " already exists",
+		},
+		{
+			name:            "externalId mode, disabled user who logged in with a different login name",
+			mode:            scimconfig.UserIDExternalID,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice.login",
+			payloadUserName: "alice",
+			wantCode:        http.StatusOK,
+			wantReprovision: true,
+			wantActive:      true,
+		},
+		{
+			name:            "externalId mode, disabled user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDExternalID,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusOK,
+			wantReprovision: true,
+			wantActive:      true,
+		},
+		{
+			name:            "userName mode, disabled user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDUserName,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://alice",
+			wantActive:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			existingUser := &v3.User{
+				ObjectMeta:   metav1.ObjectMeta{Name: userID},
+				Enabled:      ptr.To(tt.enabled),
+				PrincipalIDs: []string{tt.principalID, "local://" + userID},
+			}
+			existingAttr := &v3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: userID},
+				ExtraByProvider: map[string]map[string][]string{
+					provider: {
+						"principalid": {tt.principalID},
+						"username":    {tt.storedUserName},
+						"externalid":  {externalID},
+						"email":       {"alice@example.com"},
+					},
+				},
+			}
+			if tt.loggedIn {
+				existingAttr.LastLogin = &metav1.Time{Time: time.Now()}
+			}
+
+			userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+			userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+			userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+			userMGR := mocks.NewMockManager(ctrl)
+			if tt.wantEnsure != "" {
+				userMGR.EXPECT().EnsureUser(tt.wantEnsure, tt.payloadUserName).Return(existingUser, nil)
+				userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(userID, provider, gomock.Any()).Return(nil)
+			}
+
+			userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+			userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+			if tt.wantReprovision {
+				userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+					return attr, nil
+				})
+				userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.True(t, *u.Enabled)
+					return u, nil
+				})
+			}
+
+			srv := &SCIMServer{
+				userCache:          userCache,
+				users:              userClient,
+				userAttributeCache: userAttributeCache,
+				userAttributes:     userAttrClient,
+				userMGR:            userMGR,
+				getConfig: func(string) scimconfig.Config {
+					return scimconfig.Config{UserIDAttribute: tt.mode}
+				},
+			}
+
+			body := fmt.Sprintf(`{
+				"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+				"userName": %q,
+				"externalId": %q
+			}`, tt.payloadUserName, externalID)
+			r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+			r.SetPathValue("provider", provider)
+			w := httptest.NewRecorder()
+
+			srv.CreateUser(w, r)
+			require.Equal(t, tt.wantCode, w.Code, w.Body.String())
+
+			if tt.wantDetail != "" {
+				var resp Error
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, tt.wantDetail, resp.Detail)
+				return
+			}
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, userID, resp["id"])
+			assert.Equal(t, tt.wantActive, resp["active"])
+		})
+	}
+}
+
 func TestUpdateUser(t *testing.T) {
 	provider := "okta"
 
@@ -1559,8 +1799,9 @@ func TestUpdateUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1590,8 +1831,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:      userCache,
 			userMGR:        userMGR,
 			userAttributes: userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1633,8 +1874,9 @@ func TestUpdateUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -1665,8 +1907,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:      userCache,
 			userAttributes: userAttrClient,
 			userMGR:        userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1698,8 +1940,9 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -1749,8 +1992,9 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -1768,8 +2012,8 @@ func TestUpdateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache: userCache,
 			userMGR:   userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1802,8 +2046,9 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -1860,8 +2105,9 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &disabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &disabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -1918,8 +2164,9 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -1993,15 +2240,8 @@ func TestUpdateUser(t *testing.T) {
 			PrincipalIDs: []string{"system://local"},
 		}, nil)
 
-		userMGR := mocks.NewMockManager(ctrl)
-		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
-			ObjectMeta:      metav1.ObjectMeta{Name: userID},
-			ExtraByProvider: map[string]map[string][]string{},
-		}, false, nil)
-
 		srv := &SCIMServer{
 			userCache: userCache,
-			userMGR:   userMGR,
 		}
 
 		body := `{
@@ -2018,7 +2258,7 @@ func TestUpdateUser(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
-	t.Run("cannot deactivate default admin", func(t *testing.T) {
+	t.Run("default admin returns not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		userID := "u-admin"
@@ -2026,26 +2266,14 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Username:   "admin",
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			Username:     "admin",
+			PrincipalIDs: []string{"local://u-admin", provider + "_user://admin"}, // Linked through test-and-enable.
+			Enabled:      &enabled,
 		}, nil)
-
-		existingAttr := &v3.UserAttribute{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			ExtraByProvider: map[string]map[string][]string{
-				provider: {
-					"username":   {"admin"},
-					"externalid": {"ext-admin"},
-				},
-			},
-		}
-		userMGR := mocks.NewMockManager(ctrl)
-		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
 			userCache: userCache,
-			userMGR:   userMGR,
 			getConfig: testDefaultGetConfig,
 		}
 
@@ -2061,13 +2289,13 @@ func TestUpdateUser(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
-		require.Equal(t, http.StatusConflict, w.Code)
+		require.Equal(t, http.StatusNotFound, w.Code)
 
 		var resp Error
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Contains(t, resp.Schemas, errorSchemaID)
-		assert.Equal(t, http.StatusConflict, resp.Status)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -2127,8 +2355,9 @@ func TestUpdateUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -2154,8 +2383,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:      userCache,
 			userMGR:        userMGR,
 			userAttributes: userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -2182,8 +2411,9 @@ func TestUpdateUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2231,12 +2461,14 @@ func TestUpdateUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 		otherUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: otherUserID},
+			PrincipalIDs: []string{"local://" + otherUserID, provider + "_user://" + otherUserID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -2294,12 +2526,14 @@ func TestUpdateUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 		otherUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: otherUserID},
+			PrincipalIDs: []string{"local://" + otherUserID, provider + "_user://" + otherUserID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -2331,8 +2565,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userMGR:            userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -2362,7 +2596,8 @@ func TestDeleteUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
 		}, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
@@ -2434,15 +2669,16 @@ func TestDeleteUser(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
-	t.Run("cannot delete default admin", func(t *testing.T) {
+	t.Run("default admin returns not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		userID := "u-admin"
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Username:   "admin",
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			Username:     "admin",
+			PrincipalIDs: []string{"local://u-admin", provider + "_user://admin"}, // Linked through test-and-enable.
 		}, nil)
 
 		srv := &SCIMServer{
@@ -2455,13 +2691,13 @@ func TestDeleteUser(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
-		require.Equal(t, http.StatusConflict, w.Code)
+		require.Equal(t, http.StatusNotFound, w.Code)
 
 		var resp Error
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Contains(t, resp.Schemas, errorSchemaID)
-		assert.Equal(t, http.StatusConflict, resp.Status)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("error deleting user", func(t *testing.T) {
@@ -2471,7 +2707,8 @@ func TestDeleteUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
 		}, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
@@ -2524,8 +2761,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2587,8 +2825,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &disabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &disabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2642,8 +2881,9 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -2701,8 +2941,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2761,8 +3002,9 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -2818,9 +3060,10 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta:  metav1.ObjectMeta{Name: userID},
-			DisplayName: "Old Name",
-			Enabled:     &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			DisplayName:  "Old Name",
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2868,8 +3111,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2917,8 +3161,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -2970,8 +3215,9 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -3000,8 +3246,8 @@ func TestPatchUser(t *testing.T) {
 			userCache:      userCache,
 			userMGR:        userMGR,
 			userAttributes: userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3031,8 +3277,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3078,8 +3325,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3120,8 +3368,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3139,8 +3388,8 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache: userCache,
 			userMGR:   userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3171,8 +3420,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3190,8 +3440,8 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache: userCache,
 			userMGR:   userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3221,8 +3471,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3310,7 +3561,7 @@ func TestPatchUser(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
-	t.Run("cannot deactivate default admin", func(t *testing.T) {
+	t.Run("default admin returns not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		userID := "u-admin"
@@ -3318,25 +3569,14 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Username:   "admin",
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			Username:     "admin",
+			PrincipalIDs: []string{"local://u-admin", provider + "_user://admin"}, // Linked through test-and-enable.
+			Enabled:      &enabled,
 		}, nil)
-
-		existingAttr := &v3.UserAttribute{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			ExtraByProvider: map[string]map[string][]string{
-				provider: {
-					"username": {"admin"},
-				},
-			},
-		}
-		userMGR := mocks.NewMockManager(ctrl)
-		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
 			userCache: userCache,
-			userMGR:   userMGR,
 			getConfig: testDefaultGetConfig,
 		}
 
@@ -3350,7 +3590,13 @@ func TestPatchUser(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
-		require.Equal(t, http.StatusConflict, w.Code)
+		require.Equal(t, http.StatusNotFound, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("unsupported operation", func(t *testing.T) {
@@ -3361,8 +3607,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3403,8 +3650,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3445,8 +3693,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		srv := &SCIMServer{
@@ -3471,8 +3720,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3512,8 +3762,9 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -3563,8 +3814,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3609,8 +3861,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3663,8 +3916,9 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -3722,8 +3976,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3765,8 +4020,9 @@ func TestPatchUser(t *testing.T) {
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().Get(userID).Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}, nil)
 
 		existingAttr := &v3.UserAttribute{
@@ -3825,12 +4081,14 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 		otherUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: otherUserID},
+			PrincipalIDs: []string{"local://" + otherUserID, provider + "_user://" + otherUserID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -3886,12 +4144,14 @@ func TestPatchUser(t *testing.T) {
 		enabled := true
 
 		existingUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: userID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"local://" + userID, provider + "_user://" + userID},
+			Enabled:      &enabled,
 		}
 		otherUser := &v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
-			Enabled:    &enabled,
+			ObjectMeta:   metav1.ObjectMeta{Name: otherUserID},
+			PrincipalIDs: []string{"local://" + otherUserID, provider + "_user://" + otherUserID},
+			Enabled:      &enabled,
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -3923,8 +4183,8 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userMGR:            userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3940,4 +4200,516 @@ func TestPatchUser(t *testing.T) {
 		srv.PatchUser(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
 	})
+}
+
+func TestUserHandlersOwnership(t *testing.T) {
+	notOwned := []string{"u-other", "u-othermember", "u-stale", "u-local", "u-admin", "u-system", "u-missing"}
+	owned := []string{"u-owned", "u-loginowned", "u-loginpassword", "u-multi", "u-locallinked", "u-locallinkednm", "u-passwordfield", "u-usernameonly"}
+
+	// putPayload deactivates the user and keeps its userName and externalId.
+	putPayload := func(f *ownershipFixtures, id string) map[string]any {
+		userName, externalID := "someone", ""
+		if attr, ok := f.attrs[id]; ok && first(attr.ExtraByProvider[providerA]["username"]) != "" {
+			userName = first(attr.ExtraByProvider[providerA]["username"])
+			externalID = first(attr.ExtraByProvider[providerA]["externalid"])
+		}
+		return map[string]any{
+			"schemas":    []string{userSchemaID},
+			"userName":   userName,
+			"externalId": externalID,
+			"active":     false,
+		}
+	}
+	patchPayload := map[string]any{
+		"schemas":    []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+		"Operations": []map[string]any{{"op": "replace", "path": "active", "value": false}},
+	}
+
+	for _, id := range notOwned {
+		t.Run("GET "+id+" returns not found", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			srv := newOwnershipFixtures().server(ctrl)
+
+			w := httptest.NewRecorder()
+			srv.GetUser(w, newSCIMRequest(t, http.MethodGet, providerA, userEndpoint, id, nil))
+			require.Equal(t, http.StatusNotFound, w.Code)
+
+			var resp Error
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "User "+id+" not found", resp.Detail)
+		})
+
+		t.Run("PUT "+id+" returns not found and writes nothing", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+
+			w := httptest.NewRecorder()
+			srv.UpdateUser(w, newSCIMRequest(t, http.MethodPut, providerA, userEndpoint, id, putPayload(f, id)))
+			require.Equal(t, http.StatusNotFound, w.Code)
+
+			var resp Error
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "User "+id+" not found", resp.Detail)
+		})
+
+		t.Run("PATCH "+id+" returns not found and writes nothing", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			srv := newOwnershipFixtures().server(ctrl)
+
+			w := httptest.NewRecorder()
+			srv.PatchUser(w, newSCIMRequest(t, http.MethodPatch, providerA, userEndpoint, id, patchPayload))
+			require.Equal(t, http.StatusNotFound, w.Code)
+
+			var resp Error
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "User "+id+" not found", resp.Detail)
+		})
+
+		t.Run("DELETE "+id+" returns not found and writes nothing", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			srv := newOwnershipFixtures().server(ctrl)
+
+			w := httptest.NewRecorder()
+			srv.DeleteUser(w, newSCIMRequest(t, http.MethodDelete, providerA, userEndpoint, id, nil))
+			require.Equal(t, http.StatusNotFound, w.Code)
+
+			var resp Error
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "User "+id+" not found", resp.Detail)
+		})
+	}
+
+	for _, id := range owned {
+		t.Run("GET "+id+" succeeds", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute(id).DoAndReturn(f.ensureAndGetUserAttribute)
+
+			w := httptest.NewRecorder()
+			srv.GetUser(w, newSCIMRequest(t, http.MethodGet, providerA, userEndpoint, id, nil))
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("PUT "+id+" deactivates the user", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute(id).DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.users.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+				assert.False(t, user.GetEnabled())
+				return user, nil
+			})
+			if _, ok := f.attrs[id]; !ok {
+				// The user has no UserAttribute, so the PUT sets a userName and creates one. Only
+				// externalId mode lets the userName change.
+				srv.getConfig = externalIDUserConfig
+				srv.userAttributes.EXPECT().Create(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+					return attr, nil
+				})
+			}
+
+			w := httptest.NewRecorder()
+			srv.UpdateUser(w, newSCIMRequest(t, http.MethodPut, providerA, userEndpoint, id, putPayload(f, id)))
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("PATCH "+id+" deactivates the user", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute(id).DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.users.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+				assert.False(t, user.GetEnabled())
+				return user, nil
+			})
+
+			w := httptest.NewRecorder()
+			srv.PatchUser(w, newSCIMRequest(t, http.MethodPatch, providerA, userEndpoint, id, patchPayload))
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("DELETE "+id+" deletes the user", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			srv := newOwnershipFixtures().server(ctrl)
+			srv.users.EXPECT().Delete(id, gomock.Any()).Return(nil)
+
+			w := httptest.NewRecorder()
+			srv.DeleteUser(w, newSCIMRequest(t, http.MethodDelete, providerA, userEndpoint, id, nil))
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+	}
+
+	t.Run("GET through another provider's endpoint returns not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		w := httptest.NewRecorder()
+		srv.GetUser(w, newSCIMRequest(t, http.MethodGet, providerB, userEndpoint, "u-owned", nil))
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("GET of a user of both providers through the other provider's endpoint succeeds", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-multi").DoAndReturn(f.ensureAndGetUserAttribute)
+
+		w := httptest.NewRecorder()
+		srv.GetUser(w, newSCIMRequest(t, http.MethodGet, providerB, userEndpoint, "u-multi", nil))
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("DELETE of a user of both providers through the other provider's endpoint deletes the user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+		srv.users.EXPECT().Delete("u-multi", gomock.Any()).Return(nil)
+
+		w := httptest.NewRecorder()
+		srv.DeleteUser(w, newSCIMRequest(t, http.MethodDelete, providerB, userEndpoint, "u-multi", nil))
+		assert.Equal(t, http.StatusNoContent, w.Code)
+	})
+}
+
+func TestListUsersOwnership(t *testing.T) {
+	list := func(t *testing.T, query string) listResponse {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		r := newSCIMRequest(t, http.MethodGet, providerA, userEndpoint, "", nil)
+		r.URL.RawQuery = query
+		w := httptest.NewRecorder()
+		srv.ListUsers(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp listResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		return resp
+	}
+	ids := func(resp listResponse) []string {
+		var ids []string
+		for _, resource := range resp.Resources {
+			ids = append(ids, resource.(map[string]any)["id"].(string))
+		}
+		return ids
+	}
+
+	// The owned users with provider A extras. u-usernameonly is owned but has no UserAttribute.
+	ownedIDs := []string{"u-locallinked", "u-locallinkednm", "u-loginowned", "u-loginpassword", "u-multi", "u-owned", "u-passwordfield"}
+
+	t.Run("returns owned users only", func(t *testing.T) {
+		resp := list(t, "")
+		assert.Equal(t, len(ownedIDs), resp.TotalResults)
+		assert.Equal(t, ownedIDs, ids(resp))
+	})
+
+	t.Run("the userName filter finds a local user who linked the provider", func(t *testing.T) {
+		resp := list(t, "filter=userName%20eq%20%22linked.user%22")
+		assert.Equal(t, 1, resp.TotalResults)
+		assert.Equal(t, []string{"u-locallinked"}, ids(resp))
+	})
+
+	t.Run("the externalId filter finds a local user who linked the provider", func(t *testing.T) {
+		resp := list(t, "filter=externalId%20eq%20%22ext-u3%22")
+		assert.Equal(t, 1, resp.TotalResults)
+		assert.Equal(t, []string{"u-locallinked"}, ids(resp))
+	})
+
+	t.Run("the userName filter doesn't find a local user by a stale extra", func(t *testing.T) {
+		resp := list(t, "filter=userName%20eq%20%22local.user%22")
+		assert.Equal(t, 0, resp.TotalResults)
+		assert.Empty(t, resp.Resources)
+	})
+
+	t.Run("the userName filter doesn't find the default admin", func(t *testing.T) {
+		resp := list(t, "filter=userName%20eq%20%22admin.user%22")
+		assert.Equal(t, 0, resp.TotalResults)
+		assert.Empty(t, resp.Resources)
+	})
+
+	t.Run("the externalId filter doesn't find the default admin", func(t *testing.T) {
+		resp := list(t, "filter=externalId%20eq%20%22ext-u8%22")
+		assert.Equal(t, 0, resp.TotalResults)
+		assert.Empty(t, resp.Resources)
+	})
+
+	t.Run("pages count owned users and don't skip or repeat users", func(t *testing.T) {
+		var all []string
+		for _, startIndex := range []string{"1", "4", "7"} {
+			resp := list(t, "count=3&startIndex="+startIndex)
+			assert.Equal(t, len(ownedIDs), resp.TotalResults)
+			all = append(all, ids(resp)...)
+		}
+		assert.Equal(t, ownedIDs, all)
+	})
+}
+
+func TestCheckUserConflictOwnership(t *testing.T) {
+	// u-owned takes an externalId or userName that one other user holds for provider A.
+	// The default admin isn't owned, so its values aren't a conflict. u-locallinked is owned, so
+	// its values are.
+	tests := []struct {
+		name       string
+		getConfig  func(string) scimconfig.Config
+		put        map[string]any
+		patch      map[string]any
+		wantStatus int
+	}{
+		{
+			name:       "externalId of the default admin",
+			getConfig:  testDefaultGetConfig,
+			put:        map[string]any{"userName": "owned.user", "externalId": "ext-u8", "active": true},
+			patch:      map[string]any{"op": "replace", "path": "externalId", "value": "ext-u8"},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "userName of the default admin",
+			getConfig:  externalIDUserConfig,
+			put:        map[string]any{"userName": "admin.user", "externalId": "ext-u1", "active": true},
+			patch:      map[string]any{"op": "replace", "path": "userName", "value": "admin.user"},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "externalId of a local user who linked the provider",
+			getConfig:  testDefaultGetConfig,
+			put:        map[string]any{"userName": "owned.user", "externalId": "ext-u3", "active": true},
+			patch:      map[string]any{"op": "replace", "path": "externalId", "value": "ext-u3"},
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name:       "userName of a local user who linked the provider",
+			getConfig:  externalIDUserConfig,
+			put:        map[string]any{"userName": "linked.user", "externalId": "ext-u1", "active": true},
+			patch:      map[string]any{"op": "replace", "path": "userName", "value": "linked.user"},
+			wantStatus: http.StatusConflict,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("PUT with the "+tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+			srv.getConfig = tt.getConfig
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-owned").DoAndReturn(f.ensureAndGetUserAttribute)
+			if tt.wantStatus == http.StatusOK {
+				srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+					return attr, nil
+				})
+			}
+
+			w := httptest.NewRecorder()
+			srv.UpdateUser(w, newSCIMRequest(t, http.MethodPut, providerA, userEndpoint, "u-owned", tt.put))
+			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+
+		t.Run("PATCH with the "+tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+			srv.getConfig = tt.getConfig
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-owned").DoAndReturn(f.ensureAndGetUserAttribute)
+			if tt.wantStatus == http.StatusOK {
+				srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+					return attr, nil
+				})
+			}
+
+			payload := map[string]any{
+				"schemas":    []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+				"Operations": []map[string]any{tt.patch},
+			}
+			w := httptest.NewRecorder()
+			srv.PatchUser(w, newSCIMRequest(t, http.MethodPatch, providerA, userEndpoint, "u-owned", payload))
+			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+	}
+}
+
+func TestCreateUserOwnership(t *testing.T) {
+	createPayload := func(userName, externalID string) map[string]any {
+		return map[string]any{
+			"schemas":    []string{userSchemaID},
+			"userName":   userName,
+			"externalId": externalID,
+			"active":     true,
+		}
+	}
+	assertNotManagedConflict := func(t *testing.T, w *httptest.ResponseRecorder, name string) {
+		t.Helper()
+		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "User "+name+" can't be managed by SCIM", resp.Detail)
+	}
+	newUser := func(principal string) *v3.User {
+		return &v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-new"},
+			PrincipalIDs: []string{"local://u-new", principal},
+		}
+	}
+
+	t.Run("refuses the default admin who linked the provider and logged in", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("u8", "ext-u8")))
+		assertNotManagedConflict(t, w, "u-admin")
+	})
+
+	t.Run("refuses the default admin without a UserAttribute", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		delete(f.attrs, "u-admin")
+		srv := f.server(ctrl)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("u8", "")))
+		assertNotManagedConflict(t, w, "u-admin")
+	})
+
+	t.Run("refuses a system user without a UserAttribute", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		delete(f.attrs, "u-system")
+		srv := f.server(ctrl)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("u12", "")))
+		assertNotManagedConflict(t, w, "u-system")
+	})
+
+	t.Run("refuses when EnsureUser returns the default admin", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		user := newUser(userPrincipalName(providerA, "newuser"))
+		user.Username = "admin"
+		srv.userMGR.EXPECT().EnsureUser(userPrincipalName(providerA, "newuser"), "newuser").Return(user, nil)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("newuser", "")))
+		assertNotManagedConflict(t, w, "u-new")
+	})
+
+	t.Run("refuses when EnsureUser returns a system user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		user := newUser(userPrincipalName(providerA, "newuser"))
+		user.PrincipalIDs = append(user.PrincipalIDs, "system://local")
+		srv.userMGR.EXPECT().EnsureUser(userPrincipalName(providerA, "newuser"), "newuser").Return(user, nil)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("newuser", "")))
+		assertNotManagedConflict(t, w, "u-new")
+	})
+
+	t.Run("the default admin's provider userName isn't a conflict", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		principal := userPrincipalName(providerA, "admin.user")
+		srv.userMGR.EXPECT().EnsureUser(principal, "admin.user").Return(newUser(principal), nil)
+		srv.userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups("u-new", providerA, gomock.Any()).Return(nil)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("admin.user", "")))
+		assert.Equal(t, http.StatusCreated, w.Code)
+	})
+
+	t.Run("a disabled default admin holding the principal isn't reprovisioned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		f.users["u-admin"].Enabled = ptr.To(false)
+		f.users["u-admin"].PrincipalIDs = []string{"local://u-admin", userPrincipalName(providerA, "ext-u8")}
+		srv := f.server(ctrl)
+		srv.getConfig = externalIDUserConfig
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("new.name", "ext-u8")))
+		assertNotManagedConflict(t, w, "u-admin")
+	})
+
+	t.Run("a disabled default admin with the externalId but another principal isn't reprovisioned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		f.users["u-admin"].Enabled = ptr.To(false)
+		srv := f.server(ctrl)
+		srv.getConfig = externalIDUserConfig
+
+		principal := userPrincipalName(providerA, "ext-u8")
+		srv.userMGR.EXPECT().EnsureUser(principal, "new.name").Return(newUser(principal), nil)
+		srv.userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups("u-new", providerA, gomock.Any()).Return(nil)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("new.name", "ext-u8")))
+		require.Equal(t, http.StatusCreated, w.Code)
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "u-new", resp["id"])
+	})
+
+	t.Run("reprovisions a disabled local user who linked the provider", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		f.users["u-locallinked"].Enabled = ptr.To(false)
+		srv := f.server(ctrl)
+		srv.getConfig = externalIDUserConfig
+		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "u-locallinked", attr.Name)
+			assert.Equal(t, []string{"new.name"}, attr.ExtraByProvider[providerA]["username"])
+			return attr, nil
+		})
+		srv.users.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+			assert.Equal(t, "u-locallinked", user.Name)
+			assert.True(t, user.GetEnabled())
+			return user, nil
+		})
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload("new.name", "ext-u3")))
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "u-locallinked", resp["id"])
+	})
+
+	for _, tt := range []struct {
+		holder     string
+		uid        string
+		externalID string
+	}{
+		{holder: "u-loginowned", uid: "u9", externalID: "ext-u9"},
+		{holder: "u-locallinked", uid: "u3", externalID: "ext-u3"},
+		{holder: "u-passwordfield", uid: "u6"},
+		{holder: "u-loginpassword", uid: "u11", externalID: "ext-u11"},
+		// The conflict loop skips a user without a UserAttribute, and the holder check must not
+		// refuse it.
+		{holder: "u-usernameonly", uid: "u7"},
+		{holder: "u-multi", uid: "u5"},
+	} {
+		t.Run("links "+tt.holder, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+
+			principal := userPrincipalName(providerA, tt.uid)
+			srv.userMGR.EXPECT().EnsureUser(principal, tt.uid).Return(f.users[tt.holder], nil)
+			srv.userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(tt.holder, providerA, gomock.Any()).Return(nil)
+
+			w := httptest.NewRecorder()
+			srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", createPayload(tt.uid, tt.externalID)))
+			require.Equal(t, http.StatusCreated, w.Code)
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, tt.holder, resp["id"])
+		})
+	}
 }

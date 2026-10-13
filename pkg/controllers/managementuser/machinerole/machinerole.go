@@ -18,13 +18,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 type handler struct {
 	clusterName      string
+	clusterUID       types.UID
 	nodes            corecontrollers.NodeClient
-	secretCache      corecontrollers.SecretCache
 	clusterCache     mgmtcontrollers.ClusterCache
 	mgmtNodeCache    mgmtcontrollers.NodeCache
 	capiClusterCache capicontrollers.ClusterCache
@@ -34,14 +35,13 @@ type handler struct {
 func Register(ctx context.Context, userCtx *config.UserContext, capiCtx *wrangler.CAPIContext) {
 	h := handler{
 		clusterName:      userCtx.ClusterName,
+		clusterUID:       userCtx.ClusterUID,
 		nodes:            userCtx.Corew.Node(),
-		secretCache:      userCtx.Management.Wrangler.Core.Secret().Cache(),
 		clusterCache:     userCtx.Management.Wrangler.Mgmt.Cluster().Cache(),
 		mgmtNodeCache:    userCtx.Management.Wrangler.Mgmt.Node().Cache(),
 		capiClusterCache: capiCtx.CAPI.Cluster().Cache(),
 		capiMachineCache: capiCtx.CAPI.Machine().Cache(),
 	}
-	userCtx.Corew.Node().OnChange(ctx, "machine-worker-label", h.WorkerLabelSync)
 	userCtx.Corew.Node().OnChange(ctx, "machine-lifecycle-label", h.ImportedLabelSync)
 }
 
@@ -53,6 +53,10 @@ func (h *handler) ImportedLabelSync(_ string, node *corev1.Node) (*corev1.Node, 
 	cluster, err := h.clusterCache.Get(h.clusterName)
 	if err != nil {
 		return node, err
+	}
+	if !config.MatchesClusterUID(h.clusterUID, cluster) {
+		// A cluster created again under the same name is not this controller's.
+		return node, nil
 	}
 
 	if cluster.Status.Driver != apimgmtv3.ClusterDriverK3s && cluster.Status.Driver != apimgmtv3.ClusterDriverRke2 {
@@ -147,32 +151,4 @@ func (h *handler) lifecycleObjectsForNode(mgmtCluster *apimgmtv3.Cluster, node *
 		return nil, nil, nil
 	}
 	return mgmtCluster, mgmtNodes[0], nil
-}
-
-func (h *handler) WorkerLabelSync(_ string, node *corev1.Node) (*corev1.Node, error) {
-	if node == nil || node.DeletionTimestamp != nil || node.Labels == nil || node.Annotations == nil {
-		return node, nil
-	}
-
-	if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
-		return node, nil
-	}
-	machineName := node.Annotations[capi.MachineAnnotation]
-	if machineName == "" {
-		return node, nil
-	}
-	machineNS := node.Annotations[capi.ClusterNamespaceAnnotation]
-	if machineNS == "" {
-		return node, nil
-	}
-
-	secrets, err := h.secretCache.List(machineNS, labels.SelectorFromSet(labels.Set{capr.MachineNameLabel: machineName, capr.WorkerRoleLabel: "true"}))
-	if err != nil || len(secrets) == 0 {
-		return node, err
-	}
-
-	node = node.DeepCopy()
-	node.Labels["node-role.kubernetes.io/worker"] = "true"
-
-	return h.nodes.Update(node)
 }

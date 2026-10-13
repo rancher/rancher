@@ -232,6 +232,46 @@ func regexRedactor(patterns []string) (Redactor, error) {
 	}), nil
 }
 
+// scimPatchOpRedactor redacts the value of SCIM PATCH operations (RFC 7644 3.5.2) whose path matches patterns,
+// e.g. {"op": "replace", "path": "password", "value": "..."}. It applies only to entries marked by [CaptureSCIMRequest].
+// Rancher's SCIM server doesn't support password attributes and rejects such operations, but the body is logged anyway,
+// so a misconfigured identity provider could otherwise leak a password into the audit log.
+// Key-based redaction misses these because the attribute name is in the path value, not a key.
+// PATCH operations appear only in requests, so response bodies are left unchanged.
+func scimPatchOpRedactor(patterns []string) (Redactor, error) {
+	regexes, err := compileRegexes(patterns)
+	if err != nil {
+		return nil, err
+	}
+
+	return RedactFunc(func(log *logEntry) error {
+		if log.scim {
+			redactSCIMPatchOps(regexes, log.RequestBody)
+		}
+		return nil
+	}), nil
+}
+
+func redactSCIMPatchOps(patterns []*regexp.Regexp, v any) {
+	switch v := v.(type) {
+	case map[string]any:
+		_, hasOp := v["op"]
+		_, hasValue := v["value"]
+		path, isString := v["path"].(string)
+		if hasOp && hasValue && isString && matchesAny(path, patterns) {
+			v["value"] = redacted
+		}
+
+		for _, child := range v {
+			redactSCIMPatchOps(patterns, child)
+		}
+	case []any:
+		for _, child := range v {
+			redactSCIMPatchOps(patterns, child)
+		}
+	}
+}
+
 const (
 	redactPrefix      = "/v3/import"
 	redactedImportUrl = redactPrefix + "/" + redacted

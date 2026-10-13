@@ -1,6 +1,7 @@
 package github
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,7 +24,7 @@ func (g *Provider) formatter(apiContext *types.APIContext, resource *types.RawRe
 }
 
 func (g *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, g.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -91,18 +92,16 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 }
 
 func (g *Provider) testAndApply(request *types.APIContext) error {
-	var githubConfig v32.GithubConfig
 	githubConfigApplyInput := &v32.GithubConfigApplyInput{}
-
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
-	githubConfig = githubConfigApplyInput.GithubConfig
+	githubConfig := githubConfigApplyInput.GithubConfig
+	githubConfig.Name = applyConfigName(githubConfigApplyInput.ConfigName, githubConfig.Name)
 	githubLogin := &v32.GithubLogin{
 		Code: githubConfigApplyInput.Code,
 	}
-
 	if githubConfig.ClientSecret != "" {
 		value, err := common.ReadFromSecret(g.secrets, githubConfig.ClientSecret,
 			strings.ToLower(client.GithubConfigFieldClientSecret))
@@ -135,10 +134,17 @@ func (g *Provider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return g.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return g.userMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}
 
 	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Github Configuration", request)
+}
+
+// applyConfigName returns the name of the config to apply. Clients that don't
+// send a configName fall back to the name in the config, and then to the
+// default config for the provider.
+func applyConfigName(inputConfigName, configName string) string {
+	return cmp.Or(inputConfigName, configName, ProviderName)
 }

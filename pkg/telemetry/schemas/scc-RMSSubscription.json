@@ -123,6 +123,11 @@
       },
       "type": "array"
     },
+    "nvidia_registry_secret_present": {
+      "type": "boolean",
+      "description": "Check if any NVIDIA registration key is being used by SUSE AI Factory",
+      "default": false
+    },
     "timestamp": {
       "type": "string",
       "format": "date-time"

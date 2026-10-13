@@ -1,17 +1,17 @@
-// Package auth contains handlers and helpful functions for managing authentication. This includes token cleanup and
-// managing Rancher's RBAC kubernetes resources: ClusterRoleTemplateBindings and ProjectRoleTemplateBindings.
 package auth
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/userretention"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,8 +26,8 @@ const (
 
 type UserAttributeController struct {
 	userAttributes            mgmtcontrollers.UserAttributeClient
-	providerRefresh           func(attribs *v3.UserAttribute) (*v3.UserAttribute, error)
-	ensureUserRetentionLabels func(attribs *v3.UserAttribute) error
+	providerRefresh           func(attribs *apiv3.UserAttribute) (*apiv3.UserAttribute, error)
+	ensureUserRetentionLabels func(attribs *apiv3.UserAttribute) error
 }
 
 func newUserAttributeController(mgmt *config.ManagementContext) *UserAttributeController {
@@ -41,7 +41,7 @@ func newUserAttributeController(mgmt *config.ManagementContext) *UserAttributeCo
 }
 
 // sync is called periodically and on real updates
-func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (runtime.Object, error) {
+func (c *UserAttributeController) sync(key string, attribs *apiv3.UserAttribute) (runtime.Object, error) {
 	if attribs == nil || attribs.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -87,6 +87,10 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 		return updated, nil
 	}
 
+	// The copy read before the refresh tells, on conflict, which values the
+	// refresh changed.
+	beforeRefresh := attribs.DeepCopy()
+
 	attribs, err = c.providerRefresh(attribs)
 	if err != nil {
 		var nte *common.NonTransientError
@@ -121,8 +125,7 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 
 	newAttribs.NeedsRefresh = attribs.NeedsRefresh
 	newAttribs.LastRefresh = attribs.LastRefresh
-	newAttribs.GroupPrincipals = attribs.GroupPrincipals
-	newAttribs.ExtraByProvider = attribs.ExtraByProvider
+	applyRefreshChanges(beforeRefresh, attribs, newAttribs)
 
 	updated, nerr = c.userAttributes.Update(newAttribs)
 	if nerr != nil {
@@ -131,6 +134,87 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 	}
 
 	return updated, nil
+}
+
+// applyRefreshChanges copies onto current only the group principals and
+// extras the refresh changed from before. Values the refresh left alone keep
+// what current has, so writes made while the refresh ran, for example a SCIM
+// group removal, aren't undone. A provider's group list counts as changed when
+// its set of principal names differs; extras are compared key by key. An
+// entry the refresh added counts as changed even when it's empty.
+func applyRefreshChanges(before, refreshed, current *apiv3.UserAttribute) {
+	for provider, groups := range refreshed.GroupPrincipals {
+		old, existed := before.GroupPrincipals[provider]
+		if existed && samePrincipalNames(old.Items, groups.Items) {
+			continue
+		}
+		if current.GroupPrincipals == nil {
+			current.GroupPrincipals = map[string]apiv3.Principals{}
+		}
+		current.GroupPrincipals[provider] = groups
+	}
+	for provider := range before.GroupPrincipals {
+		if _, ok := refreshed.GroupPrincipals[provider]; !ok {
+			delete(current.GroupPrincipals, provider)
+		}
+	}
+
+	for provider, extra := range refreshed.ExtraByProvider {
+		old, existed := before.ExtraByProvider[provider]
+		if existed && maps.EqualFunc(old, extra, slices.Equal) {
+			continue
+		}
+		if current.ExtraByProvider == nil {
+			current.ExtraByProvider = map[string]map[string][]string{}
+		}
+		currentExtra, ok := current.ExtraByProvider[provider]
+		if !ok {
+			// The current object has no entry to merge into. Take the
+			// refreshed entry whole, as for groups.
+			current.ExtraByProvider[provider] = maps.Clone(extra)
+			if current.ExtraByProvider[provider] == nil {
+				current.ExtraByProvider[provider] = map[string][]string{}
+			}
+			continue
+		}
+		merged := maps.Clone(currentExtra)
+		if merged == nil {
+			merged = map[string][]string{}
+		}
+		for key, value := range extra {
+			if oldValue, ok := old[key]; !ok || !slices.Equal(oldValue, value) {
+				merged[key] = value
+			}
+		}
+		for key := range old {
+			if _, ok := extra[key]; !ok {
+				delete(merged, key)
+			}
+		}
+		current.ExtraByProvider[provider] = merged
+	}
+	for provider := range before.ExtraByProvider {
+		if _, ok := refreshed.ExtraByProvider[provider]; !ok {
+			delete(current.ExtraByProvider, provider)
+		}
+	}
+}
+
+// samePrincipalNames reports whether a and b hold the same set of principal
+// names.
+func samePrincipalNames(a, b []apiv3.Principal) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	names := func(principals []apiv3.Principal) []string {
+		out := make([]string, 0, len(principals))
+		for _, p := range principals {
+			out = append(out, p.Name)
+		}
+		slices.Sort(out)
+		return out
+	}
+	return slices.Equal(names(a), names(b))
 }
 
 // skipRefresh annotates the UserAttribute with the error so future refreshes

@@ -11,6 +11,7 @@ const (
 	AzureADConfigFieldCreated               = "created"
 	AzureADConfigFieldCreatorID             = "creatorId"
 	AzureADConfigFieldDeviceAuthEndpoint    = "deviceAuthEndpoint"
+	AzureADConfigFieldDisplayName           = "displayName"
 	AzureADConfigFieldEnabled               = "enabled"
 	AzureADConfigFieldEndSessionEndpoint    = "endSessionEndpoint"
 	AzureADConfigFieldEndpoint              = "endpoint"
@@ -41,6 +42,7 @@ type AzureADConfig struct {
 	Created               string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DeviceAuthEndpoint    string            `json:"deviceAuthEndpoint,omitempty" yaml:"deviceAuthEndpoint,omitempty"`
+	DisplayName           string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled               bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EndSessionEndpoint    string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`
 	Endpoint              string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`

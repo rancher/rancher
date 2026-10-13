@@ -12,6 +12,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -39,18 +40,18 @@ func (m *MockPasswordUpdater) EXPECT() *MockPasswordUpdaterMockRecorder {
 	return m.recorder
 }
 
-// UpdatePassword mocks base method.
-func (m *MockPasswordUpdater) UpdatePassword(userId, newPassword string) error {
+// SetPassword mocks base method.
+func (m *MockPasswordUpdater) SetPassword(user *v3.User, newPassword string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePassword", userId, newPassword)
+	ret := m.ctrl.Call(m, "SetPassword", user, newPassword)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdatePassword indicates an expected call of UpdatePassword.
-func (mr *MockPasswordUpdaterMockRecorder) UpdatePassword(userId, newPassword any) *gomock.Call {
+// SetPassword indicates an expected call of SetPassword.
+func (mr *MockPasswordUpdaterMockRecorder) SetPassword(user, newPassword any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockPasswordUpdater)(nil).UpdatePassword), userId, newPassword)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPassword", reflect.TypeOf((*MockPasswordUpdater)(nil).SetPassword), user, newPassword)
 }
 
 // VerifyAndUpdatePassword mocks base method.

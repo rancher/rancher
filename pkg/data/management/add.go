@@ -20,7 +20,7 @@ func Add(_ context.Context, wrangler *wrangler.Context, management *config.Manag
 		return err
 	}
 
-	if err := data.AuthConfigs(management); err != nil {
+	if err := data.AuthConfigs(management.Management.AuthConfigs("")); err != nil {
 		return err
 	}
 

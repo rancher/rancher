@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -33,9 +34,15 @@ import (
 )
 
 const (
-	rtbOwnerLabel                    = "authz.cluster.cattle.io/rtb-owner-updated"
-	rtbOwnerLabelLegacy              = "authz.cluster.cattle.io/rtb-owner"
-	clusterRoleOwner                 = "authz.cluster.cattle.io/clusterrole-owner"
+	rtbOwnerLabel       = "authz.cluster.cattle.io/rtb-owner-updated"
+	rtbOwnerLabelLegacy = "authz.cluster.cattle.io/rtb-owner"
+	clusterRoleOwner    = "authz.cluster.cattle.io/clusterrole-owner"
+	// clusterRoleOwnerInstallUUIDLabel records which Rancher install created a RoleTemplate-owned ClusterRole.
+	// In a nested Rancher setup, the same physical cluster can be managed as a downstream cluster by one
+	// Rancher install while also being the local cluster of another. Without this, the local install's
+	// orphan ClusterRole sweep (cluster-clusterrole-sync) can delete ClusterRoles it did not create, because
+	// the owning RoleTemplate legitimately only exists in the other install's management plane.
+	clusterRoleOwnerInstallUUIDLabel = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
@@ -261,12 +268,34 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 }
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
-	if equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
+	installUUID := settings.InstallUUID.Get()
+	if ownerInstallUUID, ok := clusterRole.Labels[clusterRoleOwnerInstallUUIDLabel]; ok && ownerInstallUUID != installUUID {
+		logrus.Tracef("installUUID=%s cluster=%s: clusterRole %v is owned by a different Rancher install (installUUID=%s), skipping update",
+			installUUID, m.clusterName, clusterRole.Name, ownerInstallUUID)
+		return nil
+	}
+
+	// Backfill the install UUID on owned ClusterRoles created before it was introduced. Never overwrite
+	// an existing value, so that installs sharing a cluster can't fight over ownership.
+	_, owned := clusterRole.Annotations[clusterRoleOwner]
+	_, stamped := clusterRole.Labels[clusterRoleOwnerInstallUUIDLabel]
+	needsStamp := owned && !stamped
+
+	if !needsStamp && equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
 		return nil
 	}
 	clusterRole = clusterRole.DeepCopy()
 	clusterRole.Rules = rt.Rules
-	logrus.Infof("Updating clusterRole %v because of rules difference with roleTemplate %v (%v).", clusterRole.Name, rt.DisplayName, rt.Name)
+	if needsStamp {
+		if clusterRole.Labels == nil {
+			clusterRole.Labels = map[string]string{}
+		}
+		clusterRole.Labels[clusterRoleOwnerInstallUUIDLabel] = installUUID
+	}
+	logrus.Tracef("installUUID=%s cluster=%s: Updating clusterRole %v.",
+		installUUID, m.clusterName, clusterRole.Name)
+	logrus.Infof("cluster=%s: Updating clusterRole %v because of rules or owner install-uuid difference with roleTemplate %v (%v).",
+		m.clusterName, clusterRole.Name, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Update(clusterRole)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't update clusterRole %v", rt.Name)
@@ -275,15 +304,31 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 }
 
 func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
-	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
+	logrus.Tracef("installUUID=%s cluster=%s: Creating clusterRole.",
+		settings.InstallUUID.Get(), m.clusterName)
+	logrus.Infof("cluster=%s: Creating clusterRole for roleTemplate %v (%v).",
+		m.clusterName, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        rt.Name,
-			Annotations: map[string]string{clusterRoleOwner: rt.Name},
+			Name: rt.Name,
+			Annotations: map[string]string{
+				clusterRoleOwner: rt.Name,
+			},
+			Labels: map[string]string{
+				clusterRoleOwnerInstallUUIDLabel: settings.InstallUUID.Get(),
+			},
 		},
 		Rules: rt.Rules,
 	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if apierrors.IsAlreadyExists(err) {
+		// The cache was stale. Reconcile the existing object so rules and the install-uuid get synced now.
+		existing, err := m.clusterRoles.Get(rt.Name, metav1.GetOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "error getting clusterRole %v", rt.Name)
+		}
+		return m.compareAndUpdateClusterRole(existing, rt)
+	}
+	if err != nil {
 		return errors.Wrapf(err, "couldn't create clusterRole %v", rt.Name)
 	}
 	return nil
@@ -378,7 +423,10 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 	}
 
 	deleteFunc := func(name string) error {
-		logrus.Infof("Deleting clusterRoleBinding %v", name)
+		logrus.Tracef("installUUID=%s cluster=%s: Deleting clusterRoleBinding %v",
+			settings.InstallUUID.Get(), m.clusterName, name)
+		logrus.Infof("cluster=%s: Deleting clusterRoleBinding %v",
+			m.clusterName, name)
 		err := m.workload.RBACw.ClusterRoleBinding().Delete(name, &metav1.DeleteOptions{})
 		return client.IgnoreNotFound(err)
 	}
@@ -415,7 +463,10 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 	}
 
 	deleteFunc := func(name string) error {
-		logrus.Infof("Deleting roleBinding %v", name)
+		logrus.Tracef("installUUID=%s cluster=%s: Deleting roleBinding %v",
+			settings.InstallUUID.Get(), m.clusterName, name)
+		logrus.Infof("cluster=%s: Deleting roleBinding %v",
+			m.clusterName, name)
 		err := m.workload.RBACw.RoleBinding().Delete(ns, name, &metav1.DeleteOptions{})
 		return client.IgnoreNotFound(err)
 	}
@@ -476,7 +527,10 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		case *rbacv1.RoleBinding:
 			_, err := m.rbLister.Get(ns, roleBinding.Name)
 			if apierrors.IsNotFound(err) {
-				logrus.Infof("Creating roleBinding %v in %s", key, ns)
+				logrus.Tracef("installUUID=%s cluster=%s: Creating roleBinding %v in %s",
+					settings.InstallUUID.Get(), m.clusterName, key, ns)
+				logrus.Infof("cluster=%s: Creating roleBinding %v in %s",
+					m.clusterName, key, ns)
 				_, err := m.roleBindings.Create(roleBinding)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
@@ -485,7 +539,10 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
-			logrus.Infof("Creating clusterRoleBinding %v", key)
+			logrus.Tracef("installUUID=%s cluster=%s: Creating clusterRoleBinding %v",
+				settings.InstallUUID.Get(), m.clusterName, key)
+			logrus.Infof("cluster=%s: Creating clusterRoleBinding %v",
+				m.clusterName, key)
 			_, err := m.workload.RBACw.ClusterRoleBinding().Create(roleBinding)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err

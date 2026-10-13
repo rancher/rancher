@@ -27,7 +27,7 @@ spec:
     protocol: TCP
     name: https
   selector:
-    app: {{ template "rancher.fullname" . }}
+{{ include "rancher.selectorLabels" . | indent 4 }}
 
 ---
 
@@ -45,4 +45,4 @@ spec:
       protocol: TCP
       name: https-internal
   selector:
-    app: {{ template "rancher.fullname" . }}
+{{ include "rancher.selectorLabels" . | indent 4 }}

@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
+	typedrkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeRKEControlPlanes implements RKEControlPlaneInterface
 type fakeRKEControlPlanes struct {
-	*gentype.FakeClientWithList[*v1.RKEControlPlane, *v1.RKEControlPlaneList]
+	*gentype.FakeClientWithListAndApply[*v1.RKEControlPlane, *v1.RKEControlPlaneList, *rkecattleiov1.RKEControlPlaneApplyConfiguration]
 	Fake *FakeRkeV1
 }
 
-func newFakeRKEControlPlanes(fake *FakeRkeV1, namespace string) rkecattleiov1.RKEControlPlaneInterface {
+func newFakeRKEControlPlanes(fake *FakeRkeV1, namespace string) typedrkecattleiov1.RKEControlPlaneInterface {
 	return &fakeRKEControlPlanes{
-		gentype.NewFakeClientWithList[*v1.RKEControlPlane, *v1.RKEControlPlaneList](
+		gentype.NewFakeClientWithListAndApply[*v1.RKEControlPlane, *v1.RKEControlPlaneList, *rkecattleiov1.RKEControlPlaneApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("rkecontrolplanes"),

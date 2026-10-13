@@ -97,5 +97,5 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 func Tunnel(config *wrangler.Context) http.Handler {
 	config.TunnelAuthorizer.Add(proxy.NewAuthorizer(config))
 	config.TunnelAuthorizer.Add(aggregation.New(config))
-	return config.TunnelServer
+	return config.TunnelSessions.Handler(config.TunnelServer)
 }

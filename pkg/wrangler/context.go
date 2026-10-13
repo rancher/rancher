@@ -151,6 +151,7 @@ type Context struct {
 	MultiClusterManager MultiClusterManager
 	TunnelServer        *remotedialer.Server
 	TunnelAuthorizer    *tunnelserver.Authorizers
+	TunnelSessions      *tunnelserver.SessionTracker
 	PeerManager         peermanager.PeerManager
 	Provisioning        provisioningv1.Interface
 	RBAC                rbacv1.Interface
@@ -576,6 +577,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
+		TunnelSessions:          tunnelserver.NewSessionTracker(),
 		Upgrade:                 upgrade.Upgrade().V1(),
 		Telemetry:               telemetry.Telemetry().V1(),
 		Plan:                    plan.Plan().V1alpha1(),

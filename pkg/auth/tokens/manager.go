@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -251,7 +252,17 @@ func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
 		err = m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
 	}
 	if err != nil {
+		// A `token not found` is intentionally treated as success.
+		// Not doing so will cause multiple concurrent deletes of the
+		// same token to throw an error (except the first) in a
+		// fundamentally benign situation.
+		//
+		// Regarding the overall issue fixed here this behaviour was
+		// only contributory, by making the main issue invisible, which
+		// was the misrouting of tokens by the caller. Adding logging is
+		// enough to address that.
 		if apierrors.IsNotFound(err) {
+			logrus.Debugf("token to delete (%s) not found", tokenName)
 			return 0, nil
 		}
 		return http.StatusInternalServerError, fmt.Errorf("failed to delete token")
@@ -519,8 +530,15 @@ var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc",
 func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
+	// The secret is keyed by the AuthConfig name so that multiple configs of
+	// the same provider don't overwrite each other.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
-		err := m.CreateSecret(userID, provider, providerToken)
+		configName, _, _, err := common.SplitPrincipalID(userPrincipal.Name)
+		if err != nil {
+			return nil, "", err
+		}
+
+		err = m.CreateSecret(userID, configName, providerToken)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create secret: %s", err)
 		}

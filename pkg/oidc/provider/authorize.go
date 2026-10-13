@@ -13,6 +13,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -213,7 +214,11 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 	// If the auth provider is specified make sure it exists and enabled.
 	authProvider := token.GetAuthProvider()
 	if authProvider != "" {
-		disabled, err := providers.IsDisabledProvider(authProvider)
+		configName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			return nil, err
+		}
+		disabled, err := providers.IsDisabledProvider(authProvider, configName)
 		if err != nil {
 			return nil, fmt.Errorf("can't check if auth provider is disabled: %w", err)
 		}

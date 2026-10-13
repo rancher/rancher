@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/machinerole"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/machineroletaint"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
@@ -19,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotextrametadata"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
@@ -48,14 +50,17 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	// For other clusters, we still need to wait for CAPI to be ready because
 	// registerProvV2 requires CAPI resources.
 	if cluster.ClusterName == "local" {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			nodesyncer.Register(ctx, cluster, nil, kubeConfigGetter)
 			return nil
 		})()
 	}
 
 	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
-		err := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		// The starter cannot block this goroutine, so it starts the controllers in the background.
+		// Failures are retried there and, if they persist, reported through
+		// UserContext.OnDeferredStartError.
+		cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			// For non-local clusters, register nodesyncer with CAPI context
 			if cluster.ClusterName != "local" {
 				nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
@@ -63,9 +68,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 			registerProvV2(ctx, cluster, capi, clusterRec)
 			return nil
 		})()
-		if err != nil {
-			logrus.Errorf("failed to start cluster manager: %v", err)
-		}
 	})
 
 	registerCaches(cluster)
@@ -111,6 +113,8 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,
 			cluster.ClusterName,
+			cluster.ClusterUID,
+			cluster.Management.Wrangler.Mgmt.Cluster().Cache(),
 			cluster.Catalog.V1().App(),
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
 	} else {
@@ -128,6 +132,16 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 					if resource.Kind == "ETCDSnapshotFile" {
 						cluster.K3s = k3s.New(cluster.ControllerFactory)
 						snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
+						// Publish the extra metadata ConfigMap so snapshots taken from here carry
+						// the resources/restoreModes payload the restore modes resolve against.
+						//
+						// Deliberately not registered for rancher-administrated (v2prov) clusters:
+						// pkg/capr/planner/manifests.go already writes a ConfigMap of the same name
+						// there as an auto-deploy manifest, carrying the legacy
+						// provisioning-cluster-spec key, and this controller replaces Data
+						// wholesale. Until the two writers are reconciled, v2prov keeps using the
+						// legacy payload.
+						snapshotextrametadata.Register(ctx, cluster, capi)
 						found = true
 						break
 					}
@@ -138,7 +152,9 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 			}
 		}
 	}
+
 	machinerole.Register(ctx, cluster, capi)
+	machineroletaint.Register(ctx, cluster, capi, clusterRec)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {

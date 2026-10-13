@@ -494,6 +494,7 @@ func TestStoreCreate(t *testing.T) {
 		return millis, nil
 	}
 	shouldGenerateToken := func() bool { return true }
+	shouldPreferRancherProxy := func() bool { return false }
 	options := &metav1.CreateOptions{}
 	tokenManager := &fakeTokenManager{}
 
@@ -502,20 +503,22 @@ func TestStoreCreate(t *testing.T) {
 	// opts function gets to change anything else.
 	newStore := func(configMapClient v1.ConfigMapClient, tokenStore tokenFetcher, tokenMgr tokenCreator, opts ...func(*Store)) *Store {
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAllAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenMgr,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:               true,
+			authorizer:               allowAllAuthorizer,
+			nsCache:                  nsCache,
+			configMapClient:          configMapClient,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			nodeCache:                nodeCache,
+			tokenMgr:                 tokenMgr,
+			getCACert:                func() string { return rancherCACert },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      shouldGenerateToken,
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 		for _, opt := range opts {
 			opt(store)
@@ -673,19 +676,21 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          commonAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:               true,
+			authorizer:               commonAuthorizer,
+			nsCache:                  nsCache,
+			configMapClient:          configMapClient,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			tokenMgr:                 tokenManager,
+			getCACert:                func() string { return "" },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      shouldGenerateToken,
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -756,18 +761,20 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          commonAuthorizer,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:               true,
+			authorizer:               commonAuthorizer,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			nodeCache:                nodeCache,
+			tokenMgr:                 tokenManager,
+			getCACert:                func() string { return "" },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      shouldGenerateToken,
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 
 		ctx := userContext(adminID, authTokenID)
@@ -866,20 +873,22 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{}
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAllAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: func() bool { return false },
+			mcmEnabled:               true,
+			authorizer:               allowAllAuthorizer,
+			nsCache:                  nsCache,
+			configMapClient:          configMapClient,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			nodeCache:                nodeCache,
+			tokenMgr:                 tokenManager,
+			getCACert:                func() string { return rancherCACert },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      func() bool { return false },
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -915,6 +924,185 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, downstream2Exec.Args, "--user=downstream2")
 		assert.Contains(t, downstream2Exec.Args, "--cluster="+downstream2)
 	})
+	t.Run("exec command with the get-token setting", func(t *testing.T) {
+		newTokenStore := func(token accessor.TokenAccessor) tokenFetcher {
+			return &fakeTokenStore{
+				fetchFunc: func(tokenID string) (accessor.TokenAccessor, error) {
+					if tokenID != authTokenID {
+						return nil, apierrors.NewNotFound(gvr.GroupResource(), tokenID)
+					}
+					return token, nil
+				},
+			}
+		}
+		githubToken := newTokenStore(&v3.Token{
+			ObjectMeta:   metav1.ObjectMeta{Name: authTokenID},
+			UserID:       "u-tokenuser", // The user id must come from the request user, not the token.
+			AuthProvider: "github",
+		})
+		openldapExtToken := newTokenStore(&ext.Token{
+			ObjectMeta: metav1.ObjectMeta{Name: authTokenID},
+			Spec: ext.TokenSpec{
+				UserID:        "u-tokenuser",
+				UserPrincipal: ext.TokenPrincipal{Name: "openldap_user://cn=user", Provider: "openldap"},
+			},
+		})
+
+		server := "--server=rancher.example.com"
+		getToken := func(args ...string) []string {
+			return append([]string{"auth", "get-token", server}, args...)
+		}
+
+		tests := []struct {
+			name           string
+			execGetToken   bool
+			generateToken  bool
+			dryRun         bool
+			excludeDefault bool
+			tokenStore     tokenFetcher
+
+			wantTokens      bool
+			wantRancherArgs []string
+			wantACEArgs     []string
+		}{
+			{
+				name:            "token command with setting off",
+				tokenStore:      githubToken,
+				wantRancherArgs: []string{"token", server, "--user=" + defaultClusterName},
+				wantACEArgs:     []string{"token", server, "--user=downstream2", "--cluster=" + downstream2},
+			},
+			{
+				name:            "get-token command",
+				execGetToken:    true,
+				tokenStore:      githubToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github"),
+			},
+			{
+				name:            "get-token command without default entry",
+				execGetToken:    true,
+				excludeDefault:  true,
+				tokenStore:      githubToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github"),
+			},
+			{
+				name:            "get-token command with ext request token",
+				execGetToken:    true,
+				tokenStore:      openldapExtToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=openldap"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=openldap"),
+			},
+			{
+				name:            "get-token command without auth provider",
+				execGetToken:    true,
+				tokenStore:      tokenStore,
+				wantRancherArgs: getToken("--user-id=" + userID),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID),
+			},
+			{
+				name:            "get-token command on dry run with token generation",
+				execGetToken:    true,
+				generateToken:   true,
+				dryRun:          true,
+				tokenStore:      githubToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github"),
+			},
+			{
+				name:          "embedded tokens with setting on",
+				execGetToken:  true,
+				generateToken: true,
+				tokenStore:    githubToken,
+				wantTokens:    true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap := obj.DeepCopy()
+					configMap.CreationTimestamp = metav1.Now()
+					configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+					return configMap, nil
+				}).AnyTimes()
+				configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					return obj.DeepCopy(), nil
+				}).AnyTimes()
+
+				tokenManager := &fakeTokenManager{}
+				store := newStore(configMapClient, tt.tokenStore, tokenManager, func(s *Store) {
+					s.shouldGenerateToken = func() bool { return tt.generateToken }
+					s.shouldExecGetToken = func() bool { return tt.execGetToken }
+				})
+
+				kubeconfig := &ext.Kubeconfig{
+					Spec: ext.KubeconfigSpec{
+						Clusters:       []string{downstream1, downstream2},
+						CurrentContext: downstream1,
+					},
+				}
+				if tt.excludeDefault {
+					kubeconfig.Spec.IncludeDefaultEntry = new(bool)
+				}
+				createOptions := &metav1.CreateOptions{}
+				if tt.dryRun {
+					createOptions.DryRun = []string{metav1.DryRunAll}
+				}
+
+				obj, err := store.Create(userContext(userID, authTokenID), kubeconfig, nil, createOptions)
+				require.NoError(t, err)
+				require.IsType(t, &ext.Kubeconfig{}, obj)
+
+				config, err := clientcmd.Load([]byte(obj.(*ext.Kubeconfig).Status.Value))
+				require.NoError(t, err)
+
+				wantContexts := map[string]string{
+					"downstream1":    defaultClusterName,
+					"downstream2":    "downstream2",
+					"downstream2-cp": "downstream2",
+				}
+				if !tt.excludeDefault {
+					wantContexts[defaultClusterName] = defaultClusterName
+				}
+				require.Len(t, config.Contexts, len(wantContexts))
+				for name, authInfo := range wantContexts {
+					require.Contains(t, config.Contexts, name)
+					assert.Equal(t, authInfo, config.Contexts[name].AuthInfo, name)
+				}
+
+				require.Len(t, config.AuthInfos, 2)
+				rancherUser := config.AuthInfos[defaultClusterName]
+				require.NotNil(t, rancherUser)
+				aceUser := config.AuthInfos["downstream2"]
+				require.NotNil(t, aceUser)
+
+				if tt.wantTokens {
+					require.Len(t, tokenManager.sharedTokenKeys, 1)
+					assert.Equal(t, tokenManager.sharedTokenKeys[0], rancherUser.Token)
+					assert.Nil(t, rancherUser.Exec)
+					require.Len(t, tokenManager.clusterTokenKeys, 1)
+					assert.Equal(t, tokenManager.clusterTokenKeys[0], aceUser.Token)
+					assert.Nil(t, aceUser.Exec)
+					return
+				}
+
+				assert.Empty(t, tokenManager.sharedTokenKeys)
+				assert.Empty(t, tokenManager.clusterTokenKeys)
+
+				assert.Empty(t, rancherUser.Token)
+				require.NotNil(t, rancherUser.Exec)
+				assert.Equal(t, "rancher", rancherUser.Exec.Command)
+				assert.Equal(t, tt.wantRancherArgs, rancherUser.Exec.Args)
+
+				assert.Empty(t, aceUser.Token)
+				require.NotNil(t, aceUser.Exec)
+				assert.Equal(t, "rancher", aceUser.Exec.Command)
+				assert.Equal(t, tt.wantACEArgs, aceUser.Exec.Args)
+			})
+		}
+	})
 	t.Run("all clusters specified", func(t *testing.T) {
 		clusterAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 			switch a.GetResource() {
@@ -948,19 +1136,21 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          clusterAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:               true,
+			authorizer:               clusterAuthorizer,
+			nsCache:                  nsCache,
+			configMapClient:          configMapClient,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			tokenMgr:                 tokenManager,
+			getCACert:                func() string { return "" },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      shouldGenerateToken,
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -1050,18 +1240,20 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			authorizer:          allowAllAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			authorizer:               allowAllAuthorizer,
+			nsCache:                  nsCache,
+			configMapClient:          configMapClient,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			tokenMgr:                 tokenManager,
+			getCACert:                func() string { return rancherCACert },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      shouldGenerateToken,
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -1565,6 +1757,233 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, config.Contexts, "downstream2-cp1")
 		assert.Contains(t, config.Contexts, "downstream2-cp2")
 	})
+	t.Run("prefer Rancher proxy for a node based ACE cluster", func(t *testing.T) {
+		tests := []struct {
+			desc               string
+			preferRancherProxy *bool
+			settingValue       bool
+			wantCurrentContext string
+			wantStored         bool
+		}{
+			{
+				desc:               "unset uses the setting false",
+				wantCurrentContext: "downstream2-cp",
+				wantStored:         false,
+			},
+			{
+				desc:               "unset uses the setting true",
+				settingValue:       true,
+				wantCurrentContext: "downstream2",
+				wantStored:         true,
+			},
+			{
+				desc:               "false overrides the setting",
+				preferRancherProxy: ptr.To(false),
+				settingValue:       true,
+				wantCurrentContext: "downstream2-cp",
+				wantStored:         false,
+			},
+			{
+				desc:               "true overrides the setting",
+				preferRancherProxy: ptr.To(true),
+				wantCurrentContext: "downstream2",
+				wantStored:         true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				var configMap *corev1.ConfigMap
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap = obj.DeepCopy()
+					configMap.CreationTimestamp = metav1.NewTime(time.Now())
+					configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+					return configMap, nil
+				}).Times(1)
+				configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap = obj.DeepCopy()
+					return configMap, nil
+				}).Times(1)
+
+				store := newStore(configMapClient, tokenStore, &fakeTokenManager{}, func(s *Store) {
+					s.shouldPreferRancherProxy = func() bool { return tt.settingValue }
+				})
+
+				ctx := userContext(userID, authTokenID)
+				kubeconfig := &ext.Kubeconfig{
+					Spec: ext.KubeconfigSpec{
+						Clusters:           []string{downstream1, downstream2},
+						CurrentContext:     downstream2,
+						PreferRancherProxy: tt.preferRancherProxy,
+					},
+				}
+
+				obj, err := store.Create(ctx, kubeconfig, nil, options)
+				require.NoError(t, err)
+
+				created := obj.(*ext.Kubeconfig)
+				assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+				require.NotNil(t, created.Spec.PreferRancherProxy)
+				assert.Equal(t, tt.wantStored, *created.Spec.PreferRancherProxy)
+				require.NotNil(t, configMap)
+				assert.Equal(t, strconv.FormatBool(tt.wantStored), configMap.Data[PreferRancherProxyField])
+
+				config, err := clientcmd.Load([]byte(created.Status.Value))
+				require.NoError(t, err)
+
+				assert.Equal(t, tt.wantCurrentContext, config.CurrentContext)
+				// Both the proxy and the ACE contexts are always included.
+				assert.Contains(t, config.Contexts, "downstream2")
+				assert.Contains(t, config.Contexts, "downstream2-cp")
+			})
+		}
+	})
+	t.Run("prefer Rancher proxy for a FQDN based ACE cluster", func(t *testing.T) {
+		downstream3 := "c-m-l5kq2x8d" // ACE enabled with a FQDN.
+		downstream3Cluster := &v3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: downstream3},
+			Spec: v3.ClusterSpec{
+				DisplayName: "downstream3",
+				ClusterSpecBase: v3.ClusterSpecBase{
+					LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{
+						Enabled: true,
+						FQDN:    "downstream3.example.com",
+					},
+				},
+			},
+		}
+
+		tests := []struct {
+			desc               string
+			preferRancherProxy bool
+			wantCurrentContext string
+		}{
+			{
+				desc:               "false",
+				wantCurrentContext: "downstream3-fqdn",
+			},
+			{
+				desc:               "true",
+				preferRancherProxy: true,
+				wantCurrentContext: "downstream3",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap := obj.DeepCopy()
+					configMap.CreationTimestamp = metav1.NewTime(time.Now())
+					configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+					return configMap, nil
+				}).Times(1)
+				configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					return obj.DeepCopy(), nil
+				}).Times(1)
+
+				clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+				clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
+					switch name {
+					case "local":
+						return localCluster.DeepCopy(), nil
+					case downstream3:
+						return downstream3Cluster.DeepCopy(), nil
+					default:
+						return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+					}
+				}).AnyTimes()
+
+				// Nodes aren't listed for a cluster with a FQDN.
+				nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
+
+				store := newStore(configMapClient, tokenStore, &fakeTokenManager{}, func(s *Store) {
+					s.clusterCache = clusterCache
+					s.nodeCache = nodeCache
+				})
+
+				ctx := userContext(userID, authTokenID)
+				kubeconfig := &ext.Kubeconfig{
+					Spec: ext.KubeconfigSpec{
+						Clusters:           []string{downstream3},
+						PreferRancherProxy: ptr.To(tt.preferRancherProxy),
+					},
+				}
+
+				obj, err := store.Create(ctx, kubeconfig, nil, options)
+				require.NoError(t, err)
+
+				created := obj.(*ext.Kubeconfig)
+				assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+
+				config, err := clientcmd.Load([]byte(created.Status.Value))
+				require.NoError(t, err)
+
+				assert.Equal(t, tt.wantCurrentContext, config.CurrentContext)
+				assert.Contains(t, config.Contexts, "downstream3")
+				assert.Contains(t, config.Contexts, "downstream3-fqdn")
+			})
+		}
+	})
+	t.Run("prefer Rancher proxy false has no effect for a non-ACE cluster", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap := obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			return obj.DeepCopy(), nil
+		}).Times(1)
+
+		store := newStore(configMapClient, tokenStore, &fakeTokenManager{})
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:           []string{downstream1},
+				PreferRancherProxy: ptr.To(false),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.Equal(t, "downstream1", config.CurrentContext)
+	})
+	t.Run("dry run returns the prefer Rancher proxy value used", func(t *testing.T) {
+		store := newStore(nil, tokenStore, &fakeTokenManager{}, func(s *Store) {
+			s.shouldPreferRancherProxy = func() bool { return true }
+		})
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters: []string{downstream2},
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, &metav1.CreateOptions{DryRun: []string{"All"}})
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		require.NotNil(t, created.Spec.PreferRancherProxy)
+		assert.True(t, *created.Spec.PreferRancherProxy)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.Equal(t, "downstream2", config.CurrentContext)
+	})
 	t.Run("exclude default entry with mixed clusters", func(t *testing.T) {
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -1666,20 +2085,22 @@ func TestStoreCreate(t *testing.T) {
 		}).Times(1)
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          commonAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:               true,
+			authorizer:               commonAuthorizer,
+			nsCache:                  nsCache,
+			configMapClient:          configMapClient,
+			userCache:                userCache,
+			tokenStore:               tokenStore,
+			clusterCache:             clusterCache,
+			nodeCache:                nodeCache,
+			tokenMgr:                 tokenManager,
+			getCACert:                func() string { return "" },
+			getDefaultTTL:            getDefaultTTL,
+			getMaxTTL:                getMaxTTL,
+			getServerURL:             getServerURL,
+			shouldGenerateToken:      shouldGenerateToken,
+			shouldExecGetToken:       func() bool { return false },
+			shouldPreferRancherProxy: shouldPreferRancherProxy,
 		}
 
 		ctx := userContext(adminID, authTokenID)
@@ -2287,6 +2708,7 @@ func TestStoreGet(t *testing.T) {
 		pathCMCurrentContextField,
 		pathCMDescriptionField,
 		pathCMTTLField,
+		pathCMPreferRancherProxyField,
 		pathCMStatusConditionsField,
 		pathCMStatusSummaryField,
 		pathCMStatusTokensField,
@@ -2332,10 +2754,11 @@ func TestStoreGet(t *testing.T) {
 			},
 		},
 		Data: map[string]string{
-			TTLField:            strconv.FormatInt(defaultTTL, 10),
-			DescriptionField:    "test",
-			CurrentContextField: "c-m-tbgzfbgf",
-			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+			TTLField:                strconv.FormatInt(defaultTTL, 10),
+			DescriptionField:        "test",
+			CurrentContextField:     "c-m-tbgzfbgf",
+			ClustersField:           `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+			PreferRancherProxyField: "true",
 		},
 	}
 
@@ -2344,6 +2767,7 @@ func TestStoreGet(t *testing.T) {
 		pathKConfigCurrentContextField,
 		pathKConfigDescriptionField,
 		pathKConfigTTLField,
+		pathKConfigPreferRancherProxyField,
 		fieldpath.MakePathOrDie("metadata"),
 		fieldpath.MakePathOrDie("type"),
 	).ToJSON()
@@ -2404,6 +2828,8 @@ func TestStoreGet(t *testing.T) {
 		assert.Equal(t, defaultTTL, kubeconfig.Spec.TTL)
 		assert.Equal(t, configMap.Data[DescriptionField], kubeconfig.Spec.Description)
 		assert.Equal(t, configMap.Data[CurrentContextField], kubeconfig.Spec.CurrentContext)
+		require.NotNil(t, kubeconfig.Spec.PreferRancherProxy)
+		assert.True(t, *kubeconfig.Spec.PreferRancherProxy)
 
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
 		require.NoError(t, err)
@@ -3278,6 +3704,148 @@ func TestStoreUpdate(t *testing.T) {
 			assert.False(t, isCreated)
 			assert.True(t, apierrors.IsBadRequest(err))
 		})
+	})
+	t.Run("spec.preferRancherProxy", func(t *testing.T) {
+		tests := []struct {
+			desc    string
+			stored  *bool // Nil for a kubeconfig created before the field was added.
+			value   *bool
+			wantErr bool
+		}{
+			{desc: "false changed to true is rejected", stored: ptr.To(false), value: ptr.To(true), wantErr: true},
+			{desc: "true changed to false is rejected", stored: ptr.To(true), value: ptr.To(false), wantErr: true},
+			{desc: "value set on a kubeconfig without one is rejected", value: ptr.To(false), wantErr: true},
+			{desc: "unchanged false is kept", stored: ptr.To(false), value: ptr.To(false)},
+			{desc: "unchanged true is kept", stored: ptr.To(true), value: ptr.To(true)},
+			{desc: "unset keeps the stored value", stored: ptr.To(true)},
+			{desc: "unset on a kubeconfig without a value", value: nil},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				storedConfigMap := oldConfigMap.DeepCopy()
+				if tt.stored != nil {
+					storedConfigMap.Data[PreferRancherProxyField] = strconv.FormatBool(*tt.stored)
+				}
+
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+					return storedConfigMap.DeepCopy(), nil
+				})
+				if !tt.wantErr {
+					configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+						assert.Equal(t, storedConfigMap.Data[PreferRancherProxyField], configMap.Data[PreferRancherProxyField])
+						assert.Equal(t, "updated", configMap.Data[DescriptionField])
+						return configMap.DeepCopy(), nil
+					})
+				}
+
+				store := &Store{
+					authorizer:      commonAuthorizer,
+					configMapClient: configMapClient,
+					userCache:       userCache,
+					tokenMgr:        tokenManager,
+				}
+
+				updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
+
+				ctx := userContext(userID, "")
+
+				oldKubeconfig, err := store.fromConfigMap(storedConfigMap)
+				require.NoError(t, err)
+
+				update := oldKubeconfig.DeepCopy()
+				update.Spec.Description = "updated"
+				update.Spec.PreferRancherProxy = tt.value
+				objInfo := &fakeUpdatedObjectInfo{obj: update}
+
+				obj, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, &metav1.UpdateOptions{})
+				assert.False(t, isCreated)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Nil(t, obj)
+					assert.True(t, apierrors.IsBadRequest(err))
+					assert.ErrorContains(t, err, "spec.preferRancherProxy is immutable")
+					return
+				}
+
+				require.NoError(t, err)
+				updated := obj.(*ext.Kubeconfig)
+				assert.Equal(t, tt.stored, updated.Spec.PreferRancherProxy)
+				assert.Equal(t, "updated", updated.Spec.Description)
+			})
+		}
+	})
+	t.Run("spec.includeDefaultEntry", func(t *testing.T) {
+		tests := []struct {
+			desc    string
+			stored  *bool // Nil when the field was omitted on create.
+			value   *bool
+			wantErr bool
+		}{
+			{desc: "false changed to true is rejected", stored: ptr.To(false), value: ptr.To(true), wantErr: true},
+			{desc: "true changed to false is rejected", stored: ptr.To(true), value: ptr.To(false), wantErr: true},
+			{desc: "value set on a kubeconfig without one is rejected", value: ptr.To(false), wantErr: true},
+			{desc: "unchanged false is kept", stored: ptr.To(false), value: ptr.To(false)},
+			{desc: "unchanged true is kept", stored: ptr.To(true), value: ptr.To(true)},
+			{desc: "unset keeps the stored value", stored: ptr.To(true)},
+			{desc: "unset on a kubeconfig without a value", value: nil},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				storedConfigMap := oldConfigMap.DeepCopy()
+				if tt.stored != nil {
+					storedConfigMap.Data[IncludeDefaultEntryField] = strconv.FormatBool(*tt.stored)
+				}
+
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+					return storedConfigMap.DeepCopy(), nil
+				})
+				if !tt.wantErr {
+					configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+						assert.Equal(t, storedConfigMap.Data[IncludeDefaultEntryField], configMap.Data[IncludeDefaultEntryField])
+						assert.Equal(t, "updated", configMap.Data[DescriptionField])
+						return configMap.DeepCopy(), nil
+					})
+				}
+
+				store := &Store{
+					authorizer:      commonAuthorizer,
+					configMapClient: configMapClient,
+					userCache:       userCache,
+					tokenMgr:        tokenManager,
+				}
+
+				updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
+
+				ctx := userContext(userID, "")
+
+				oldKubeconfig, err := store.fromConfigMap(storedConfigMap)
+				require.NoError(t, err)
+
+				update := oldKubeconfig.DeepCopy()
+				update.Spec.Description = "updated"
+				update.Spec.IncludeDefaultEntry = tt.value
+				objInfo := &fakeUpdatedObjectInfo{obj: update}
+
+				obj, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, &metav1.UpdateOptions{})
+				assert.False(t, isCreated)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Nil(t, obj)
+					assert.True(t, apierrors.IsBadRequest(err))
+					assert.ErrorContains(t, err, "spec.includeDefaultEntry is immutable")
+					return
+				}
+
+				require.NoError(t, err)
+				updated := obj.(*ext.Kubeconfig)
+				assert.Equal(t, tt.stored, updated.Spec.IncludeDefaultEntry)
+				assert.Equal(t, "updated", updated.Spec.Description)
+			})
+		}
 	})
 	t.Run("dryRun", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -4771,5 +5339,105 @@ func TestIncludeDefaultEntryConfigMapRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result.Spec.IncludeDefaultEntry)
 		assert.True(t, *result.Spec.IncludeDefaultEntry)
+	})
+}
+
+func TestPreferRancherProxyConfigMapRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+
+	t.Run("nil round-trips as nil", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL: 3600,
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.NotContains(t, cm.Data, PreferRancherProxyField)
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		assert.Nil(t, result.Spec.PreferRancherProxy)
+	})
+	t.Run("false round-trips as false", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL:                3600,
+				PreferRancherProxy: ptr.To(false),
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.Equal(t, "false", cm.Data[PreferRancherProxyField])
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		require.NotNil(t, result.Spec.PreferRancherProxy)
+		assert.False(t, *result.Spec.PreferRancherProxy)
+	})
+	t.Run("true round-trips as true", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL:                3600,
+				PreferRancherProxy: ptr.To(true),
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.Equal(t, "true", cm.Data[PreferRancherProxyField])
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		require.NotNil(t, result.Spec.PreferRancherProxy)
+		assert.True(t, *result.Spec.PreferRancherProxy)
+	})
+	t.Run("invalid stored value", func(t *testing.T) {
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Data: map[string]string{
+				TTLField:                "3600",
+				PreferRancherProxyField: "foo",
+			},
+		}
+
+		_, err := store.fromConfigMap(cm)
+		assert.ErrorContains(t, err, "error parsing preferRancherProxy")
+	})
+	t.Run("managed fields are mapped to the configmap", func(t *testing.T) {
+		fieldsJSON, err := fieldpath.NewSet(pathKConfigPreferRancherProxyField).ToJSON()
+		require.NoError(t, err)
+
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+				ManagedFields: []metav1.ManagedFieldsEntry{
+					{
+						Manager:    "kubeconfig",
+						FieldsType: "v1",
+						FieldsV1:   &metav1.FieldsV1{Raw: fieldsJSON},
+					},
+				},
+			},
+			Spec: ext.KubeconfigSpec{
+				TTL:                3600,
+				PreferRancherProxy: ptr.To(true),
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		require.Len(t, cm.ManagedFields, 1)
+
+		wantJSON, err := fieldpath.NewSet(pathCMPreferRancherProxyField).ToJSON()
+		require.NoError(t, err)
+		assert.JSONEq(t, string(wantJSON), string(cm.ManagedFields[0].FieldsV1.Raw))
 	})
 }

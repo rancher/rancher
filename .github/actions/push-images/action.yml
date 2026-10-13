@@ -16,7 +16,7 @@ runs:
         path: /tmp
         merge-multiple: true
     - name: Setup Environment Variables
-      uses: ./.github/actions/setup-tag-env
+      uses: $/.github/actions/setup-tag-env
     - name: Docker Registry Login
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:

@@ -14,10 +14,12 @@ import (
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var update = flag.Bool("update", false, "update snapshot files with current test outputs")
@@ -70,16 +72,19 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
+			// deliberately out of order: the rendered tolerations must come out
+			// sorted, otherwise the pod template changes on every reconcile and
+			// the agent is rolled out endlessly
 			taints: []corev1.Taint{
+				{
+					Key:    "key2",
+					Effect: corev1.TaintEffectPreferNoSchedule,
+				},
 				{
 					Key:       "key1",
 					Value:     "value1",
 					Effect:    corev1.TaintEffectNoSchedule,
 					TimeAdded: &metav1.Time{}, // this should be stripped from tolerations
-				},
-				{
-					Key:    "key2",
-					Effect: corev1.TaintEffectPreferNoSchedule,
 				},
 			},
 		},
@@ -467,4 +472,56 @@ func sanitizeName(name string) string {
 	name = strings.ReplaceAll(name, " ", "-")
 	name = strings.ReplaceAll(name, ",", "")
 	return name
+}
+
+func TestSystemTemplate_quotedValues(t *testing.T) {
+	secretLister := &corefakes.SecretListerMock{
+		GetFunc: func(namespace string, name string) (*corev1.Secret, error) {
+			return nil, apierror.NewNotFound(schema.GroupResource{}, name)
+		},
+	}
+	payload := "x\"\n          - name: EXTRA\n            value: \"y"
+
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-quoted"},
+		Spec: apimgmtv3.ClusterSpec{
+			DisplayName:    "test",
+			ImportedConfig: &apimgmtv3.ImportedConfig{PrivateRegistryURL: payload},
+		},
+		Status: apimgmtv3.ClusterStatus{Driver: "imported"},
+	}
+
+	var b bytes.Buffer
+	err := SystemTemplate(&b, &TemplateOps{
+		AgentImage:   payload,
+		AuthImage:    payload,
+		AssetsImage:  payload,
+		Token:        "token",
+		URL:          "https://rancher.example",
+		Cluster:      cluster,
+		SecretLister: secretLister,
+		Mutator:      namespace.GetMutator(),
+	})
+	assert.NoError(t, err)
+
+	var found bool
+	for _, r := range strings.Split(b.String(), "\n---\n") {
+		obj, gvk, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(r), nil, nil)
+		if err != nil || gvk.Kind != "Deployment" {
+			continue
+		}
+		found = true
+		container := obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0]
+		assert.Equal(t, payload, container.Image)
+		for _, ic := range obj.(*appsv1.Deployment).Spec.Template.Spec.InitContainers {
+			assert.Equal(t, payload, ic.Image)
+		}
+		for _, env := range container.Env {
+			assert.NotEqual(t, "EXTRA", env.Name)
+			if env.Name == "CATTLE_SYSTEM_DEFAULT_REGISTRY" {
+				assert.Equal(t, payload, env.Value)
+			}
+		}
+	}
+	assert.True(t, found, "cattle-cluster-agent deployment not rendered")
 }

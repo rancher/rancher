@@ -57,6 +57,7 @@ type RKE2ConfigServer struct {
 	capiClusterCache         capicontrollers.ClusterCache
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
+	namespaceCache           corecontrollers.NamespaceCache
 	k8s                      kubernetes.Interface
 
 	capiAvailable bool
@@ -84,6 +85,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		mgmtClusterCache:         clients.Mgmt.Cluster().Cache(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
+		namespaceCache:           clients.Core.Namespace().Cache(),
 		k8s:                      clients.K8s,
 	}
 

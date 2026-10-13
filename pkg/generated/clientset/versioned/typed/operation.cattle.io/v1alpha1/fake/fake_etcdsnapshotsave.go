@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
-	operationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1"
+	operationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/operation.cattle.io/v1alpha1"
+	typedoperationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeETCDSnapshotSaves implements ETCDSnapshotSaveInterface
 type fakeETCDSnapshotSaves struct {
-	*gentype.FakeClientWithList[*v1alpha1.ETCDSnapshotSave, *v1alpha1.ETCDSnapshotSaveList]
+	*gentype.FakeClientWithListAndApply[*v1alpha1.ETCDSnapshotSave, *v1alpha1.ETCDSnapshotSaveList, *operationcattleiov1alpha1.ETCDSnapshotSaveApplyConfiguration]
 	Fake *FakeOperationV1alpha1
 }
 
-func newFakeETCDSnapshotSaves(fake *FakeOperationV1alpha1, namespace string) operationcattleiov1alpha1.ETCDSnapshotSaveInterface {
+func newFakeETCDSnapshotSaves(fake *FakeOperationV1alpha1, namespace string) typedoperationcattleiov1alpha1.ETCDSnapshotSaveInterface {
 	return &fakeETCDSnapshotSaves{
-		gentype.NewFakeClientWithList[*v1alpha1.ETCDSnapshotSave, *v1alpha1.ETCDSnapshotSaveList](
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.ETCDSnapshotSave, *v1alpha1.ETCDSnapshotSaveList, *operationcattleiov1alpha1.ETCDSnapshotSaveApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1alpha1.SchemeGroupVersion.WithResource("etcdsnapshotsaves"),

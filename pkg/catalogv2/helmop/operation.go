@@ -552,6 +552,16 @@ func (c Command) renderArgs() ([]string, error) {
 		dataMap["server-side"] = "true"
 	}
 
+	if v, ok := dataMap["wait"]; ok {
+		delete(dataMap, "wait")
+		waitValue := convert.ToString(v)
+		if waitValue == "true" {
+			dataMap["wait"] = "watcher"
+		}
+		// If wait is false or any other value, omit the flag entirely.
+		// Helm v4 defaults to hookOnly when --wait is not specified.
+	}
+
 	for k, v := range dataMap {
 		s := convert.ToString(v)
 		k = convert.ToArgKey(k)

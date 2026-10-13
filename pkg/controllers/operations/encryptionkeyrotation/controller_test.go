@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
@@ -15,6 +17,7 @@ import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,6 +40,15 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{}, nil
 }
 
+// The restore-target and install methods complete the ops.Adapter contract; only the etcd snapshot
+// restore controller uses them.
+func (a *stubAdapter) RestoreTarget(_ string) (*unstructured.Unstructured, error) { return nil, nil }
+func (a *stubAdapter) UpdateRestoreTarget(_ *unstructured.Unstructured) error     { return nil }
+func (a *stubAdapter) WaitForRestoreTarget() (bool, error)                        { return true, nil }
+func (a *stubAdapter) InstallInstruction(_ *corev1.Secret, _ string) (plan.OneTimeInstruction, bool) {
+	return plan.OneTimeInstruction{}, false
+}
+
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }
@@ -45,8 +57,11 @@ func (a *stubAdapter) RuntimeCommand() string {
 	return "rke2"
 }
 
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	return "/var/lib/rancher/rke2"
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return "/var/lib/rancher/rke2", nil
+}
+func (a *stubAdapter) DistroManifestPaths(_ string) ops.ManifestPaths {
+	return ops.ManifestPaths{}
 }
 
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -56,12 +71,20 @@ func (a *stubAdapter) ServerUnit() string {
 	return "rke2-server"
 }
 
+func (a *stubAdapter) RuntimeService(_ *corev1.Secret) string {
+	return "rke2-server"
+}
+
+func (a *stubAdapter) DistroServices(secret *corev1.Secret) []string {
+	return ops.DistroServices(a.RuntimeCommand(), secret)
+}
+
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }
 
-func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string {
-	return "/var/lib/rancher/rke2/bin/kubectl"
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
+	return "/var/lib/rancher/rke2/bin/kubectl", nil
 }
 
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string {
@@ -87,12 +110,16 @@ func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
 func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/config.yaml.d"
 }
+func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, _ string) (ops.ComponentTLSSettings, error) {
+	return ops.ComponentTLSSettings{}, nil
+}
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
 func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
-func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret, _ *rkev1.ETCDSnapshotS3, _ string, _ bool) ([]string, []string, []plan.File, error) {
+	return nil, nil, nil, nil
 }
+func (a *stubAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 { return nil }
 
 type enqueueCall struct {
 	gvk       schema.GroupVersionKind
@@ -165,7 +192,9 @@ func newScope(op *opv1alpha1.EncryptionKeyRotation, beacon *planv1alpha1.Beacon,
 
 type fakeEncryptionKeyRotationController struct {
 	operationcontrollers.EncryptionKeyRotationController
-	getFn func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error)
+	getFn        func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error)
+	enqueueCalls int
+	deleteCalls  int
 }
 
 func (f *fakeEncryptionKeyRotationController) Get(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
@@ -173,6 +202,15 @@ func (f *fakeEncryptionKeyRotationController) Get(namespace, name string, opts m
 		return nil, nil
 	}
 	return f.getFn(namespace, name, opts)
+}
+
+func (f *fakeEncryptionKeyRotationController) EnqueueAfter(_, _ string, _ time.Duration) {
+	f.enqueueCalls++
+}
+
+func (f *fakeEncryptionKeyRotationController) Delete(_, _ string, _ *metav1.DeleteOptions) error {
+	f.deleteCalls++
+	return nil
 }
 
 type fakeBeaconClient struct {
@@ -893,6 +931,209 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 			}
 			if tt.wantRefCleared && s.beacon.Annotations[beaconOwnerRefAnnotation] != "" {
 				t.Fatalf("expected owner ref annotation cleared")
+			}
+		})
+	}
+}
+
+func TestUpdateStatusPausedCondition(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name            string
+		paused          bool
+		initiallyPaused bool
+		expectedStatus  string
+		expectedReason  string
+		expectedMessage string
+	}{
+		{
+			name:            "paused",
+			paused:          true,
+			initiallyPaused: false,
+			expectedStatus:  "True",
+			expectedReason:  opv1alpha1.PausedReason,
+			expectedMessage: "Operation is paused",
+		},
+		{
+			name:            "resumed",
+			paused:          false,
+			initiallyPaused: true,
+			expectedStatus:  "False",
+			expectedReason:  opv1alpha1.NotPausedReason,
+			expectedMessage: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = tc.paused
+			op.Generation = 7
+
+			initialStatus := opv1alpha1.EncryptionKeyRotationStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase: opv1alpha1.OperationPhaseInProgress,
+				},
+				Step: opv1alpha1.EncryptionKeyRotationStepRotate,
+			}
+
+			if tc.initiallyPaused {
+				opv1alpha1.PausedCondition.True(&initialStatus)
+				opv1alpha1.PausedCondition.Reason(&initialStatus, opv1alpha1.PausedReason)
+				opv1alpha1.PausedCondition.Message(&initialStatus, "Operation is paused")
+			}
+
+			status := updateStatus(op, initialStatus)
+
+			if status.ObservedGeneration != int64(7) {
+				t.Errorf("ObservedGeneration = %d, want 7", status.ObservedGeneration)
+			}
+			if got := opv1alpha1.PausedCondition.GetStatus(&status); got != tc.expectedStatus {
+				t.Errorf("PausedCondition status = %q, want %q", got, tc.expectedStatus)
+			}
+			if got := opv1alpha1.PausedCondition.GetReason(&status); got != tc.expectedReason {
+				t.Errorf("PausedCondition reason = %q, want %q", got, tc.expectedReason)
+			}
+			if got := opv1alpha1.PausedCondition.GetMessage(&status); got != tc.expectedMessage {
+				t.Errorf("PausedCondition message = %q, want %q", got, tc.expectedMessage)
+			}
+
+			// Verify phase and step are unchanged
+			if status.Phase != initialStatus.Phase {
+				t.Errorf("Phase = %q, want %q (unchanged)", status.Phase, initialStatus.Phase)
+			}
+			if status.Step != initialStatus.Step {
+				t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
+			}
+		})
+	}
+}
+
+func TestOnChange_Paused(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Paused = true
+	op.Generation = 7
+
+	initialStatus := opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase: opv1alpha1.OperationPhaseInProgress,
+		},
+		Step: opv1alpha1.EncryptionKeyRotationStepRotate,
+	}
+
+	op.Status = initialStatus
+
+	h := &handler{}
+	status, err := h.OnChange(op, op.Status)
+
+	if err != nil {
+		t.Fatalf("OnChange returned error: %v", err)
+	}
+
+	// Verify PausedCondition is set to True
+	if got := opv1alpha1.PausedCondition.GetStatus(&status); got != "True" {
+		t.Errorf("PausedCondition status = %q, want %q", got, "True")
+	}
+	if got := opv1alpha1.PausedCondition.GetReason(&status); got != opv1alpha1.PausedReason {
+		t.Errorf("PausedCondition reason = %q, want %q", got, opv1alpha1.PausedReason)
+	}
+	if got := opv1alpha1.PausedCondition.GetMessage(&status); got != "Operation is paused" {
+		t.Errorf("PausedCondition message = %q, want %q", got, "Operation is paused")
+	}
+
+	// Verify ObservedGeneration is updated
+	if status.ObservedGeneration != int64(7) {
+		t.Errorf("ObservedGeneration = %d, want 7", status.ObservedGeneration)
+	}
+
+	// Verify phase and step are preserved
+	if status.Phase != initialStatus.Phase {
+		t.Errorf("Phase = %q, want %q (unchanged)", status.Phase, initialStatus.Phase)
+	}
+	if status.Step != initialStatus.Step {
+		t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
+	}
+}
+
+func TestOnChange_StablePausedOperation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		phase       opv1alpha1.OperationPhase
+		step        opv1alpha1.EncryptionKeyRotationStep
+		ttl         int64
+		lastUpdated metav1.Time
+	}{
+		{
+			name:        "stable in-progress paused operation",
+			phase:       opv1alpha1.OperationPhaseInProgress,
+			step:        opv1alpha1.EncryptionKeyRotationStepRotate,
+			ttl:         300,
+			lastUpdated: metav1.Now(),
+		},
+		{
+			name:        "stable terminal expired paused operation",
+			phase:       opv1alpha1.OperationPhaseSucceeded,
+			step:        opv1alpha1.EncryptionKeyRotationStepRotate,
+			ttl:         0,
+			lastUpdated: metav1.NewTime(metav1.Now().Add(-10 * time.Minute)),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = true
+			op.Spec.TTL = tc.ttl
+			op.Generation = 7
+
+			initialStatus := opv1alpha1.EncryptionKeyRotationStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase:       tc.phase,
+					LastUpdated: tc.lastUpdated,
+				},
+				Step: tc.step,
+			}
+
+			// Pre-compute the expected status with paused condition
+			currentStatus := updateStatus(op, initialStatus)
+			op.Status = currentStatus
+
+			controller := &fakeEncryptionKeyRotationController{}
+			h := &handler{
+				encryptionkeyrotations: controller,
+			}
+
+			returnedStatus, err := h.OnChange(op, op.Status)
+			if err != nil {
+				t.Fatalf("OnChange returned error: %v", err)
+			}
+
+			// Verify status unchanged
+			if !equality.Semantic.DeepEqual(returnedStatus, currentStatus) {
+				t.Errorf("returnedStatus differs from currentStatus")
+			}
+
+			// Verify phase and step preserved
+			if returnedStatus.Phase != tc.phase {
+				t.Errorf("Phase = %q, want %q", returnedStatus.Phase, tc.phase)
+			}
+			if returnedStatus.Step != tc.step {
+				t.Errorf("Step = %q, want %q", returnedStatus.Step, tc.step)
+			}
+
+			// Verify no delete occurred
+			if controller.deleteCalls != 0 {
+				t.Errorf("Delete called %d times, want 0", controller.deleteCalls)
+			}
+
+			// Verify no enqueue occurred
+			if controller.enqueueCalls != 0 {
+				t.Errorf("EnqueueAfter called %d times, want 0", controller.enqueueCalls)
 			}
 		})
 	}

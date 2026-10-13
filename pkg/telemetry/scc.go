@@ -20,12 +20,13 @@ const (
 
 // SccPayload represents the canonical golang implementation of `schemas/scc-RMSSubscription.json`
 type SccPayload struct {
-	Version         string          `json:"version" jsonschema:"pattern=^\\d+\\.\\d+\\.\\d+$,description=Product Version normalized for SCC - must be semver. https://semver.org/"`
-	Subscription    SccSubscription `json:"subscription"`
-	FeatureFlags    []string        `json:"feature_flags,omitempty" jsonschema:"description=Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"`
-	ManagedSystems  []SccSystem     `json:"managedSystems" jsonschema:"description=Active systems under management and their details; to be expanded"`
-	ManagedClusters []SccCluster    `json:"managedClusters"`
-	Timestamp       time.Time       `json:"timestamp"`
+	Version                     string          `json:"version" jsonschema:"pattern=^\\d+\\.\\d+\\.\\d+$,description=Product Version normalized for SCC - must be semver. https://semver.org/"`
+	Subscription                SccSubscription `json:"subscription"`
+	FeatureFlags                []string        `json:"feature_flags,omitempty" jsonschema:"description=Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"`
+	ManagedSystems              []SccSystem     `json:"managedSystems" jsonschema:"description=Active systems under management and their details; to be expanded"`
+	ManagedClusters             []SccCluster    `json:"managedClusters"`
+	NVIDIARegistrySecretPresent bool            `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=Check if any NVIDIA registration key is being used by SUSE AI Factory,default=false"`
+	Timestamp                   time.Time       `json:"timestamp"`
 }
 
 type SccSubscription struct {
@@ -166,10 +167,11 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	}
 
 	return &SccPayload{
-		Version:         productVersion,
-		FeatureFlags:    telG.FeatureFlags(),
-		ManagedSystems:  systems,
-		ManagedClusters: clusters,
+		Version:                     productVersion,
+		FeatureFlags:                telG.FeatureFlags(),
+		ManagedSystems:              systems,
+		ManagedClusters:             clusters,
+		NVIDIARegistrySecretPresent: telG.IsNVIDIAPresent(),
 		Subscription: SccSubscription{
 			InstallUUID: telG.InstallUUID(),
 			ClusterUUID: telG.ClusterUUID(),

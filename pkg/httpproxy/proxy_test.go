@@ -3,6 +3,9 @@ package httpproxy
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -524,4 +527,39 @@ func TestIsBadHeader(t *testing.T) {
 			assert.Equal(t, test.isBad, isBadHeader(test.key))
 		})
 	}
+}
+
+// ReverseProxy merges the upstream headers in with Add, so without stripInheritedCSP the client receives two Content-Security-Policy headers.
+func TestInheritedCSPIsNotDuplicated(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	upstreamURL, err := url.Parse(upstream.URL)
+	assert.NoError(t, err)
+
+	reverseProxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = upstreamURL.Scheme
+			req.URL.Host = upstreamURL.Host
+			req.Host = upstreamURL.Host
+		},
+		ModifyResponse: setModifiedHeaders,
+	}
+
+	// globalMiddleware stands in for the chain in pkg/rancher/rancher.go, which sets the header before the request reaches here.
+	globalMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			rw.Header().Set(CSP, "base-uri 'self'; object-src 'none'; frame-ancestors 'self'")
+			next.ServeHTTP(rw, req)
+		})
+	}
+
+	recorder := httptest.NewRecorder()
+	globalMiddleware(stripInheritedCSP(reverseProxy)).
+		ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/meta/proxy/example.com/", nil))
+
+	// The proxy's own sandboxing policy must be the only one sent.
+	assert.Equal(t, []string{"default-src 'none'; style-src 'unsafe-inline'; sandbox"}, recorder.Header()[CSP])
 }

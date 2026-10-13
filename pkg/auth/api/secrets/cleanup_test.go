@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	azuread "github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -197,68 +198,160 @@ func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.S
 	return secretController
 }
 
-func TestCleanupClientSecretsOKTAConfig(t *testing.T) {
+func TestCleanupClientSecretsWithLDAPConfig(t *testing.T) {
+	for _, config := range []*v3.AuthConfig{
+		&v3.AuthConfig{
+			Type:       client.OKTAConfigType,
+			ObjectMeta: metav1.ObjectMeta{Name: "okta"},
+			Enabled:    true,
+		},
+		&v3.AuthConfig{
+			Type:       client.ADFSConfigType,
+			ObjectMeta: metav1.ObjectMeta{Name: "adfs"},
+			Enabled:    true,
+		},
+	} {
+		secretName1 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "spkey")
+		secretName2 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "serviceaccountpassword")
+		oauthSecretName := "user123-secret"
+
+		initialStore := map[string]*corev1.Secret{}
+		ctrl := gomock.NewController(t)
+		secrets := getSecretControllerMock(ctrl, initialStore)
+
+		_, err := secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName1,
+				Namespace: common.SecretsNamespace,
+			},
+		})
+		assert.NoError(t, err)
+
+		_, err = secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName2,
+				Namespace: common.SecretsNamespace,
+			},
+		})
+		assert.NoError(t, err)
+
+		_, err = secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      oauthSecretName,
+				Namespace: tokens.SecretNamespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				config.Name: []byte("my user token"),
+			},
+		})
+		assert.NoError(t, err)
+
+		s, err := secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
+		assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName1)
+
+		s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
+		assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName2)
+
+		s, err = secrets.Get(tokens.SecretNamespace, oauthSecretName, metav1.GetOptions{})
+		assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", oauthSecretName)
+
+		err = CleanupClientSecrets(secrets, config)
+		assert.NoError(t, err)
+
+		t.Run("Cleanup deletes provider secrets - "+config.Type, func(t *testing.T) {
+			s, err = secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
+			assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName1)
+			assert.Nil(t, s, "expected the secret to be nil")
+
+			s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
+			assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName2)
+			assert.Nil(t, s, "expected the secret to be nil")
+		})
+	}
+}
+
+func TestCleanupClientSecretsAdditionalConfig(t *testing.T) {
 	config := &v3.AuthConfig{
-		Type:       client.OKTAConfigType,
-		ObjectMeta: metav1.ObjectMeta{Name: "okta"},
+		Type:       client.GithubConfigType,
+		ObjectMeta: metav1.ObjectMeta{Name: "github-eu"},
 		Enabled:    true,
 	}
 
-	secretName1 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "spkey")
-	secretName2 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "serviceaccountpassword")
-	oauthSecretName := "user123-secret"
-
-	initialStore := map[string]*corev1.Secret{}
+	defaultSecretName := "githubconfig-clientsecret"
+	configSecretName := "githubconfig-github-eu-clientsecret"
 	ctrl := gomock.NewController(t)
-	secrets := getSecretControllerMock(ctrl, initialStore)
+	secrets := getSecretControllerMock(ctrl, map[string]*corev1.Secret{})
 
+	for _, name := range []string{defaultSecretName, configSecretName} {
+		_, err := secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: common.SecretsNamespace},
+		})
+		require.NoError(t, err)
+	}
+
+	oauthSecretName := "user123-secret"
 	_, err := secrets.Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName1,
-			Namespace: common.SecretsNamespace,
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: oauthSecretName, Namespace: tokens.SecretNamespace},
+		Type:       corev1.SecretTypeOpaque,
+		Data:       map[string][]byte{config.Name: []byte("my user token")},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	_, err = secrets.Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName2,
-			Namespace: common.SecretsNamespace,
-		},
+	require.NoError(t, CleanupClientSecrets(secrets, config))
+
+	_, err = secrets.Get(common.SecretsNamespace, configSecretName, metav1.GetOptions{})
+	assert.Error(t, err, "expected the secret belonging to the disabled config to be deleted")
+
+	_, err = secrets.Get(common.SecretsNamespace, defaultSecretName, metav1.GetOptions{})
+	assert.NoError(t, err, "expected the secret belonging to the default config to be retained")
+
+	_, err = secrets.Get(tokens.SecretNamespace, oauthSecretName, metav1.GetOptions{})
+	assert.Error(t, err, "expected the OAuth tokens for the disabled config to be deleted")
+}
+
+func TestCleanupClientSecretsAdditionalAzureConfig(t *testing.T) {
+	config := &v3.AuthConfig{
+		Type:       client.AzureADConfigType,
+		ObjectMeta: metav1.ObjectMeta{Name: "azure-eu"},
+		Enabled:    true,
+	}
+
+	ctrl := gomock.NewController(t)
+	secrets := getSecretControllerMock(ctrl, map[string]*corev1.Secret{})
+	for _, name := range []string{"azuread-access-token", "azure-eu-access-token"} {
+		_, err := secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: common.SecretsNamespace},
+		})
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, CleanupClientSecrets(secrets, config))
+
+	_, err := secrets.Get(common.SecretsNamespace, "azure-eu-access-token", metav1.GetOptions{})
+	assert.Error(t, err, "expected the access token for the disabled config to be deleted")
+
+	_, err = secrets.Get(common.SecretsNamespace, "azuread-access-token", metav1.GetOptions{})
+	assert.NoError(t, err, "expected the access token for the default config to be retained")
+}
+
+func TestCleanupClientSecretsAzureConfigWithLongName(t *testing.T) {
+	config := &v3.AuthConfig{
+		Type:       client.AzureADConfigType,
+		ObjectMeta: metav1.ObjectMeta{Name: strings.Repeat("a", 100)},
+		Enabled:    true,
+	}
+
+	secretName := azuread.AccessTokenSecretName(config.Name)
+	ctrl := gomock.NewController(t)
+	secrets := getSecretControllerMock(ctrl, map[string]*corev1.Secret{})
+	_, err := secrets.Create(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: common.SecretsNamespace},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	_, err = secrets.Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      oauthSecretName,
-			Namespace: tokens.SecretNamespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			config.Name: []byte("my user token"),
-		},
-	})
-	assert.NoError(t, err)
+	require.NoError(t, CleanupClientSecrets(secrets, config))
 
-	s, err := secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
-	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName1)
-
-	s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
-	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName2)
-
-	s, err = secrets.Get(tokens.SecretNamespace, oauthSecretName, metav1.GetOptions{})
-	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", oauthSecretName)
-
-	err = CleanupClientSecrets(secrets, config)
-	assert.NoError(t, err)
-
-	t.Run("Cleanup deletes provider secrets", func(t *testing.T) {
-		s, err = secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
-		assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName1)
-		assert.Nil(t, s, "expected the secret to be nil")
-
-		s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
-		assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName2)
-		assert.Nil(t, s, "expected the secret to be nil")
-	})
+	_, err = secrets.Get(common.SecretsNamespace, secretName, metav1.GetOptions{})
+	assert.Error(t, err, "expected the access token for the disabled config to be deleted")
 }

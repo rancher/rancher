@@ -18,6 +18,8 @@ go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 All tests can be run with `make controller-test`. That runs the bash script [`run_controller_tests.sh`](./run_controller_tests.sh).
 To specify a k8s version, set the environment variable `ENVTEST_K8S_VERSION`. Otherwise it will use the latest version available.
 
+Alternatively run `make test` which will install dependencies before running the tests.
+
 ### Manually
 
 After installing `setup-envtest`, export the environment variable `KUBEBUILDER_ASSETS` to point to where setup-envtest was installed using the following:

@@ -3,6 +3,7 @@ package snapshotutil
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
 	"reflect"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestCompressInterface(t *testing.T) {
@@ -50,6 +52,49 @@ func TestCompressInterface(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, tt.value, target)
 		})
+	}
+}
+
+// TestDecompressInterfaceNumberTypes pins the number convention DecompressInterface decodes with.
+// Consumers that decode into a map[string]any compare the result against, and write it into,
+// unstructured objects, where an integral number is an int64; encoding/json would hand back a
+// float64 that silently never compares equal to it.
+func TestDecompressInterfaceNumberTypes(t *testing.T) {
+	payload, err := CompressInterface(map[string]any{
+		"integral":    30,
+		"negative":    -1,
+		"zero":        0,
+		"fractional":  1.5,
+		"exponential": 1e3,
+		"large":       int64(math.MaxInt64),
+		"nested":      map[string]any{"deep": 7},
+		"slice":       []any{300, map[string]any{"deeper": 8}},
+		"string":      "30",
+		"bool":        true,
+	})
+	require.NoError(t, err)
+
+	decoded := map[string]any{}
+	require.NoError(t, DecompressInterface(payload, &decoded))
+
+	assert.Equal(t, int64(30), decoded["integral"])
+	assert.Equal(t, int64(-1), decoded["negative"])
+	assert.Equal(t, int64(0), decoded["zero"])
+	assert.Equal(t, 1.5, decoded["fractional"])
+	// Marshals as 1000, so it is integral on the wire regardless of its Go type.
+	assert.Equal(t, int64(1000), decoded["exponential"])
+	assert.Equal(t, int64(math.MaxInt64), decoded["large"])
+	assert.Equal(t, int64(7), decoded["nested"].(map[string]any)["deep"])
+	assert.Equal(t, int64(300), decoded["slice"].([]any)[0])
+	assert.Equal(t, int64(8), decoded["slice"].([]any)[1].(map[string]any)["deeper"])
+	// Types other than numbers are untouched.
+	assert.Equal(t, "30", decoded["string"])
+	assert.Equal(t, true, decoded["bool"])
+
+	// unstructured.SetNestedField rejects any value it cannot represent, so a decoded tree that
+	// writes cleanly is also a tree applyRestoreMode can apply.
+	for k, v := range decoded {
+		require.NoError(t, unstructured.SetNestedField(map[string]any{}, v, "spec", k), "field %q", k)
 	}
 }
 

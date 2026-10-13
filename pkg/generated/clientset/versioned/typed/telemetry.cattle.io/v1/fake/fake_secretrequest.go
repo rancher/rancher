@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1"
-	telemetrycattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1"
+	telemetrycattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/telemetry.cattle.io/v1"
+	typedtelemetrycattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeSecretRequests implements SecretRequestInterface
 type fakeSecretRequests struct {
-	*gentype.FakeClientWithList[*v1.SecretRequest, *v1.SecretRequestList]
+	*gentype.FakeClientWithListAndApply[*v1.SecretRequest, *v1.SecretRequestList, *telemetrycattleiov1.SecretRequestApplyConfiguration]
 	Fake *FakeTelemetryV1
 }
 
-func newFakeSecretRequests(fake *FakeTelemetryV1) telemetrycattleiov1.SecretRequestInterface {
+func newFakeSecretRequests(fake *FakeTelemetryV1) typedtelemetrycattleiov1.SecretRequestInterface {
 	return &fakeSecretRequests{
-		gentype.NewFakeClientWithList[*v1.SecretRequest, *v1.SecretRequestList](
+		gentype.NewFakeClientWithListAndApply[*v1.SecretRequest, *v1.SecretRequestList, *telemetrycattleiov1.SecretRequestApplyConfiguration](
 			fake.Fake,
 			"",
 			v1.SchemeGroupVersion.WithResource("secretrequests"),

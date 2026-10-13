@@ -9,6 +9,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -87,6 +88,48 @@ func waitForBackpopulatedSnapshot(t *testing.T, clients *clients.Clients, cluste
 	return picked
 }
 
+// waitForBackpopulatedSnapshotForStorage polls until a snapshot with the given storage has been
+// back-populated for the cluster, then returns the most recently created one.
+//
+// The selector is the cluster label alone, with the storage checked on the object. A local snapshot
+// additionally carries the node it was taken on, but an S3 one does not — snapshotbackpopulate owns
+// an S3 snapshot by the cluster, because any etcd node can pull it back out of the bucket, and the
+// restore controller elects any etcd machine for the same reason.
+func waitForBackpopulatedSnapshotForStorage(t *testing.T, clients *clients.Clients, clusterNamespace, clusterName string, storage snapshotbackpopulate.Storage, createdAfter time.Time) *rkev1.ETCDSnapshot {
+	t.Helper()
+
+	var picked *rkev1.ETCDSnapshot
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 10*time.Minute, true, func(_ context.Context) (bool, error) {
+		list, err := clients.RKE.ETCDSnapshot().List(clusterNamespace, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, clusterName),
+		})
+		if err != nil {
+			return false, err
+		}
+		for i := range list.Items {
+			s := &list.Items[i]
+			if s.SnapshotFile.Name == "" {
+				continue
+			}
+			if (s.SnapshotFile.S3 != nil) != (storage == snapshotbackpopulate.S3) {
+				continue
+			}
+			if s.SnapshotFile.CreatedAt == nil || !s.SnapshotFile.CreatedAt.Time.After(createdAfter) {
+				continue
+			}
+			if picked == nil || s.SnapshotFile.CreatedAt.After(picked.SnapshotFile.CreatedAt.Time) {
+				picked = s
+			}
+		}
+		return picked != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for a back-populated %s ETCDSnapshot CR in %s: %v", storage, clusterNamespace, err)
+	}
+	t.Logf("using %s snapshot %s/%s (file=%s)", storage, picked.Namespace, picked.Name, picked.SnapshotFile.Name)
+	return picked
+}
+
 // SnapshotRestoreOption mutates the ETCDSnapshotRestore object before it is submitted. Mirrors
 // SnapshotSaveOption — use it to attach lifecycle-hook labels or override the default TTL.
 type SnapshotRestoreOption func(*opv1alpha1.ETCDSnapshotRestore)
@@ -102,6 +145,15 @@ func WithRestoreLabels(labels map[string]string) SnapshotRestoreOption {
 		for k, v := range labels {
 			op.Labels[k] = v
 		}
+	}
+}
+
+// WithRestoreMode sets the restore mode, i.e. how much of the cluster configuration captured in the
+// snapshot is restored alongside etcd. The mode must be one the snapshot advertises on its
+// capr.RestoreModeOptionsAnnotation, otherwise the operation is canceled during preflight.
+func WithRestoreMode(mode string) SnapshotRestoreOption {
+	return func(op *opv1alpha1.ETCDSnapshotRestore) {
+		op.Spec.Args.RestoreMode = mode
 	}
 }
 

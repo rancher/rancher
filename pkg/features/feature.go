@@ -113,8 +113,8 @@ var (
 	ProvisioningPreBootstrap = newFeature(
 		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
-		false,
-		false,
+		true,
+		true,
 		true)
 	CleanStaleSecrets = newFeature(
 		"clean-stale-secrets",
@@ -161,7 +161,7 @@ var (
 	ClusterAutoscaling = newPrimeFeature(
 		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",
-		true,
+		IsPrime(), // we only want this to show in the UI if it's a prime build - even if it's a prime-only feature.
 		false,
 		true,
 	)
@@ -179,7 +179,7 @@ var (
 		false,
 		true,
 	)
-	SCIM = newFeature(
+	SCIM = newPrimeFeature(
 		"scim",
 		"Enable SCIM identity provisioning",
 		false,
@@ -228,6 +228,39 @@ var (
 		true,
 		true,
 	)
+	ADFSLDAPSearch = newPrimeFeature(
+		"adfs-ldap-search",
+		"Enable LDAP search for ADFS/SAML",
+		true,
+		false,
+		true,
+	)
+	UIConfigurableTables = newFeature(
+		"ui-configurable-tables",
+		"Enable configurable UI tables",
+		true,
+		true,
+		true,
+	)
+	UIConfigurableDashboards = newFeature(
+		"ui-configurable-dashboards",
+		"[Experimental] Allow users to customise specific UI pages",
+		false,
+		true,
+		true,
+	)
+	MultiAuthProviders = newPrimeFeature(
+		"multiple-auth-providers",
+		"Allows multiple enabled auth-providers",
+		true,
+		true,
+		true)
+	MultiAuthProviderCross = newPrimeFeature(
+		"multiple-auth-provider-cross",
+		"Search across all auth-providers",
+		false,
+		true,
+		true)
 )
 
 func ListEnabled() []string {

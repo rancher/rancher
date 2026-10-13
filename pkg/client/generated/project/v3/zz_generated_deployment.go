@@ -19,6 +19,7 @@ const (
 	DeploymentFieldDeploymentStatus              = "deploymentStatus"
 	DeploymentFieldEnableServiceLinks            = "enableServiceLinks"
 	DeploymentFieldEphemeralContainers           = "ephemeralContainers"
+	DeploymentFieldEvictionResponders            = "evictionResponders"
 	DeploymentFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	DeploymentFieldFsgid                         = "fsgid"
 	DeploymentFieldGids                          = "gids"
@@ -91,6 +92,7 @@ type Deployment struct {
 	DeploymentStatus              *DeploymentStatus              `json:"deploymentStatus,omitempty" yaml:"deploymentStatus,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`

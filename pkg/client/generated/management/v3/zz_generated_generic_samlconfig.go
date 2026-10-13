@@ -8,6 +8,7 @@ const (
 	GenericSAMLConfigFieldAnnotations         = "annotations"
 	GenericSAMLConfigFieldCreated             = "created"
 	GenericSAMLConfigFieldCreatorID           = "creatorId"
+	GenericSAMLConfigFieldDisplayName         = "displayName"
 	GenericSAMLConfigFieldDisplayNameField    = "displayNameField"
 	GenericSAMLConfigFieldEnabled             = "enabled"
 	GenericSAMLConfigFieldEntityID            = "entityID"
@@ -40,6 +41,7 @@ type GenericSAMLConfig struct {
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName         string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DisplayNameField    string            `json:"displayNameField,omitempty" yaml:"displayNameField,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EntityID            string            `json:"entityID,omitempty" yaml:"entityID,omitempty"`

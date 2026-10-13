@@ -8,6 +8,7 @@ const (
 	ADFSConfigFieldAnnotations         = "annotations"
 	ADFSConfigFieldCreated             = "created"
 	ADFSConfigFieldCreatorID           = "creatorId"
+	ADFSConfigFieldDisplayName         = "displayName"
 	ADFSConfigFieldDisplayNameField    = "displayNameField"
 	ADFSConfigFieldEnabled             = "enabled"
 	ADFSConfigFieldEntityID            = "entityID"
@@ -20,6 +21,7 @@ const (
 	ADFSConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	ADFSConfigFieldName                = "name"
 	ADFSConfigFieldNameIDFormat        = "nameIDFormat"
+	ADFSConfigFieldOpenLdapConfig      = "openLdapConfig"
 	ADFSConfigFieldOwnerReferences     = "ownerReferences"
 	ADFSConfigFieldRancherAPIHost      = "rancherApiHost"
 	ADFSConfigFieldRemoved             = "removed"
@@ -40,6 +42,7 @@ type ADFSConfig struct {
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName         string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DisplayNameField    string            `json:"displayNameField,omitempty" yaml:"displayNameField,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EntityID            string            `json:"entityID,omitempty" yaml:"entityID,omitempty"`
@@ -52,6 +55,7 @@ type ADFSConfig struct {
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NameIDFormat        string            `json:"nameIDFormat,omitempty" yaml:"nameIDFormat,omitempty"`
+	OpenLdapConfig      *LdapFields       `json:"openLdapConfig,omitempty" yaml:"openLdapConfig,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`

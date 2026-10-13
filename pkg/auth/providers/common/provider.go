@@ -46,7 +46,7 @@ type AuthProvider interface {
 	// GetUserExtraAttributes retrieves the extra attributes from the specified principal.
 	// Used during login, to create the login token.
 	GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string
-	IsDisabledProvider() (bool, error)
+	IsDisabledProvider(string) (bool, error)
 
 	// LogoutAll implements the "logout-all" action for the provider, if supported. If
 	// "logout-all" is not supported do nothing and return nil.

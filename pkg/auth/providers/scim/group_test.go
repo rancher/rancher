@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-var testDefaultGetConfig = func(string) providerConfig { return defaultProviderConfig() }
+var testDefaultGetConfig = func(string) scimconfig.Config { return scimconfig.Default() }
 
 func TestGetRancherGroupMembers(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -197,6 +198,90 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 	assert.Equal(t, userResource, developers[0].Type)
 }
 
+func TestResolveGroupMembers(t *testing.T) {
+	provider := "okta"
+	groupName := "Engineering"
+
+	t.Run("rejects nested group member", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// getRancherGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			getConfig: testDefaultGetConfig,
+		}
+
+		members, err := srv.resolveGroupMembers(provider, groupPrincipalName(provider, groupName), []scimMember{
+			{Value: "grp-xyz", Type: "Group", Display: "SubTeam"},
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, members)
+		scimErr, ok := err.(*Error)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
+	})
+
+	t.Run("rejects unsupported member type", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// getRancherGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			getConfig: testDefaultGetConfig,
+		}
+
+		members, err := srv.resolveGroupMembers(provider, groupPrincipalName(provider, groupName), []scimMember{
+			{Value: "something-else", Type: "SomethingElse", Display: "Something Else"},
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, members)
+		scimErr, ok := err.(*Error)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
+	})
+
+	t.Run("rejects member not found in pre-flight", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// getRancherGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		// User does not exist.
+		notFound := &apierrors.StatusError{
+			ErrStatus: metav1.Status{
+				Status: metav1.StatusFailure,
+				Reason: metav1.StatusReasonNotFound,
+				Code:   http.StatusNotFound,
+			},
+		}
+		userCache.EXPECT().Get("u-missing").Return(nil, notFound)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			getConfig: testDefaultGetConfig,
+		}
+
+		members, err := srv.resolveGroupMembers(provider, groupPrincipalName(provider, groupName), []scimMember{
+			{Value: "u-missing", Display: "missing.user"},
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, members)
+		scimErr, ok := err.(*Error)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, scimErr.Status)
+	})
+}
+
 func TestSyncGroupMembers(t *testing.T) {
 	provider := "okta"
 	groupName := "Engineering"
@@ -205,14 +290,12 @@ func TestSyncGroupMembers(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		// Current state: no members.
-		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
 		// Adding one member.
 		newMember := scimMember{Value: "u-mo773yttt4", Display: "john.doe"}
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
-		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
+		}, nil)
 
 		existingAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
@@ -244,7 +327,7 @@ func TestSyncGroupMembers(t *testing.T) {
 			getConfig:      testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember})
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember}, map[string]string{})
 		require.NoError(t, err)
 	})
 
@@ -258,7 +341,6 @@ func TestSyncGroupMembers(t *testing.T) {
 		}
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 		userCache.EXPECT().Get("u-new").Return(user, nil).AnyTimes()
 
 		userMGR := mocks.NewMockManager(ctrl)
@@ -282,7 +364,7 @@ func TestSyncGroupMembers(t *testing.T) {
 			getConfig:      testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember})
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember}, map[string]string{})
 		require.NoError(t, err)
 
 		require.NotNil(t, created)
@@ -297,7 +379,6 @@ func TestSyncGroupMembers(t *testing.T) {
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		// Current state: one member.
 		existingUser := &v3.User{ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"}}
-		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
 
 		existingAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
@@ -311,9 +392,6 @@ func TestSyncGroupMembers(t *testing.T) {
 			},
 		}
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(existingAttr, nil)
-
 		// Remove the member.
 		userCache.EXPECT().Get("u-mo773yttt4").Return(existingUser, nil)
 		userMGR := mocks.NewMockManager(ctrl)
@@ -326,91 +404,14 @@ func TestSyncGroupMembers(t *testing.T) {
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(updatedAttr, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userMGR:            userMGR,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{})
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{}, map[string]string{"u-mo773yttt4": "john.doe"})
 		require.NoError(t, err)
-	})
-
-	t.Run("rejects nested group member", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-
-		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		// getRancherGroupMembers: no current members.
-		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
-
-		srv := &SCIMServer{
-			userCache: userCache,
-			getConfig: testDefaultGetConfig,
-		}
-
-		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
-			{Value: "grp-xyz", Type: "Group", Display: "SubTeam"},
-		})
-
-		require.Error(t, err)
-		scimErr, ok := err.(*Error)
-		require.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
-	})
-
-	t.Run("rejects unsupported member type", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-
-		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		// getRancherGroupMembers: no current members.
-		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
-
-		srv := &SCIMServer{
-			userCache: userCache,
-			getConfig: testDefaultGetConfig,
-		}
-
-		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
-			{Value: "something-else", Type: "SomethingElse", Display: "Something Else"},
-		})
-
-		require.Error(t, err)
-		scimErr, ok := err.(*Error)
-		require.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
-	})
-
-	t.Run("rejects member not found in pre-flight", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-
-		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		// getRancherGroupMembers: no current members.
-		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
-
-		// Pre-flight: user does not exist.
-		notFound := &apierrors.StatusError{
-			ErrStatus: metav1.Status{
-				Status: metav1.StatusFailure,
-				Reason: metav1.StatusReasonNotFound,
-				Code:   http.StatusNotFound,
-			},
-		}
-		userCache.EXPECT().Get("u-missing").Return(nil, notFound)
-
-		srv := &SCIMServer{
-			userCache: userCache,
-			getConfig: testDefaultGetConfig,
-		}
-
-		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
-			{Value: "u-missing", Display: "missing.user"},
-		})
-
-		require.Error(t, err)
-		scimErr, ok := err.(*Error)
-		require.True(t, ok)
-		assert.Equal(t, http.StatusNotFound, scimErr.Status)
 	})
 }
 
@@ -506,12 +507,6 @@ func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
 	userCache.EXPECT().Get(memberID).Return(&v3.User{
 		ObjectMeta: metav1.ObjectMeta{Name: memberID},
 	}, nil).AnyTimes()
-	userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
-		{ObjectMeta: metav1.ObjectMeta{Name: memberID}},
-	}, nil)
-
-	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil).AnyTimes()
 
 	userMGR := mocks.NewMockManager(ctrl)
 	userMGR.EXPECT().EnsureAndGetUserAttribute(memberID).Return(existingAttr, false, nil)
@@ -525,22 +520,21 @@ func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
 	})
 
 	srv := &SCIMServer{
-		userCache:          userCache,
-		userAttributeCache: userAttributeCache,
-		userAttributes:     userAttrClient,
-		userMGR:            userMGR,
-		getConfig:          testDefaultGetConfig,
+		userCache:      userCache,
+		userAttributes: userAttrClient,
+		userMGR:        userMGR,
+		getConfig:      testDefaultGetConfig,
 	}
 
 	err := srv.syncGroupMembers(provider, principalName, groupName, []scimMember{
 		{Value: memberID, Display: "john.doe"},
-	})
+	}, map[string]string{memberID: "john.doe"})
 	require.NoError(t, err)
 }
 
 func TestApplyPatchGroup(t *testing.T) {
-	cfg := defaultProviderConfig()
-	externalIDCfg := providerConfig{GroupIDAttribute: GroupIDExternalID}
+	cfg := scimconfig.Default()
+	externalIDCfg := scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 
 	t.Run("replaces externalId", func(t *testing.T) {
 		group := &v3.Group{ExternalID: "old-id"}
@@ -849,7 +843,7 @@ func TestPatchGroup(t *testing.T) {
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
@@ -857,8 +851,9 @@ func TestPatchGroup(t *testing.T) {
 
 		// Adding member.
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
-		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-mo773yttt4"},
+			PrincipalIDs: []string{"local://u-mo773yttt4", provider + "_user://john.doe"},
+		}, nil).Times(2) // Once in resolveGroupMembers, once inside addGroupMember.
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: "u-mo773yttt4"},
@@ -866,7 +861,9 @@ func TestPatchGroup(t *testing.T) {
 		}, false, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
 
-		// For final getRancherGroupMembers call.
+		// First call in resolveGroupMembers: the group has no members yet.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+		// Second call for the final getRancherGroupMembers.
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
 			{ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"}},
 		}, nil)
@@ -938,7 +935,7 @@ func TestPatchGroup(t *testing.T) {
 
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
@@ -984,7 +981,7 @@ func TestPatchGroup(t *testing.T) {
 
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
@@ -1032,11 +1029,14 @@ func TestPatchGroup(t *testing.T) {
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
 		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		// resolveGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
 		// Pre-flight: user does not exist.
 		notFound := &apierrors.StatusError{
@@ -1092,7 +1092,7 @@ func TestPatchGroup(t *testing.T) {
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
@@ -1148,7 +1148,7 @@ func TestPatchGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "old-external-id",
 			Provider:    provider,
@@ -1203,7 +1203,7 @@ func TestPatchGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "old-external-id",
 			Provider:    provider,
@@ -1258,7 +1258,7 @@ func TestPatchGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "old-external-id",
 			Provider:    provider,
@@ -1268,8 +1268,8 @@ func TestPatchGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -1306,7 +1306,7 @@ func TestPatchGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "same-external-id",
 			Provider:    provider,
@@ -1320,8 +1320,8 @@ func TestPatchGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupCache,
 			userCache:   userCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -1357,7 +1357,7 @@ func TestPatchGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "old-external-id",
 			Provider:    provider,
@@ -1417,15 +1417,16 @@ func TestPatchGroup(t *testing.T) {
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
 		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
 
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
-		}, nil).Times(2)
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-mo773yttt4"},
+			PrincipalIDs: []string{"local://u-mo773yttt4", provider + "_user://john.doe"},
+		}, nil).Times(2) // Once in resolveGroupMembers, once inside addGroupMember.
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: "u-mo773yttt4"},
@@ -1433,6 +1434,9 @@ func TestPatchGroup(t *testing.T) {
 		}, false, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
 
+		// First call in resolveGroupMembers: the group has no members yet.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+		// Second call for the final getRancherGroupMembers.
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
 			{ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"}},
 		}, nil)
@@ -1487,7 +1491,7 @@ func TestPatchGroup(t *testing.T) {
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
@@ -1541,7 +1545,7 @@ func TestPatchGroup(t *testing.T) {
 
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			Provider:    provider,
 		}
@@ -1892,7 +1896,7 @@ func TestCreateGroup(t *testing.T) {
 		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
 		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
 
-		// Mock for syncGroupMembers -> getRancherGroupMembers
+		// Mock for resolveGroupMembers -> getRancherGroupMembers
 		enabled := true
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
@@ -1902,9 +1906,10 @@ func TestCreateGroup(t *testing.T) {
 			},
 		}, nil)
 		userCache.EXPECT().Get("u-user1").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
-			Enabled:    &enabled,
-		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-user1"},
+			Enabled:      &enabled,
+			PrincipalIDs: []string{"local://u-user1", provider + "_user://user1"},
+		}, nil).Times(2) // Once in resolveGroupMembers, once inside addGroupMember.
 
 		userAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
@@ -2129,20 +2134,14 @@ func TestCreateGroup(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
-	t.Run("error syncing members", func(t *testing.T) {
+	t.Run("error resolving members", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
+		// The group is not listed or created, because the members are resolved first.
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
-
-		createdGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
-			DisplayName: "Engineering",
-		}
 		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
 
-		// getRancherGroupMembers calls userCache.List
+		// resolveGroupMembers -> getRancherGroupMembers calls userCache.List
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("list failed"))
 
@@ -2173,20 +2172,32 @@ func TestCreateGroup(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
+	t.Run("error syncing members after the group is created", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+		srv.groups.EXPECT().Create(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+			group = group.DeepCopy()
+			group.Name = "grp-new"
+			return group, nil
+		})
+		// The member resolves, but adding it fails.
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-owned").Return(nil, false, fmt.Errorf("some error"))
+
+		payload := map[string]any{"displayName": "NewGroup", "members": []map[string]any{{"value": "u-owned"}}}
+		w := httptest.NewRecorder()
+		srv.CreateGroup(w, newSCIMRequest(t, http.MethodPost, providerA, groupEndpoint, "", payload))
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
 	t.Run("rejects group type member in members list", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
+		// The group is not listed or created, because the members are resolved first.
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
-
-		createdGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
-			DisplayName: "Engineering",
-		}
 		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
 
-		// syncGroupMembers -> getRancherGroupMembers needs List; pre-flight rejects group type before any Get.
+		// resolveGroupMembers -> getRancherGroupMembers needs List; the member type check rejects
+		// group type before any Get.
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
@@ -2220,17 +2231,11 @@ func TestCreateGroup(t *testing.T) {
 	t.Run("member not found returns 404", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
+		// The group is not listed or created, because the members are resolved first.
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
-
-		createdGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
-			DisplayName: "Engineering",
-		}
 		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
 
-		// syncGroupMembers -> getRancherGroupMembers; then pre-flight Get finds user missing.
+		// resolveGroupMembers -> getRancherGroupMembers; then the member Get finds user missing.
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 		notFound := &apierrors.StatusError{
@@ -2269,20 +2274,21 @@ func TestCreateGroup(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
-	t.Run("conflict when group found by ID", func(t *testing.T) {
+	t.Run("conflict by displayName when the body has an id", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: "grp-existing"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-existing", Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-id",
 		}
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().Get("grp-existing").Return(existingGroup, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
 
-		// When ID is provided and the group exists, CreateGroup returns 409 Conflict
-		// without persisting any change. The mutability-gated update belongs to UpdateGroup.
+		// CreateGroup ignores the id in the body and finds the existing group by displayName.
+		// It returns 409 Conflict without persisting any change. The mutability-gated update
+		// belongs to UpdateGroup.
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			getConfig:   testDefaultGetConfig,
@@ -2355,7 +2361,7 @@ func TestGetGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-eng-001",
 		}
@@ -2422,7 +2428,7 @@ func TestGetGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-eng-001",
 		}
@@ -2461,7 +2467,7 @@ func TestGetGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -2555,7 +2561,7 @@ func TestGetGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -2591,7 +2597,7 @@ func TestGetGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -2661,7 +2667,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-id",
 		}
@@ -2716,7 +2722,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "old-ext-id",
 		}
@@ -2773,7 +2779,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "old-ext-id",
 		}
@@ -2783,8 +2789,8 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -2815,7 +2821,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Old Name",
 			ExternalID:  "ext-123",
 		}
@@ -2836,8 +2842,8 @@ func TestUpdateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -2867,7 +2873,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Old Name",
 			ExternalID:  "ext-123",
 		}
@@ -2906,7 +2912,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-id",
 		}
@@ -2921,9 +2927,10 @@ func TestUpdateGroup(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "u-user1"}, Enabled: &enabled},
 		}, nil)
 		userCache.EXPECT().Get("u-user1").Return(&v3.User{
-			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
-			Enabled:    &enabled,
-		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-user1"},
+			Enabled:      &enabled,
+			PrincipalIDs: []string{"local://u-user1", provider + "_user://user1"},
+		}, nil).Times(2) // Once in resolveGroupMembers, once inside addGroupMember.
 
 		userAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
@@ -3071,12 +3078,12 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
-	t.Run("error syncing members", func(t *testing.T) {
+	t.Run("error resolving members", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-id",
 		}
@@ -3115,12 +3122,34 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
+	t.Run("error syncing members after the group is renamed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+		srv.getConfig = externalIDGroupConfig
+		srv.groups.EXPECT().Update(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+			assert.Equal(t, "GroupA renamed", group.DisplayName)
+			return group, nil
+		})
+		// The member resolves, but adding it fails.
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-owned").Return(nil, false, fmt.Errorf("some error"))
+
+		payload := map[string]any{
+			"id":          "grp-a",
+			"displayName": "GroupA renamed",
+			"externalId":  "ext-grp-a",
+			"members":     []map[string]any{{"value": "u-owned"}},
+		}
+		w := httptest.NewRecorder()
+		srv.UpdateGroup(w, newSCIMRequest(t, http.MethodPut, providerA, groupEndpoint, "grp-a", payload))
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
 	t.Run("removes members not in update", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupID := "grp-abc123"
 		existingGroup := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 			ExternalID:  "ext-id",
 		}
@@ -3199,7 +3228,7 @@ func TestDeleteGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -3234,7 +3263,7 @@ func TestDeleteGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -3358,7 +3387,7 @@ func TestDeleteGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -3394,7 +3423,7 @@ func TestDeleteGroup(t *testing.T) {
 
 		groupID := "grp-abc123"
 		group := &v3.Group{
-			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID, Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: "Engineering",
 		}
 
@@ -3427,5 +3456,428 @@ func TestDeleteGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, resp.Schemas, errorSchemaID)
 		assert.Equal(t, http.StatusInternalServerError, resp.Status)
+	})
+}
+
+func TestGroupHandlersOwnership(t *testing.T) {
+	for _, id := range []string{"grp-b", "grp-missing"} {
+		putPayload := map[string]any{"id": id, "displayName": "GroupB", "externalId": "ext-grp-b", "members": []map[string]any{}}
+		patchPayload := map[string]any{
+			"schemas":    []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{{"op": "replace", "path": "externalId", "value": "changed"}},
+		}
+
+		for _, tt := range []struct {
+			method  string
+			handler func(*SCIMServer) http.HandlerFunc
+			body    any
+		}{
+			{method: http.MethodGet, handler: func(s *SCIMServer) http.HandlerFunc { return s.GetGroup }},
+			{method: http.MethodPut, handler: func(s *SCIMServer) http.HandlerFunc { return s.UpdateGroup }, body: putPayload},
+			{method: http.MethodPatch, handler: func(s *SCIMServer) http.HandlerFunc { return s.PatchGroup }, body: patchPayload},
+			{method: http.MethodDelete, handler: func(s *SCIMServer) http.HandlerFunc { return s.DeleteGroup }},
+		} {
+			t.Run(tt.method+" "+id+" returns not found and writes nothing", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				srv := newOwnershipFixtures().server(ctrl)
+
+				w := httptest.NewRecorder()
+				tt.handler(srv.SCIMServer)(w, newSCIMRequest(t, tt.method, providerA, groupEndpoint, id, tt.body))
+				require.Equal(t, http.StatusNotFound, w.Code)
+
+				var resp Error
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, "Group "+id+" not found", resp.Detail)
+			})
+		}
+	}
+}
+
+func TestCreateGroupIgnoresBodyID(t *testing.T) {
+	for _, id := range []string{"grp-b", "grp-a", "grp-missing"} {
+		for _, tt := range []struct {
+			displayName string
+			wantStatus  int
+		}{
+			{displayName: "NewGroup", wantStatus: http.StatusCreated},
+			{displayName: "GroupA", wantStatus: http.StatusConflict},
+			{displayName: "GroupB", wantStatus: http.StatusCreated},
+		} {
+			t.Run("id "+id+" and displayName "+tt.displayName, func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				f := newOwnershipFixtures()
+				srv := f.server(ctrl)
+
+				// The group is looked up by displayName within provider A's groups, never by id.
+				groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+				groupsCache.EXPECT().List(labels.Set{authProviderLabel: providerA}.AsSelector()).Return([]*v3.Group{f.groups["grp-a"]}, nil)
+				srv.groupsCache = groupsCache
+
+				if tt.wantStatus == http.StatusCreated {
+					srv.groups.EXPECT().Create(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+						assert.Equal(t, providerA, group.Labels[authProviderLabel])
+						assert.Equal(t, tt.displayName, group.DisplayName)
+						group = group.DeepCopy()
+						group.Name = "grp-new"
+						return group, nil
+					})
+				}
+
+				payload := map[string]any{"id": id, "displayName": tt.displayName}
+				w := httptest.NewRecorder()
+				srv.CreateGroup(w, newSCIMRequest(t, http.MethodPost, providerA, groupEndpoint, "", payload))
+				require.Equal(t, tt.wantStatus, w.Code)
+
+				if tt.wantStatus == http.StatusCreated {
+					var resp map[string]any
+					require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+					assert.Equal(t, "grp-new", resp["id"])
+				}
+			})
+		}
+	}
+}
+
+// memberIDs returns the member IDs from a SCIM group resource.
+func memberIDs(t *testing.T, resource map[string]any) []string {
+	t.Helper()
+
+	members, ok := resource["members"].([]any)
+	require.True(t, ok)
+
+	var ids []string
+	for _, member := range members {
+		ids = append(ids, member.(map[string]any)["value"].(string))
+	}
+	return ids
+}
+
+// assertGroupARemoved returns a DoAndReturn function for userAttributes.Update that checks grp-a's
+// principal was removed.
+// When the test ends, it checks that the updated users are exactly the given ones.
+func assertGroupARemoved(t *testing.T, users ...string) func(*v3.UserAttribute) (*v3.UserAttribute, error) {
+	var updated []string
+	t.Cleanup(func() { assert.ElementsMatch(t, users, updated) })
+
+	return func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+		updated = append(updated, attr.Name)
+		assert.Empty(t, attr.GroupPrincipals[providerA].Items)
+		return attr, nil
+	}
+}
+
+func TestGroupExistingMembersNotOwned(t *testing.T) {
+	// grp-a has three members: u-locallinked is owned; u-admin and u-othermember aren't.
+	t.Run("GET shows members who aren't owned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		w := httptest.NewRecorder()
+		srv.GetGroup(w, newSCIMRequest(t, http.MethodGet, providerA, groupEndpoint, "grp-a", nil))
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, []string{"u-admin", "u-locallinked", "u-othermember"}, memberIDs(t, resp))
+	})
+
+	t.Run("list shows members who aren't owned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		w := httptest.NewRecorder()
+		srv.ListGroups(w, newSCIMRequest(t, http.MethodGet, providerA, groupEndpoint, "", nil))
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp listResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Len(t, resp.Resources, 2) // grp-a and grp-a2.
+		assert.Equal(t, []string{"u-admin", "u-locallinked", "u-othermember"}, memberIDs(t, resp.Resources[0].(map[string]any)))
+	})
+
+	t.Run("PUT keeps members who aren't owned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute(gomock.Any()).DoAndReturn(f.ensureAndGetUserAttribute).Times(3)
+
+		payload := map[string]any{
+			"id":          "grp-a",
+			"displayName": "GroupA",
+			"externalId":  "ext-grp-a",
+			"members":     []map[string]any{{"value": "u-admin"}, {"value": "u-othermember"}, {"value": "u-locallinked"}},
+		}
+		w := httptest.NewRecorder()
+		srv.UpdateGroup(w, newSCIMRequest(t, http.MethodPut, providerA, groupEndpoint, "grp-a", payload))
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("PUT that keeps the default admin and adds a system user returns not found and writes nothing", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		payload := map[string]any{
+			"id":          "grp-a",
+			"displayName": "GroupA",
+			"externalId":  "ext-grp-a",
+			"members":     []map[string]any{{"value": "u-admin"}, {"value": "u-othermember"}, {"value": "u-locallinked"}, {"value": "u-system"}},
+		}
+		w := httptest.NewRecorder()
+		srv.UpdateGroup(w, newSCIMRequest(t, http.MethodPut, providerA, groupEndpoint, "grp-a", payload))
+		require.Equal(t, http.StatusNotFound, w.Code)
+
+		var resp Error
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "User u-system not found", resp.Detail)
+	})
+
+	t.Run("PATCH add keeps members who aren't owned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute(gomock.Any()).DoAndReturn(f.ensureAndGetUserAttribute).Times(2)
+
+		payload := map[string]any{
+			"schemas":    []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{{"op": "add", "path": "members", "value": []map[string]any{{"value": "u-admin"}, {"value": "u-othermember"}}}},
+		}
+		w := httptest.NewRecorder()
+		srv.PatchGroup(w, newSCIMRequest(t, http.MethodPatch, providerA, groupEndpoint, "grp-a", payload))
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, []string{"u-admin", "u-locallinked", "u-othermember"}, memberIDs(t, resp))
+	})
+
+	t.Run("PATCH remove takes out members who aren't owned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute(gomock.Any()).DoAndReturn(f.ensureAndGetUserAttribute).Times(2)
+		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(assertGroupARemoved(t, "u-admin", "u-othermember")).Times(2)
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{"op": "remove", "path": `members[value eq "u-admin"]`},
+				{"op": "remove", "path": `members[value eq "u-othermember"]`},
+			},
+		}
+		w := httptest.NewRecorder()
+		srv.PatchGroup(w, newSCIMRequest(t, http.MethodPatch, providerA, groupEndpoint, "grp-a", payload))
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("PUT without members who aren't owned takes them out", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute(gomock.Any()).DoAndReturn(f.ensureAndGetUserAttribute).Times(3)
+		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(assertGroupARemoved(t, "u-admin", "u-othermember")).Times(2)
+
+		payload := map[string]any{"id": "grp-a", "displayName": "GroupA", "externalId": "ext-grp-a", "members": []map[string]any{{"value": "u-locallinked"}}}
+		w := httptest.NewRecorder()
+		srv.UpdateGroup(w, newSCIMRequest(t, http.MethodPut, providerA, groupEndpoint, "grp-a", payload))
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("DELETE takes out members who aren't owned", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute(gomock.Any()).DoAndReturn(f.ensureAndGetUserAttribute).Times(3)
+		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(assertGroupARemoved(t, "u-admin", "u-othermember", "u-locallinked")).Times(3)
+		srv.groups.EXPECT().Delete("grp-a", gomock.Any()).Return(nil)
+
+		w := httptest.NewRecorder()
+		srv.DeleteGroup(w, newSCIMRequest(t, http.MethodDelete, providerA, groupEndpoint, "grp-a", nil))
+		assert.Equal(t, http.StatusNoContent, w.Code)
+	})
+
+	t.Run("POST keeps a member who isn't owned but already holds the group principal", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newOwnershipFixtures()
+		// The default admin got the new group's principal from a login to provider A.
+		f.attrs["u-admin"].GroupPrincipals[providerA] = v3.Principals{Items: []v3.Principal{{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupPrincipalName(providerA, "NewGroup")},
+			DisplayName: "NewGroup",
+		}}}
+		srv := f.server(ctrl)
+		srv.groups.EXPECT().Create(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+			group = group.DeepCopy()
+			group.Name = "grp-new"
+			return group, nil
+		})
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-admin").DoAndReturn(f.ensureAndGetUserAttribute)
+
+		payload := map[string]any{"displayName": "NewGroup", "members": []map[string]any{{"value": "u-admin"}}}
+		w := httptest.NewRecorder()
+		srv.CreateGroup(w, newSCIMRequest(t, http.MethodPost, providerA, groupEndpoint, "", payload))
+		assert.Equal(t, http.StatusCreated, w.Code)
+	})
+}
+
+func TestGroupMemberAdditionsOwnership(t *testing.T) {
+	requests := []struct {
+		name string
+		// send runs the request that adds the member to a group the member isn't in.
+		send func(t *testing.T, srv *ownershipServer, member string) *httptest.ResponseRecorder
+		// groupWrite sets up the group write a successful request makes.
+		groupWrite func(t *testing.T, srv *ownershipServer)
+		// principal is the group principal a successful request gives the member.
+		principal string
+	}{
+		{
+			// The PATCH also changes externalId, so a write before the member check would show.
+			name: "PATCH add",
+			send: func(t *testing.T, srv *ownershipServer, member string) *httptest.ResponseRecorder {
+				payload := map[string]any{
+					"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+					"Operations": []map[string]any{
+						{"op": "replace", "path": "externalId", "value": "ext-grp-a2-new"},
+						{"op": "add", "path": "members", "value": []map[string]any{{"value": member}}},
+					},
+				}
+				w := httptest.NewRecorder()
+				srv.PatchGroup(w, newSCIMRequest(t, http.MethodPatch, providerA, groupEndpoint, "grp-a2", payload))
+				return w
+			},
+			groupWrite: func(t *testing.T, srv *ownershipServer) {
+				srv.groups.EXPECT().Update(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+					assert.Equal(t, "ext-grp-a2-new", group.ExternalID)
+					return group, nil
+				})
+			},
+			principal: groupPrincipalName(providerA, "GroupA2"),
+		},
+		{
+			name: "POST",
+			send: func(t *testing.T, srv *ownershipServer, member string) *httptest.ResponseRecorder {
+				payload := map[string]any{"displayName": "NewGroup", "members": []map[string]any{{"value": member}}}
+				w := httptest.NewRecorder()
+				srv.CreateGroup(w, newSCIMRequest(t, http.MethodPost, providerA, groupEndpoint, "", payload))
+				return w
+			},
+			groupWrite: func(t *testing.T, srv *ownershipServer) {
+				srv.groups.EXPECT().Create(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+					group = group.DeepCopy()
+					group.Name = "grp-new"
+					return group, nil
+				})
+			},
+			principal: groupPrincipalName(providerA, "NewGroup"),
+		},
+		{
+			// The PUT also renames the group, so a write before the member check would show.
+			name: "PUT",
+			send: func(t *testing.T, srv *ownershipServer, member string) *httptest.ResponseRecorder {
+				srv.getConfig = externalIDGroupConfig
+				payload := map[string]any{
+					"id":          "grp-a2",
+					"displayName": "GroupA2 renamed",
+					"externalId":  "ext-grp-a2",
+					"members":     []map[string]any{{"value": member}},
+				}
+				w := httptest.NewRecorder()
+				srv.UpdateGroup(w, newSCIMRequest(t, http.MethodPut, providerA, groupEndpoint, "grp-a2", payload))
+				return w
+			},
+			groupWrite: func(t *testing.T, srv *ownershipServer) {
+				srv.groups.EXPECT().Update(gomock.Any()).DoAndReturn(func(group *v3.Group) (*v3.Group, error) {
+					assert.Equal(t, "GroupA2 renamed", group.DisplayName)
+					return group, nil
+				})
+			},
+			principal: groupPrincipalName(providerA, "ext-grp-a2"),
+		},
+	}
+
+	for _, req := range requests {
+		// u-admin and u-system hold a provider A principal but aren't owned.
+		for _, member := range []string{"u-other", "u-local", "u-admin", "u-system", "u-missing"} {
+			t.Run(req.name+" with "+member+" returns not found and writes nothing", func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				srv := newOwnershipFixtures().server(ctrl)
+
+				w := req.send(t, srv, member)
+				require.Equal(t, http.StatusNotFound, w.Code)
+
+				var resp Error
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, "User "+member+" not found", resp.Detail)
+			})
+		}
+
+		t.Run(req.name+" with a user cache error returns 500 and writes nothing", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			srv := newOwnershipFixtures().server(ctrl)
+			userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+			userCache.EXPECT().Get("u-owned").Return(nil, fmt.Errorf("some error"))
+			srv.userCache = userCache
+
+			w := req.send(t, srv, "u-owned")
+			assert.Equal(t, http.StatusInternalServerError, w.Code)
+		})
+
+		t.Run(req.name+" with a local user who linked the provider adds the member", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newOwnershipFixtures()
+			srv := f.server(ctrl)
+			req.groupWrite(t, srv)
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-locallinkednm").DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+				assert.Equal(t, "u-locallinkednm", attr.Name)
+				require.Len(t, attr.GroupPrincipals[providerA].Items, 1)
+				assert.Equal(t, req.principal, attr.GroupPrincipals[providerA].Items[0].Name)
+				return attr, nil
+			})
+
+			w := req.send(t, srv, "u-locallinkednm")
+			assert.Less(t, w.Code, http.StatusMultipleChoices)
+		})
+	}
+}
+
+func TestGroupMemberAdditionsAllOrNothing(t *testing.T) {
+	// u-owned could be added, but u-other can't, so the request fails as a whole and nothing is
+	// written.
+	members := []map[string]any{{"value": "u-owned"}, {"value": "u-other"}}
+
+	t.Run("POST", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		payload := map[string]any{"displayName": "NewGroup", "members": members}
+		w := httptest.NewRecorder()
+		srv.CreateGroup(w, newSCIMRequest(t, http.MethodPost, providerA, groupEndpoint, "", payload))
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("PUT", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		payload := map[string]any{"id": "grp-a", "displayName": "GroupA", "externalId": "ext-grp-a", "members": members}
+		w := httptest.NewRecorder()
+		srv.UpdateGroup(w, newSCIMRequest(t, http.MethodPut, providerA, groupEndpoint, "grp-a", payload))
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("PATCH that also removes a member", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newOwnershipFixtures().server(ctrl)
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{"op": "remove", "path": `members[value eq "u-locallinked"]`},
+				{"op": "add", "path": "members", "value": members},
+			},
+		}
+		w := httptest.NewRecorder()
+		srv.PatchGroup(w, newSCIMRequest(t, http.MethodPatch, providerA, groupEndpoint, "grp-a", payload))
+		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 }

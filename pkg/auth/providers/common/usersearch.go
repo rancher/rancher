@@ -33,12 +33,14 @@ func NewUserSearcher(users UserLister) *UserSearcher {
 	return &UserSearcher{users: users}
 }
 
-// SearchPrincipals returns the user principals owned by provider that belong to
-// users matching searchKey, ordered by principal ID. A user contributes a
-// principal only if it carries a principal ID for provider, so users known to
-// Rancher through some other provider are left out. A search key that is empty
-// or only whitespace matches nothing, to avoid returning every user.
-func (s *UserSearcher) SearchPrincipals(provider, searchKey string) ([]apiv3.Principal, error) {
+// SearchPrincipals returns the user principals owned by the configName
+// AuthConfig that belong to users matching searchKey, ordered by principal ID.
+// A user contributes a principal only if it carries a principal ID for
+// configName, so users known to Rancher through some other config are left
+// out. The returned principals have providerName as their Provider. A search
+// key that is empty or only whitespace matches nothing, to avoid returning
+// every user.
+func (s *UserSearcher) SearchPrincipals(providerName, configName, searchKey string) ([]apiv3.Principal, error) {
 	queryKey := strings.ToLower(searchKey)
 	normalizedQueryKey := normalizeSearchKey(queryKey)
 
@@ -53,7 +55,7 @@ func (s *UserSearcher) SearchPrincipals(provider, searchKey string) ([]apiv3.Pri
 		return nil, fmt.Errorf("listing users for search %q: %w", searchKey, err)
 	}
 
-	prefix := provider + "_" + UserPrincipalType + "://"
+	prefix := configName + "_" + UserPrincipalType + "://"
 
 	var principals []apiv3.Principal
 	for _, user := range users {
@@ -76,7 +78,7 @@ func (s *UserSearcher) SearchPrincipals(provider, searchKey string) ([]apiv3.Pri
 				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
 				DisplayName:   user.DisplayName,
 				PrincipalType: UserPrincipalType,
-				Provider:      provider,
+				Provider:      providerName,
 			})
 		}
 	}
@@ -90,17 +92,17 @@ func (s *UserSearcher) SearchPrincipals(provider, searchKey string) ([]apiv3.Pri
 	return principals, nil
 }
 
-// PrincipalsWithFallback returns the principals of provider's users matching
-// searchKey, followed by fallback unless one of them already has its ID.
+// PrincipalsWithFallback returns the principals of the configName AuthConfig's
+// users matching searchKey, followed by fallback unless one of them already has its ID.
 // Providers whose identity provider offers no user lookup call this with a
 // principal built from the search key, so an admin can still enter an external
 // ID by hand for an identity Rancher has not seen yet. A nil searcher yields
 // only the fallback.
-func PrincipalsWithFallback(searcher *UserSearcher, provider, searchKey string, fallback apiv3.Principal) ([]apiv3.Principal, error) {
+func PrincipalsWithFallback(searcher *UserSearcher, providerName, configName, searchKey string, fallback apiv3.Principal) ([]apiv3.Principal, error) {
 	var principals []apiv3.Principal
 
 	if searcher != nil {
-		known, err := searcher.SearchPrincipals(provider, searchKey)
+		known, err := searcher.SearchPrincipals(providerName, configName, searchKey)
 		if err != nil {
 			return nil, err
 		}

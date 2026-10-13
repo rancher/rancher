@@ -1,6 +1,7 @@
 package snapshotbackpopulate
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -722,7 +723,7 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 					DoAndReturn(func(created *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
 						annotations := created.GetAnnotations()
 						require.NotNil(t, annotations)
-						assert.Equal(t, tc.expectedAnnotation, annotations[RestoreModeOptionsAnnotation], "Annotation should be set correctly")
+						assert.Equal(t, tc.expectedAnnotation, annotations[capr.RestoreModeOptionsAnnotation], "Annotation should be set correctly")
 
 						assert.Equal(t, "successful", created.SnapshotFile.Status, "Status should be successful because ReadyToUse is true")
 
@@ -1184,6 +1185,228 @@ func TestGetSnapshotHash(t *testing.T) {
 
 			got := getSnapshotHash(tt.snapshot)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// provClusterResourceKey is the resource key the snapshotextrametadata controller publishes a
+// v2prov cluster under. Hardcoded rather than imported because it is a wire format shared with the
+// downstream payload, not a Go constant this package owns.
+const provClusterResourceKey = "cluster.provisioning.cattle.io"
+
+// compressResources renders a resources payload the way snapshotextrametadata does.
+func compressResources(t *testing.T, resources map[string]any) string {
+	t.Helper()
+
+	payload, err := snapshotutil.CompressInterface(resources)
+	require.NoError(t, err)
+	return payload
+}
+
+// marshalRestoreModes renders a restoreModes payload the way snapshotextrametadata does.
+func marshalRestoreModes(t *testing.T, modes map[string]string) string {
+	t.Helper()
+
+	payload, err := json.Marshal(modes)
+	require.NoError(t, err)
+	return string(payload)
+}
+
+func TestGetRestoreModesAnnotationFromExtraMetadata(t *testing.T) {
+	t.Parallel()
+
+	cluster := newProvisioningClusterUnstructured("fleet-default", "example")
+
+	kubernetesVersionSelector := "$['" + provClusterResourceKey + "']['spec']['kubernetesVersion']"
+
+	// populatedResources is what snapshotextrametadata publishes for a healthy v2prov cluster.
+	populatedResources := map[string]any{
+		provClusterResourceKey: map[string]any{
+			"metadata": map[string]any{"name": "example"},
+			"spec": map[string]any{
+				"kubernetesVersion": "v1.34.1+rke2r1",
+				"rkeConfig":         map[string]any{"additionalManifest": "# manifest"},
+			},
+		},
+	}
+
+	allModes := map[string]string{
+		rkev1.RestoreRKEConfigAll:               rkev1.RestoreModeSelectorWildcard,
+		rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector,
+		rkev1.RestoreRKEConfigNone:              "",
+	}
+
+	tests := []struct {
+		name     string
+		metadata map[string]string
+		expected string
+	}{
+		{
+			name: "every mode resolves",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey:    compressResources(t, populatedResources),
+			},
+			expected: "none,kubernetesVersion,all",
+		},
+		{
+			// Nothing restorable was captured, so neither kubernetesVersion nor the wildcard "all"
+			// resolves: restoremode.Resolve expands the wildcard over restoremode.WritablePaths, so
+			// "all" is offered only when a field it would actually write was captured.
+			name: "nothing restorable was captured",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{"rkeConfig": map[string]any{}},
+					},
+				}),
+			},
+			expected: "none",
+		},
+		{
+			name: "kubernetesVersion selector resolves to an empty value",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{"kubernetesVersion": ""},
+					},
+				}),
+			},
+			expected: "none",
+		},
+		{
+			// kubernetesVersion was not captured but another writable field was, so "all" stands on
+			// its own.
+			name: "only a field other than kubernetesVersion was captured",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{
+							"rkeConfig": map[string]any{"additionalManifest": "# manifest"},
+						},
+					},
+				}),
+			},
+			expected: "none,all",
+		},
+		{
+			name: "no resources were published",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+			},
+			expected: "none",
+		},
+		{
+			name: "resources payload is corrupt",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey:    "not-base64-or-gzip-corrupt-data",
+			},
+			expected: "none",
+		},
+		{
+			name: "restoreModes payload is not JSON",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: "{not json",
+				rkev1.SnapshotMetadataResourcesKey:    compressResources(t, populatedResources),
+			},
+			expected: "none",
+		},
+		{
+			name: "restoreModes payload declares no modes",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: "{}",
+				rkev1.SnapshotMetadataResourcesKey:    compressResources(t, populatedResources),
+			},
+			expected: "none",
+		},
+		{
+			name: "restoreModes payload omits none",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector,
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+			},
+			expected: "none,kubernetesVersion",
+		},
+		{
+			name: "a mode with an unparsable selector is dropped",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigNone:              "",
+					rkev1.RestoreRKEConfigKubernetesVersion: "spec.kubernetesVersion",
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+			},
+			expected: "none",
+		},
+		{
+			name: "modes this rancher does not know about are emitted last",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigAll:               rkev1.RestoreModeSelectorWildcard,
+					rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector,
+					rkev1.RestoreRKEConfigNone:              "",
+					"additionalManifest":                    "$['" + provClusterResourceKey + "']['spec']['rkeConfig']['additionalManifest']",
+					"aardvark":                              rkev1.RestoreModeSelectorWildcard,
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+			},
+			expected: "none,kubernetesVersion,all,aardvark,additionalManifest",
+		},
+		{
+			name: "restoreModes takes precedence over the legacy cluster spec",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigNone: "",
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+				rkev1.SnapshotMetadataClusterSpecKey: func() string {
+					payload, err := snapshotutil.CompressInterface(&provv1.ClusterSpec{
+						KubernetesVersion: "v1.34.1+rke2r1",
+						RKEConfig:         &provv1.RKEConfig{},
+					})
+					require.NoError(t, err)
+					return payload
+				}(),
+			},
+			expected: "none",
+		},
+		{
+			name: "an empty restoreModes key falls back to the legacy cluster spec",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: "",
+				rkev1.SnapshotMetadataClusterSpecKey: func() string {
+					payload, err := snapshotutil.CompressInterface(&provv1.ClusterSpec{
+						KubernetesVersion: "v1.34.1+rke2r1",
+						RKEConfig:         &provv1.RKEConfig{},
+					})
+					require.NoError(t, err)
+					return payload
+				}(),
+			},
+			expected: "none,kubernetesVersion,all",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			downstream := &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1"},
+				Spec:       k3s.ETCDSnapshotSpec{Metadata: tt.metadata},
+			}
+
+			// The modes come out of a map, so assert the value is stable: an unstable annotation
+			// would make populateUpstreamSnapshotFromDownstream patch on every reconcile.
+			for range 10 {
+				assert.Equal(t, tt.expected, getRestoreModesAnnotation(downstream, cluster))
+			}
 		})
 	}
 }

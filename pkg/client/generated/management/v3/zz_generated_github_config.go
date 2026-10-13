@@ -10,6 +10,7 @@ const (
 	GithubConfigFieldClientSecret        = "clientSecret"
 	GithubConfigFieldCreated             = "created"
 	GithubConfigFieldCreatorID           = "creatorId"
+	GithubConfigFieldDisplayName         = "displayName"
 	GithubConfigFieldEnabled             = "enabled"
 	GithubConfigFieldHostname            = "hostname"
 	GithubConfigFieldHostnameToClientID  = "hostnameToClientId"
@@ -33,6 +34,7 @@ type GithubConfig struct {
 	ClientSecret        string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName         string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Hostname            string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" yaml:"hostnameToClientId,omitempty"`

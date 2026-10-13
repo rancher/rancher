@@ -119,11 +119,11 @@ func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request, d
 	proxy.ModifyResponse = func(response *http.Response) error {
 		if response.StatusCode == http.StatusOK {
 			if contentType := mime.TypeByExtension(filepath.Ext(r.URL.Path)); contentType != "" {
-				w.Header().Set("Content-Type", contentType)
+				response.Header.Set("Content-Type", contentType)
 			} else {
 				body, _ := io.ReadAll(response.Body)
 				response.Body = io.NopCloser(bytes.NewBuffer(body))
-				w.Header().Set("Content-Type", http.DetectContentType(body))
+				response.Header.Set("Content-Type", http.DetectContentType(body))
 			}
 		}
 		return nil

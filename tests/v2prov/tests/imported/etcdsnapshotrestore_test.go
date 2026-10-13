@@ -6,13 +6,23 @@ import (
 	"testing"
 	"time"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotrestore"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/rancher/rancher/tests/v2prov/objectstore"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 // configMapProof drives the standard "create CM → snapshot → delete CM → restore → CM is back"
@@ -89,6 +99,7 @@ func runRestoreScenario(
 	expectedSnapshotCount int,
 	snapshotNodeName string,
 	restoreByCRName bool,
+	s3 bool,
 ) {
 	t.Helper()
 
@@ -104,11 +115,21 @@ func runRestoreScenario(
 
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, expectedSnapshotCount)
 
-	// The snapshotbackpopulate controller mirrors downstream ETCDSnapshotFile resources into the
-	// management cluster as rkev1.ETCDSnapshot CRs, in the namespace named for the cluster.
-	snapshot := waitForBackpopulatedSnapshot(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotNodeName, snapshotsValidAfter)
-	if snapshot.SnapshotFile.Name == "" {
-		t.Fatalf("back-populated snapshot %s has empty SnapshotFile.Name", snapshot.Name)
+	var snapshot *rkev1.ETCDSnapshot
+	if s3 {
+		// The snapshotbackpopulate controller mirrors downstream ETCDSnapshotFile resources into the
+		// management cluster as rkev1.ETCDSnapshot CRs, in the namespace named for the cluster.
+		snapshot = waitForBackpopulatedSnapshotForStorage(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotbackpopulate.S3, snapshotsValidAfter)
+		if snapshot.SnapshotFile.Name == "" {
+			t.Fatalf("back-populated snapshot %s has empty SnapshotFile.Name", snapshot.Name)
+		}
+	} else {
+		// The snapshotbackpopulate controller mirrors downstream ETCDSnapshotFile resources into the
+		// management cluster as rkev1.ETCDSnapshot CRs, in the namespace named for the cluster.
+		snapshot = waitForBackpopulatedSnapshot(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotNodeName, snapshotsValidAfter)
+		if snapshot.SnapshotFile.Name == "" {
+			t.Fatalf("back-populated snapshot %s has empty SnapshotFile.Name", snapshot.Name)
+		}
 	}
 	t.Logf("using snapshot %s (file=%s)", snapshot.Name, snapshot.SnapshotFile.Name)
 
@@ -146,7 +167,96 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
 
 	// Single all-roles node: one etcd member → one snapshot. Restore from imported-init-0
 	// (the init node has the leader's snapshot file).
-	runRestoreScenario(t, cs, fx, 1, "imported-init-0", false)
+	runRestoreScenario(t, cs, fx, 1, "imported-init-0", false, false)
+}
+
+// Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3 is the same proof-of-restore as
+// the single-node variant, but with 3 nodes each holding all three roles. Three etcd members
+// produce three snapshot files (one per node). The restore is driven from imported-node-2 to
+// deliberately exercise the non-init etcd path.
+func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3(t *testing.T) {
+	cs, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	fx := setUpImportedCluster(t, cs, "test-imported-restore-3-nodes-all-roles-s3", []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 3},
+	})
+
+	t.Logf("created imported cluster %s", fx.mgmtCluster.Name)
+
+	osInfo, err := objectstore.GetObjectStore(cs, fx.mgmtCluster.Name, "store0", "s3snapshots")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("created s3 store")
+
+	etcd := apimgmtv3.ETCD{
+		DisableSnapshots: true,
+		S3: &apimgmtv3.ETCDSnapshotS3{
+			Endpoint:            osInfo.Endpoint,
+			EndpointCA:          osInfo.Cert,
+			Bucket:              osInfo.Bucket,
+			CloudCredentialName: osInfo.CloudCredentialName,
+			Folder:              "testfolder",
+		},
+	}
+
+	t.Log("applying etcd config to cluster")
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		c, err := cs.Mgmt.Cluster().Get(fx.mgmtCluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if c.Status.Driver == apimgmtv3.ClusterDriverK3s {
+			require.NotNil(t, c.Spec.K3sConfig, "k3s cluster %s has no k3sConfig to configure", c.Name)
+			c.Spec.K3sConfig.ETCD = etcd
+		} else {
+			require.NotNil(t, c.Spec.Rke2Config, "rke2 cluster %s has no rke2Config to upgrade", c.Name)
+			c.Spec.Rke2Config.ETCD = etcd
+		}
+		c, err = cs.Mgmt.Cluster().Update(c)
+		if err == nil {
+			fx.mgmtCluster = c
+		}
+		return err
+	})
+	require.NoError(t, err, "setting etcd s3 config")
+
+	t.Log("etcd config applied")
+	t.Log("waiting for etcd config to apply to nodes")
+
+	// wait until present
+	err = wait.ClusterObject(cs.Ctx, cs.Mgmt.Cluster().Watch, fx.mgmtCluster, func(obj runtime.Object) (bool, error) {
+		nodes, err := cs.Mgmt.Node().List(fx.mgmtCluster.Name, metav1.ListOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		for _, node := range nodes.Items {
+			if node.Annotations == nil {
+				return false, nil
+			}
+			if !node.Spec.Etcd {
+				continue
+			}
+			if node.Annotations["management.cattle.io/applied-etcd-config-hash"] == "" {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	t.Log("etcd config applied to nodes")
+
+	// 3 etcd members → 3 snapshot files. Restore by the rkev1.ETCDSnapshot CR name so the
+	// controller picks the right machine via the snapshot's owner reference.
+	runRestoreScenario(t, cs, fx, 6, "imported-init-0", true, true)
 }
 
 // Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles is the same proof-of-restore as
@@ -166,7 +276,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles(t *t
 
 	// 3 etcd members → 3 snapshot files. Restore by the rkev1.ETCDSnapshot CR name so the
 	// controller picks the right machine via the snapshot's owner reference.
-	runRestoreScenario(t, cs, fx, 3, "imported-node-2", true)
+	runRestoreScenario(t, cs, fx, 3, "imported-node-2", true, false)
 }
 
 // Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach is the same proof-of-restore but
@@ -187,7 +297,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *te
 	})
 
 	// Single etcd node → one snapshot file. Restore by name to mirror the single-node behavior.
-	runRestoreScenario(t, cs, fx, 1, "imported-init-0", true)
+	runRestoreScenario(t, cs, fx, 1, "imported-init-0", true, false)
 }
 
 // Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook walks an ETCDSnapshotRestore through
@@ -228,7 +338,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, 1)
-	snapshot := waitForBackpopulatedSnapshot(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, "imported-init-0", snapshotsValidAfter)
+	snapshot := waitForBackpopulatedSnapshotForStorage(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotbackpopulate.Local, snapshotsValidAfter)
 	if snapshot.SnapshotFile.Name == "" {
 		t.Fatalf("back-populated snapshot %s has empty SnapshotFile.Name", snapshot.Name)
 	}

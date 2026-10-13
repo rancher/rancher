@@ -1,28 +1,27 @@
 module github.com/rancher/rancher/pkg/client
 
-go 1.26.0
+go 1.27.0
 
-toolchain go1.26.6
+toolchain go1.27.2
 
 require (
-	github.com/rancher/norman v0.10.0
-	k8s.io/apimachinery v0.36.4
+	github.com/rancher/norman v0.10.1
+	k8s.io/apimachinery v0.37.1
 )
 
 require (
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rancher/wrangler/v3 v3.7.0 // indirect
-	github.com/sirupsen/logrus v1.9.4 // indirect
+	github.com/rancher/wrangler/v3 v3.8.0-rc.2 // indirect
+	github.com/sirupsen/logrus v1.10.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.4 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
 )

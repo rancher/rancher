@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	operationcattleiov1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	applyconfigurationoperationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/operation.cattle.io/v1alpha1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type EncryptionKeyRotationInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*operationcattleiov1alpha1.EncryptionKeyRotationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operationcattleiov1alpha1.EncryptionKeyRotation, err error)
+	Apply(ctx context.Context, encryptionKeyRotation *applyconfigurationoperationcattleiov1alpha1.EncryptionKeyRotationApplyConfiguration, opts v1.ApplyOptions) (result *operationcattleiov1alpha1.EncryptionKeyRotation, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, encryptionKeyRotation *applyconfigurationoperationcattleiov1alpha1.EncryptionKeyRotationApplyConfiguration, opts v1.ApplyOptions) (result *operationcattleiov1alpha1.EncryptionKeyRotation, err error)
 	EncryptionKeyRotationExpansion
 }
 
 // encryptionKeyRotations implements EncryptionKeyRotationInterface
 type encryptionKeyRotations struct {
-	*gentype.ClientWithList[*operationcattleiov1alpha1.EncryptionKeyRotation, *operationcattleiov1alpha1.EncryptionKeyRotationList]
+	*gentype.ClientWithListAndApply[*operationcattleiov1alpha1.EncryptionKeyRotation, *operationcattleiov1alpha1.EncryptionKeyRotationList, *applyconfigurationoperationcattleiov1alpha1.EncryptionKeyRotationApplyConfiguration]
 }
 
 // newEncryptionKeyRotations returns a EncryptionKeyRotations
 func newEncryptionKeyRotations(c *OperationV1alpha1Client, namespace string) *encryptionKeyRotations {
 	return &encryptionKeyRotations{
-		gentype.NewClientWithList[*operationcattleiov1alpha1.EncryptionKeyRotation, *operationcattleiov1alpha1.EncryptionKeyRotationList](
+		gentype.NewClientWithListAndApply[*operationcattleiov1alpha1.EncryptionKeyRotation, *operationcattleiov1alpha1.EncryptionKeyRotationList, *applyconfigurationoperationcattleiov1alpha1.EncryptionKeyRotationApplyConfiguration](
 			"encryptionkeyrotations",
 			c.RESTClient(),
 			scheme.ParameterCodec,

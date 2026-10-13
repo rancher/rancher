@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,11 +22,13 @@ import (
 	"github.com/rancher/shepherd/pkg/clientbase"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func init() {
@@ -79,8 +82,33 @@ func (p *RTBTestSuite) newSubSession() *rancher.Client {
 	return client
 }
 
-// createUser creates a new user with the given global role and returns it with password set.
+const (
+	crtbRemoveFinalizer = "wrangler.cattle.io/mgmt-crtb-remove-handler"
+	prtbRemoveFinalizer = "wrangler.cattle.io/mgmt-prtb-remove-handler"
+)
+
+// rtbFinalizers returns the finalizers on the CRTB or PRTB with the given Norman ID
+// ("<namespace>:<name>").
+//
+// Tests that delete an RTB must first wait for its remove-handler finalizer. Rancher creates the
+// RTB's RBAC bindings before its controller adds that finalizer. If the RTB is deleted in that
+// window, Kubernetes removes it immediately, the remove handler never runs, and the bindings (and
+// the user's access) are orphaned for good.
+func rtbFinalizers(client *rancher.Client, gvr schema.GroupVersionResource, id string) ([]string, error) {
+	namespace, name, _ := strings.Cut(id, ":")
+	dynamicClient, err := client.GetDownStreamClusterClient(extrbac.LocalCluster)
+	if err != nil {
+		return nil, err
+	}
+	rtb, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return rtb.GetFinalizers(), nil
+}
+
 func (p *RTBTestSuite) createUser(client *rancher.Client, prefix, globalRole string) *management.User {
+	// createUser creates a new user with the given global role and returns it with password set.
 	enabled := true
 	pw := password.GenerateUserPassword("testpass-")
 	user, err := users.CreateUserWithRole(client, &management.User{
@@ -121,6 +149,9 @@ func (p *RTBTestSuite) assertClusterAccessRevoked(userClient *rancher.Client) {
 	p.Require().Contains(err.Error(), "403")
 }
 
+// TestPRTBRoleTemplateInheritance tests that a user bound by a PRTB to a role template gains the
+// permissions of the role templates it inherits from, both directly and through a chain of
+// inheritance, and that changes to an inherited role template propagate to the user.
 func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	client := p.newSubSession()
 
@@ -138,7 +169,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	p.Require().NoError(err)
 
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
-	p.Require().Error(err)
+	p.Require().True(apierrors.IsForbidden(err), "expected forbidden before any binding, got: %v", err)
 
 	rtB, err := client.Management.RoleTemplate.Create(
 		&management.RoleTemplate{
@@ -183,6 +214,13 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	secret, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
 	p.Require().NoError(err)
 
+	// Deleting the PRTB before its remove-handler finalizer is added orphans its bindings (see rtbFinalizers).
+	p.Require().EventuallyWithT(func(c *assert.CollectT) {
+		finalizers, err := rtbFinalizers(client, extrbac.ProjectRoleTemplateBindingGroupVersionResource, prtb.ID)
+		assert.NoError(c, err)
+		assert.Contains(c, finalizers, prtbRemoveFinalizer)
+	}, 2*time.Minute, 2*time.Second, "waiting for the PRTB remove-handler finalizer")
+
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
 	p.Require().NoError(err)
 
@@ -198,9 +236,9 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	p.Require().Eventually(func() bool {
+	p.Require().EventuallyWithT(func(c *assert.CollectT) {
 		_, err := secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
-		return err != nil
+		assert.Truef(c, apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
 	}, 2*time.Minute, 2*time.Second, "waiting for secret access to be revoked after PRTB removal")
 
 	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
@@ -227,7 +265,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	p.Require().NoError(err)
 
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, anotherSecret.Name, metav1.GetOptions{})
-	p.Require().Error(err)
+	p.Require().True(apierrors.IsForbidden(err), "expected forbidden on a secret not covered by the role, got: %v", err)
 
 	// Test that permissions are updated when inherited roletemplate bound by PRTB is changed.
 
@@ -262,6 +300,9 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	p.Require().NoError(err)
 }
 
+// TestCRTBRoleTemplateInheritance tests that a user bound by a CRTB to a role template gains the
+// permissions of the role templates it inherits from, both directly and through a chain of
+// inheritance, and that changes to an inherited role template propagate to the user.
 func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	client := p.newSubSession()
 
@@ -277,7 +318,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	p.Require().NoError(err)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
-	p.Require().Error(err)
+	p.Require().True(apierrors.IsForbidden(err), "expected forbidden before any binding, got: %v", err)
 
 	rtB, err := client.Management.RoleTemplate.Create(
 		&management.RoleTemplate{
@@ -321,13 +362,20 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
 	p.Require().NoError(err)
 
+	// Deleting the CRTB before its remove-handler finalizer is added orphans its bindings (see rtbFinalizers).
+	p.Require().EventuallyWithT(func(c *assert.CollectT) {
+		finalizers, err := rtbFinalizers(client, extrbac.ClusterRoleTemplateBindingGroupVersionResource, crtb.ID)
+		assert.NoError(c, err)
+		assert.Contains(c, finalizers, crtbRemoveFinalizer)
+	}, 2*time.Minute, 2*time.Second, "waiting for the CRTB remove-handler finalizer")
+
 	err = client.Management.ClusterRoleTemplateBinding.Delete(crtb)
 	p.Require().NoError(err)
 
 	// Ensure the user can no longer access the namespace after the CRTB is removed.
-	p.Require().Eventually(func() bool {
+	p.Require().EventuallyWithT(func(c *assert.CollectT) {
 		_, err := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
-		return err != nil
+		assert.Truef(c, apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
 	}, 2*time.Minute, 2*time.Second, "waiting for namespace access to be revoked after CRTB removal")
 
 	// Test that user can get a specified namespace once granted the permission to do so via a chain of
@@ -361,7 +409,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	anotherNS := p.createNamespace(client, pn)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, anotherNS.Name)
-	p.Require().Error(err)
+	p.Require().True(apierrors.IsForbidden(err), "expected forbidden on a namespace not covered by the role, got: %v", err)
 
 	// Test that permissions are updated when inherited roletemplate bound by CRTB is changed.
 

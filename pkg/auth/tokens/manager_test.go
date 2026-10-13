@@ -21,7 +21,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
@@ -174,32 +176,64 @@ func TestGetTokenByIDExt(t *testing.T) {
 	assert.Equal(t, legacyToken, &token)
 }
 
-func TestDeleteTokenByNameLegacy(t *testing.T) {
+func TestDeleteTokenByName(t *testing.T) {
 	tokenName := "testname"
-	tokenClient := &fakeTokenClient{}
-	tokenManager := Manager{
-		tokens: tokenClient,
-	}
-	code, err := tokenManager.DeleteTokenByName(tokenName)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, code)
-	assert.Equal(t, 1, tokenClient.DeleteCount())
-}
 
-func TestDeleteTokenByNameExt(t *testing.T) {
-	tokenName := "testname"
-	ctrl := gomock.NewController(t)
-	secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-	users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
-	users.EXPECT().Cache().Return(nil)
-	secrets.EXPECT().Cache().Return(nil)
-	secrets.EXPECT().Delete("cattle-tokens", tokenName, &metav1.DeleteOptions{}).Return(nil)
-	tokenManager := Manager{
-		extTokenStore: exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil),
+	extSetup := func(ctrl *gomock.Controller, err error) Manager {
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Delete("cattle-tokens", tokenName, &metav1.DeleteOptions{}).Return(err)
+		return Manager{
+			extTokenStore: exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil),
+		}
 	}
-	code, err := tokenManager.DeleteTokenByName("ext/" + tokenName)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, code)
+
+	legacySetup := func(ctrl *gomock.Controller, err error) Manager {
+		return Manager{tokens: &fakeTokenClient{err: err}}
+	}
+
+	for _, tcase := range []struct {
+		kind   string
+		prefix string
+		setup  func(ctrl *gomock.Controller, err error) Manager
+	}{
+		{
+			kind:   "legacy",
+			prefix: "",
+			setup:  legacySetup,
+		},
+		{
+			kind:   "ext",
+			prefix: "ext/",
+			setup:  extSetup,
+		},
+	} {
+		t.Run(tcase.kind+" token, delete, no error", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			tokenManager := tcase.setup(ctrl, nil)
+			code, err := tokenManager.DeleteTokenByName(tcase.prefix + tokenName)
+			assert.NoError(t, err)
+			assert.Equal(t, 0, code)
+		})
+
+		t.Run(tcase.kind+" token, delete, not found is no error", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			tokenManager := tcase.setup(ctrl, apierrors.NewNotFound(schema.GroupResource{}, tokenName))
+			code, err := tokenManager.DeleteTokenByName(tcase.prefix + tokenName)
+			assert.NoError(t, err)
+			assert.Equal(t, 0, code)
+		})
+
+		t.Run(tcase.kind+" token, delete, other errors surface as internal error", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			tokenManager := tcase.setup(ctrl, fmt.Errorf("some error"))
+			code, err := tokenManager.DeleteTokenByName(tcase.prefix + tokenName)
+			assert.Error(t, err)
+			assert.Equal(t, http.StatusInternalServerError, code)
+		})
+	}
 }
 
 func TestGetTokenLegacy(t *testing.T) {
@@ -583,6 +617,7 @@ type fakeTokenClient struct {
 	get    *apiv3.Token
 	gmap   map[string]*apiv3.Token
 	delete int
+	err    error
 }
 
 func (f *fakeTokenClient) DeleteCount() int {
@@ -602,6 +637,9 @@ func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*apiv3.To
 
 func (f *fakeTokenClient) Delete(name string, options *metav1.DeleteOptions) error {
 	f.delete += 1
+	if f.err != nil {
+		return f.err
+	}
 	return nil
 }
 

@@ -681,7 +681,9 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 	// Create a ClusterRepo
-	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
+	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{
+		Spec: v1.RepoSpec{ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60, MaxRetries: 2}},
+	})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	_, err := c.catalogClient.ClusterRepos().Create(context.TODO(), cr, metav1.CreateOptions{})
@@ -851,8 +853,9 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 			Name: repoName,
 		},
 		Spec: v1.RepoSpec{
-			URL:               fmt.Sprintf("oci://%s/rancher", u.Host),
-			InsecurePlainHTTP: true,
+			URL:                      fmt.Sprintf("oci://%s/rancher", u.Host),
+			InsecurePlainHTTP:        true,
+			ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60},
 		},
 	}
 	_, err = c.catalogClient.ClusterRepos().Create(context.Background(), clusterRepo, metav1.CreateOptions{})
@@ -945,7 +948,9 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 // testClusterRepo takes in ClusterRepoParams and tests CREATE, UPDATE, and DELETE operations
 func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	// Create a ClusterRepo
-	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
+	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{
+		Spec: v1.RepoSpec{ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60, MaxRetries: 2}},
+	})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
@@ -1217,7 +1222,9 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 
 		return status.DownloadTime != prevDownloadTime, nil
 	})
-
+	if err != nil {
+		c.T().Logf("Error while downloading ClusterRepo %s from catalog: %v. \n CR status: \n %v", ClusterRepoName, err, clusterRepo.Status)
+	}
 	return clusterRepo, err
 }
 

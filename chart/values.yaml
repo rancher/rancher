@@ -225,7 +225,7 @@ useBundledSystemChart: false
 # Important: update build.yaml when this default image needs to be changed, then run `go generate`.
 assetsImage:
   repository: rancher/rancher-assets
-  tag: v2.16-20260805T1815Z-dev
+  tag: v2.16-20260914T2041Z-dev
 
 # Certmanager version compatibility
 certmanager:
@@ -255,13 +255,15 @@ postDelete:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.8.1"
+    tag: "v0.9.0-rc.1"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
   namespaceList:
+    - cattle-fleet-local-system
     - cattle-fleet-system
     - cattle-system
+    - cattle-turtles-system
     - rancher-operator-system
   # Number of seconds to wait for an app to be uninstalled
   timeout: 120
@@ -275,7 +277,7 @@ preUpgrade:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.8.1"
+    tag: "v0.9.0-rc.1"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 
@@ -298,6 +300,30 @@ extraTolerations: {}
 #    values:
 #      - us-north-42
 extraNodeSelectorTerms: {}
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: ""
+  maxUnavailable: ""
+  unhealthyPodEvictionPolicy: ""
+
+  # Optional: Add extra labels to the default selector
+  # These are merged with the standard selectorLabels (app: rancher)
+  extraMatchLabels: {}
+  #   tier: frontend
+  #   environment: production
+
+  # Advanced: Completely override the selector with custom logic
+  # When set, this replaces the default selector entirely (extraMatchLabels ignored)
+  # Use this for complex selectors with matchExpressions
+  selector: {}
+  #   matchLabels:
+  #     app: rancher
+  #     custom-label: value
+  #   matchExpressions:
+  #     - key: environment
+  #       operator: In
+  #       values: [prod, staging]
 
 livenessProbe:
   timeoutSeconds: 5

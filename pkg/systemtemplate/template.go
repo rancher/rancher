@@ -187,13 +187,15 @@ spec:
       {{- if .EnablePriorityClass }}
       priorityClassName: cattle-cluster-agent-priority-class
       {{- end }}
+      {{- if not .IsPreBootstrap }}
       initContainers:
       - name: rancher-charts-copy
-        image: {{.AssetsImage}}
+        image: {{ .AssetsImage | quote }}
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: rancher-charts
           mountPath: /charts
+      {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -204,28 +206,29 @@ spec:
           env:
           {{- if ne .Features "" }}
           - name: CATTLE_FEATURES
-            value: "{{.Features}}"
+            value: {{ .Features | quote }}
           {{- end }}
           - name: CATTLE_SERVER
-            value: "{{.URLPlain}}"
+            value: {{ .URLPlain | quote }}
           - name: CATTLE_CA_CHECKSUM
-            value: "{{.CAChecksum}}"
+            value: {{ .CAChecksum | quote }}
           - name: CATTLE_CLUSTER
             value: "true"
           - name: CATTLE_K8S_MANAGED
             value: "true"
           - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
-            value: "{{.ClusterRegistry}}"
+            value: {{ .ClusterRegistry | quote }}
           - name: CATTLE_CREDENTIAL_NAME
             value: cattle-credentials-{{.TokenKey}}
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
-            value: "{{.SUCAppNameOverride}}"
+            value: {{ .SUCAppNameOverride | quote }}
           {{- if eq .NamespaceOptions.Enabled true }}
           - name: RANCHER_NAMESPACE_OPTIONS
             value: '{{.NamespaceOptions | mustToJson}}'
           {{- end }}
           {{- if .IsPreBootstrap }}
-          # since we're on the host network, talk to the apiserver over localhost
+          - name: CATTLE_PREBOOTSTRAP
+            value: "true"
           {{- end }}
           {{- if .SystemDefaultPullSecrets}}
           - name: CATTLE_SYSTEM_DEFAULT_REGISTRY_PULL_SECRETS
@@ -238,7 +241,7 @@ spec:
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}
-          image: "{{.AgentImage}}"
+          image: {{ .AgentImage | quote }}
           volumeMounts:
           - name: rancher-charts
             mountPath: /var/lib/rancher-data/local-catalogs/v2
@@ -313,7 +316,7 @@ spec:
       - operator: Exists
       containers:
       - name: kube-api-auth
-        image: "{{.AuthImage}}"
+        image: {{ .AuthImage | quote }}
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: k8s-ssl
@@ -370,9 +373,9 @@ metadata:
   name: cattle-cluster-agent-priority-class
 value: {{ .PriorityClassValue }}
 {{- if .PreemptionPolicy }}
-preemptionPolicy: {{ .PreemptionPolicy }}
+preemptionPolicy: {{ .PreemptionPolicy | quote }}
 {{- end }}
-description: {{ .Description }}
+description: {{ .Description | quote }}
 `
 
 	cattleClusterPodDisruptionBudgetTemplate = `

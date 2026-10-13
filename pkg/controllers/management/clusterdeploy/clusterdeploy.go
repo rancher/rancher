@@ -46,6 +46,7 @@ const (
 	AgentForceDeployAnn        = "io.cattle.agent.force.deploy"
 	AgentRegistrationTokenHash = "io.cattle.agent.registration-token-hash"
 	clusterImage               = "clusterImage"
+	tokenNotReadyRequeueDelay  = 5 * time.Second
 )
 
 var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
@@ -541,6 +542,13 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	tokenHashChanged, err := cd.registrationTokenHashChanged(cluster)
+	if errors.Is(err, crt.ErrTokenNotReady) {
+		// Deploying now would render the agent with an empty token, which can never authenticate,
+		// so wait for the token to be stored in its Secret.
+		logrus.Debugf("clusterDeploy: deployAgent: waiting for system registration token of cluster [%s]: %v", cluster.Name, err)
+		cd.clusters.Controller().EnqueueAfter("", cluster.Name, tokenNotReadyRequeueDelay)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -707,7 +715,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            url,
-		IsPreBootstrap: capr.PreBootstrap(cluster),
+		IsPreBootstrap: capr.ShouldPreBootstrap(cluster),
 		Cluster:        cluster,
 		AgentFeatures:  features,
 		Taints:         taints,
@@ -836,7 +844,7 @@ func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, err
 		if controlPlaneLabelFound {
 			toAdd, _ := taints.GetToDiffTaints(allTaints, node.Spec.InternalNodeSpec.Taints)
 			for _, taintStr := range toAdd {
-				if !strings.HasPrefix(taintStr.Key, "node.kubernetes.io") {
+				if !taints.IsTransient(taintStr) {
 					logrus.Debugf("clusterDeploy: getControlPlaneTaints: toAdd: %v", toAdd)
 					allTaints = append(allTaints, taintStr)
 					continue
@@ -845,6 +853,7 @@ func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, err
 			}
 		}
 	}
+	taints.Sort(allTaints)
 	logrus.Debugf("clusterDeploy: getControlPlaneTaints: allTaints: %v", allTaints)
 
 	return allTaints, nil

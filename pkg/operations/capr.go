@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
@@ -16,6 +18,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,8 +57,129 @@ func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{Object: ustr}, nil
 }
 
-func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) (args []string, env []string, files []plan.File) {
-	return nil, nil, nil
+// RestoreTarget returns the provv1.Cluster for the provisioning-cluster resource key. That, not the
+// RKEControlPlane ClusterObject returns, is where a restored configuration has to be written:
+// provisioningcluster/template.go regenerates the RKEControlPlane from the provv1.Cluster on every
+// reconcile, so a write to the controlplane would be reverted. The provv1.Cluster, RKEControlPlane,
+// CAPI Cluster and beacon all share (namespace, name) for CAPR — see BeaconRef.
+func (a *CAPRAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceProvCluster {
+		return nil, nil
+	}
+
+	cluster, err := a.clients.Provisioning.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *CAPRAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	cluster := &provv1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return fmt.Errorf("converting provisioning cluster %s/%s from unstructured: %w", obj.GetNamespace(), obj.GetName(), err)
+	}
+
+	_, err := a.clients.Provisioning.Cluster().Update(cluster)
+	return err
+}
+
+// WaitForRestoreTarget reports whether the RKEControlPlane has been regenerated from the current
+// provisioning Cluster.
+//
+// provisioningcluster renders the RKEControlPlane from the provv1.Cluster and stamps the spec it
+// rendered from onto it as capr.ClusterSpecAnnotation. Comparing that against the live provv1.Cluster
+// spec tells us whether the controlplane — and therefore everything derived from it, including the
+// Kubernetes version a restore installs — reflects configuration a restore has just written. A
+// missing annotation counts as not yet rendered.
+func (a *CAPRAdapter) WaitForRestoreTarget() (bool, error) {
+	cluster, err := a.clients.Provisioning.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return false, err
+	}
+
+	rendered := a.controlPlane.Annotations[capr.ClusterSpecAnnotation]
+	if rendered == "" {
+		return false, nil
+	}
+
+	renderedSpec, err := snapshotutil.DecompressClusterSpec(rendered)
+	if err != nil {
+		return false, fmt.Errorf("decoding %s on rkecontrolplane %s/%s: %w",
+			capr.ClusterSpecAnnotation, a.controlPlane.Namespace, a.controlPlane.Name, err)
+	}
+
+	return equality.Semantic.DeepEqual(renderedForComparison(&cluster.Spec), renderedForComparison(renderedSpec)), nil
+}
+
+// renderedForComparison zeroes the fields provisioningcluster deliberately drops before stamping
+// capr.ClusterSpecAnnotation, so a rendered spec and a live one can be compared. Keep in sync with
+// provisioningcluster.rkeControlPlane and the note above provv1.RKEConfig — the same four fields are
+// stripped by snapshotextrametadata when it publishes a cluster into snapshot metadata.
+func renderedForComparison(spec *provv1.ClusterSpec) *provv1.ClusterSpec {
+	out := spec.DeepCopy()
+	if out.RKEConfig != nil {
+		out.RKEConfig.ETCDSnapshotRestore = nil
+		out.RKEConfig.ETCDSnapshotCreate = nil
+		out.RKEConfig.RotateCertificates = nil
+		out.RKEConfig.RotateEncryptionKeys = nil
+	}
+	return out
+}
+
+func (a *CAPRAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	if a.controlPlane.Spec.ETCD == nil {
+		return nil
+	}
+	return a.controlPlane.Spec.ETCD.S3
+}
+
+// ToS3ArgsEnvAndFiles resolves s3 against the control plane's own S3 configuration and the cloud
+// credential either of them references. Rendered endpoint CA files land in the same location the
+// CAPR planner writes them to, so a CA the planner already placed on the node resolves to the
+// path the snapshot recorded.
+func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	target, err := ResolveS3Target(
+		a.clients.Core.Secret().Cache(),
+		s3,
+		a.ETCDSnapshotS3(),
+		a.controlPlane.Namespace,
+		path.Join(dataDir, EndpointCADirectory),
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
+}
+
+// InstallInstruction installs the distro at the RKEControlPlane's Kubernetes version. That version
+// is what the restore-mode step writes when a restore rolls the cluster back, so installing it here
+// is what lets the subsequent --cluster-reset run against the snapshot's version.
+func (a *CAPRAdapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {
+	if a.controlPlane.Spec.KubernetesVersion == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(
+		a.controlPlane.Spec.KubernetesVersion,
+		dataDir,
+		a.controlPlane,
+		toCoreEnvVars(a.controlPlane.Spec.AgentEnvVars),
+		secret,
+	), true
 }
 
 func (a *CAPRAdapter) LoopbackAddress(_ *corev1.Secret) string {
@@ -190,6 +314,79 @@ func (a *CAPRAdapter) ServerUnit() string {
 		return "rke2-server"
 	}
 	return "k3s"
+}
+
+// RuntimeService returns the systemd unit responsible for the runtime on the node represented
+// by secret: ServerUnit on control-plane/etcd nodes, or the runtime agent unit on worker-only
+// nodes.
+func (a *CAPRAdapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
+// DistroServices returns the distro service identifiers this cluster's runtime exposes on the
+// node represented by secret.
+func (a *CAPRAdapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
+// componentTLSSettingsFromRenderedConfig extracts scheduler/controller-manager
+// TLS settings from a rendered CAPR config map.
+func componentTLSSettingsFromRenderedConfig(config map[string]any, component string) ComponentTLSSettings {
+	var arg any
+	switch component {
+	case KubeControllerManagerProbeName:
+		arg = config[KubeControllerManagerArg]
+	case KubeSchedulerProbeName:
+		arg = config[KubeSchedulerArg]
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	// Parse the rendered config value which can be string, []string, or []any
+	var keyValueArgs []string
+	switch v := arg.(type) {
+	case []any:
+		keyValueArgs = make([]string, len(v))
+		for i, item := range v {
+			keyValueArgs[i] = fmt.Sprintf("%v", item)
+		}
+	case []string:
+		keyValueArgs = v
+	case string:
+		keyValueArgs = []string{v}
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	var settings ComponentTLSSettings
+	for _, argument := range keyValueArgs {
+		key, value, ok := strings.Cut(argument, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings
+}
+
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings from the
+// rendered per-machine runtime config.
+func (a *CAPRAdapter) ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	config, err := a.renderConfig(secret)
+	if err != nil {
+		return ComponentTLSSettings{}, err
+	}
+	return componentTLSSettingsFromRenderedConfig(config, component), nil
 }
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
@@ -487,6 +684,16 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 		cni == "calico+multus"
 }
 
+// convertInterfaceSliceToStringSlice converts an interface slice to strings.
+// Used by getArgValue for processing unstructured config data.
+func convertInterfaceSliceToStringSlice(input []any) []string {
+	stringArr := make([]string, 0, len(input))
+	for _, v := range input {
+		stringArr = append(stringArr, fmt.Sprintf("%v", v))
+	}
+	return stringArr
+}
+
 // getArgValue will search the passed in interface (arg) for a key that matches the searchArg. If a match is found, it
 // returns the value of the argument, otherwise it returns an empty string.
 func getArgValue(arg any, searchArg string, delim string) string {
@@ -523,29 +730,27 @@ func splitArgKeyVal(val string, delim string) (string, string) {
 	return "", ""
 }
 
-// convertInterfaceSliceToStringSlice converts an input interface slice to a string slice by iterating through the
-// interface slice and converting each entry to a string using Sprintf.
-func convertInterfaceSliceToStringSlice(input []any) []string {
-	var stringArr []string
-	for _, v := range input {
-		stringArr = append(stringArr, fmt.Sprintf("%v", v))
-	}
-	return stringArr
+func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return capr.GetDistroDataDir(a.controlPlane), nil
 }
 
-func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	return capr.GetDistroDataDir(a.controlPlane)
+func (a *CAPRAdapter) DistroManifestPaths(dataDir string) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
 
 func (a *CAPRAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
 }
 
-func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
+func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) (string, error) {
 	if a.RuntimeCommand() == "k3s" {
-		return "/usr/local/bin/kubectl"
+		return "/usr/local/bin/kubectl", nil
 	}
-	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dataDir, "bin", "kubectl"), nil
 }
 
 func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {

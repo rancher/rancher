@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
-	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
+	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/generated/applyconfiguration/plan.cattle.io/v1alpha1"
+	typedplancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeBeacons implements BeaconInterface
 type fakeBeacons struct {
-	*gentype.FakeClientWithList[*v1alpha1.Beacon, *v1alpha1.BeaconList]
+	*gentype.FakeClientWithListAndApply[*v1alpha1.Beacon, *v1alpha1.BeaconList, *plancattleiov1alpha1.BeaconApplyConfiguration]
 	Fake *FakePlanV1alpha1
 }
 
-func newFakeBeacons(fake *FakePlanV1alpha1, namespace string) plancattleiov1alpha1.BeaconInterface {
+func newFakeBeacons(fake *FakePlanV1alpha1, namespace string) typedplancattleiov1alpha1.BeaconInterface {
 	return &fakeBeacons{
-		gentype.NewFakeClientWithList[*v1alpha1.Beacon, *v1alpha1.BeaconList](
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.Beacon, *v1alpha1.BeaconList, *plancattleiov1alpha1.BeaconApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1alpha1.SchemeGroupVersion.WithResource("beacons"),

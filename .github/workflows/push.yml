@@ -20,7 +20,7 @@ env:
   REGISTRY: "docker.io"
 jobs:
   unit-tests:
-    uses: ./.github/workflows/unit-test.yml
+    uses: $/.github/workflows/unit-test.yml
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -36,7 +36,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
+        uses: $/.github/actions/build-images/server
   build-agent:
     strategy:
       matrix:
@@ -52,7 +52,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: $/.github/actions/build-images/agent
   push-images:
     needs: [unit-tests, build-server, build-agent]
     strategy:
@@ -78,11 +78,11 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: push
-        uses: ./.github/actions/push-images
+        uses: $/.github/actions/push-images
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     permissions:
       contents: read
       id-token: write
@@ -99,7 +99,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/rancher-chart/build
+        uses: $/.github/actions/rancher-chart/build
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
@@ -112,7 +112,7 @@ jobs:
       - name: publish
         env:
           CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
-        uses: ./.github/actions/rancher-chart/publish-aws
+        uses: $/.github/actions/rancher-chart/publish-aws
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -137,7 +137,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
-        uses: ./.github/actions/build-images/installer
+        uses: $/.github/actions/build-images/installer
   merge-server-agent-installer-manifests:
     needs: [push-images, build-installer]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -156,7 +156,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Login to Docker Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -166,12 +166,12 @@ jobs:
       - name: merge server manifests
         with:
           image: "${{ env.IMAGE }}"
-        uses: ./.github/actions/merge-manifests
+        uses: $/.github/actions/merge-manifests
       - name: merge agent manifests
         with:
           image: "${{ env.IMAGE_AGENT }}"
-        uses: ./.github/actions/merge-manifests
+        uses: $/.github/actions/merge-manifests
       - name: merge installer manifests
         with:
           image: "${{ env.IMAGE_INSTALLER }}"
-        uses: ./.github/actions/merge-manifests
+        uses: $/.github/actions/merge-manifests

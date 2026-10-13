@@ -1,11 +1,16 @@
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
+	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -18,6 +23,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
+)
+
+const (
+	rke2NodeArgsAnnotation = "rke2.io/node-args"
+	k3sNodeArgsAnnotation  = "k3s.io/node-args"
+	rke2NodeEnvAnnotation  = "rke2.io/node-env"
+	k3sNodeEnvAnnotation   = "k3s.io/node-env"
+
+	defaultRKE2DataDirectory = "/var/lib/rancher/rke2"
+	defaultK3sDataDirectory  = "/var/lib/rancher/k3s"
 )
 
 func init() {
@@ -111,6 +126,18 @@ func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Clu
 	return capiClusterAdapter(clients, capiCluster, "")
 }
 
+// NewImportedAdapter returns an ImportedAdapter for the given mgmt v3 Cluster.
+//
+// Use it when the caller has already established that the cluster is a true imported standalone
+// RKE2/K3s cluster. NewAdapter re-derives that from the cluster's labels and annotations and will
+// dispatch to a CAPI-backed adapter instead when either indicates the cluster is provisioned.
+func NewImportedAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) *ImportedAdapter {
+	return &ImportedAdapter{
+		cluster: cluster,
+		clients: clients,
+	}
+}
+
 // BeaconRef returns the mgmt v3 Cluster's name-as-namespace + name convention. The mgmt v3
 // Cluster is cluster-scoped, but its per-cluster namespace on the local cluster is named after
 // the cluster itself and hosts every downstream artifact (mgmt v3 Nodes, beacons, machine-plan
@@ -132,6 +159,79 @@ func (a *ImportedAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the mgmt v3 Cluster, which is where an imported cluster's restorable
+// configuration lives. Its spec.rke2Config/spec.k3sConfig kubernetesVersion is the *desired*
+// version — k3sbasedupgrade reads it and drives the downstream system-upgrade-controller plans from
+// it — and the agent-customization fields are applied by Rancher directly.
+func (a *ImportedAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceMgmtCluster {
+		return nil, nil
+	}
+
+	cluster, err := a.clients.Mgmt.Cluster().Cache().Get(a.cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *ImportedAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	cluster := &mgmtv3.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return fmt.Errorf("converting mgmt cluster %s from unstructured: %w", obj.GetName(), err)
+	}
+
+	_, err := a.clients.Mgmt.Cluster().Update(cluster)
+	return err
+}
+
+// WaitForRestoreTarget always reports ready. The mgmt v3 Cluster is itself the restore target and
+// nothing upstream is rendered off it — the desired version is consumed downstream by the
+// system-upgrade-controller, well after this operation has finished.
+func (a *ImportedAdapter) WaitForRestoreTarget() (bool, error) {
+	return true, nil
+}
+
+// InstallInstruction installs the distro at the version the mgmt cluster is configured for.
+//
+// For an imported cluster a version change would normally be rolled out by the downstream
+// system-upgrade-controller, but that happens long after this operation completes and
+// `--cluster-reset` has to run against the snapshot's own binary. Installing it here puts the right
+// version in place before the reset, and leaves the upgrade controller with nothing to do because
+// the nodes already match the desired version.
+func (a *ImportedAdapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {
+	version := a.kubernetesVersion()
+	if version == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(version, dataDir, nil, a.cluster.Spec.AgentEnvVars, secret), true
+}
+
+// kubernetesVersion returns the version the mgmt cluster is configured for, preferring the distro
+// config Status.Driver selects — the same choice k3sbasedupgrade makes — and falling back to the
+// version the cluster last reported when no desired version has been set.
+func (a *ImportedAdapter) kubernetesVersion() string {
+	if a.cluster.Status.Driver == mgmtv3.ClusterDriverK3s {
+		if a.cluster.Spec.K3sConfig != nil && a.cluster.Spec.K3sConfig.Version != "" {
+			return a.cluster.Spec.K3sConfig.Version
+		}
+	} else if a.cluster.Spec.Rke2Config != nil && a.cluster.Spec.Rke2Config.Version != "" {
+		return a.cluster.Spec.Rke2Config.Version
+	}
+
+	if a.cluster.Status.Version != nil {
+		return a.cluster.Status.Version.GitVersion
+	}
+	return ""
 }
 
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
@@ -185,7 +285,7 @@ func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 }
 
 func (a *ImportedAdapter) GetSupervisorPort(_ *corev1.Secret) string {
-	if a.RuntimeCommand() == "rke2" {
+	if a.RuntimeCommand() == capr.RuntimeRKE2 {
 		return "9345"
 	}
 	return "6443"
@@ -196,8 +296,44 @@ type ImportedAdapter struct {
 	clients *wrangler.CAPIContext
 }
 
-func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+// ETCDSnapshotS3 returns the etcd S3 configuration from the mgmt v3 Cluster's distro config. The
+// rke2 and k3s configs carry the same ETCD type, so which one applies follows the runtime.
+func (a *ImportedAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	if a.RuntimeCommand() == capr.RuntimeRKE2 {
+		if a.cluster.Spec.Rke2Config == nil {
+			return nil
+		}
+		return a.cluster.Spec.Rke2Config.ETCD.S3
+	}
+
+	if a.cluster.Spec.K3sConfig == nil {
+		return nil
+	}
+	return a.cluster.Spec.K3sConfig.ETCD.S3
+}
+
+// ToS3ArgsEnvAndFiles resolves s3 against the mgmt v3 Cluster's own S3 configuration and the cloud
+// credential either of them references. Cloud credentials for a mgmt cluster are named
+// "<namespace>:<name>" and live in the global namespace, which is where a bare name is resolved.
+func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	target, err := ResolveS3Target(
+		a.clients.Core.Secret().Cache(),
+		s3,
+		a.ETCDSnapshotS3(),
+		a.cluster.Name,
+		path.Join(dataDir, EndpointCADirectory),
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
 }
 
 // WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
@@ -253,27 +389,370 @@ func (a *ImportedAdapter) WaitForRegister() (bool, error) {
 	return len(expectedMachines) == 0, nil
 }
 
-// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
+// RuntimeCommand returns the command used to interact with the distro CLI (RKE2/K3S).
 func (a *ImportedAdapter) RuntimeCommand() string {
-	if a.cluster.Status.Provider == "rke2" {
-		return "rke2"
+	if a.cluster.Status.Provider == capr.RuntimeRKE2 {
+		return capr.RuntimeRKE2
 	}
-	return "k3s"
+	return capr.RuntimeK3S
 }
 
 // ServerUnit returns the systemd unit name for a distro server node.
 func (a *ImportedAdapter) ServerUnit() string {
-	if a.cluster.Status.Provider == "rke2" {
-		return "rke2-server"
+	if a.cluster.Status.Provider == capr.RuntimeRKE2 {
+		return capr.RuntimeRKE2 + "-server"
 	}
-	return "k3s"
+	return capr.RuntimeK3S
 }
 
-func (a *ImportedAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	if a.cluster.Status.Provider == "rke2" {
-		return "/var/lib/rancher/rke2"
+// RuntimeService returns the systemd unit responsible for the runtime on the node represented
+// by secret: ServerUnit on control-plane/etcd nodes, or the runtime agent unit on worker-only
+// nodes.
+func (a *ImportedAdapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
 	}
-	return "/var/lib/rancher/k3s"
+	return a.RuntimeCommand() + "-agent"
+}
+
+// DistroServices returns the distro service identifiers this cluster's runtime exposes on the
+// node represented by secret.
+func (a *ImportedAdapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
+// managementNodeForSecret resolves the machine-plan Secret -> lifecycle labels ->
+// management Node cache lookup chain. Returns (nil, nil) when the secret carries no
+// lifecycle labels.
+func (a *ImportedAdapter) managementNodeForSecret(secret *corev1.Secret) (*mgmtv3.Node, error) {
+	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
+		return nil, nil
+	}
+
+	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
+	if err != nil {
+		return nil, fmt.Errorf("unable to resolve lifecycle reference for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+
+	node, err := a.clients.Mgmt.Node().Cache().Get(ref.Namespace, ref.Name)
+	if apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("unable to find management node %s/%s for machine-plan secret %s/%s", ref.Namespace, ref.Name, secret.Namespace, secret.Name)
+	} else if err != nil {
+		return nil, fmt.Errorf("unable to get management node %s/%s for machine-plan secret %s/%s: %w", ref.Namespace, ref.Name, secret.Namespace, secret.Name, err)
+	}
+
+	return node, nil
+}
+
+// nodeArgsForRuntime parses the runtime-specific node-args annotation off the management
+// Node's status. Returns nil, nil when node is nil or the annotation is absent/empty.
+func nodeArgsForRuntime(node *mgmtv3.Node, runtime string) ([]string, error) {
+	if node == nil {
+		return nil, nil
+	}
+
+	argsKey := rke2NodeArgsAnnotation
+	if runtime == capr.RuntimeK3S {
+		argsKey = k3sNodeArgsAnnotation
+	}
+
+	argsJSON, ok := node.Status.NodeAnnotations[argsKey]
+	if !ok || argsJSON == "" {
+		return nil, nil
+	}
+
+	var args []string
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return nil, fmt.Errorf("unable to parse %s annotation on management node %s/%s: %w", argsKey, node.Namespace, node.Name, err)
+	}
+	return args, nil
+}
+
+// nodeEnvForRuntime parses the runtime-specific node-env annotation off the management
+// Node's status. Returns nil, nil when node is nil or the annotation is absent/empty.
+func nodeEnvForRuntime(node *mgmtv3.Node, runtime string) (map[string]string, error) {
+	if node == nil {
+		return nil, nil
+	}
+
+	envKey := rke2NodeEnvAnnotation
+	if runtime == capr.RuntimeK3S {
+		envKey = k3sNodeEnvAnnotation
+	}
+
+	envJSON, ok := node.Status.NodeAnnotations[envKey]
+	if !ok || envJSON == "" {
+		return nil, nil
+	}
+
+	var env map[string]string
+	if err := json.Unmarshal([]byte(envJSON), &env); err != nil {
+		return nil, fmt.Errorf("unable to parse %s annotation on management node %s/%s: %w", envKey, node.Namespace, node.Name, err)
+	}
+	return env, nil
+}
+
+// nodeArgs returns the selected runtime's node arguments for the machine-plan secret.
+// It follows the machine-plan Secret -> lifecycle labels -> management Node -> status
+// nodeAnnotations lookup chain and returns an error when the lookup or parsing fails.
+func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) ([]string, error) {
+	node, err := a.managementNodeForSecret(secret)
+	if err != nil {
+		return nil, err
+	}
+	return nodeArgsForRuntime(node, a.RuntimeCommand())
+}
+
+// arguments is an ordered command-line argument list. It is a lightweight view over the
+// supplied slice — converting a []string to arguments does not copy the values.
+type arguments []string
+
+// Last returns the last non-empty value supplied for any exact option name, or
+// an empty string when none has a value. It accepts both split (--option value)
+// and combined (--option=value) forms. When multiple aliases are given, the last
+// value wins across all aliases.
+func (a arguments) Last(names ...string) string {
+	var last string
+	for i, arg := range a {
+		for _, name := range names {
+			if arg == name {
+				if i+1 < len(a) && a[i+1] != "" {
+					last = a[i+1]
+				}
+				continue
+			}
+			if strings.HasPrefix(arg, name+"=") {
+				if v := strings.TrimPrefix(arg, name+"="); v != "" {
+					last = v
+				}
+			}
+		}
+	}
+	return last
+}
+
+// Values returns every value supplied for one exact option name, preserving
+// command-line order. It accepts both split (--option value) and combined
+// (--option=value) forms, which is useful for repeated wrapper options.
+func (a arguments) Values(name string) []string {
+	var values []string
+	for i, arg := range a {
+		if arg == name {
+			if i+1 < len(a) {
+				values = append(values, a[i+1])
+			}
+			continue
+		}
+		if strings.HasPrefix(arg, name+"=") {
+			values = append(values, strings.TrimPrefix(arg, name+"="))
+		}
+	}
+	return values
+}
+
+func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) (string, error) {
+	runtime := a.RuntimeCommand()
+
+	node, err := a.managementNodeForSecret(secret)
+	if err != nil {
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+	if node == nil {
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: no management node found", secret.Namespace, secret.Name)
+	}
+
+	args, err := nodeArgsForRuntime(node, runtime)
+	if err != nil {
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+	if dataDir := arguments(args).Last("--data-dir", "-d"); dataDir != "" {
+		return dataDir, nil
+	}
+
+	env, err := nodeEnvForRuntime(node, runtime)
+	if err != nil {
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+
+	if runtime == capr.RuntimeRKE2 {
+		if dataDir := env["RKE2_DATA_DIR"]; dataDir != "" {
+			return dataDir, nil
+		}
+		return defaultRKE2DataDirectory, nil
+	}
+	if dataDir := env["K3S_DATA_DIR"]; dataDir != "" {
+		return dataDir, nil
+	}
+	return defaultK3sDataDirectory, nil
+}
+
+func (a *ImportedAdapter) DistroManifestPaths(dataDir string) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
+}
+
+// normalizeCNIValues splits each raw --cni/RKE2_CNI value on commas and trims surrounding
+// whitespace from each plugin name, preserving order — Multus's position relative to Calico is
+// meaningful (RKE2 normally lists it first), so the values must not be sorted or deduplicated.
+func normalizeCNIValues(values []string) []string {
+	var normalized []string
+	for _, value := range values {
+		for _, plugin := range strings.Split(value, ",") {
+			if plugin = strings.TrimSpace(plugin); plugin != "" {
+				normalized = append(normalized, plugin)
+			}
+		}
+	}
+	return normalized
+}
+
+// rke2ServerCNI resolves one RKE2 server node's effective bundled CNI selection.
+//
+// Precedence matches RKE2 itself: an explicit --cni argument always wins; only when it is absent
+// does the RKE2_CNI environment variable apply; only when neither is set does RKE2's own default
+// (Canal) apply. Environment parsing is skipped entirely when --cni is present, so a malformed,
+// unrelated rke2.io/node-env annotation cannot block resolution.
+//
+// A nil args result means the server has not reported its runtime arguments yet — that is
+// missing information, not evidence of any particular CNI, so it is returned as an error rather
+// than silently assumed to be Canal.
+func rke2ServerCNI(node *mgmtv3.Node) ([]string, error) {
+	args, err := nodeArgsForRuntime(node, capr.RuntimeRKE2)
+	if err != nil {
+		return nil, fmt.Errorf("parsing runtime arguments for server node %s/%s: %w", node.Namespace, node.Name, err)
+	}
+	if args == nil {
+		return nil, fmt.Errorf("server node %s/%s has not reported its runtime arguments yet", node.Namespace, node.Name)
+	}
+
+	if cni := arguments(args).Values("--cni"); len(cni) > 0 {
+		return normalizeCNIValues(cni), nil
+	}
+
+	env, err := nodeEnvForRuntime(node, capr.RuntimeRKE2)
+	if err != nil {
+		return nil, fmt.Errorf("parsing runtime environment for server node %s/%s: %w", node.Namespace, node.Name, err)
+	}
+	if cni := env["RKE2_CNI"]; cni != "" {
+		return normalizeCNIValues([]string{cni}), nil
+	}
+
+	return []string{"canal"}, nil
+}
+
+// effectiveRKE2CNI resolves the bundled CNI plugin selection configured on this imported RKE2
+// cluster. That configuration lives on the cluster's RKE2 control-plane node(s), not on the node
+// receiving a given plan — a Linux worker normally runs `rke2 agent` and does not repeat the
+// server's --cni selection in its own arguments, but a Calico worker still needs the Calico
+// liveness probe.
+//
+// Only control-plane nodes deploy the bundled CNI; an etcd-only node has no CNI configuration of
+// its own to conflict with, so it is excluded from both the source list and the comparison below.
+//
+// This only detects RKE2's own bundled CNI selection. It does not, and cannot, detect an
+// independently installed Calico deployment when the cluster is configured with cni: none —
+// that is out of scope here.
+func (a *ImportedAdapter) effectiveRKE2CNI() ([]string, error) {
+	nodes, err := a.clients.Mgmt.Node().Cache().List(a.cluster.Name, labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("listing management nodes for cluster %s: %w", a.cluster.Name, err)
+	}
+
+	var servers []*mgmtv3.Node
+	for _, node := range nodes {
+		if node.DeletionTimestamp != nil {
+			continue
+		}
+		if node.Spec.ControlPlane {
+			servers = append(servers, node)
+		}
+	}
+	if len(servers) == 0 {
+		return nil, fmt.Errorf("cluster %s has no RKE2 control-plane node(s) to resolve CNI configuration from", a.cluster.Name)
+	}
+
+	// Sort so resolution order — and therefore which server's name appears first in a conflict
+	// error — is stable across reconciles instead of depending on cache iteration order.
+	slices.SortFunc(servers, func(a, b *mgmtv3.Node) int { return strings.Compare(a.Name, b.Name) })
+
+	var resolved []string
+	var resolvedFrom string
+	for _, node := range servers {
+		cni, err := rke2ServerCNI(node)
+		if err != nil {
+			return nil, err
+		}
+		if resolvedFrom == "" {
+			resolved = cni
+			resolvedFrom = node.Name
+			continue
+		}
+		if !slices.Equal(resolved, cni) {
+			return nil, fmt.Errorf("cluster %s has conflicting effective CNI selections: server %s resolved %v, server %s resolved %v",
+				a.cluster.Name, resolvedFrom, resolved, node.Name, cni)
+		}
+	}
+	return resolved, nil
+}
+
+// componentTLSSettingsFromNodeArgs extracts scheduler/controller-manager
+// TLS settings from imported node arguments.
+func componentTLSSettingsFromNodeArgs(args []string, component string) ComponentTLSSettings {
+	var outer string
+	switch component {
+	case KubeControllerManagerProbeName:
+		outer = "--" + KubeControllerManagerArg
+	case KubeSchedulerProbeName:
+		outer = "--" + KubeSchedulerArg
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	innerArgs := arguments(args).Values(outer)
+
+	var settings ComponentTLSSettings
+	for _, arg := range innerArgs {
+		key, value, ok := strings.Cut(arg, "=")
+		if !ok {
+			continue
+		}
+		// clean possible double-dash prefix from the inner argument key, e.g. --secure-port=6443
+		key = strings.TrimPrefix(key, "--")
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings
+}
+
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings parsed from the
+// imported node's effective runtime arguments.
+func (a *ImportedAdapter) ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	args, err := a.nodeArgs(secret)
+	if err != nil {
+		return ComponentTLSSettings{}, err
+	}
+	return componentTLSSettingsFromNodeArgs(args, component), nil
+}
+
+// renderSecureProbeFromSettings applies TLS certificate and secure-port settings parsed from an
+// imported node's runtime arguments. RenderProbes reads node args once and reuses the parsed
+// settings for both component probes. fallbackCertPath is used only when settings has no
+// explicit TLS cert file configured.
+func renderSecureProbeFromSettings(settings ComponentTLSSettings, probe plan.Probe, loopbackAddress, defaultSecurePort, fallbackCertPath string) (plan.Probe, error) {
+	securePort := settings.SecurePort
+	if securePort == "" {
+		securePort = defaultSecurePort
+	}
+	tlsCert := settings.TLSCertFile
+	if tlsCert == "" {
+		tlsCert = fallbackCertPath
+	}
+	return ReplaceCACertAndPortForProbes(probe, tlsCert, loopbackAddress, securePort)
 }
 
 func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -282,7 +761,7 @@ func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 }
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
-// Currently custom data directories, probes, and using ipv4 as the primary ip family are not supported.
+// Imported clusters currently support per-node custom data-directory paths via DistroDataDirectory.
 func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
@@ -307,9 +786,9 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		probes[probeName] = AllProbes[probeName]
 	}
 
-	dataDir := "/var/lib/rancher/rke2"
-	if runtime == capr.RuntimeK3S {
-		dataDir = "/var/lib/rancher/k3s"
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
 	}
 
 	// only support ipv4, need to implement per-node extraction mechanism
@@ -326,16 +805,45 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		probes[SupervisorProbeName] = supervisorProbe
 	}
 
+	// Calico applicability comes from the imported RKE2 cluster's control-plane node(s)
+	// configuration, not from the node receiving this plan — Linux workers don't repeat the
+	// server's --cni selection in their own arguments, but a Calico worker still needs this
+	// liveness probe. Only Linux, non-etcd-only RKE2 nodes are eligible to receive it at all.
+	etcdOnly := IsEtcd(secret) && !IsControlPlane(secret)
+	calicoProbeApplies := runtime == capr.RuntimeRKE2 && !IsWindows(secret) && !etcdOnly
+
+	if calicoProbeApplies {
+		cni, err := a.effectiveRKE2CNI()
+		if err != nil {
+			return probes, err
+		}
+		if slices.Contains(cni, CalicoProbeName) {
+			probes[CalicoProbeName] = AllProbes[CalicoProbeName]
+		}
+	}
+
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmProbe, err := renderSecureProbe("", probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		// Use the node's actual configured TLS cert and secure-port for these probes; a
+		// probe built from defaults alone can fail even when the component is healthy if
+		// the user configured either setting explicitly.
+		args, err := a.nodeArgs(secret)
+		if err != nil {
+			return probes, err
+		}
+
+		kcmFallbackCertPath := path.Join(dataDir, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmSettings := componentTLSSettingsFromNodeArgs(args, KubeControllerManagerProbeName)
+		kcmProbe, err := renderSecureProbeFromSettings(kcmSettings, probes[KubeControllerManagerProbeName], loopbackAddress, DefaultKubeControllerManagerPort, kcmFallbackCertPath)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksProbe, err := renderSecureProbe("", probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksFallbackCertPath := path.Join(dataDir, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksSettings := componentTLSSettingsFromNodeArgs(args, KubeSchedulerProbeName)
+		ksProbe, err := renderSecureProbeFromSettings(ksSettings, probes[KubeSchedulerProbeName], loopbackAddress, DefaultKubeSchedulerPort, ksFallbackCertPath)
 		if err != nil {
 			return probes, err
 		}
@@ -355,8 +863,7 @@ func (a *ImportedAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 	node, err := a.clients.Mgmt.Node().Cache().Get(a.cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		return false, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return false, err
 	}
 	if node.DeletionTimestamp != nil {
@@ -431,15 +938,19 @@ func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*c
 	return nil, nil
 }
 
-func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {
-	if a.cluster.Status.Provider == "k3s" {
-		return "/usr/local/bin/kubectl"
+func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) (string, error) {
+	if a.RuntimeCommand() == capr.RuntimeK3S {
+		return "/usr/local/bin/kubectl", nil
 	}
-	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dataDir, "bin", "kubectl"), nil
 }
 
 func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {
-	if a.cluster.Status.Provider == "k3s" {
+	if a.RuntimeCommand() == capr.RuntimeK3S {
 		return "/etc/rancher/k3s/k3s.yaml"
 	}
 	return "/etc/rancher/rke2/rke2.yaml"
@@ -481,7 +992,48 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 	})
 }
 
-// PauseCluster is a no-op for imported clusters since they have no CAPI cluster.
-func (a *ImportedAdapter) PauseCluster(_ bool) error {
-	return nil
+// PauseCluster suspends version management for the imported cluster by toggling
+// importedclusterversionmanagement.VersionManagementPausedAnno on the mgmt v3 Cluster.
+//
+// An imported cluster has no CAPI object to pause, but it does have a controller that reacts to the
+// cluster's desired Kubernetes version: k3sbasedupgrade renders system-upgrade-controller plans from
+// it. A restore rewrites that version and reinstalls the distro on the nodes itself, so without this
+// the upgrade controller would see the rewritten version mid-restore and start draining nodes to roll
+// out plans of its own. See the annotation's own comment for the rest.
+//
+// The annotation is read straight off the object on every reconcile of the upgrade handler, so the
+// pause takes effect as soon as this returns.
+func (a *ImportedAdapter) PauseCluster(pause bool) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Read through the client rather than trusting a.cluster: the operation holds its adapter
+		// across reconciles, and the annotation is the one field two steps of the same operation both
+		// write.
+		cluster, err := a.clients.Mgmt.Cluster().Get(a.cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if pause {
+			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] == "true" {
+				return nil
+			}
+			cluster = cluster.DeepCopy()
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
+		} else {
+			if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; !ok {
+				return nil
+			}
+			cluster = cluster.DeepCopy()
+			delete(cluster.Annotations, importedclusterversionmanagement.VersionManagementPausedAnno)
+		}
+
+		logrus.Infof("[operations] imported cluster %s: setting %s=%v", cluster.Name,
+			importedclusterversionmanagement.VersionManagementPausedAnno, pause)
+
+		_, err = a.clients.Mgmt.Cluster().Update(cluster)
+		return err
+	})
 }
