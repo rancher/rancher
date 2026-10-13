@@ -846,8 +846,8 @@ func TestGetGroupsForTokenAuthProviderUsesConfigName(t *testing.T) {
 	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributeCache.EXPECT().Get("u-abcdef").Return(&v3.UserAttribute{
 		GroupPrincipals: map[string]v3.Principals{
-			"github":    {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}}}},
-			"github-eu": {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}}}},
+			"github":    {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}, Provider: "github"}}},
+			"github-eu": {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}}},
 		},
 	}, nil)
 
@@ -866,5 +866,5 @@ func TestGetGroupsForTokenAuthProviderUsesConfigName(t *testing.T) {
 
 	groups := manager.GetGroupsForTokenAuthProvider(token)
 
-	assert.Equal(t, []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}}}, groups)
+	assert.Equal(t, []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}}, groups)
 }
