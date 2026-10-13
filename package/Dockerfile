@@ -47,20 +47,20 @@ RUN zypper refresh && \
     # Early install coreutils-single (smaller size), otherwise coreutils will be transitively installed
     zypper --installroot /chroot -n in --no-recommends coreutils-single && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates findutils xz gzip tar gawk vim-small openssh-clients \
+      catatonit curl util-linux ca-certificates findutils xz gzip tar gawk vim-small \
       ca-certificates-mozilla `# the -prebuilt package in the base image is not sufficient, as we are running update-ca-certificates in the entrypoint`
 
 
 FROM chroot-builder AS chroot-builder-server
 RUN zypper --installroot /chroot -n in --no-recommends \
-      git-core unzip sed shadow netcat-openbsd mkisofs && \
+      unzip sed shadow netcat-openbsd mkisofs && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+      sed grep jq hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
     rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
     zypper --installroot /chroot -n in -r pkgs kubectl-1.37 && \
