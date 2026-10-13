@@ -1,6 +1,7 @@
 package clusterregistrationtoken
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -25,6 +26,11 @@ const (
 	expiresAtDataKey            = "expiresAt"
 	gracePeriodExpiresAtDataKey = "gracePeriodExpiresAt"
 )
+
+// ErrTokenNotReady is returned when a CRT's token has not been stored in its Secret yet, e.g. the CRT
+// was just created or has not been migrated from Status.Token. Callers must wait instead of using an
+// empty token, which would never authenticate.
+var ErrTokenNotReady = errors.New("cluster registration token is not ready")
 
 func SecretName(crtName string) string {
 	return secretPrefix + crtName
@@ -85,13 +91,15 @@ func TokenSecretCluster(secret *corev1.Secret, getNamespace func(name string) (*
 	return cluster, false, nil
 }
 
+// GetTokenFromSecret returns the plaintext token of crt. It returns an error wrapping ErrTokenNotReady
+// if the token is not available in the CRT's Secret yet, so it never returns an empty token.
 func GetTokenFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) (string, error) {
 	if crt == nil {
-		return "", nil
+		return "", ErrTokenNotReady
 	}
 
 	if crt.Status.TokenSecretName == "" {
-		return "", nil
+		return "", fmt.Errorf("CRT %s/%s has no token secret: %w", crt.Namespace, crt.Name, ErrTokenNotReady)
 	}
 
 	secret, err := secrets.Get(crt.Namespace, crt.Status.TokenSecretName)
@@ -102,6 +110,9 @@ func GetTokenFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) 
 	token, ok := secret.Data[tokenDataKey]
 	if !ok {
 		return "", fmt.Errorf("token key not found in secret %s/%s", crt.Namespace, crt.Status.TokenSecretName)
+	}
+	if len(token) == 0 {
+		return "", fmt.Errorf("token in secret %s/%s is empty: %w", crt.Namespace, crt.Status.TokenSecretName, ErrTokenNotReady)
 	}
 
 	return string(token), nil
