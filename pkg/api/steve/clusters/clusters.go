@@ -21,7 +21,6 @@ import (
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/v3/pkg/schemas"
-	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -82,15 +81,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 			schema.ResourceActions["generateKubeconfig"] = schemas.Action{
 				Output: "generateKubeconfigOutput",
 			}
-			schema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
-				// By pass authorization for local shell because the user might not have
-				// GET granted for local cluster
-				if request.Name == "local" && request.Link == "shell" && shellHandler != nil {
-					shellHandler.ServeHTTP(request.Response, request.Request)
-					return types.APIObject{}, validation.ErrComplete
-				}
-				return handlers.ByIDHandler(request)
-			}
+			schema.ByIDHandler = handlers.ByIDHandler
 			// Everybody can list even if they have no list or get privileges. The users
 			// authorization will still be used to determine what can be seen but just
 			// may result in an empty list
