@@ -643,8 +643,8 @@ github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae7577
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379/go.mod h1:IfqyXrTiCAg8rTJodbGApTiORgujJnBH+QyHHJlFSII=
 github.com/rancher/lasso v0.2.8 h1:AhAk1AKz9ZpvPlFj07JKRYGzIxaPNywUs2LpSwcyGDU=
 github.com/rancher/lasso v0.2.8/go.mod h1:HyENYowaiGY9jnsyxLnhGfoOBZlU3y+lws8qCYyuBOc=
-github.com/rancher/machine v0.15.0-rancher142.6 h1:youx2t35jvlhdVja801sfNnbhkuPqwjERiMGOnmnTzU=
-github.com/rancher/machine v0.15.0-rancher142.6/go.mod h1:mHFF3ZaKwJdZKriI0Igv90bBMgLXR5Bnc1eEsEQMkFk=
+github.com/rancher/machine v0.15.0-rancher142.7-rc.0 h1:LG3s03jof0tmlRMrE/0Oj7V0yRqu4mesiF3uHXGoAhM=
+github.com/rancher/machine v0.15.0-rancher142.7-rc.0/go.mod h1:duHvddKTSvD76yeoCtXMFmnMSVLx5s44xT1UX/Vd99o=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/muchang v0.1.0 h1:Yuu3b7eFRqnnbp6qbLsP/5SY3IKGDj2mUUTzy4AiUVw=
