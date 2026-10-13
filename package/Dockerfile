@@ -67,7 +67,7 @@ RUN ln -s /usr/bin/kubectl-1.36 /chroot/usr/bin/kubectl
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.8 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.9 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
