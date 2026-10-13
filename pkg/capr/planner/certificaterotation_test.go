@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -247,7 +248,8 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 	}
 
 	genericSetup := func(mp *mockPlanner) {
-		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(ClusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{Status: v3.ClusterRegistrationTokenStatus{Token: "lol"}}}, nil)
+		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(ClusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{ObjectMeta: metav1.ObjectMeta{Namespace: "somecluster", Name: "default-token"}, Status: v3.ClusterRegistrationTokenStatus{TokenSecretName: "crt-token-default-token"}}}, nil)
+		mp.secretCache.EXPECT().Get("somecluster", "crt-token-default-token").Return(&v1.Secret{Data: map[string][]byte{"token": []byte("lol")}}, nil)
 		mp.managementClusters.EXPECT().Get("somecluster").Return(&v3.Cluster{}, nil)
 	}
 
