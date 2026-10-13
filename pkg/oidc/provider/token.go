@@ -432,6 +432,7 @@ func createIDToken(oidcClient *v3.OIDCClient, rancherToken accessor.TokenAccesso
 
 	if slices.Contains(scopes, "profile") {
 		idClaims["name"] = user.DisplayName
+		idClaims["preferred_username"] = user.DisplayName
 	}
 	if nonce != "" {
 		idClaims["nonce"] = nonce

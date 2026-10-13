@@ -15,9 +15,10 @@ import (
 
 // UserInfoResponse represents the response from the userinfo endpoint.
 type UserInfoResponse struct {
-	Sub      string   `json:"sub"`
-	UserName string   `json:"username,omitempty"`
-	Groups   []string `json:"groups,omitempty"`
+	Sub               string   `json:"sub"`
+	UserName          string   `json:"username,omitempty"`
+	PreferredUsername string   `json:"preferred_username,omitempty"`
+	Groups            []string `json:"groups,omitempty"`
 }
 
 type userInfoHandler struct {
@@ -86,6 +87,7 @@ func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		response.UserName = user.DisplayName
+		response.PreferredUsername = user.DisplayName
 	}
 
 	if slices.Contains(scopes, "groups") {
