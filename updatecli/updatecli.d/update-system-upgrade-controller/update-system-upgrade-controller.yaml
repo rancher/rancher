@@ -48,7 +48,19 @@ sources:
     name: 'Get latest upstream system-upgrade-controller pkg/apis version'
     kind: shell
     spec:
-      command: 'GOTOOLCHAIN=auto go mod download -json "github.com/{{ .repos.system_upgrade_controller.owner }}/{{ .repos.system_upgrade_controller.repo }}/pkg/apis@master" | grep ''"Version":'' | sed -E ''s/.*"Version": "([^"]+)".*/\1/'''
+      command: |
+        set -eu
+        output=$(GOTOOLCHAIN=auto go mod download -json "github.com/{{ .repos.system_upgrade_controller.owner }}/{{ .repos.system_upgrade_controller.repo }}/pkg/apis@master")
+        version=$(printf '%s\n' "$output" | grep '"Version":' | sed -E 's/.*"Version": "([^"]+)".*/\1/')
+        case "$version" in
+          v[0-9]*)
+            printf '%s\n' "$version"
+            ;;
+          *)
+            echo "Error: invalid or empty version '$version' retrieved for system-upgrade-controller pkg/apis" >&2
+            exit 1
+            ;;
+        esac
 
 targets:
   update-go-mod:
