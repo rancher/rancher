@@ -702,6 +702,36 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 				return []byte(fakeNewPasswordSalt), nil
 			},
 		},
+		"error when current password doesn't match": {
+			userID:          fakeUserID,
+			currentPassword: fakeCurrentPassword,
+			newPassword:     fakeNewPassword,
+			mockHashKey: func(string, []byte, int, int) ([]byte, error) {
+				return []byte("different-password-hash"), nil
+			},
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fakeUserID,
+						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
+					},
+					Data: map[string][]byte{
+						"salt":     []byte(fakePasswordSalt),
+						"password": []byte(fakeCurrentPasswordHash),
+					},
+				}, nil)
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			expectErrorMessage: "invalid current password",
+		},
 		"error when secret can't be fetched": {
 			userID:          fakeUserID,
 			currentPassword: fakeNewPassword,

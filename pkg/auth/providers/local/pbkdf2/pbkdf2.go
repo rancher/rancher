@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha3"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -27,6 +28,9 @@ const (
 	pbkdf2sha3512Hash           = "pbkdf2sha3512"
 	bcryptHash                  = "bcrypt"
 )
+
+// ErrInvalidPassword is returned when the provided password does not match the password hash.
+var ErrInvalidPassword = errors.New("invalid password")
 
 // Pbkdf2 handles password storage and hashing using PBKDF2.
 type Pbkdf2 struct {
@@ -221,6 +225,9 @@ func (p *Pbkdf2) VerifyAndUpdatePassword(userId string, currentPassword, newPass
 	}
 
 	if err := p.ComparePassword(currentPassword, secret.Data["password"], secret.Data["salt"]); err != nil {
+		if errors.Is(err, ErrInvalidPassword) {
+			return fmt.Errorf("invalid current password")
+		}
 		return err
 	}
 
@@ -288,7 +295,7 @@ func (p *Pbkdf2) ComparePassword(password string, hashedPassword, salt []byte) e
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 	if !bytes.Equal(computedHash, hashedPassword) {
-		return fmt.Errorf("invalid password")
+		return ErrInvalidPassword
 	}
 
 	return nil
