@@ -6,7 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/audit"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
-	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/authentication"
@@ -33,7 +33,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	// clean extra that is not part of userInfo
 	for header := range req.Header {
 		if key, ok := strings.CutPrefix(header, authentication.ImpersonateUserExtraHeaderPrefix); ok {
-			if !providers.IsValidUserExtraAttribute(key) {
+			if !common.IsValidUserExtraAttribute(key) {
 				req.Header.Del(header)
 			}
 		}
