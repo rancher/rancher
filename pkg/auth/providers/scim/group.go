@@ -169,6 +169,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 // Returns:
 //   - 201 on success
 //   - 400 for invalid requests
+//   - 404 if a member doesn't exist or isn't owned by the provider
 //   - 409 if the group already exists.
 func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::CreateGroup: url %s", r.URL)
@@ -196,6 +197,23 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	gpn := groupPrincipalName(provider, gid)
+	var existing map[string]string
+	if len(payload.Members) > 0 {
+		existing, err = s.resolveGroupMembers(provider, gpn, payload.Members)
+		if err != nil {
+			var scimErr *Error
+			if errors.As(err, &scimErr) {
+				writeError(w, scimErr)
+				return
+			}
+
+			logrus.Errorf("scim::CreateGroup: failed to resolve group members: %s", err)
+			writeError(w, NewInternalError())
+			return
+		}
+	}
+
 	group, created, err := s.ensureRancherGroup(provider, payload)
 	if err != nil {
 		logrus.Errorf("scim::CreateGroup: failed to ensure rancher group: %s", err)
@@ -209,15 +227,9 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gpn := groupPrincipalName(provider, gid)
 	if len(payload.Members) > 0 {
-		err = s.syncGroupMembers(provider, gpn, group.DisplayName, payload.Members)
+		err = s.syncGroupMembers(provider, gpn, group.DisplayName, payload.Members, existing)
 		if err != nil {
-			if scimErr, ok := err.(*Error); ok {
-				writeError(w, scimErr)
-				return
-			}
-
 			logrus.Errorf("scim::CreateGroup: failed to sync group members: %s", err)
 			writeError(w, NewInternalError())
 			return
@@ -250,7 +262,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests
-//   - 404 if the group is not found.
+//   - 404 if the group is not found or isn't owned by the provider.
 func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::GetGroup: url %s", r.URL)
 
@@ -263,7 +275,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 		excludeMembers = slices.Contains(fields, "members")
 	}
 
-	group, err := s.groupsCache.Get(id)
+	group, err := s.getOwnedGroup(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
@@ -317,7 +329,9 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 // UpdateGroup updates a group.
 // Returns:
 //   - 200 on success
-//   - 400 for invalid requests.
+//   - 400 for invalid requests
+//   - 404 if the group is not found or isn't owned by the provider, or a new member doesn't exist
+//     or isn't owned by the provider.
 func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::UpdateGroup: url %s", r.URL)
 
@@ -345,7 +359,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 
-	group, err := s.groupsCache.Get(id)
+	group, err := s.getOwnedGroup(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
@@ -365,6 +379,27 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
+	if gid == "" {
+		logrus.Errorf("scim::UpdateGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
+		writeError(w, NewInternalError())
+		return
+	}
+	gpn := groupPrincipalName(provider, gid)
+
+	existing, err := s.resolveGroupMembers(provider, gpn, payload.Members)
+	if err != nil {
+		var scimErr *Error
+		if errors.As(err, &scimErr) {
+			writeError(w, scimErr)
+			return
+		}
+
+		logrus.Errorf("scim::UpdateGroup: failed to resolve group members for %s: %s", id, err)
+		writeError(w, NewInternalError())
+		return
+	}
+
 	if group.ExternalID != payload.ExternalID || group.DisplayName != payload.DisplayName {
 		group = group.DeepCopy()
 		group.ExternalID = payload.ExternalID
@@ -377,14 +412,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
-	if gid == "" {
-		logrus.Errorf("scim::UpdateGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
-		writeError(w, NewInternalError())
-		return
-	}
-	gpn := groupPrincipalName(provider, gid)
-	err = s.syncGroupMembers(provider, gpn, group.DisplayName, payload.Members)
+	err = s.syncGroupMembers(provider, gpn, group.DisplayName, payload.Members, existing)
 	if err != nil {
 		logrus.Errorf("scim::UpdateGroup: failed to sync group members for %s: %s", id, err)
 		writeError(w, NewInternalError())
@@ -420,14 +448,16 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 //
 // Returns:
 //   - 200 on success
-//   - 400 for invalid requests.
+//   - 400 for invalid requests
+//   - 404 if the group is not found or isn't owned by the provider, or a new member doesn't exist
+//     or isn't owned by the provider.
 func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::PatchGroup: url %s", r.URL)
 
 	provider := r.PathValue("provider")
 	id := r.PathValue("id")
 
-	group, err := s.groupsCache.Get(id)
+	group, err := s.getOwnedGroup(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
@@ -544,20 +574,6 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Pre-flight: verify all members exist before making any mutations.
-	// Try to avoid partial updates as much as possible.
-	for _, member := range membersToAdd {
-		if _, err := s.userCache.Get(member.Value); err != nil {
-			if apierrors.IsNotFound(err) {
-				writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", member.Value)))
-				return
-			}
-			logrus.Errorf("scim::PatchGroup: failed to look up member %s: %s", member.Value, err)
-			writeError(w, NewInternalError())
-			return
-		}
-	}
-
 	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::PatchGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
@@ -565,6 +581,22 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	gpn := groupPrincipalName(provider, gid)
+
+	// Pre-flight: verify all new members before making any mutations.
+	// Try to avoid partial updates as much as possible.
+	if len(membersToAdd) > 0 {
+		if _, err := s.resolveGroupMembers(provider, gpn, membersToAdd); err != nil {
+			var scimErr *Error
+			if errors.As(err, &scimErr) {
+				writeError(w, scimErr)
+				return
+			}
+
+			logrus.Errorf("scim::PatchGroup: failed to resolve members: %s", err)
+			writeError(w, NewInternalError())
+			return
+		}
+	}
 
 	// Apply group updates
 	if shouldUpdateGroup {
@@ -628,14 +660,14 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 // DeleteGroup deletes a group.
 // Returns:
 //   - 204 on successful deletion
-//   - 404 if the group is not found
+//   - 404 if the group is not found or isn't owned by the provider.
 func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::DeleteGroup: url %s", r.URL)
 
 	provider := r.PathValue("provider")
 	id := r.PathValue("id")
 
-	group, err := s.groupsCache.Get(id)
+	group, err := s.getOwnedGroup(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
@@ -742,13 +774,15 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, principalName strin
 	return members, nil
 }
 
-// syncGroupMembers synchronizes the members of a group to match the provided list.
+// resolveGroupMembers verifies the requested members before any mutation and returns the group's
+// current members.
 // principalName is the full group principal name (e.g. "okta_group://Engineering").
-// displayName is the human-readable group name, stored on new group principals.
-func (s *SCIMServer) syncGroupMembers(provider, principalName, displayName string, members []scimMember) error {
+// Every member must be a User. A member who isn't in the group yet must exist and be owned by the
+// provider, or the request gets 404.
+func (s *SCIMServer) resolveGroupMembers(provider, principalName string, members []scimMember) (map[string]string, error) {
 	rancherMembers, err := s.getRancherGroupMembers(provider, principalName)
 	if err != nil {
-		return fmt.Errorf("failed to get groups: %w", err)
+		return nil, fmt.Errorf("failed to get groups: %w", err)
 	}
 
 	existing := make(map[string]string, len(rancherMembers))
@@ -756,25 +790,35 @@ func (s *SCIMServer) syncGroupMembers(provider, principalName, displayName strin
 		existing[m.Value] = m.Display
 	}
 
-	// Pre-flight: verify all members are Users and exist before making any mutations.
-	// Try to avoid partial updates as much as possible.
 	for _, member := range members {
 		switch strings.ToLower(member.Type) { // The default caseExact value for the type attribute is false.
 		case "", "user": // The type attribute is optional. We'll default to "User" if it's not provided.
 		case "group":
-			return NewError(http.StatusBadRequest, "Nested groups are not supported")
+			return nil, NewError(http.StatusBadRequest, "Nested groups are not supported")
 		default:
-			return NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported member type: %s", member.Type))
+			return nil, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported member type: %s", member.Type))
 		}
 
-		if _, err := s.userCache.Get(member.Value); err != nil {
+		if _, ok := existing[member.Value]; ok {
+			continue
+		}
+
+		if _, err := s.getOwnedUser(provider, member.Value); err != nil {
 			if apierrors.IsNotFound(err) {
-				return NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", member.Value))
+				return nil, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", member.Value))
 			}
-			return fmt.Errorf("failed to get user %s: %w", member.Value, err)
+			return nil, fmt.Errorf("failed to get user %s: %w", member.Value, err)
 		}
 	}
 
+	return existing, nil
+}
+
+// syncGroupMembers synchronizes the members of a group to match the provided list.
+// principalName is the full group principal name (e.g. "okta_group://Engineering").
+// displayName is the human-readable group name, stored on new group principals.
+// existing holds the group's current members, as returned by resolveGroupMembers.
+func (s *SCIMServer) syncGroupMembers(provider, principalName, displayName string, members []scimMember, existing map[string]string) error {
 	retained := make(map[string]struct{})
 	for _, member := range members {
 		if _, ok := existing[member.Value]; !ok {
@@ -943,28 +987,20 @@ func (s *SCIMServer) removeAllGroupMembers(provider, principalName string) error
 // ensureRancherGroup ensures that a Rancher group exists for the given SCIM group.
 // Returns the group, a boolean indicating if a new group was created, and any error.
 func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Group, bool, error) {
-	var (
-		group *v3.Group
-		err   error
-	)
+	var group *v3.Group
 
-	if grp.ID != "" {
-		group, err = s.groupsCache.Get(grp.ID)
-		if err != nil {
-			return nil, false, err
-		}
-	} else {
-		// Try to find an existing group by display name.
-		groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to list groups for provider %s: %w", provider, err)
-		}
+	// Try to find an existing group by display name.
+	// An id in the request body is ignored, because id is read-only and a server ignores it in a
+	// POST (RFC 7644).
+	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to list groups for provider %s: %w", provider, err)
+	}
 
-		for _, g := range groups {
-			if strings.EqualFold(g.DisplayName, grp.DisplayName) {
-				group = g
-				break
-			}
+	for _, g := range groups {
+		if strings.EqualFold(g.DisplayName, grp.DisplayName) {
+			group = g
+			break
 		}
 	}
 
