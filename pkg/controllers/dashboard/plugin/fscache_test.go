@@ -1,9 +1,14 @@
 package plugin
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -348,6 +353,101 @@ func Test_getChartNameAndVersion(t *testing.T) {
 			assert.NoError(t, err, testCase.name)
 		}
 	}
+}
+
+func TestUntar(t *testing.T) {
+	testCases := []struct {
+		Name          string
+		Files         []string
+		ExpectedFiles []string
+	}{
+		{
+			Name: "Extract files with explicit directory entries",
+			Files: []string{
+				"1.0.0/",
+				"1.0.0/files.txt",
+			},
+			ExpectedFiles: []string{
+				"1.0.0/files.txt",
+			},
+		},
+		{
+			Name: "Extract files without explicit directory entries",
+			Files: []string{
+				"1.0.0/files.txt",
+			},
+			ExpectedFiles: []string{
+				"1.0.0/files.txt",
+			},
+		},
+		{
+			Name: "Extract files from nested directories without directory entries",
+			Files: []string{
+				"1.0.0/assets/plugin.js",
+			},
+			ExpectedFiles: []string{
+				"1.0.0/assets/plugin.js",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			dst := t.TempDir()
+			archive := createTarGz(t, tc.Files)
+
+			err := Untar(dst, bytes.NewReader(archive))
+			assert.NoError(t, err)
+
+			for _, expectedFile := range tc.ExpectedFiles {
+				filePath := filepath.Join(dst, expectedFile)
+
+				info, err := os.Stat(filePath)
+				assert.NoError(t, err)
+				assert.False(t, info.IsDir())
+			}
+		})
+	}
+}
+
+func createTarGz(t *testing.T, files []string) []byte {
+	t.Helper()
+
+	var buffer bytes.Buffer
+
+	gzipWriter := gzip.NewWriter(&buffer)
+	tarWriter := tar.NewWriter(gzipWriter)
+
+	for _, file := range files {
+		if strings.HasSuffix(file, "/") {
+			err := tarWriter.WriteHeader(&tar.Header{
+				Name:     file,
+				Mode:     0755,
+				Typeflag: tar.TypeDir,
+			})
+			assert.NoError(t, err)
+
+			continue
+		}
+
+		content := []byte(file)
+
+		err := tarWriter.WriteHeader(&tar.Header{
+			Name:     file,
+			Mode:     0644,
+			Size:     int64(len(content)),
+			Typeflag: tar.TypeReg,
+		})
+		assert.NoError(t, err)
+
+		_, err = tarWriter.Write(content)
+		assert.NoError(t, err)
+	}
+
+	assert.NoError(t, tarWriter.Close())
+	assert.NoError(t, gzipWriter.Close())
+
+	return buffer.Bytes()
 }
 
 func Test_validateFilesTxtEntries(t *testing.T) {
