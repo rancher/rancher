@@ -45,6 +45,7 @@ const (
 	AgentForceDeployAnn        = "io.cattle.agent.force.deploy"
 	AgentRegistrationTokenHash = "io.cattle.agent.registration-token-hash"
 	clusterImage               = "clusterImage"
+	tokenNotReadyRequeueDelay  = 5 * time.Second
 )
 
 var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
@@ -416,6 +417,13 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	tokenHashChanged, err := cd.registrationTokenHashChanged(cluster)
+	if errors.Is(err, crt.ErrTokenNotReady) {
+		// Deploying now would render the agent with an empty token, which can never authenticate,
+		// so wait for the token to be stored in its Secret.
+		logrus.Debugf("clusterDeploy: deployAgent: waiting for system registration token of cluster [%s]: %v", cluster.Name, err)
+		cd.clusters.Controller().EnqueueAfter("", cluster.Name, tokenNotReadyRequeueDelay)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
