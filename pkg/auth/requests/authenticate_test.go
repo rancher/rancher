@@ -319,7 +319,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Contains(t, resp.Groups, configName+"_group://56789")
 	})
 
-	t.Run("groups fall back to the token auth provider for an invalid principal", func(t *testing.T) {
+	t.Run("groups fall back to the token auth provider for system user with unparseable principal", func(t *testing.T) {
 		oldUserPrincipal := token.UserPrincipal
 		oldUserPrincipalIDs := user.PrincipalIDs
 		oldGroupPrincipals := userAttribute.GroupPrincipals
@@ -339,6 +339,26 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+	})
+
+	t.Run("non-system user and unparseable principal fails with invalid principal", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldUserPrincipalIDs := user.PrincipalIDs
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			user.PrincipalIDs = oldUserPrincipalIDs
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+		token.UserPrincipal.Name = "invalid-principal"
+		token.UserPrincipal.Provider = "other-provider"
+		user.PrincipalIDs = []string{"github://test"}
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+		}
+
+		_, err := authenticator.Authenticate(req)
+		require.ErrorContains(t, err, "invalid principal: invalid-principal")
 	})
 
 	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
