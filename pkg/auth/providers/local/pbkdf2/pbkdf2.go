@@ -242,14 +242,7 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 
 	switch secret.Annotations[passwordHashAnnotation] {
 	case pbkdf2sha3512Hash:
-		hashedPassword, err := p.hashKey(password, secret.Data["salt"], iterations, keyLength)
-		if err != nil {
-			return fmt.Errorf("failed to hash password: %w", err)
-		}
-		if !bytes.Equal(hashedPassword, secret.Data["password"]) {
-			return fmt.Errorf("invalid password")
-		}
-		return nil
+		return p.ComparePassword(password, secret.Data["password"], secret.Data["salt"])
 	case bcryptHash:
 		if err := bcrypt.CompareHashAndPassword(secret.Data["password"], []byte(password)); err != nil {
 			return err
@@ -291,6 +284,19 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 	default:
 		return fmt.Errorf("unsupported hashing algorithm")
 	}
+}
+
+// ComparePassword verifies if the provided password matches the hashed password using the provided salt.
+func (p *Pbkdf2) ComparePassword(password string, hashedPassword, salt []byte) error {
+	computedHash, err := p.hashKey(password, salt, iterations, keyLength)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+	if !bytes.Equal(computedHash, hashedPassword) {
+		return fmt.Errorf("invalid password")
+	}
+
+	return nil
 }
 
 func sha3512Key(password string, salt []byte, iter, keyLength int) ([]byte, error) {

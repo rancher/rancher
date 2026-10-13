@@ -16,6 +16,51 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+func TestComparePassword(t *testing.T) {
+	password := "correct-password"
+	salt := []byte("password-salt")
+	hashedPassword := []byte("password-hash")
+
+	tests := map[string]struct {
+		hashKey            func(password string, salt []byte, iter, keyLength int) ([]byte, error)
+		expectErrorMessage string
+	}{
+		"matching password": {
+			hashKey: func(gotPassword string, gotSalt []byte, iter, keyLen int) ([]byte, error) {
+				assert.Equal(t, password, gotPassword)
+				assert.Equal(t, salt, gotSalt)
+				assert.Equal(t, iterations, iter)
+				assert.Equal(t, keyLength, keyLen)
+				return hashedPassword, nil
+			},
+		},
+		"non-matching password": {
+			hashKey: func(string, []byte, int, int) ([]byte, error) {
+				return []byte("different-hash"), nil
+			},
+			expectErrorMessage: "invalid password",
+		},
+		"hashing error": {
+			hashKey: func(string, []byte, int, int) ([]byte, error) {
+				return nil, errors.New("unexpected error")
+			},
+			expectErrorMessage: "failed to hash password: unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := Pbkdf2{hashKey: test.hashKey}
+			err := p.ComparePassword(password, hashedPassword, salt)
+			if test.expectErrorMessage == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.expectErrorMessage)
+			}
+		})
+	}
+}
+
 func TestCreatePassword(t *testing.T) {
 	ctlr := gomock.NewController(t)
 	fakeUserID := "fake-user-id"
