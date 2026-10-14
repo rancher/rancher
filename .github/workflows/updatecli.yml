@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install updatecli
-        uses: updatecli/updatecli-action@2efa15cbae1751f532f9bfc88f56adafd6d1faed # v3.8.0
+        uses: updatecli/updatecli-action@5d180ff09f5204e599bbd6030cd1736009ed5ff2 # v3.9.0
 
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
