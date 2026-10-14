@@ -22,6 +22,7 @@ var (
 		"projectroletemplatebindings":                true,
 		"proxyendpoints":                             true,
 		"oidcclients":                                true,
+		"authconfigs":                                true,
 		"users":                                      true,
 	}
 	allowPost = map[string]bool{

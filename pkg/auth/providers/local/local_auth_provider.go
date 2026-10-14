@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,10 +32,11 @@ const (
 	searchIndexDefaultLen = 6
 )
 
-var invalidHash, _ = bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
+var invalidHash = make([]byte, 32)
 
 type PasswordVerifier interface {
 	VerifyPassword(user *apiv3.User, password string) error
+	ComparePassword(password string, hashedPassword, salt []byte) error
 }
 
 type Provider struct {
@@ -136,7 +136,7 @@ func (l *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, inpu
 	if err != nil {
 		// If the user don't exist the password is evaluated
 		// to avoid user enumeration via timing attack (time based side-channel).
-		bcrypt.CompareHashAndPassword(invalidHash, []byte(pwd))
+		_ = l.pwdVerifier.ComparePassword(pwd, invalidHash, invalidHash)
 		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
 		return apiv3.Principal{}, nil, "", authFailedError
 	}
