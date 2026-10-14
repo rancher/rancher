@@ -115,6 +115,56 @@ func TestGetUserInfoUsername(t *testing.T) {
 	}
 }
 
+func TestUsernameFromInfo(t *testing.T) {
+	extra := map[string][]string{"username": {"from-extra"}}
+	base := &user.DefaultInfo{Name: "u-1", UID: "u-1", Groups: []string{"g"}, Extra: extra}
+
+	tests := []struct {
+		name string
+		info user.Info
+		want string
+	}{
+		{name: "explicit name wins over extras", info: WithUsername(base, "explicit"), want: "explicit"},
+		{name: "empty explicit name falls back to extras", info: WithUsername(base, ""), want: "from-extra"},
+		{name: "plain info uses extras", info: base, want: "from-extra"},
+		{name: "plain info without extras", info: &user.DefaultInfo{Name: "u-2"}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, UsernameFromInfo(tt.info))
+		})
+	}
+}
+
+func TestWithUsernameKeepsUserInfo(t *testing.T) {
+	base := &user.DefaultInfo{Name: "u-1", UID: "uid-1", Groups: []string{"g"}, Extra: map[string][]string{"k": {"v"}}}
+
+	got := WithUsername(base, "explicit")
+
+	assert.Equal(t, "u-1", got.GetName())
+	assert.Equal(t, "uid-1", got.GetUID())
+	assert.Equal(t, []string{"g"}, got.GetGroups())
+	assert.Equal(t, map[string][]string{"k": {"v"}}, got.GetExtra())
+	assert.Same(t, base, WithUsername(base, ""), "an empty name must return the info unchanged")
+	assert.Nil(t, WithUsername(nil, "explicit"))
+}
+
+func TestGetUserInfoPrefersExplicitUsername(t *testing.T) {
+	info := WithUsername(&user.DefaultInfo{
+		Name:  "u-1",
+		Extra: map[string][]string{"username": {"from-extra"}},
+	}, "explicit")
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(request.WithUser(req.Context(), info))
+
+	got := getUserInfo(req)
+
+	assert.Equal(t, "u-1", got.Name)
+	assert.Equal(t, "explicit", got.Username)
+	assert.Equal(t, map[string][]string{"username": {"from-extra"}}, got.Extra, "extras must not be changed")
+}
+
 func TestFillUsername(t *testing.T) {
 	type record struct{ username, displayName string }
 	users := map[string]record{

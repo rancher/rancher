@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	requestsar "github.com/rancher/rancher/pkg/auth/requests/sar"
@@ -243,6 +244,97 @@ func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(request.WithUser(t.Context(), realCaller))
 			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			var entry struct {
+				User map[string]any `json:"user"`
+			}
+			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+
+			assert.Equal(t, tt.wantName, entry.User["name"])
+			if tt.wantUsername == "" {
+				assert.NotContains(t, entry.User, "username")
+			} else {
+				assert.Equal(t, tt.wantUsername, entry.User["username"])
+			}
+		})
+	}
+}
+
+type filterTestAuthenticator struct {
+	resp *AuthenticatorResponse
+}
+
+func (a filterTestAuthenticator) Authenticate(*http.Request) (*AuthenticatorResponse, error) {
+	return a.resp, nil
+}
+
+func (a filterTestAuthenticator) TokenFromRequest(*http.Request) (accessor.TokenAccessor, error) {
+	return nil, nil
+}
+
+func TestAuditUsernameFromAuthenticatorResponse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		resp         *AuthenticatorResponse
+		swapTo       *user.DefaultInfo // Stands in for the impersonation filter.
+		wantName     string
+		wantUsername string
+	}{
+		{
+			name: "explicit username wins over the extra",
+			resp: &AuthenticatorResponse{
+				IsAuthed: true, User: "u-1",
+				Extras:   map[string][]string{"username": {"from-extra"}},
+				Username: "explicit",
+			},
+			wantName:     "u-1",
+			wantUsername: "explicit",
+		},
+		{
+			name: "no explicit username uses the extra",
+			resp: &AuthenticatorResponse{
+				IsAuthed: true, User: "u-1",
+				Extras: map[string][]string{"username": {"from-extra"}},
+			},
+			wantName:     "u-1",
+			wantUsername: "from-extra",
+		},
+		{
+			name: "explicit username is dropped when the request user is replaced",
+			resp: &AuthenticatorResponse{
+				IsAuthed: true, User: "u-1",
+				Extras:   map[string][]string{"username": {"from-extra"}},
+				Username: "explicit",
+			},
+			swapTo:       &user.DefaultInfo{Name: "u-target"},
+			wantName:     "u-target",
+			wantUsername: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			writer, err := audit.NewWriter(out, audit.WriterOptions{})
+			require.NoError(t, err)
+
+			swap := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+					if tt.swapTo != nil {
+						req = req.WithContext(request.WithUser(req.Context(), tt.swapTo))
+					}
+					next.ServeHTTP(rw, req)
+				})
+			}
+			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+			handler := ToAuthMiddleware(filterTestAuthenticator{resp: tt.resp})(
+				audit.NewAuditLogMiddleware(writer)(swap(authHeaderHandler{next: next})))
+
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 
 			var entry struct {
 				User map[string]any `json:"user"`

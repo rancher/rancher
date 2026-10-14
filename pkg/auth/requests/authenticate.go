@@ -15,6 +15,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -63,6 +64,11 @@ type AuthenticatorResponse struct {
 	UserPrincipal string
 	Groups        []string
 	Extras        map[string][]string
+
+	// Username is the authoritative human-readable name of the user for this
+	// session, shown in the audit log. It is optional and deliberately not part
+	// of Extras, which are forwarded as impersonation headers.
+	Username string
 }
 
 // ClusterRouter returns the cluster ID based on the request URL's path.
@@ -102,12 +108,13 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 		if err != nil {
 			return nil, false, err
 		}
-		return &user.DefaultInfo{
+		info := &user.DefaultInfo{
 			Name:   authResp.User,
 			UID:    authResp.User,
 			Groups: authResp.Groups,
 			Extra:  authResp.Extras,
-		}, authResp.IsAuthed, err
+		}
+		return audit.WithUsername(info, authResp.Username), authResp.IsAuthed, err
 	}
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }

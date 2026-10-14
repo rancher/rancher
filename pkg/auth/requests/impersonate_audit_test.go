@@ -171,3 +171,50 @@ func TestImpersonationAuditUser(t *testing.T) {
 		})
 	}
 }
+
+// TestImpersonationAuditUserKeepsAuthoritativeCallerName checks that the real caller's authoritative
+// username, which the authenticator attaches to the request user, is recorded in impersonatedBy, while
+// the impersonated user never inherits it.
+func TestImpersonationAuditUserKeepsAuthoritativeCallerName(t *testing.T) {
+	t.Parallel()
+
+	const (
+		caller = "u-caller"
+		target = "u-target"
+	)
+	callerInfo := audit.WithUsername(&user.DefaultInfo{
+		Name:   caller,
+		UID:    caller,
+		Groups: []string{"system:authenticated"},
+		Extra:  map[string][]string{"username": {"from-extra"}},
+	}, "explicit")
+
+	sarMock := mocks.NewMockSubjectAccessReview(gomock.NewController(t))
+	sarMock.EXPECT().UserCanImpersonateUser(gomock.Any(), caller, []string{"system:authenticated"}, target).Return(true, nil)
+
+	out := &bytes.Buffer{}
+	writer, err := audit.NewWriter(out, audit.WriterOptions{})
+	require.NoError(t, err)
+
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	ia := &ImpersonatingAuth{sar: sarMock}
+	handler := audit.NewAuditLogMiddleware(writer)(ia.ImpersonationMiddleware(NewAuthenticatedFilter(next)))
+
+	req := httptest.NewRequest(http.MethodGet, "/k8s/clusters/c-1/api", nil)
+	req = req.WithContext(request.WithUser(req.Context(), callerInfo))
+	req.Header.Set("Impersonate-User", target)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	var entry struct {
+		User map[string]any `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+
+	assert.Equal(t, target, entry.User["name"])
+	assert.NotContains(t, entry.User, "username", "the target must not inherit the caller's name")
+	assert.Equal(t, map[string]any{
+		"name":     caller,
+		"username": "explicit",
+		"group":    []any{"system:authenticated"},
+	}, entry.User["impersonatedBy"])
+}

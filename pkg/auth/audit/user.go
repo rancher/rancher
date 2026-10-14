@@ -56,7 +56,7 @@ type Impersonator struct {
 // only the SCIM authenticator replaces it, so the content of existing entries does not change.
 func (u *User) SetIdentity(info user.Info) {
 	u.Name = info.GetName()
-	u.Username = UsernameFromExtra(info.GetExtra())
+	u.Username = UsernameFromInfo(info)
 	u.Group = info.GetGroups()
 }
 
@@ -64,7 +64,7 @@ func (u *User) SetIdentity(info user.Info) {
 func (u *User) SetImpersonatedBy(real user.Info) {
 	u.ImpersonatedBy = &Impersonator{
 		Name:     real.GetName(),
-		Username: UsernameFromExtra(real.GetExtra()),
+		Username: UsernameFromInfo(real),
 		Group:    real.GetGroups(),
 	}
 }
@@ -137,6 +137,42 @@ func (lh *LoggingHandler) lookupUsername(userID string) string {
 		return username
 	}
 	return displayName
+}
+
+// UsernameInfo is implemented by a user.Info that carries an authoritative human-readable name,
+// chosen by the authenticator for the session. See [WithUsername].
+type UsernameInfo interface {
+	AuditUsername() string
+}
+
+type usernameInfo struct {
+	user.Info
+	username string
+}
+
+func (u usernameInfo) AuditUsername() string { return u.username }
+
+// WithUsername returns info carrying username as its authoritative human-readable name. It is kept
+// out of the user extras on purpose: extras are forwarded as impersonation headers and checked
+// against the impersonator role. The name is lost whenever the request user is replaced, for
+// example by impersonation, so it can never describe a different user than the one it was set for.
+// An empty username returns info unchanged.
+func WithUsername(info user.Info, username string) user.Info {
+	if info == nil || username == "" {
+		return info
+	}
+	return usernameInfo{Info: info, username: username}
+}
+
+// UsernameFromInfo returns the human-readable name for info, or "" if there is none. The
+// authoritative name from [WithUsername] wins, otherwise it is taken from the user extras.
+func UsernameFromInfo(info user.Info) string {
+	if u, ok := info.(UsernameInfo); ok {
+		if username := u.AuditUsername(); username != "" {
+			return username
+		}
+	}
+	return UsernameFromExtra(info.GetExtra())
 }
 
 func getUserInfo(req *http.Request) *User {

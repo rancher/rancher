@@ -82,25 +82,36 @@
 // # Username
 //
 // [User].Username, and ImpersonatedBy.Username, is the human-readable name. It
-// comes from the "username" user extra (see [UsernameFromExtra]). When the
-// entry is written and it is still empty, it is looked up from the user record
-// that the respective Name refers to: the user's username, then its display
-// name (see [UserResolver] and [WithUserResolver]). System identities have no
-// record and keep an empty Username.
+// is chosen in this order:
 //
-// After a user impersonation the replacement user has only the extras sent in
-// the Impersonate-Extra-* headers, so the effective Username usually comes
-// from the lookup. It is never carried over from the real caller.
+//  1. The authoritative name the authenticator attached to the request user
+//     with [WithUsername], read through [UsernameInfo]. It is not part of the
+//     user extras, because extras are forwarded as impersonation headers and
+//     checked against the impersonator role.
+//  2. The "username" user extra (see [UsernameFromExtra]).
+//  3. When the entry is written and it is still empty, the user record that the
+//     respective Name refers to: its username, then its display name (see
+//     [UserResolver] and [WithUserResolver]). System identities have no record
+//     and keep an empty Username.
 //
-// Do not add fallback usernames to the extras built by the token
-// authenticator. Those extras are forwarded as impersonation headers, and the
-// per-user impersonator ClusterRole (pkg/impersonation) only allows the
-// username values stored in the user's attributes, so an unlisted value is
-// rejected with "not allowed to impersonate extras".
+// The authoritative name is attached to the request user object itself, so it
+// is lost whenever that object is replaced. After a user impersonation the
+// replacement user has only the extras sent in the Impersonate-Extra-* headers,
+// so the effective Username usually comes from the lookup, and it is never
+// carried over from the real caller. ImpersonatedBy.Username is read from the
+// caller before the replacement, so it keeps the authoritative name.
 //
-// No username source may depend on data that the verbosity level drops
-// (request or response headers and bodies). The login name from a login
-// request body is read regardless of level for this reason.
+// Rules:
+//   - Do not add fallback usernames to the extras built by the token
+//     authenticator. They are forwarded as impersonation headers, and the
+//     per-user impersonator ClusterRole (pkg/impersonation) only allows the
+//     username values stored in the user's attributes, so an unlisted value is
+//     rejected with "not allowed to impersonate extras".
+//   - No username source may depend on data that the verbosity level drops
+//     (request or response headers and bodies). The login name from a login
+//     request body is read regardless of level for this reason.
+//   - Authentication providers decide what a user's name is. The audit package
+//     only reads it.
 //
 // # Known limitations
 //
