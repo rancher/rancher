@@ -3,17 +3,23 @@ package helm
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/kstatus"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -25,18 +31,21 @@ type operationHandler struct {
 	pods            corecontrollers.PodCache
 	k8s             kubernetes.Interface
 	operationsCache catalogcontrollers.OperationCache
+	apps            catalogcontrollers.AppController
 }
 
 func RegisterOperations(ctx context.Context,
 	k8s kubernetes.Interface,
 	pods corecontrollers.PodController,
-	operations catalogcontrollers.OperationController) {
+	operations catalogcontrollers.OperationController,
+	apps catalogcontrollers.AppController) {
 
 	o := operationHandler{
 		ctx:             ctx,
 		k8s:             k8s,
 		pods:            pods.Cache(),
 		operationsCache: operations.Cache(),
+		apps:            apps,
 	}
 
 	operations.Cache().AddIndexer(podIndex, indexOperationsByPod)
@@ -85,6 +94,28 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 			status.PodCreated = true
 			if container.State.Terminated.ExitCode == 0 {
 				kstatus.SetActive(&status)
+				if operation.Status.Action != "uninstall" {
+					retry.OnError(wait.Backoff{Steps: 3, Duration: 1 * time.Second, Factor: 2, Jitter: 0.1},
+						func(err error) bool {
+							return apierrors.IsConflict(err) || apierrors.IsNotFound(err)
+						},
+						func() error {
+							app, err := o.apps.Get(operation.Status.Namespace, operation.Status.Release, metav1.GetOptions{})
+							if err != nil {
+								return err
+							}
+							if !reflect.DeepEqual(app.Status.Tolerations, operation.Status.Tolerations) {
+								app.Status.Tolerations = operation.Status.Tolerations
+								_, err = o.apps.UpdateStatus(app)
+								if err != nil {
+									logrus.Errorf("failed to update app.status.tolerations: %v", err)
+									return err
+								}
+							}
+							return nil
+						},
+					)
+				}
 			} else {
 				kstatus.SetError(&status,
 					fmt.Sprintf("%s exit code: %d",

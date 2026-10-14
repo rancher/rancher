@@ -33,7 +33,7 @@ func (in *App) DeepCopyInto(out *App) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
-	out.Status = in.Status
+	in.Status.DeepCopyInto(&out.Status)
 	return
 }
 
@@ -430,6 +430,13 @@ func (in *ReleaseSpec) DeepCopy() *ReleaseSpec {
 func (in *ReleaseStatus) DeepCopyInto(out *ReleaseStatus) {
 	*out = *in
 	out.Summary = in.Summary
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
