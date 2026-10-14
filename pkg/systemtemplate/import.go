@@ -15,7 +15,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	util "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -58,12 +58,12 @@ type clusterAgentContext struct {
 	NamespaceOptions     namespace.Mutator
 	// AgentDeploymentPullSecrets are pull secrets that are used exclusively for
 	// the cluster agent deployment
-	AgentDeploymentPullSecrets []util.AgentPullSecret
+	AgentDeploymentPullSecrets []pkgcluster.AgentPullSecret
 	// SystemDefaultPullSecrets are secret references passed to the cluster
 	// agent as environment variables, later used to deploy system charts with the
 	// correct pull secret configuration.
-	SystemDefaultPullSecrets []util.AgentPullSecret
-	AllPullSecrets           []util.AgentPullSecret
+	SystemDefaultPullSecrets []pkgcluster.AgentPullSecret
+	AllPullSecrets           []pkgcluster.AgentPullSecret
 }
 
 type priorityClassContext struct {
@@ -101,12 +101,12 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func PriorityClassTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
-	value, preemption := util.GetDesiredPriorityClassValueAndPreemption(cluster)
+	value, preemption := pkgcluster.GetDesiredPriorityClassValueAndPreemption(cluster)
 
 	pctx := priorityClassContext{
 		PriorityClassValue: value,
 		PreemptionPolicy:   preemption,
-		Description:        util.PriorityClassDescription,
+		Description:        pkgcluster.PriorityClassDescription,
 	}
 
 	buf := &bytes.Buffer{}
@@ -123,7 +123,7 @@ func PriorityClassTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 }
 
 func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
-	minAvailable, maxUnavailable := util.GetDesiredPodDisruptionBudgetValues(cluster)
+	minAvailable, maxUnavailable := pkgcluster.GetDesiredPodDisruptionBudgetValues(cluster)
 
 	pdbctx := podDisruptionBudgetContext{
 		MinAvailable:   minAvailable,
@@ -174,9 +174,9 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	var registryURL string
 	var err error
-	var registryConfigs, agentDeploymentPullSecrets, systemDefaultPullSecrets []util.AgentPullSecret
+	var registryConfigs, agentDeploymentPullSecrets, systemDefaultPullSecrets []pkgcluster.AgentPullSecret
 
-	registryURL, registryConfigs, err = util.GeneratePrivateRegistryEncodedDockerConfig(ops.Cluster, ops.SecretLister)
+	registryURL, registryConfigs, err = pkgcluster.GeneratePrivateRegistryEncodedDockerConfig(ops.Cluster, ops.SecretLister)
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 	// only set the _system default_ pull secrets for imported or hosted clusters, which are identified by the legacy cluster naming convention (c-xxxxx).
 	// Provisioned and custom clusters (identified by c-m-xxxxx) will use the underlying containerd configuration set at the node level
 	// to authenticate pulls, so deploying image pull secrets in those environments is unnecessary.
-	if util.MgmtNameRegexp.MatchString(ops.Cluster.Name) {
+	if pkgcluster.MgmtNameRegexp.MatchString(ops.Cluster.Name) {
 		systemDefaultPullSecrets = registryConfigs
 	}
 
@@ -253,14 +253,14 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	agentEnvVars = toYAML(envVars)
 
-	if appendTolerations := util.GetClusterAgentTolerations(ops.Cluster); appendTolerations != nil {
+	if appendTolerations := pkgcluster.GetClusterAgentTolerations(ops.Cluster); appendTolerations != nil {
 		agentAppendTolerations = toYAML(appendTolerations)
 		if agentAppendTolerations == "" {
 			return fmt.Errorf("error converting agent append tolerations to YAML")
 		}
 	}
 
-	affinity, err := util.GetClusterAgentAffinity(ops.Cluster)
+	affinity, err := pkgcluster.GetClusterAgentAffinity(ops.Cluster)
 	if err != nil {
 		return err
 	}
@@ -269,14 +269,14 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		return fmt.Errorf("error converting agent affinity to YAML")
 	}
 
-	if resourceRequirements := util.GetClusterAgentResourceRequirements(ops.Cluster); resourceRequirements != nil {
+	if resourceRequirements := pkgcluster.GetClusterAgentResourceRequirements(ops.Cluster); resourceRequirements != nil {
 		agentResourceRequirements = toYAML(resourceRequirements)
 		if agentResourceRequirements == "" {
 			return fmt.Errorf("error converting agent resource requirements to YAML")
 		}
 	}
 
-	pcEnabled, pdbEnabled := util.AgentSchedulingCustomizationEnabled(ops.Cluster)
+	pcEnabled, pdbEnabled := pkgcluster.AgentSchedulingCustomizationEnabled(ops.Cluster)
 
 	var pdb string
 	if pdbEnabled {
@@ -361,7 +361,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 
 // ForCluster is used to generate the cluster agent manifest for a given management cluster.
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
-	status := util.GetAgentSchedulingCustomizationStatus(cluster)
+	status := pkgcluster.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil
 
 	buf := &bytes.Buffer{}
@@ -445,7 +445,7 @@ func GetDesiredAssetsImage(cluster *apimgmtv3.Cluster) string {
 	return desiredCharts
 }
 
-func toYAML(v interface{}) string {
+func toYAML(v any) string {
 	data, err := json.Marshal(v)
 	if err != nil {
 		// Swallow errors inside of a template so it doesn't affect remaining template lines

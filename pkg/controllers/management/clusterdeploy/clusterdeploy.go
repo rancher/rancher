@@ -17,7 +17,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
-	util "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
@@ -141,8 +141,8 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 			toUpdate.Status.AppliedWebhookDeploymentCustomization = modified.Status.AppliedWebhookDeploymentCustomization
 		}
 		// Copy conditions this controller owns
-		util.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
-		util.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
+		pkgcluster.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
+		pkgcluster.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
 		_, updateErr = cd.clusters.UpdateStatus(toUpdate)
 	}
 
@@ -288,12 +288,12 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desire
 		return true
 	}
 
-	if pdbChanged, _ := util.AgentSchedulingPodDisruptionBudgetChanged(cluster); pdbChanged {
+	if pdbChanged, _ := pkgcluster.AgentSchedulingPodDisruptionBudgetChanged(cluster); pdbChanged {
 		logrus.Infof("clusterDeploy: redeployAgent: will redeploy Rancher agent due to Pod Disruption Budget configuration changed for [%s],", cluster.Name)
 		return true
 	}
 
-	if util.AgentDeploymentCustomizationChanged(cluster) {
+	if pkgcluster.AgentDeploymentCustomizationChanged(cluster) {
 		logrus.Infof("clusterDeploy: redeployAgent: will redeploy Rancher agent due to agent deployment customization changed for [%s],", cluster.Name)
 		return true
 	}
@@ -309,7 +309,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desire
 // This is required to ensure that unwanted pod disruption budgets are not left behind in downstream clusters, as simply omitting
 // the object from the agent manifest does not guarantee that the object will be removed.
 func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) error {
-	_, pdbDeleted := util.AgentSchedulingPodDisruptionBudgetChanged(cluster)
+	_, pdbDeleted := pkgcluster.AgentSchedulingPodDisruptionBudgetChanged(cluster)
 	if !pdbDeleted {
 		return nil
 	}
@@ -336,7 +336,7 @@ func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) e
 	// any resources later omitted from that manifest must be manually removed.
 	o, err := kubectl.Delete(pdbYaml, kubeConfig)
 	if err != nil {
-		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", util.PodDisruptionBudgetName)) {
+		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", pkgcluster.PodDisruptionBudgetName)) {
 			return fmt.Errorf("could not delete existing pod disruption budget: %w", err)
 		}
 	}
@@ -355,7 +355,7 @@ func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
 		return nil
 	}
 
-	if !util.WebhookDeploymentCustomizationChanged(cluster) {
+	if !pkgcluster.WebhookDeploymentCustomizationChanged(cluster) {
 		return nil
 	}
 
@@ -382,7 +382,7 @@ func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
 	}
 
 	logrus.Infof("clusterDeploy: manageWebhookConfig: successfully applied webhook ConfigMap to cluster [%s]", cluster.Name)
-	util.UpdateAppliedWebhookDeploymentCustomization(cluster)
+	pkgcluster.UpdateAppliedWebhookDeploymentCustomization(cluster)
 	return nil
 }
 
@@ -391,7 +391,7 @@ func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
 // a kubeConfig will be generated, the downstream priority class will be deleted and recreated, and a boolean indicating the type of update will be returned.
 // If the priority class is being created or deleted, the agent deployment manifest must update the priorityClassName field accordingly.
 func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, bool, bool, error) {
-	pcChanged, pcCreated, pcRemovedFromCluster := util.AgentSchedulingPriorityClassChanged(cluster)
+	pcChanged, pcCreated, pcRemovedFromCluster := pkgcluster.AgentSchedulingPriorityClassChanged(cluster)
 	if !pcChanged && !pcRemovedFromCluster && !pcCreated {
 		return pcChanged, pcCreated, pcRemovedFromCluster, nil
 	}
@@ -418,7 +418,7 @@ func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, 
 	// the object to update it
 	o, err := kubectl.Delete(pcYaml, kubeConfig)
 	if err != nil {
-		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", util.PriorityClassName)) {
+		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", pkgcluster.PriorityClassName)) {
 			return pcChanged, pcCreated, pcRemovedFromCluster, fmt.Errorf("could not delete existing priority class : %w", err)
 		}
 	}
@@ -439,19 +439,19 @@ func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, 
 // If the downstream object is missing, it will be recreated using the priority class configuration set on the apimgmtv3.Cluster object.
 // A boolean is returned to indicate if the priority class exists on the downstream cluster, as well as any errors encountered.
 func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeConfig *clientcmdapi.Config) (bool, error) {
-	pcEnabled, _ := util.AgentSchedulingCustomizationEnabled(cluster)
+	pcEnabled, _ := pkgcluster.AgentSchedulingCustomizationEnabled(cluster)
 	if !pcEnabled {
 		return false, nil
 	}
 
-	schedulingStatus := util.GetAgentSchedulingCustomizationStatus(cluster)
+	schedulingStatus := pkgcluster.GetAgentSchedulingCustomizationStatus(cluster)
 	if schedulingStatus == nil || schedulingStatus.PriorityClass == nil {
 		return false, nil
 	}
 
 	logrus.Debugf("clusterDeploy: deployAgent: ensuring that downstream priority class exists for [%s]", cluster.Name)
 
-	out, err := kubectl.GetNonNamespacedResource(kubeConfig, util.PriorityClassKind, util.PriorityClassName)
+	out, err := kubectl.GetNonNamespacedResource(kubeConfig, pkgcluster.PriorityClassKind, pkgcluster.PriorityClassName)
 	if err == nil {
 		return true, nil
 	}
@@ -481,11 +481,11 @@ func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeCon
 // downstream to stay up to date with the version in the local cluster.
 // The value is generated using the secrets name, namespace, and the observed resource version.
 func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (string, bool, error) {
-	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
+	if !pkgcluster.MgmtNameRegexp.MatchString(cluster.Name) {
 		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
 	}
 
-	registry, _ := util.GetPrivateRegistry(cluster)
+	registry, _ := pkgcluster.GetPrivateRegistry(cluster)
 	// since provisioned clusters don't use pull secrets we don't need to track the hash. This also helps
 	// reduce unneeded agent redeployments.
 	if registry == nil || len(registry.PullSecrets) == 0 {
@@ -574,7 +574,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			logrus.Errorf("clusterDeploy: failed to rollout cattle-cluster-agent deployment: %s: %v", output, err)
 			return err
 		}
-		util.UpdateAppliedAgentDeploymentCustomization(cluster)
+		pkgcluster.UpdateAppliedAgentDeploymentCustomization(cluster)
 		return nil
 	}
 
@@ -660,7 +660,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
 	cluster.Status.AppliedClusterAgentImagePullSecretsHash = pullSecretHash
 
-	util.UpdateAppliedAgentDeploymentCustomization(cluster)
+	pkgcluster.UpdateAppliedAgentDeploymentCustomization(cluster)
 
 	return nil
 }
