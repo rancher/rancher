@@ -111,7 +111,8 @@
 //     (request or response headers and bodies). The login name from a login
 //     request body is read regardless of level for this reason.
 //   - Authentication providers decide what a user's name is. The audit package
-//     only reads it.
+//     only reads it. The token authenticator reports the login name of the
+//     principal the token was issued for.
 //
 // # Known limitations
 //

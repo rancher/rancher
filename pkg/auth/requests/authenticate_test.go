@@ -258,6 +258,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -1808,6 +1809,36 @@ func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
 			for key, values := range tt.want {
 				assert.ElementsMatch(t, values, got[key], key)
 			}
+		})
+	}
+}
+
+func TestSessionUsername(t *testing.T) {
+	t.Parallel()
+
+	user := &v3.User{Username: "local-user"}
+	token := func(provider, loginName string) *v3.Token {
+		return &v3.Token{AuthProvider: provider, UserPrincipal: v3.Principal{LoginName: loginName}}
+	}
+
+	tests := []struct {
+		name  string
+		token *v3.Token
+		want  string
+	}{
+		{name: "local token uses the principal login name", token: token("local", "local-user"), want: "local-user"},
+		{name: "external token uses the principal login name", token: token("keycloakoidc", "jane@example.com"), want: "jane@example.com"},
+		{name: "principal login name wins over the user's username", token: token("local", "from-principal"), want: "from-principal"},
+		{name: "local token without login name uses the user's username", token: token("local", ""), want: "local-user"},
+		{name: "legacy token without provider uses the user's username", token: token("", ""), want: "local-user"},
+		{name: "external token without login name has none", token: token("keycloakoidc", ""), want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, sessionUsername(tt.token, user))
 		})
 	}
 }

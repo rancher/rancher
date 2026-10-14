@@ -259,6 +259,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		UserPrincipal: token.GetUserPrincipal().Name,
 		Groups:        groups,
 		Extras:        extras,
+		Username:      sessionUsername(token, authUser),
 	}
 
 	logrus.Debugf("Extras returned %v", authResp.Extras)
@@ -303,6 +304,21 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	logrus.Debugf("auth: Updated lastUsedAt for token %s", token.GetName())
 
 	return authResp, nil
+}
+
+// sessionUsername returns the human-readable name of the user for the session of the token, which
+// the audit log shows. It is the login name of the principal the token was issued for, so it is the
+// provider's own answer for this session. Unlike the stored user attributes it cannot be replaced
+// by a provider refresh, and for a user linked to several providers it is the one for this session
+// instead of one of many. A token without a login name falls back to the username of a local user.
+func sessionUsername(token accessor.TokenAccessor, user *apiv3.User) string {
+	if name := token.GetUserPrincipal().LoginName; name != "" {
+		return name
+	}
+	if ap := token.GetAuthProvider(); ap == "local" || ap == "" {
+		return user.Username
+	}
+	return ""
 }
 
 func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *apiv3.UserAttribute) map[string][]string {
