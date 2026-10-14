@@ -31,8 +31,9 @@ import (
 const repoName = "rancher-charts"
 
 var watchedSettings = map[string]struct{}{
-	settings.RancherWebhookVersion.Name: {},
-	settings.SystemDefaultRegistry.Name: {},
+	settings.RancherWebhookVersion.Name:            {},
+	settings.SystemDefaultRegistry.Name:            {},
+	settings.SystemDefaultRegistryPullSecrets.Name: {},
 }
 
 // Register subscribes to changes that affect the webhook chart and ensures the chart is installed.
@@ -88,6 +89,9 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 		registryMap["systemDefaultRegistry"] = ""
 		systemGlobalRegistry["cattle"] = registryMap
 	}
+
+	// imagePullSecrets are always set to ensure old values get cleared out
+	h.setImagePullSecrets(systemGlobalRegistry["cattle"].(map[string]any))
 
 	values := map[string]interface{}{
 		"global": systemGlobalRegistry,
@@ -207,6 +211,15 @@ func (h *handler) setPriorityClass(values map[string]interface{}) {
 	} else if !chart.IsNotFoundError(err) {
 		logrus.Warnf("[webhookchart] failed to get %s for %s: %s", chart.PriorityClassKey, chart.WebhookChartName, err.Error())
 	}
+}
+
+func (h *handler) setImagePullSecrets(values map[string]any) {
+	var pullSecretsAsStrings []string
+	registry, _ := clusterutil.GetPrivateRegistry(nil)
+	if registry != nil {
+		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()
+	}
+	values["imagePullSecrets"] = pullSecretsAsStrings
 }
 
 func (h *handler) getChartValues(chartName string) map[string]interface{} {
