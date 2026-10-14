@@ -57,6 +57,24 @@ func UsernameFromExtra(extra map[string][]string) string {
 	return username
 }
 
+// fillUsername sets an empty Username from the user record that Name refers to: the user's
+// username, otherwise its display name. It runs when the entry is written, so Name is final.
+// Users without a record, such as system identities, keep an empty Username.
+func (lh *LoggingHandler) fillUsername(u *User) {
+	if u.Username != "" || u.Name == "" || lh.resolveUser == nil {
+		return
+	}
+	username, displayName, ok := lh.resolveUser(u.Name)
+	if !ok {
+		return
+	}
+	if username != "" {
+		u.Username = username
+		return
+	}
+	u.Username = displayName
+}
+
 func getUserInfo(req *http.Request) *User {
 	user, _ := request.UserFrom(req.Context())
 	extra := user.GetExtra()

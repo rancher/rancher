@@ -44,6 +44,8 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			respTimestamp := time.Now().Format(time.RFC3339)
 
+			auditLog.fillUsername(user)
+
 			verbosityLevel := auditLog.ResolveVerbosity(req.RequestURI)
 
 			auditUser := user
