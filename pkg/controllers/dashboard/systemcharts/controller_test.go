@@ -9,7 +9,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	chartfake "github.com/rancher/rancher/pkg/controllers/dashboard/chart/fake"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -85,7 +84,7 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
 			Annotations: map[string]string{
-				importedclusterversionmanagement.VersionManagementAnno: "system-default",
+				v3.ClusterImportedVersionManagementAnnotation: "system-default",
 			},
 		},
 	}
@@ -1566,7 +1565,7 @@ func Test_ChartInstallation(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "local",
 						Annotations: map[string]string{
-							importedclusterversionmanagement.VersionManagementAnno: "system-default",
+							v3.ClusterImportedVersionManagementAnnotation: "system-default",
 						},
 					},
 					Spec: v3.ClusterSpec{
