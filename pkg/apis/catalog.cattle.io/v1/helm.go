@@ -2,7 +2,7 @@ package v1
 
 import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,6 +21,8 @@ type App struct {
 type ReleaseStatus struct {
 	Summary            Summary `json:"summary,omitempty"`
 	ObservedGeneration int64   `json:"observedGeneration"`
+	// Tolerations are the tolerations that were last used when modifying the App
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
 type Summary struct {
