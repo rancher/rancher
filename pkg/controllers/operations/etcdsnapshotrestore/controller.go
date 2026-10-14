@@ -1760,11 +1760,17 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	}
 
 	serverArgPath := path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml")
+	dataDir, err := s.adapter.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
 
 	if initialPass && secret.UID != initSecret.UID {
 		nodePlan.Files = append(nodePlan.Files, plan.File{
-			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
-			Path:    serverArgPath,
+			Content: base64.StdEncoding.EncodeToString(
+				[]byte(fmt.Sprintf("server: \"https://%s:%s\"\ntoken-file: %q\n", serverURL, s.adapter.GetSupervisorPort(secret), path.Join(dataDir, "server/token"))),
+			),
+			Path: serverArgPath,
 		})
 	} else if !initialPass {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
