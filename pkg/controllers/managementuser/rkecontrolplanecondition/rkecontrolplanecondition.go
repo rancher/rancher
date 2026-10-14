@@ -18,9 +18,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
-// downstream API calls to check the system-upgrade-controller app status.
-const systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+const (
+	// systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
+	// downstream API calls to check the system-upgrade-controller app status.
+	systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+
+	// noSUCChartVersionReason is the SystemUpgradeControllerReady reason used when the
+	// SystemUpgradeControllerChartVersion setting is empty. It is compared against the existing
+	// condition so the accompanying warning is logged only when the state actually changes.
+	noSUCChartVersionReason = "the SystemUpgradeControllerChartVersion setting is not set"
+)
 
 // throttleState tracks throttle and enqueue deduplication state for a single RKEControlPlane object.
 type throttleState struct {
@@ -67,8 +74,13 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
-		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
+		// Log only on transition; this is a status handler, so it runs on every change, and the condition set below
+		// already records the reason so we can filter out duplicate logs.
+		if !capr.SystemUpgradeControllerReady.IsFalse(&status) ||
+			capr.SystemUpgradeControllerReady.GetReason(&status) != noSUCChartVersionReason {
+			logrus.Warnf("[rkecontrolplanecondition] %s/%s: %s", obj.Namespace, obj.Name, noSUCChartVersionReason)
+		}
+		capr.SystemUpgradeControllerReady.Reason(&status, noSUCChartVersionReason)
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
 		return status, nil
