@@ -12,7 +12,15 @@ import (
 
 // User holds information about the user who caused the audit log
 type User struct {
-	Name  string              `json:"name,omitempty"`
+	// Name is the Rancher user ID (for example "user-h9q7h") for authenticated users, or a
+	// system identity such as "system:unauthenticated". It is not a login name and is opaque
+	// to humans; use Username to identify a person.
+	Name string `json:"name,omitempty"`
+
+	// Username is the human-readable name of the user. It is best-effort and may be empty.
+	// It is not guaranteed to be unique and can change over time, so use Name for correlation.
+	Username string `json:"username,omitempty"`
+
 	Group []string            `json:"group,omitempty"`
 	Extra map[string][]string `json:"extra,omitempty"`
 
