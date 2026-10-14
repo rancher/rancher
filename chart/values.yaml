@@ -254,8 +254,10 @@ postDelete:
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
   namespaceList:
+    - cattle-fleet-local-system
     - cattle-fleet-system
     - cattle-system
+    - cattle-turtles-system
     - rancher-operator-system
   # Number of seconds to wait for an app to be uninstalled
   timeout: 120
