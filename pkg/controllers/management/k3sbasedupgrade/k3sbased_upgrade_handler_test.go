@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -22,8 +21,8 @@ func TestOnClusterChange_Paused(t *testing.T) {
 		{
 			name: "paused with version management enabled",
 			annotations: map[string]string{
-				importedclusterversionmanagement.VersionManagementAnno:       "true",
-				importedclusterversionmanagement.VersionManagementPausedAnno: "true",
+				mgmtv3.ClusterImportedVersionManagementAnnotation:       "true",
+				mgmtv3.ClusterImportedVersionManagementPausedAnnotation: "true",
 			},
 		},
 		{
@@ -31,14 +30,14 @@ func TestOnClusterChange_Paused(t *testing.T) {
 			// the downstream cluster to delete plans, which a restore has no business doing.
 			name: "paused with version management disabled",
 			annotations: map[string]string{
-				importedclusterversionmanagement.VersionManagementAnno:       "false",
-				importedclusterversionmanagement.VersionManagementPausedAnno: "true",
+				mgmtv3.ClusterImportedVersionManagementAnnotation:       "false",
+				mgmtv3.ClusterImportedVersionManagementPausedAnnotation: "true",
 			},
 		},
 		{
 			name: "paused with no version management annotation",
 			annotations: map[string]string{
-				importedclusterversionmanagement.VersionManagementPausedAnno: "true",
+				mgmtv3.ClusterImportedVersionManagementPausedAnnotation: "true",
 			},
 		},
 	}

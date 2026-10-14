@@ -11,7 +11,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	pkgcluster "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -946,7 +945,7 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 }
 
 // PauseCluster suspends version management for the imported cluster by toggling
-// importedclusterversionmanagement.VersionManagementPausedAnno on the mgmt v3 Cluster.
+// importedclusterversionmanagement.ClusterImportedVersionManagementPausedAnnotation on the mgmt v3 Cluster.
 //
 // An imported cluster has no CAPI object to pause, but it does have a controller that reacts to the
 // cluster's desired Kubernetes version: k3sbasedupgrade renders system-upgrade-controller plans from
@@ -967,24 +966,24 @@ func (a *ImportedAdapter) PauseCluster(pause bool) error {
 		}
 
 		if pause {
-			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] == "true" {
+			if cluster.Annotations[mgmtv3.ClusterImportedVersionManagementPausedAnnotation] == "true" {
 				return nil
 			}
 			cluster = cluster.DeepCopy()
 			if cluster.Annotations == nil {
 				cluster.Annotations = map[string]string{}
 			}
-			cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
+			cluster.Annotations[mgmtv3.ClusterImportedVersionManagementPausedAnnotation] = "true"
 		} else {
-			if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; !ok {
+			if _, ok := cluster.Annotations[mgmtv3.ClusterImportedVersionManagementPausedAnnotation]; !ok {
 				return nil
 			}
 			cluster = cluster.DeepCopy()
-			delete(cluster.Annotations, importedclusterversionmanagement.VersionManagementPausedAnno)
+			delete(cluster.Annotations, mgmtv3.ClusterImportedVersionManagementPausedAnnotation)
 		}
 
 		logrus.Infof("[operations] imported cluster %s: setting %s=%v", cluster.Name,
-			importedclusterversionmanagement.VersionManagementPausedAnno, pause)
+			mgmtv3.ClusterImportedVersionManagementPausedAnnotation, pause)
 
 		_, err = a.clients.Mgmt.Cluster().Update(cluster)
 		return err

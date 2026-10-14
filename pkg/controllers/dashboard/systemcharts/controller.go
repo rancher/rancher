@@ -12,7 +12,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
@@ -405,7 +404,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.Enabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -414,7 +413,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.Enabled(cluster)
 					}
 				}
 				toInstall := versionManagementEnabled && toEnable
@@ -448,7 +447,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.Enabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -457,7 +456,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.Enabled(cluster)
 					}
 				}
 				toUninstall := !versionManagementEnabled && noManagedPlan

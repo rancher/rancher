@@ -1,4 +1,4 @@
-package importedclusterversionmanagement
+package cluster
 
 import (
 	"testing"
@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -40,10 +39,8 @@ func TestVersionManagementEnabled(t *testing.T) {
 			name: "annotation true",
 			args: args{
 				cluster: &mgmtv3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							VersionManagementAnno: "true",
-						},
+					Annotations: map[string]string{
+						mgmtv3.ClusterImportedVersionManagementAnnotation: "true",
 					},
 				},
 			},
@@ -53,10 +50,8 @@ func TestVersionManagementEnabled(t *testing.T) {
 			name: "annotation false",
 			args: args{
 				cluster: &mgmtv3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							VersionManagementAnno: "false",
-						},
+					Annotations: map[string]string{
+						mgmtv3.ClusterImportedVersionManagementAnnotation: "false",
 					},
 				},
 			},
@@ -66,10 +61,8 @@ func TestVersionManagementEnabled(t *testing.T) {
 			name: "annotation system-default with setting true",
 			args: args{
 				cluster: &mgmtv3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							VersionManagementAnno: "system-default",
-						},
+					Annotations: map[string]string{
+						mgmtv3.ClusterImportedVersionManagementAnnotation: "system-default",
 					},
 				},
 			},
@@ -79,10 +72,8 @@ func TestVersionManagementEnabled(t *testing.T) {
 			name: "missing annotation with setting true",
 			args: args{
 				cluster: &mgmtv3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							"another-anno": "true",
-						},
+					Annotations: map[string]string{
+						"another-anno": "true",
 					},
 				},
 			},
@@ -116,22 +107,22 @@ func TestPaused(t *testing.T) {
 		},
 		{
 			name:    "annotation true",
-			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "true"}),
+			cluster: clusterWithAnnotations(map[string]string{mgmtv3.ClusterImportedVersionManagementPausedAnnotation: "true"}),
 			want:    true,
 		},
 		{
 			name:    "annotation false",
-			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "false"}),
+			cluster: clusterWithAnnotations(map[string]string{mgmtv3.ClusterImportedVersionManagementPausedAnnotation: "false"}),
 			want:    false,
 		},
 		{
 			name:    "unrecognised value",
-			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "system-default"}),
+			cluster: clusterWithAnnotations(map[string]string{mgmtv3.ClusterImportedVersionManagementPausedAnnotation: "system-default"}),
 			want:    false,
 		},
 		{
 			name:    "unrelated annotation",
-			cluster: clusterWithAnnotations(map[string]string{VersionManagementAnno: "true"}),
+			cluster: clusterWithAnnotations(map[string]string{mgmtv3.ClusterImportedVersionManagementAnnotation: "true"}),
 			want:    false,
 		},
 	}
@@ -147,6 +138,6 @@ func TestPaused(t *testing.T) {
 
 func clusterWithAnnotations(annotations map[string]string) *mgmtv3.Cluster {
 	return &mgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+		Annotations: annotations,
 	}
 }

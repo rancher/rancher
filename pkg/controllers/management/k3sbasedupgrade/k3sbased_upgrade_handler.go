@@ -5,7 +5,7 @@ import (
 	"time"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	cluster2 "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
@@ -34,13 +34,13 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 	// An etcd snapshot restore suspends version management while it rewrites the cluster's desired
 	// version and reinstalls the distro itself. Exit before touching anything: mid-restore there is
 	// nothing useful to render, and both branches below write plans and modify the cluster object.
-	if importedclusterversionmanagement.Paused(cluster) {
+	if cluster2.Paused(cluster) {
 		logrus.Debugf("[k3s-based-upgrader] [%s] version management is paused by %s, skipping",
-			cluster.Name, importedclusterversionmanagement.VersionManagementPausedAnno)
+			cluster.Name, mgmtv3.ClusterImportedVersionManagementPausedAnnotation)
 		return cluster, nil
 	}
 
-	if !importedclusterversionmanagement.Enabled(cluster) {
+	if !cluster2.Enabled(cluster) {
 		var masterPlan, workerPlan planv1.Plan
 
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)

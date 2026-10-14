@@ -16,7 +16,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	pkgcluster "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/image"
@@ -332,7 +331,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		// the case of imported RKE2/K3s cluster
 		if features.ManagedSystemUpgradeController.Enabled() {
-			if importedclusterversionmanagement.Enabled(cluster) {
+			if pkgcluster.Enabled(cluster) {
 				enableMSUC = true
 			} else if cluster.Labels != nil {
 				if _, ok := cluster.Labels["cluster-api.cattle.io/owned"]; ok {
