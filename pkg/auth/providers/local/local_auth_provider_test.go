@@ -8,6 +8,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -255,6 +256,31 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			require.Empty(t, principals)
 		})
 	}
+}
+
+func TestAuthenticateUserComparesPasswordWhenUserDoesNotExist(t *testing.T) {
+	verifier := &mockPasswordVerifier{}
+	provider := Provider{
+		userIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+			userNameIndex: userNameIndexer,
+		}),
+		pwdVerifier: verifier,
+	}
+	password := "submitted-password"
+
+	_, _, _, err := provider.AuthenticateUser(nil, nil, &v3.BasicLogin{
+		Username: "missing-user",
+		Password: password,
+	})
+
+	require.Error(t, err)
+	assert.Equal(t, verifier.comparisons, []passwordComparison{
+		{
+			password:       password,
+			hashedPassword: invalidHash,
+			salt:           invalidHash,
+		},
+	})
 }
 
 func TestProviderSearchPrincipalsMultiAuthProviderCrossSearchesAllUsers(t *testing.T) {
@@ -644,4 +670,28 @@ func (f fakeAuthConfigLister) Get(namespace, name string) (*v3.AuthConfig, error
 	}
 
 	return nil, errors.New("not found")
+}
+
+type passwordComparison struct {
+	password       string
+	hashedPassword []byte
+	salt           []byte
+}
+
+type mockPasswordVerifier struct {
+	comparisons []passwordComparison
+}
+
+func (r *mockPasswordVerifier) VerifyPassword(*v3.User, string) error {
+	return errors.New("not implemented")
+}
+
+func (r *mockPasswordVerifier) ComparePassword(password string, hashedPassword, salt []byte) error {
+	r.comparisons = append(r.comparisons, passwordComparison{
+		password:       password,
+		hashedPassword: hashedPassword,
+		salt:           salt,
+	})
+
+	return nil
 }
