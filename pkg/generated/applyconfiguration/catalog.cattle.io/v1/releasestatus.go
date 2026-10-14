@@ -28,7 +28,8 @@ type ReleaseStatusApplyConfiguration struct {
 	Summary            *SummaryApplyConfiguration `json:"summary,omitempty"`
 	ObservedGeneration *int64                     `json:"observedGeneration,omitempty"`
 	// Tolerations are the tolerations that were last used when modifying the App
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	Tolerations            []corev1.Toleration `json:"tolerations,omitempty"`
+	AutomaticCPTolerations *bool               `json:"automaticCPTolerations,omitempty"`
 }
 
 // ReleaseStatusApplyConfiguration constructs a declarative configuration of the ReleaseStatus type for use with
@@ -60,5 +61,13 @@ func (b *ReleaseStatusApplyConfiguration) WithTolerations(values ...corev1.Toler
 	for i := range values {
 		b.Tolerations = append(b.Tolerations, values[i])
 	}
+	return b
+}
+
+// WithAutomaticCPTolerations sets the AutomaticCPTolerations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AutomaticCPTolerations field is set to the value of the last call.
+func (b *ReleaseStatusApplyConfiguration) WithAutomaticCPTolerations(value bool) *ReleaseStatusApplyConfiguration {
+	b.AutomaticCPTolerations = &value
 	return b
 }
