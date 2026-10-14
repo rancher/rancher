@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/kontainer-engine/store"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
