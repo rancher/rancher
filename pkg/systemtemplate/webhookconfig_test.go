@@ -94,7 +94,6 @@ func TestWebhookConfigMapTemplate_FullCustomization(t *testing.T) {
 	assert.Contains(t, yaml, "minAvailable:")
 }
 
-
 func TestIndentBlock(t *testing.T) {
 	input := "line1\nline2\nline3"
 	result := indentBlock(input, 4)
