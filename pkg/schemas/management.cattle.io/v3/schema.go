@@ -332,9 +332,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				"refreshauthprovideraccess": {},
 			}
 		}).
-		MustImportAndCustomize(&Version, v3.AuthConfig{}, func(schema *types.Schema) {
-			schema.CollectionMethods = []string{http.MethodGet}
-		}).
+		MustImport(&Version, v3.AuthConfig{}).
 		// Local Config
 		MustImportAndCustomize(&Version, v3.LocalConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"

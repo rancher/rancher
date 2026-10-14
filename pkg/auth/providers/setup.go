@@ -37,6 +37,7 @@ func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, sche
 
 	authConfigBaseSchema := schemas.Schema(&managementschema.Version, client.AuthConfigType)
 	authConfigBaseSchema.Store = secrets.Wrap(authConfigBaseSchema.Store, management.Wrangler.Core.Secret())
+
 	for _, authConfigSubtype := range authConfigTypes {
 		subSchema := schemas.Schema(&managementschema.Version, authConfigSubtype)
 		GetProviderByType(authConfigSubtype).CustomizeSchema(subSchema)
