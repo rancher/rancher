@@ -2,14 +2,6 @@ name: Renovate
 on:
   workflow_dispatch:
     inputs:
-      logLevel:
-        description: "Override default log level"
-        required: false
-        default: info
-        type: choice
-        options:
-          - info
-          - debug
       overrideSchedule:
         description: "Override all schedules"
         required: false
@@ -48,12 +40,11 @@ jobs:
       contents: read
       id-token: write # Required for Vault OIDC authentication.
     # https://github.com/rancher/renovate-config/releases
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@b69f2cf5cd5e550bf1bf5a915095992508bff099 # v1.0.12
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@80aa9b4d01e1f6cd0b56d524492357271e75df72 # v1.0.13
     # Note: github.event.inputs.<name> with '||' fallbacks is used across all inputs
     # so that scheduled cron runs (where github.event.inputs is null) safely default.
     with:
       configMigration: ${{ github.event.inputs.configMigration || 'true' }}
-      logLevel: ${{ github.event.inputs.logLevel || 'info' }}
       overrideSchedule: ${{ github.event.inputs.overrideSchedule || 'false' }}
       renovateConfig: ${{ github.event.inputs.renovateConfig || '.github/renovate.json' }}
       minimumReleaseAge: ${{ github.event.inputs.minimumReleaseAge || 'null' }}
