@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -43,12 +44,27 @@ func getUserNameForBasicLogin(body []byte) string {
 	return input.Username
 }
 
+// UsernameFromExtra returns the human-readable name from the "username" user extra, or "" if there is none.
+// The extra can hold several values, one per linked auth provider, in no meaningful order. The
+// smallest non-empty value is returned so the result is stable across requests.
+func UsernameFromExtra(extra map[string][]string) string {
+	var username string
+	for _, name := range extra[common.UserAttributeUserName] {
+		if name != "" && (username == "" || name < username) {
+			username = name
+		}
+	}
+	return username
+}
+
 func getUserInfo(req *http.Request) *User {
 	user, _ := request.UserFrom(req.Context())
+	extra := user.GetExtra()
 	return &User{
-		Name:  user.GetName(),
-		Group: user.GetGroups(),
-		Extra: user.GetExtra(),
+		Name:     user.GetName(),
+		Username: UsernameFromExtra(extra),
+		Group:    user.GetGroups(),
+		Extra:    extra,
 	}
 }
 

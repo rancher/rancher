@@ -1,15 +1,19 @@
 package requests
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/auth/audit"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	requestsar "github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -176,6 +180,83 @@ func TestAuthHeaderHandlerServeHTTPClearsImpersonationHeadersForServiceAccountAu
 	assert.Empty(t, requested.impersonateUser)
 	assert.Empty(t, requested.impersonateGroups)
 	assert.Empty(t, requested.impersonateFoo)
+}
+
+func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
+	t.Parallel()
+
+	realCaller := &user.DefaultInfo{
+		Name:   "user-admin",
+		Groups: []string{"system:authenticated"},
+		Extra:  map[string][]string{"username": {"admin"}},
+	}
+
+	tests := []struct {
+		name         string
+		effective    *user.DefaultInfo
+		wantName     string
+		wantUsername string
+	}{
+		{
+			name:         "request user unchanged",
+			effective:    realCaller,
+			wantName:     "user-admin",
+			wantUsername: "admin",
+		},
+		{
+			name: "impersonated user without username does not keep the real caller's username",
+			effective: &user.DefaultInfo{
+				Name:   "user-target",
+				Groups: []string{"system:authenticated"},
+			},
+			wantName:     "user-target",
+			wantUsername: "",
+		},
+		{
+			name: "impersonated user with username",
+			effective: &user.DefaultInfo{
+				Name:   "user-target",
+				Groups: []string{"system:authenticated"},
+				Extra:  map[string][]string{"username": {"target"}},
+			},
+			wantName:     "user-target",
+			wantUsername: "target",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			writer, err := audit.NewWriter(out, audit.WriterOptions{})
+			require.NoError(t, err)
+
+			// Stands in for the impersonation filter, which replaces the request user after the audit user is captured.
+			swapUser := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+					next.ServeHTTP(rw, req.WithContext(request.WithUser(req.Context(), tt.effective)))
+				})
+			}
+			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+			handler := audit.NewAuditLogMiddleware(writer)(swapUser(authHeaderHandler{next: next}))
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(request.WithUser(t.Context(), realCaller))
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			var entry struct {
+				User map[string]any `json:"user"`
+			}
+			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+
+			assert.Equal(t, tt.wantName, entry.User["name"])
+			if tt.wantUsername == "" {
+				assert.NotContains(t, entry.User, "username")
+			} else {
+				assert.Equal(t, tt.wantUsername, entry.User["username"])
+			}
+		})
+	}
 }
 
 type filterTestSubjectAccessReviewClient struct {

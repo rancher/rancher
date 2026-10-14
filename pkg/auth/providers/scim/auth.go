@@ -152,6 +152,7 @@ func setAuditUser(r *http.Request, provider, tokenID string) {
 	}
 
 	auditUser.Name = "system:scim:" + provider
+	auditUser.Username = ""
 	auditUser.Group = []string{"system:scim"}
 	auditUser.Extra = map[string][]string{
 		"scim.cattle.io/provider": {provider},

@@ -531,6 +531,18 @@ func TestTokenAuthenticatorAuditUser(t *testing.T) {
 		assert.Equal(t, []string{"system:unauthenticated", "system:cattle:error", "", ""}, userInfo.Groups[:4])
 	})
 
+	t.Run("valid token does not keep a username from the request user", func(t *testing.T) {
+		t.Parallel()
+
+		userInfo := newErrorUser()
+		userInfo.Extra = map[string][]string{"username": {"someone"}}
+
+		got := serve(t, secrets, validToken, audit.WriterOptions{}, userInfo)["user"].(map[string]any)
+
+		assert.Equal(t, "system:scim:okta", got["name"])
+		assert.NotContains(t, got, "username")
+	})
+
 	t.Run("invalid token", func(t *testing.T) {
 		t.Parallel()
 
