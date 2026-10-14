@@ -11,7 +11,6 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
@@ -191,7 +190,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	var err error
 	cluster = cluster.DeepCopy()
 	if masterPlan.Name == "" && workerPlan.Name == "" {
-		if importedclusterversionmanagement.Enabled(cluster) {
+		if pkgcluster.Enabled(cluster) {
 			// enter upgrading state
 			if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
 				mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
@@ -220,7 +219,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 		c := strategy.ServerConcurrency
-		if !importedclusterversionmanagement.Enabled(cluster) {
+		if !pkgcluster.Enabled(cluster) {
 			c = int(masterPlan.Spec.Concurrency)
 		}
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
@@ -232,7 +231,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	if workerPlan.Name != "" && len(workerPlan.Status.Applying) > 0 {
 		mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 		c := strategy.WorkerConcurrency
-		if !importedclusterversionmanagement.Enabled(cluster) {
+		if !pkgcluster.Enabled(cluster) {
 			c = int(workerPlan.Spec.Concurrency)
 		}
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
