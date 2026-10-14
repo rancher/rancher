@@ -50,7 +50,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			auditUser := user
 			if auditLog.writer.ExcludeGroups {
-				auditUser.Group = nil
+				auditUser.clearGroups()
 			}
 			auditLogEntry := newLog(verbosityLevel, auditUser, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName, scim)
 			auditLog.Write(auditLogEntry)

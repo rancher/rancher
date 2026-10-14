@@ -8,6 +8,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -25,11 +26,62 @@ type User struct {
 	Group []string            `json:"group,omitempty"`
 	Extra map[string][]string `json:"extra,omitempty"`
 
+	// ImpersonatedBy is the real authenticated caller. It is set only when the caller successfully
+	// impersonated another user, in which case Name, Username, Group and Extra describe the
+	// impersonated (effective) user. A denied impersonation leaves it unset.
+	ImpersonatedBy *Impersonator `json:"impersonatedBy,omitempty"`
+
 	// RequestUser is the --as user
 	RequestUser string `json:"requestUser,omitempty"`
 
 	// RequestGroups is the --as-group list
 	RequestGroups []string `json:"requestGroups,omitempty"`
+}
+
+// Impersonator identifies the real authenticated caller of an impersonated request.
+type Impersonator struct {
+	// Name is the Rancher user ID of the caller, with the same meaning as [User].Name.
+	Name string `json:"name,omitempty"`
+
+	// Username is the human-readable name of the caller, with the same meaning as [User].Username.
+	Username string `json:"username,omitempty"`
+
+	Group []string `json:"group,omitempty"`
+}
+
+// SetIdentity sets Name, Username and Group to the effective identity of the request from info.
+// Group is replaced, not modified in place, because it shares memory with info.
+//
+// Extra and ImpersonatedBy are left unchanged. Extra is captured when the entry is created, and
+// only the SCIM authenticator replaces it, so the content of existing entries does not change.
+func (u *User) SetIdentity(info user.Info) {
+	u.Name = info.GetName()
+	u.Username = UsernameFromExtra(info.GetExtra())
+	u.Group = info.GetGroups()
+}
+
+// SetImpersonatedBy records real as the authenticated caller that impersonated the effective user.
+func (u *User) SetImpersonatedBy(real user.Info) {
+	u.ImpersonatedBy = &Impersonator{
+		Name:     real.GetName(),
+		Username: UsernameFromExtra(real.GetExtra()),
+		Group:    real.GetGroups(),
+	}
+}
+
+// Impersonate records that real is impersonating effective: effective becomes the identity of the
+// request and real is kept as ImpersonatedBy. Call it where the request user is replaced.
+func (u *User) Impersonate(real, effective user.Info) {
+	u.SetImpersonatedBy(real)
+	u.SetIdentity(effective)
+}
+
+// clearGroups removes the groups of the user and of the impersonator, for the ExcludeGroups option.
+func (u *User) clearGroups() {
+	u.Group = nil
+	if u.ImpersonatedBy != nil {
+		u.ImpersonatedBy.Group = nil
+	}
 }
 
 func getUserNameForBasicLogin(body []byte) string {
@@ -57,33 +109,41 @@ func UsernameFromExtra(extra map[string][]string) string {
 	return username
 }
 
-// fillUsername sets an empty Username from the user record that Name refers to: the user's
-// username, otherwise its display name. It runs when the entry is written, so Name is final.
-// Users without a record, such as system identities, keep an empty Username.
+// fillUsername sets an empty Username, and an empty ImpersonatedBy.Username, from the user record
+// that the respective Name refers to: the user's username, otherwise its display name. It runs when
+// the entry is written, so the names are final. Users without a record, such as system identities,
+// keep an empty Username.
 func (lh *LoggingHandler) fillUsername(u *User) {
-	if u.Username != "" || u.Name == "" || lh.resolveUser == nil {
+	if lh.resolveUser == nil {
 		return
 	}
-	username, displayName, ok := lh.resolveUser(u.Name)
+	if u.Username == "" {
+		u.Username = lh.lookupUsername(u.Name)
+	}
+	if u.ImpersonatedBy != nil && u.ImpersonatedBy.Username == "" {
+		u.ImpersonatedBy.Username = lh.lookupUsername(u.ImpersonatedBy.Name)
+	}
+}
+
+func (lh *LoggingHandler) lookupUsername(userID string) string {
+	if userID == "" {
+		return ""
+	}
+	username, displayName, ok := lh.resolveUser(userID)
 	if !ok {
-		return
+		return ""
 	}
 	if username != "" {
-		u.Username = username
-		return
+		return username
 	}
-	u.Username = displayName
+	return displayName
 }
 
 func getUserInfo(req *http.Request) *User {
-	user, _ := request.UserFrom(req.Context())
-	extra := user.GetExtra()
-	return &User{
-		Name:     user.GetName(),
-		Username: UsernameFromExtra(extra),
-		Group:    user.GetGroups(),
-		Extra:    extra,
-	}
+	info, _ := request.UserFrom(req.Context())
+	u := &User{Extra: info.GetExtra()}
+	u.SetIdentity(info)
+	return u
 }
 
 // FromContext gets the user information from the given context.

@@ -151,6 +151,88 @@ func TestFillUsername(t *testing.T) {
 	}
 }
 
+func TestUserSetIdentity(t *testing.T) {
+	groups := []string{"g1", "g2"}
+	extra := map[string][]string{"username": {"alice"}}
+	info := &user.DefaultInfo{Name: "u-1", Groups: groups, Extra: extra}
+
+	u := &User{
+		Name:           "old",
+		Username:       "old-name",
+		Group:          []string{"old"},
+		Extra:          map[string][]string{"old": {"x"}},
+		ImpersonatedBy: &Impersonator{Name: "keep"},
+		RequestUser:    "as-user",
+	}
+	u.SetIdentity(info)
+
+	assert.Equal(t, "u-1", u.Name)
+	assert.Equal(t, "alice", u.Username)
+	assert.Equal(t, groups, u.Group)
+	assert.Equal(t, map[string][]string{"old": {"x"}}, u.Extra, "SetIdentity must not touch Extra")
+	assert.Equal(t, &Impersonator{Name: "keep"}, u.ImpersonatedBy, "SetIdentity must not touch ImpersonatedBy")
+	assert.Equal(t, "as-user", u.RequestUser, "SetIdentity must not touch RequestUser")
+
+	// Clearing the audit user's groups must not modify the memory it shares with the request user.
+	u.clearGroups()
+	assert.Nil(t, u.Group)
+	assert.Equal(t, []string{"g1", "g2"}, info.Groups)
+}
+
+func TestUserImpersonate(t *testing.T) {
+	realGroups := []string{"real-group"}
+	real := &user.DefaultInfo{Name: "u-real", Groups: realGroups, Extra: map[string][]string{"username": {"alice"}, "requesttokenid": {"token-1"}}}
+	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"system:authenticated"}}
+
+	u := &User{Extra: real.Extra}
+	u.SetIdentity(real)
+	u.Impersonate(real, effective)
+
+	assert.Equal(t, "u-target", u.Name)
+	assert.Empty(t, u.Username, "the caller's username must not carry over to the impersonated user")
+	assert.Equal(t, []string{"system:authenticated"}, u.Group)
+	assert.Equal(t, real.Extra, u.Extra, "Extra is captured at entry and keeps its content")
+	assert.Equal(t, &Impersonator{Name: "u-real", Username: "alice", Group: realGroups}, u.ImpersonatedBy)
+
+	u.clearGroups()
+	assert.Nil(t, u.Group)
+	assert.Nil(t, u.ImpersonatedBy.Group)
+	assert.Equal(t, []string{"real-group"}, realGroups, "the caller's groups must not be modified in place")
+}
+
+func TestUserImpersonatedByJSON(t *testing.T) {
+	plain, err := json.Marshal(&User{Name: "u-1"})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"name":"u-1"}`, string(plain), "impersonatedBy must be omitted when there is no impersonation")
+
+	imp, err := json.Marshal(&User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice", Group: []string{"g"}}})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"name":"u-target","impersonatedBy":{"name":"u-real","username":"alice","group":["g"]}}`, string(imp))
+}
+
+func TestFillUsernameImpersonator(t *testing.T) {
+	resolver := func(id string) (string, string, bool) {
+		switch id {
+		case "u-real":
+			return "", "Real Person", true
+		case "u-target":
+			return "target", "", true
+		}
+		return "", "", false
+	}
+	lh := &LoggingHandler{resolveUser: resolver}
+
+	u := &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}}
+	lh.fillUsername(u)
+	assert.Equal(t, "target", u.Username)
+	assert.Equal(t, "Real Person", u.ImpersonatedBy.Username)
+
+	// An impersonator that already has a username keeps it.
+	u = &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice"}}
+	lh.fillUsername(u)
+	assert.Equal(t, "alice", u.ImpersonatedBy.Username)
+}
+
 func TestMiddlewareFillsUsernameFromResolver(t *testing.T) {
 	resolver := func(userID string) (string, string, bool) {
 		if userID == "u-external" {

@@ -41,105 +41,84 @@
 // # The audit User
 //
 // The [User] is a shared pointer created before the handler runs. Downstream
-// middleware may mutate it, and the final entry reflects those mutations.
+// middleware may change it, and the final entry reflects those changes.
 //
-// Current mutation points include:
+// Model: Name, Username and Group describe the effective identity, meaning who
+// the request is authorized as. ImpersonatedBy describes the real authenticated
+// caller and is set only when a user impersonation succeeded. Extra is captured
+// when the entry is created and is not refreshed, see the compatibility rule
+// below. RequestUser and RequestGroups hold the raw Impersonate-* headers,
+// and are recorded before authorization, so a denied impersonation still
+// shows the attempted target while the identity stays the real caller.
 //
-//   - The impersonation filter sets RequestUser and RequestGroups.
-//   - requests.NewAuthenticatedFilter sets Name and Group from the current
-//     request user, which may be the impersonated user.
-//   - The SCIM token authenticator sets Name, Group, and Extra.
+// The identity changes in three ways, and each has one owner:
 //
-// Preserve these invariants when changing the [User] or its mutation points:
+//   - Authentication substitution: the service-account and token-review
+//     authenticators replace the error user. There is no real caller, so only
+//     the effective identity changes. requests.NewAuthenticatedFilter applies
+//     it with [User.SetIdentity].
+//   - User impersonation: the impersonation filter replaces the request user
+//     and calls [User.Impersonate] with the user before and after the swap.
+//   - SCIM: the SCIM token authenticator sets the identity of the SCIM caller
+//     with [User.SetIdentity].
 //
+// Preserve these invariants when changing the [User]:
+//
+//   - Change the identity only through [User.SetIdentity] and
+//     [User.Impersonate], so Name, Username, Group and ImpersonatedBy cannot
+//     drift apart.
+//   - Do not change the content or format of existing fields for requests that
+//     are not affected by a bug. Log consumers parse them. New information
+//     goes in new optional fields that are omitted when empty, as Username and
+//     ImpersonatedBy are.
 //   - Group and Extra initially alias memory owned by the request context's
 //     user info. Replace them rather than modifying them in place.
 //   - Name is the stable, unique Rancher user ID, not a human-readable name.
-//     Store human-readable identity separately.
-//   - Fields derived from the request user must be refreshed wherever Name
-//     is refreshed, unless they intentionally represent request-entry state.
-//   - ExcludeGroups clears Group on the shared [User]; preserve the required
-//     lifecycle and ownership assumptions when changing this behavior.
+//     Human-readable identity goes in Username.
+//   - ExcludeGroups clears the groups of the user and of ImpersonatedBy on the
+//     shared [User]. This is safe only because it happens after the request has
+//     completed.
+//
+// # Username
+//
+// [User].Username, and ImpersonatedBy.Username, is the human-readable name. It
+// comes from the "username" user extra (see [UsernameFromExtra]). When the
+// entry is written and it is still empty, it is looked up from the user record
+// that the respective Name refers to: the user's username, then its display
+// name (see [UserResolver] and [WithUserResolver]). System identities have no
+// record and keep an empty Username.
+//
+// After a user impersonation the replacement user has only the extras sent in
+// the Impersonate-Extra-* headers, so the effective Username usually comes
+// from the lookup. It is never carried over from the real caller.
+//
+// Do not add fallback usernames to the extras built by the token
+// authenticator. Those extras are forwarded as impersonation headers, and the
+// per-user impersonator ClusterRole (pkg/impersonation) only allows the
+// username values stored in the user's attributes, so an unlisted value is
+// rejected with "not allowed to impersonate extras".
+//
+// No username source may depend on data that the verbosity level drops
+// (request or response headers and bodies). The login name from a login
+// request body is read regardless of level for this reason.
 //
 // # Known limitations
 //
-//   - After user impersonation, Name identifies the impersonated user, but
-//     Extra still describes the original caller. SCIM replaces Extra.
-//   - After service-account impersonation, Name still identifies the real
-//     caller, because the request user is not replaced. The meaning of Name
-//     therefore depends on the kind of impersonation.
-//   - The real caller of a user impersonation is not recorded as an identity.
-//     RequestUser and RequestGroups only hold the raw Impersonate-* headers,
-//     and they are recorded before authorization, so they are also set when
-//     the impersonation is denied.
+//   - Service-account impersonation is not modeled. The request user is not
+//     replaced there (the downstream token is created for the service account
+//     in the cluster proxy), so Name stays the real caller and ImpersonatedBy
+//     is unset. The meaning of Name therefore depends on the kind of
+//     impersonation. This needs its own design.
+//   - After a user impersonation, Name and Group are the impersonated user's,
+//     but Extra still holds the extras of the authenticated caller, for example
+//     its request token ID. This is kept on purpose, because log consumers
+//     may rely on it. ImpersonatedBy has the caller's name, username and groups,
+//     so the caller does not have to be inferred from Extra. If a use case needs
+//     more of the caller, add it to Impersonator as an additive field.
 //   - Routes that do not run requests.NewAuthenticatedFilter retain the
-//     initially captured identity, which may be anonymous or an error user.
+//     initially captured identity. Every route that runs the impersonation
+//     filter also runs NewAuthenticatedFilter, but a new route that does not
+//     would need to call [User.SetIdentity] itself.
 //   - Authentication failures are captured as "system:cattle:error" or
-//     "system:unauthenticated".
-//
-// # Suggested fixes
-//
-// These are proposals, not current behavior. They are written down so that
-// changes to the [User] are made against one agreed model.
-//
-// Model: Name, Username, Group and Extra always describe the effective
-// identity, meaning the identity the request is authorized as. A new optional
-// field, impersonatedBy, describes the real authenticated caller. It is
-// present only when an impersonation succeeded, so the meaning of the main
-// fields is the same on every route.
-//
-// Shape of impersonatedBy:
-//   - Use a dedicated small struct, not a nested [User]. Reusing [User] makes
-//     the type recursive and drags in RequestUser and RequestGroups, which mean
-//     nothing for the real caller.
-//   - It holds name (the Rancher user ID), username (human-readable and
-//     best-effort, with the same source and gaps as the top-level Username)
-//     and group.
-//   - It does not hold extra for now. Add it later as an additive field if a
-//     use case appears, for example the request token ID to tie an action to
-//     the real caller's token.
-//
-// Where it is set:
-//   - In the impersonation filter, at the point where the request user is
-//     replaced, using the pre-replacement user info that the filter already
-//     holds. No lookup is needed for name and group.
-//   - Through one helper on [User] that changes Name, Username, Group, Extra
-//     and impersonatedBy together, so they cannot drift apart.
-//   - requests.NewAuthenticatedFilter and the SCIM authenticator should call
-//     the same helper instead of assigning fields one by one.
-//
-// Service-account impersonation follows the same rule: the effective identity
-// is the service account and the real caller goes in impersonatedBy. This
-// changes the shape of existing entries, so it needs a release note.
-//
-// Denied impersonation keeps today's behavior. RequestUser and RequestGroups
-// still record the attempted target, the main identity stays the real caller,
-// and impersonatedBy is absent. Keep RequestUser and RequestGroups for
-// compatibility with existing log consumers.
-//
-// ExcludeGroups must also clear the groups inside impersonatedBy, or the new
-// field would expose groups that the operator chose to exclude.
-//
-// Effective Username after a user impersonation: the replacement user is built
-// only from the Impersonate-Group and Impersonate-Extra-* headers, so the
-// effective Username is empty unless the client sent it. Filling it needs a
-// lookup of the target user. Do not add fallback usernames to the extras built
-// by the token authenticator: those extras are forwarded as impersonation
-// headers and the per-user impersonator ClusterRole (pkg/impersonation) only
-// allows the username values stored in the user's attributes, so an unlisted
-// value is rejected with "not allowed to impersonate extras".
-//
-// Tests: nothing currently pins the audit fields set during impersonation.
-// Cover at least no impersonation, successful user impersonation, successful
-// service-account impersonation, denied impersonation, SCIM, and
-// ExcludeGroups.
-//
-// Other known limitations:
-//   - Anonymous and error identities are expected on unauthenticated routes.
-//     No change is proposed; consumers should treat "system:unauthenticated"
-//     and "system:cattle:error" as "no identity".
-//   - Routes without requests.NewAuthenticatedFilter keep the captured
-//     identity. That is acceptable once the helper is the only way to change
-//     the identity and every identity-changing filter calls it.
-//   - SCIM replacing Extra moves to the shared helper.
+//     "system:unauthenticated". Consumers should treat these as "no identity".
 package audit

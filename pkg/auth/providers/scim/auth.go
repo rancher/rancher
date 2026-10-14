@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // tokenSecretNamespace is the namespace for SCIM token secrets.
@@ -151,9 +152,11 @@ func setAuditUser(r *http.Request, provider, tokenID string) {
 		return
 	}
 
-	auditUser.Name = "system:scim:" + provider
-	auditUser.Username = ""
-	auditUser.Group = []string{"system:scim"}
+	auditUser.SetIdentity(&user.DefaultInfo{
+		Name:   "system:scim:" + provider,
+		Groups: []string{"system:scim"},
+	})
+	// SetIdentity leaves Extra alone, so replace it here.
 	auditUser.Extra = map[string][]string{
 		"scim.cattle.io/provider": {provider},
 		"scim.cattle.io/token-id": {tokenID},
