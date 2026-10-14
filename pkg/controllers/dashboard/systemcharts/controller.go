@@ -10,7 +10,7 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterutil "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
@@ -622,7 +622,7 @@ func (h *handler) setImagePullSecrets(values map[string]interface{}, useObjectRe
 	var pullSecretsAsStrings []string
 	var pullSecretsAsObjectReferences []kcorev1.LocalObjectReference
 
-	registry, _ := clusterutil.GetPrivateRegistry(nil)
+	registry, _ := pkgcluster.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecretsAsObjectReferences = registry.PullSecretsAsObjectReferences()
 		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()

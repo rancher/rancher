@@ -101,11 +101,11 @@ Loop:
 	return nil
 }
 
-func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, systemNamespaces map[string]bool) error {
+func (n *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, systemNamespaces map[string]bool) error {
 	policyName := getHostPortsPolicyName(pod)
 
 	if _, ok := systemNamespaces[pod.Namespace]; ok {
-		npmgr.delete(pod.Namespace, policyName)
+		n.delete(pod.Namespace, policyName)
 		return nil
 	}
 
@@ -134,7 +134,7 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, systemNamespaces
 	})
 
 	logrus.Debugf("netpolMgr: hostPortsUpdateHandler: pod=%+v has host ports, hence programming np=%+v", *pod, *np)
-	return npmgr.program(np)
+	return n.program(np)
 }
 
 func getHostPortsPolicyName(pod *corev1.Pod) string {

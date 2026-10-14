@@ -12,7 +12,7 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterutil "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
@@ -160,7 +160,7 @@ func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
 		return obj, nil
 	}
-	if clusterutil.WebhookDeploymentCustomizationChanged(obj) {
+	if pkgcluster.WebhookDeploymentCustomizationChanged(obj) {
 		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
 	}
 	return obj, nil
@@ -198,7 +198,7 @@ func (h *handler) updateAppliedWebhookCustomization() error {
 			return err
 		}
 		cluster := cached.DeepCopy()
-		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
+		pkgcluster.UpdateAppliedWebhookDeploymentCustomization(cluster)
 		_, err = h.clusters.UpdateStatus(cluster)
 		return err
 	})

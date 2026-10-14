@@ -9,7 +9,7 @@ import (
 	"time"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterutils "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
@@ -33,13 +33,13 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 	)
 	switch {
 	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
-		upgradeImage = path.Join(clusterutils.GetPrivateRegistryURL(cluster), rke2upgradeImage)
+		upgradeImage = path.Join(pkgcluster.GetPrivateRegistryURL(cluster), rke2upgradeImage)
 		masterPlanName = rke2MasterPlanName
 		workerPlanName = rke2WorkerPlanName
 		Version = cluster.Spec.Rke2Config.Version
 		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
 	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
-		upgradeImage = path.Join(clusterutils.GetPrivateRegistryURL(cluster), k3supgradeImage)
+		upgradeImage = path.Join(pkgcluster.GetPrivateRegistryURL(cluster), k3supgradeImage)
 		masterPlanName = k3sMasterPlanName
 		workerPlanName = k3sWorkerPlanName
 		Version = cluster.Spec.K3sConfig.Version
