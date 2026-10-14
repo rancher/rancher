@@ -111,6 +111,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	RoleTemplate(schemas, apiContext)
 	KontainerDriver(schemas, apiContext)
 	RancherUserNotifications(schemas, apiContext)
+	AuthConfigs(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -374,4 +375,8 @@ func RancherUserNotifications(schemas *types.Schemas, management *config.ScaledC
 
 func OIDCClients(schemas *types.Schemas, management *config.ScaledContext) {
 	schemas.Schema(&managementschema.Version, client.OIDCClientType)
+}
+
+func AuthConfigs(schemas *types.Schemas, management *config.ScaledContext) {
+	schemas.Schema(&managementschema.Version, client.AuthConfigType)
 }
