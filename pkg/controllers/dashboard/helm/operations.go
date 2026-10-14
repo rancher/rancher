@@ -104,13 +104,14 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 							if err != nil {
 								return err
 							}
+							app.Status.AutomaticCPTolerations = operation.Status.AutomaticCPTolerations
 							if !reflect.DeepEqual(app.Status.Tolerations, operation.Status.Tolerations) {
 								app.Status.Tolerations = operation.Status.Tolerations
-								_, err = o.apps.UpdateStatus(app)
-								if err != nil {
-									logrus.Errorf("failed to update app.status.tolerations: %v", err)
-									return err
-								}
+							}
+							_, err = o.apps.UpdateStatus(app)
+							if err != nil {
+								logrus.Errorf("failed to update app.status.tolerations: %v", err)
+								return err
 							}
 							return nil
 						},

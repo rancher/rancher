@@ -22,7 +22,8 @@ type ReleaseStatus struct {
 	Summary            Summary `json:"summary,omitempty"`
 	ObservedGeneration int64   `json:"observedGeneration"`
 	// Tolerations are the tolerations that were last used when modifying the App
-	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+	Tolerations            []v1.Toleration `json:"tolerations,omitempty"`
+	AutomaticCPTolerations bool            `json:"automaticCPTolerations,omitempty"`
 }
 
 type Summary struct {
