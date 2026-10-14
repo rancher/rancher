@@ -201,7 +201,7 @@ func userControllersStoppedTimedOut(cluster *v3.Cluster) bool {
 // scheduleAgentUninstall uninstalls the Rancher agent from the downstream cluster if it needs it, trying
 // 3 times before giving up, and returns how to record the outcome on AgentUninstallScheduled.
 func (c *ClusterLifecycleCleanup) scheduleAgentUninstall(obj *v3.Cluster) (coreV1.ConditionStatus, string, string) {
-	var uninstall func(*v3.Cluster) (string, error)
+	var uninstall func(*v32.Cluster) (string, error)
 	switch {
 	case obj.Name == "local" && obj.Spec.Internal:
 		uninstall = c.cleanupLocalCluster

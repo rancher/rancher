@@ -6,6 +6,7 @@ import (
 
 	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
@@ -105,7 +106,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	}
 
 	// Just register the snapshot controller if the cluster is administrated by rancher.
-	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if pkgcluster.IsAdministrated(clusterRec) {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 			cluster.K3s = k3s.New(cluster.ControllerFactory)
 			snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
