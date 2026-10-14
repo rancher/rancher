@@ -434,7 +434,7 @@ require (
 	k8s.io/component-base v0.33.1 // indirect
 	k8s.io/component-helpers v0.32.13 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	oras.land/oras-go v1.2.5 // indirect
+	oras.land/oras-go/v2 v2.0.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
