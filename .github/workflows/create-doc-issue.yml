@@ -22,12 +22,23 @@ jobs:
         run: |
           set -euo pipefail
 
-          if gh api "orgs/${GITHUB_REPOSITORY_OWNER}/members" --paginate | jq -se --arg GITHUB_ACTOR "$GITHUB_ACTOR" 'add | any(.login == $GITHUB_ACTOR)' > /dev/null; then
+          # Use single-user endpoint because it covers private members (returns 204 for
+          # members, 404/302 for non-members/unauthorized, and other codes for errors).
+          status=$(gh api -i "orgs/${GITHUB_REPOSITORY_OWNER}/members/${GITHUB_ACTOR}" 2>/dev/null | head -n1 | awk '{print $2}' || true)
+
+          case "${status}" in
+            204)
               echo "is_member=true" >> "$GITHUB_OUTPUT"
-          else
-              echo "${GITHUB_ACTOR} is not a member of ${GITHUB_REPOSITORY_OWNER}" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            404|302)
+              echo "${GITHUB_ACTOR} is not a member of ${GITHUB_REPOSITORY_OWNER} (or the token cannot see them)" >> "$GITHUB_STEP_SUMMARY"
               echo "is_member=false" >> "$GITHUB_OUTPUT"
-          fi
+              ;;
+            *)
+              echo "Unexpected status '${status}' checking membership; check CREATE_DOCS_PAT" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac
       - name: Create doc issue
         id: create
         if: steps.membership.outputs.is_member == 'true'
