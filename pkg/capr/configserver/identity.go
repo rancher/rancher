@@ -5,6 +5,7 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -86,7 +87,7 @@ func ResolveMgmtTokenCaller(
 	// navigate mgmt shell → provv1.Cluster → CAPI cluster in fleet-default. Classify as
 	// KindV2Prov so onSecretChange falls through to that path rather than mistakenly running the
 	// imported RKE2/K3s (mgmt v3 Node) handler.
-	if mgmtCluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if pkgcluster.IsAdministrated(mgmtCluster) {
 		return &LifecycleContext{
 			Kind:            KindV2Prov,
 			TargetNamespace: tokenNamespace,

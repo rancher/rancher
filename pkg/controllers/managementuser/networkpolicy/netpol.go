@@ -9,14 +9,14 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
+	cluster3 "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	rancherv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rnetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
 	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 
-	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
@@ -316,12 +316,12 @@ func (npmgr *netpolMgr) getClusterCNI(clusterName string, node *corev1.Node) (st
 
 // isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster
 func isProvisionedRke2Cluster(cluster *v3.Cluster) bool {
-	return cluster.Status.Provider == v32.ClusterDriverRke2 && imported.IsAdministratedByProvisioningCluster(cluster)
+	return cluster.Status.Provider == v32.ClusterDriverRke2 && cluster3.IsAdministrated(cluster)
 }
 
 // getRKE2ClusterCNI returns the RKE2 cluster CNI name if it is found, or an api error
 func (npmgr *netpolMgr) getRKE2ClusterCNI(mgmtCluster *v3.Cluster) (string, error) {
-	clusters, err := npmgr.clusters.GetByIndex(cluster2.ByCluster, mgmtCluster.Name)
+	clusters, err := npmgr.clusters.GetByIndex(pkgcluster.ByCluster, mgmtCluster.Name)
 	if err != nil {
 		return "", err
 	}

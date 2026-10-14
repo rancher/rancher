@@ -2,7 +2,7 @@ package features
 
 import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
+	"github.com/rancher/rancher/pkg/cluster"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -79,7 +79,7 @@ func enableRKE2IfClustersExist(feature *v3.Feature, featuresClient managementv3.
 	}
 
 	for _, c := range clusters.Items {
-		if imported.IsAdministratedByProvisioningCluster(&c) {
+		if cluster.IsAdministrated(&c) {
 			feature = feature.DeepCopy()
 			feature.SetValue(true)
 			feature.Status.LockedValue = feature.Spec.Value

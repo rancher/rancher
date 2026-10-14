@@ -13,6 +13,7 @@ import (
 	lassodynamic "github.com/rancher/lasso/pkg/dynamic"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	k8sprovider "github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
@@ -161,7 +162,7 @@ func shouldInstall(cluster *apimgmtv3.Cluster) bool {
 		return false
 	}
 
-	if cluster.Annotations != nil && cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if pkgcluster.IsAdministrated(cluster) {
 		return false
 	}
 

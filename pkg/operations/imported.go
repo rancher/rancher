@@ -10,6 +10,7 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
@@ -104,7 +105,7 @@ func turtlesCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) 
 // cluster → provv1.Cluster (via the ByCluster index) → CAPI Cluster and dispatches via
 // capiClusterAdapter. Returns (nil, nil) when the annotation is not set.
 func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) (Adapter, error) {
-	if cluster.Annotations["provisioning.cattle.io/administrated"] != "true" {
+	if !pkgcluster.IsAdministrated(cluster) {
 		return nil, nil
 	}
 	provClusters, err := clients.Provisioning.Cluster().Cache().GetByIndex(provcluster.ByCluster, cluster.Name)

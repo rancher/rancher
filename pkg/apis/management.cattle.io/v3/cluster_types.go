@@ -91,6 +91,10 @@ const (
 	ClusterDriverAlibaba  = "Alibaba"
 	ClusterDriverRancherD = "rancherd"
 
+	// ClusterAdministratedAnnotation is used to denote the management cluster's lifecycle is controlled by a
+	// cluster.provisioning.cattle.io object.
+	ClusterAdministratedAnnotation = "provisioning.cattle.io/administrated"
+
 	ClusterPrivateRegistrySecret = "PrivateRegistrySecret"
 	ClusterPrivateRegistryURL    = "PrivateRegistryURL"
 )

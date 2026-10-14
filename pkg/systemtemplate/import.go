@@ -359,6 +359,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	}
 }
 
+// ForCluster is used to generate the cluster agent manifest for a given management cluster.
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
 	status := util.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil

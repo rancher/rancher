@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -42,10 +43,6 @@ const (
 	mgmtClusterKey      = rkev1.SnapshotResourceMgmtCluster
 	provClusterKey      = rkev1.SnapshotResourceProvCluster
 	rke2ControlPlaneKey = rkev1.SnapshotResourceRKE2ControlPlane
-
-	// administratedAnnotation marks a mgmt v3 Cluster shell whose real configuration lives on a
-	// provisioning cluster. Matches the check in pkg/operations/imported.go.
-	administratedAnnotation = "provisioning.cattle.io/administrated"
 )
 
 // errUnsupportedClusterType is returned when a cluster is managed by something this controller has
@@ -358,7 +355,7 @@ func (h *handler) turtlesAdapter(cluster *apimgmtv3.Cluster) (adapter, error) {
 // by the administrated annotation on the mgmt cluster shell, by tracing mgmt Cluster -> provv1
 // Cluster through the ByCluster index. Returns (nil, nil) when the annotation is not set.
 func (h *handler) administratedAdapter(cluster *apimgmtv3.Cluster) (adapter, error) {
-	if cluster.Annotations[administratedAnnotation] != "true" {
+	if !pkgcluster.IsAdministrated(cluster) {
 		return nil, nil
 	}
 

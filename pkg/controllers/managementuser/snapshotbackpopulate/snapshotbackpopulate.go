@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -104,7 +105,7 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 	}
 
 	switch {
-	case cluster.Annotations["provisioning.cattle.io/administrated"] == "true":
+	case pkgcluster.IsAdministrated(cluster):
 		provCluster, err := userContext.Management.Wrangler.Provisioning.Cluster().Cache().GetByIndex(provcluster.ByCluster, cluster.Name)
 		if err != nil {
 			logrus.Errorf("error getting provisioning cluster %s: %v", cluster.Name, err)
