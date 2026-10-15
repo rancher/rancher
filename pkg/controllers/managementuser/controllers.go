@@ -177,7 +177,7 @@ func registerCaches(cluster *config.UserContext) {
 
 // PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start
 // the functions should return an error if they fail, and the start of the controllers will be blocked until all of them succeed
-func PreBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+func PreBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) error {
 	if cluster.ClusterName == "local" {
 		return nil
 	}

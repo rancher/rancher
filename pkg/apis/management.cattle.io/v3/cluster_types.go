@@ -59,10 +59,21 @@ const (
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
 	// a system project
-	ClusterConditionSystemNamespacesAssigned             condition.Cond = "SystemNamespacesAssigned"
-	ClusterConditionAddonDeploy                          condition.Cond = "AddonDeploy"
-	ClusterConditionSystemAccountCreated                 condition.Cond = "SystemAccountCreated"
-	ClusterConditionAgentDeployed                        condition.Cond = "AgentDeployed"
+	ClusterConditionSystemNamespacesAssigned condition.Cond = "SystemNamespacesAssigned"
+	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
+	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
+
+	// ClusterConditionAgentDeployed surfaces when the
+	// [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy] handler has succeeded or failed to apply
+	// the updated cluster-agent manifest for a given cluster.
+	ClusterConditionAgentDeployed condition.Cond = "AgentDeployed"
+
+	// ClusterConditionRegistered surfaces when the cluster-agent dials back to Rancher for the first time.
+	// Once set this condition will always remain true.
+	// This condition can be set by either the initial remotedialer connection, or the "stv-cluster-" connection made
+	// when steve aggregation is enabled, though in most cases it will be set by the former.
+	ClusterConditionRegistered condition.Cond = "Registered"
+
 	ClusterConditionGlobalAdminsSynced                   condition.Cond = "GlobalAdminsSynced"
 	ClusterConditionInitialRolesPopulated                condition.Cond = "InitialRolesPopulated"
 	ClusterConditionServiceAccountMigrated               condition.Cond = "ServiceAccountMigrated"
@@ -514,10 +525,12 @@ func (c *Cluster) GetSecret(key string) string {
 	if secret.IsValid() && secret.String() != "" {
 		return secret.String()
 	}
+
 	status := reflect.ValueOf(&c.Status).Elem()
 	secret = status.FieldByName(key)
 	if secret.IsValid() {
 		return secret.String()
 	}
+
 	return ""
 }

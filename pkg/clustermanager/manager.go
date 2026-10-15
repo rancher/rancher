@@ -237,7 +237,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	// pre-bootstrap the cluster if it's not already bootstrapped
 	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
 	if capr.ShouldPreBootstrap(rec.clusterRec) {
-		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
+		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec)
 		if err != nil {
 			transaction.Rollback()
 			return err
@@ -340,10 +340,8 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		Host:        u.String(),
 		Dial:        clusterDialer,
 		BearerToken: string(secret.Data[secretmigrator.SecretKey]),
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData:     append(caBytes, suffix...),
-			NextProtos: []string{"http/1.1"},
-		},
+		CAData:      append(caBytes, suffix...),
+		NextProtos:  []string{"http/1.1"},
 		Timeout:     45 * time.Second,
 		RateLimiter: ratelimit.None,
 		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,

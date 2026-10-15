@@ -2,20 +2,32 @@ package planner
 
 import (
 	"fmt"
-	"sort"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 )
 
-// generateClusterAgentManifest generates a cluster agent manifest
+// generateClusterAgentManifest generates the cluster agent manifest.
 func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]byte, error) {
 	if controlPlane.Spec.ManagementClusterName == "local" {
 		return nil, nil
 	}
 
-	tokens, err := p.clusterRegistrationTokenCache.GetByIndex(ClusterRegToken, controlPlane.Spec.ManagementClusterName)
+	mgmtCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	// todo(jhyde): mark the cluster as registered the first time the tunnel connects.
+	// Use the default-token when initially rendering the manifest, then switch over to the system token once it exists.
+	desiredTokenName := "default-token"
+	if apimgmtv3.ClusterConditionAgentDeployed.IsTrue(mgmtCluster) {
+		desiredTokenName = "system"
+	}
+
+	tokens, err := p.clusterRegistrationTokenCache.GetByIndex(ClusterRegToken, mgmtCluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -24,13 +36,16 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, fmt.Errorf("no cluster registration token found")
 	}
 
-	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i].Name < tokens[j].Name
-	})
+	var crt *apimgmtv3.ClusterRegistrationToken
+	for _, t := range tokens {
+		if t.Name == desiredTokenName {
+			crt = t
+			break
+		}
+	}
 
-	mgmtCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
-	if err != nil {
-		return nil, err
+	if crt == nil {
+		return nil, fmt.Errorf("could not find cluster registration token %s", desiredTokenName)
 	}
 
 	taints, err := getTaints(entry, controlPlane)
@@ -38,7 +53,7 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, err
 	}
 
-	token, err := crt.GetTokenFromSecret(p.secretCache, tokens[0])
+	token, err := clusterregistrationtoken.GetTokenFromSecret(p.secretCache, crt)
 	if err != nil {
 		return nil, err
 	}
