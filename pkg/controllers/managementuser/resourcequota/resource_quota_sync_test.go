@@ -1,18 +1,104 @@
 package resourcequota
 
 import (
-	"go.uber.org/mock/gomock"
 	"reflect"
 	"testing"
+	"time"
+
+	"go.uber.org/mock/gomock"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcache "k8s.io/client-go/tools/cache"
 )
+
+func TestCreateResourceQuotaRevalidatesWhenQuotaUnchanged(t *testing.T) {
+	const projectRef = "c-1:p-1"
+
+	setup := func(t *testing.T, validated bool) (*SyncController, *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList], *corev1.Namespace) {
+		ctrl := gomock.NewController(t)
+		nsMock := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+		projects := fake.NewMockCacheInterface[*v32.Project](ctrl)
+		quotas := fake.NewMockCacheInterface[*corev1.ResourceQuota](ctrl)
+
+		projects.EXPECT().Get("c-1", "p-1").Return(&v32.Project{
+			Spec: v32.ProjectSpec{
+				ResourceQuota: &v32.ProjectResourceQuota{
+					Limit: v32.ResourceQuotaLimit{LimitsCPU: "2000m"},
+				},
+				NamespaceDefaultResourceQuota: &v32.NamespaceResourceQuota{
+					Limit: v32.ResourceQuotaLimit{LimitsCPU: "1000m"},
+				},
+			},
+		}, nil).AnyTimes()
+
+		// The enforcing quota already matches the (now valid) request.
+		quotas.EXPECT().List("tn1", gomock.Any()).Return([]*corev1.ResourceQuota{{
+			Spec: corev1.ResourceQuotaSpec{
+				Hard: corev1.ResourceList{corev1.ResourceLimitsCPU: resource.MustParse("1")},
+			},
+		}}, nil).AnyTimes()
+
+		indexer := clientcache.NewIndexer(clientcache.MetaNamespaceKeyFunc,
+			clientcache.Indexers{clientcache.NamespaceIndex: clientcache.MetaNamespaceIndexFunc})
+		assert.NoError(t, indexer.AddIndexers(map[string]clientcache.IndexFunc{nsByProjectIndex: nsByProjectID}))
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "tn1",
+				Annotations: map[string]string{
+					projectIDAnnotation:     projectRef,
+					resourceQuotaAnnotation: `{"limit":{"limitsCpu":"1000m"}}`,
+				},
+			},
+		}
+		assert.NoError(t, namespaceutil.SetNamespaceCondition(ns, time.Second, ResourceQuotaInitCondition, true, ""))
+		msg := ""
+		if !validated {
+			msg = "Negative resource quota [limits.cpu=-1]"
+		}
+		assert.NoError(t, namespaceutil.SetNamespaceCondition(ns, time.Second, ResourceQuotaValidatedCondition, validated, msg))
+
+		return &SyncController{
+			Namespaces:          nsMock,
+			NsIndexer:           indexer,
+			ProjectCache:        projects,
+			ResourceQuotaLister: quotas,
+		}, nsMock, ns
+	}
+
+	t.Run("stale false condition is cleared", func(t *testing.T) {
+		sc, nsMock, ns := setup(t, false)
+		var updatedNs *corev1.Namespace
+		nsMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(n *corev1.Namespace) (*corev1.Namespace, error) {
+			updatedNs = n
+			return n, nil
+		}).Times(1)
+
+		_, err := sc.CreateResourceQuota(ns)
+		assert.NoError(t, err)
+
+		if assert.NotNil(t, updatedNs) {
+			ok, err := namespaceutil.IsNamespaceConditionSet(updatedNs, ResourceQuotaValidatedCondition, true)
+			assert.NoError(t, err)
+			assert.True(t, ok)
+		}
+	})
+
+	t.Run("true condition causes no update", func(t *testing.T) {
+		sc, _, ns := setup(t, true)
+
+		// no Update expectation: any namespace update fails the test
+		_, err := sc.CreateResourceQuota(ns)
+		assert.NoError(t, err)
+	})
+}
 
 func TestSetLimitRangeAnnotation(t *testing.T) {
 	t.Run("setLimitRangeAnnotation, no annotations", func(t *testing.T) {
