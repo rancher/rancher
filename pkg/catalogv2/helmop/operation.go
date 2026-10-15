@@ -188,6 +188,7 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
 		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
@@ -212,6 +213,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 	}
 
 	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
 		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
@@ -236,6 +238,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 	}
 
 	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
 		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
