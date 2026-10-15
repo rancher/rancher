@@ -160,6 +160,7 @@ type TemplateOps struct {
 
 func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
+
 	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", ops.URL, ops.Token, ops.Namespace)))
 	tokenKey := hex.EncodeToString(d[:])[:10]
 
@@ -311,12 +312,17 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AllPullSecrets:             registryConfigs,
 		SUCAppNameOverride: func() string {
 			// Set the field to ensure backward compatibility in the case of node-driver RKE2/K3s cluster
-			if ops.Cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
-				(ops.Cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || ops.Cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
-				if ops.Cluster.Spec.DisplayName != "" {
-					return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
-						capr.SafeConcatName(48, ops.Cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
-				}
+			if pkgcluster.IsAdministrated(ops.Cluster) && ops.Cluster.Spec.DisplayName != "" {
+				return capr.SafeConcatName(
+					capr.MaxHelmReleaseNameLength,
+					"mcc",
+					capr.SafeConcatName(
+						48,
+						ops.Cluster.Spec.DisplayName,
+						"managed",
+						"system-upgrade-controller",
+					),
+				)
 			}
 			return ""
 		}(),
@@ -331,7 +337,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		// the case of imported RKE2/K3s cluster
 		if features.ManagedSystemUpgradeController.Enabled() {
-			if pkgcluster.Enabled(cluster) {
+			if pkgcluster.ImportedVersionManagementEnabled(cluster) {
 				enableMSUC = true
 			} else if cluster.Labels != nil {
 				if _, ok := cluster.Labels["cluster-api.cattle.io/owned"]; ok {
@@ -359,6 +365,11 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 }
 
 // ForCluster is used to generate the cluster agent manifest for a given management cluster.
+// ForCluster should be preferred over SystemTemplate where possible as it provides the complete manifest as a byte
+// array and requires no further input.
+// Ideally the token and taints would be derived solely based on the cluster object, but currently consumers are allowed
+// to choose between the "default-token" and "system" token, and taints are not always derivable from the management
+// cluster object.
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
 	status := pkgcluster.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil
@@ -408,13 +419,16 @@ func CAChecksum() string {
 
 func GetDesiredAgentImage(cluster *apimgmtv3.Cluster) string {
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
+
 	desiredAgent := cluster.Spec.DesiredAgentImage
 	if cluster.Spec.AgentImageOverride != "" {
 		desiredAgent = cluster.Spec.AgentImageOverride
 	}
+
 	if desiredAgent == "" || desiredAgent == "fixed" {
 		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	}
+
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAgent is [%s] for cluster [%s]", desiredAgent, cluster.Name)
 	return desiredAgent
 }
@@ -432,16 +446,16 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 }
 
 func GetDesiredAssetsImage(cluster *apimgmtv3.Cluster) string {
-	logrus.Tracef("clusterDeploy: getting desired charts image for [%s]", cluster.Name)
-	desiredCharts := cluster.Spec.DesiredAssetsImage
+	logrus.Tracef("clusterDeploy: getting desired assets image for [%s]", cluster.Name)
+	desiredAssetsImage := cluster.Spec.DesiredAssetsImage
 	if cluster.Spec.AssetsImageOverride != "" {
-		desiredCharts = cluster.Spec.AssetsImageOverride
+		desiredAssetsImage = cluster.Spec.AssetsImageOverride
 	}
-	if desiredCharts == "" || desiredCharts == "fixed" {
-		desiredCharts = image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
+	if desiredAssetsImage == "" || desiredAssetsImage == "fixed" {
+		desiredAssetsImage = image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
 	}
-	logrus.Tracef("clusterDeploy: desiredCharts is [%s] for cluster [%s]", desiredCharts, cluster.Name)
-	return desiredCharts
+	logrus.Tracef("clusterDeploy: desiredAssets is [%s] for cluster [%s]", desiredAssetsImage, cluster.Name)
+	return desiredAssetsImage
 }
 
 func toYAML(v any) string {

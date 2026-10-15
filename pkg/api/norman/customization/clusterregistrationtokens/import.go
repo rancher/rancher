@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -82,13 +81,16 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		return
 	}
 
-	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	assetsImage := image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
+	agentImage := systemtemplate.GetDesiredAgentImage(cluster)
+	assetsImage := systemtemplate.GetDesiredAssetsImage(cluster)
+	if authImage == "" {
+		authImage = systemtemplate.GetDesiredAuthImage(cluster)
+	}
 	ops := &systemtemplate.TemplateOps{
 		AgentImage:     agentImage,
 		AuthImage:      authImage,
 		AssetsImage:    assetsImage,
-		Namespace:      "",
+		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            url,
 		IsPreBootstrap: false,
