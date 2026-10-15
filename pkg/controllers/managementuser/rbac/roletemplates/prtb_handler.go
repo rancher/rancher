@@ -257,12 +257,18 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 // applies the namespaces rules of a RoleBinding to the namespace the RoleBinding is in.
 func ProjectNamespaceRoles(projectName string, rules []rbacv1.PolicyRule) []string {
 	allows := func(verb string) bool {
-		return rbacAuth.RulesAllow(authorizer.AttributesRecord{
+		attributes := authorizer.AttributesRecord{
 			Verb:            verb,
 			APIGroup:        "",
 			Resource:        "namespaces",
 			ResourceRequest: true,
-		}, rules...)
+		}
+		for _, rule := range rules {
+			if len(rule.ResourceNames) == 0 && rbacAuth.RulesAllow(attributes, rule) {
+				return true
+			}
+		}
+		return false
 	}
 
 	var roles []string
