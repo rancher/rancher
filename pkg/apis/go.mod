@@ -36,11 +36,11 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.15.3-rc.1
-	github.com/rancher/ali-operator v1.15.2-rc.1
-	github.com/rancher/eks-operator v1.15.3-rc.1
+	github.com/rancher/aks-operator v1.15.3-rc.2
+	github.com/rancher/ali-operator v1.15.2-rc.2
+	github.com/rancher/eks-operator v1.15.3-rc.2
 	github.com/rancher/fleet/pkg/apis v0.16.3-beta.2
-	github.com/rancher/gke-operator v1.15.4-rc.1
+	github.com/rancher/gke-operator v1.15.4-rc.2
 	github.com/rancher/norman v0.9.11
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/wrangler/v3 v3.7.2
@@ -81,12 +81,12 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
