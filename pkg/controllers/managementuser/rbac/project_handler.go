@@ -3,9 +3,11 @@ package rbac
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"reflect"
+	"slices"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -17,8 +19,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 func newProjectLifecycle(r *manager, secretClient wcorev1.SecretClient) *pLifecycle {
@@ -41,11 +41,15 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 			continue
 		}
 
-		err = p.m.createProjectNSRole(roleName, verb, "", project.Name)
+		err = p.m.createProjectNSRole(roleName, verb, "")
 		if err != nil {
 			return project, err
 		}
 
+	}
+
+	if err := p.ensureManageNSRole(project.Name); err != nil {
+		return project, err
 	}
 
 	err := p.ensureNamespacesAssigned(project)
@@ -62,7 +66,8 @@ func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
 }
 
 func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
-	for _, suffix := range projectNSVerbToSuffix {
+	suffixes := append(slices.Collect(maps.Values(projectNSVerbToSuffix)), projectNSManageSuffix)
+	for _, suffix := range suffixes {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
 		err := p.m.workload.RBACw.ClusterRole().Delete(roleName, &metav1.DeleteOptions{})
@@ -156,35 +161,45 @@ func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
 	return err
 }
 
-// ensureNamespaceRolesUpdated makes sure that the namespace roles have up-to-date rules, and issues updates if they don't
+// ensureNamespaceRolesUpdated makes sure the project's namespaces-manage and namespaces-edit roles exist.
 func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
-	// right now, only the edit role for namespaces has need of an update
+	if err := p.ensureManageNSRole(project.Name); err != nil {
+		return err
+	}
+
+	// The namespace handler maintains the rules of the edit and readonly roles.
 	suffix := projectNSVerbToSuffix[projectNSEditVerb]
 	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
-	cr, err := p.m.crLister.Get(roleName)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return p.m.createProjectNSRole(roleName, projectNSEditVerb, "", project.Name)
-		}
+	_, err := p.m.crLister.Get(roleName)
+	if apierrors.IsNotFound(err) {
+		return p.m.createProjectNSRole(roleName, projectNSEditVerb, "")
+	} else if err != nil {
 		return fmt.Errorf("unable to get backing cluster role for project %s: %w", project.Name, err)
 	}
-	// manage-ns permission was added later on in rancher's lifecycle, so we may need to update the CR if it doesn't
-	// have this permission
-	manageNSRecord := authorizer.AttributesRecord{
-		Verb:            manageNSVerb,
-		APIGroup:        management.GroupName,
-		Resource:        v3.ProjectResourceName,
-		Name:            project.Name,
-		ResourceRequest: true,
-	}
-	if !rbac.RulesAllow(manageNSRecord, cr.Rules...) {
-		// only add the manageNS permission so that we don't overwrite the other permissions dynamically given by the
-		// namespace_handler
-		cr = addManageNSPermission(cr, project.Name)
-		_, err = p.m.clusterRoles.Update(cr)
-		if err != nil {
-			return fmt.Errorf("unable to update backing cluster role for project %s: %w", project.Name, err)
+	return nil
+}
+
+// ensureManageNSRole makes sure the project's namespaces-manage ClusterRole exists and only grants manage-namespaces on
+// the project.
+func (p *pLifecycle) ensureManageNSRole(projectName string) error {
+	desired := buildProjectNSManageRole(projectName)
+	cr, err := p.m.crLister.Get(desired.Name)
+	if apierrors.IsNotFound(err) {
+		if _, err := p.m.clusterRoles.Create(desired); err != nil && !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create namespaces manage cluster role for project %s: %w", projectName, err)
 		}
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("unable to get namespaces manage cluster role for project %s: %w", projectName, err)
+	}
+
+	if reflect.DeepEqual(cr.Rules, desired.Rules) {
+		return nil
+	}
+	cr = cr.DeepCopy()
+	cr.Rules = desired.Rules
+	if _, err := p.m.clusterRoles.Update(cr); err != nil {
+		return fmt.Errorf("unable to update namespaces manage cluster role for project %s: %w", projectName, err)
 	}
 	return nil
 }
