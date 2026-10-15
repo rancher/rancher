@@ -65,10 +65,10 @@ type AuthenticatorResponse struct {
 	Groups        []string
 	Extras        map[string][]string
 
-	// Username is the authoritative human-readable name of the user for this
-	// session, shown in the audit log. It is optional and deliberately not part
-	// of Extras, which are forwarded as impersonation headers.
-	Username string
+	// Identity is the authoritative identity of the user for this session (username,
+	// provider and principal), shown in the audit log. It is optional and deliberately
+	// not part of Extras, which are forwarded as impersonation headers.
+	Identity audit.Identity
 }
 
 // ClusterRouter returns the cluster ID based on the request URL's path.
@@ -114,7 +114,7 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 			Groups: authResp.Groups,
 			Extra:  authResp.Extras,
 		}
-		return audit.WithUsername(info, authResp.Username), authResp.IsAuthed, err
+		return audit.WithIdentity(info, authResp.Identity), authResp.IsAuthed, err
 	}
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
@@ -259,7 +259,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		UserPrincipal: token.GetUserPrincipal().Name,
 		Groups:        groups,
 		Extras:        extras,
-		Username:      sessionUsername(token, authUser),
+		Identity:      sessionIdentity(token, authUser),
 	}
 
 	logrus.Debugf("Extras returned %v", authResp.Extras)
@@ -306,19 +306,25 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	return authResp, nil
 }
 
-// sessionUsername returns the human-readable name of the user for the session of the token, which
-// the audit log shows. It is the login name of the principal the token was issued for, so it is the
-// provider's own answer for this session. Unlike the stored user attributes it cannot be replaced
-// by a provider refresh, and for a user linked to several providers it is the one for this session
-// instead of one of many. A token without a login name falls back to the username of a local user.
-func sessionUsername(token accessor.TokenAccessor, user *apiv3.User) string {
-	if name := token.GetUserPrincipal().LoginName; name != "" {
-		return name
+// sessionIdentity returns the identity of the user for the session of the token, which the audit log
+// shows. It comes from the principal the token was issued for, so it is the provider's own answer for
+// this session. Unlike the stored user attributes it cannot be replaced by a provider refresh, and for
+// a user linked to several providers it is the one for this session instead of one of many. A token
+// without a login name falls back to the username of a local user.
+func sessionIdentity(token accessor.TokenAccessor, user *apiv3.User) audit.Identity {
+	principal := token.GetUserPrincipal()
+	identity := audit.Identity{
+		Username:    principal.LoginName,
+		Provider:    token.GetAuthProvider(),
+		PrincipalID: principal.Name,
 	}
-	if ap := token.GetAuthProvider(); ap == "local" || ap == "" {
-		return user.Username
+	if identity.Provider == "" || identity.Provider == "local" {
+		identity.Provider = "local"
+		if identity.Username == "" {
+			identity.Username = user.Username
+		}
 	}
-	return ""
+	return identity
 }
 
 func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *apiv3.UserAttribute) map[string][]string {

@@ -43,7 +43,7 @@
 // The [User] is a shared pointer created before the handler runs. Downstream
 // middleware may change it, and the final entry reflects those changes.
 //
-// Model: Name, Username and Group describe the effective identity, meaning who
+// Model: Name, Identity and Group describe the effective identity, meaning who
 // the request is authorized as. ImpersonatedBy describes the real authenticated
 // caller and is set only when a user impersonation succeeded. Extra is captured
 // when the entry is created and is not refreshed, see the compatibility rule
@@ -65,47 +65,57 @@
 // Preserve these invariants when changing the [User]:
 //
 //   - Change the identity only through [User.SetIdentity] and
-//     [User.Impersonate], so Name, Username, Group and ImpersonatedBy cannot
+//     [User.Impersonate], so Name, Identity, Group and ImpersonatedBy cannot
 //     drift apart.
 //   - Do not change the content or format of existing fields for requests that
 //     are not affected by a bug. Log consumers parse them. New information
-//     goes in new optional fields that are omitted when empty, as Username and
+//     goes in new optional fields that are omitted when empty, as Identity and
 //     ImpersonatedBy are.
 //   - Group and Extra initially alias memory owned by the request context's
 //     user info. Replace them rather than modifying them in place.
 //   - Name is the stable, unique Rancher user ID, not a human-readable name.
-//     Human-readable identity goes in Username.
+//     Who the user is, as a person and a provider, goes in Identity.
 //   - ExcludeGroups clears the groups of the user and of ImpersonatedBy on the
 //     shared [User]. This is safe only because it happens after the request has
 //     completed.
 //
-// # Username
+// # Identity
 //
-// [User].Username and ImpersonatedBy are opt-in, through [WithIncludeUsername], which Rancher
+// [User].Identity and ImpersonatedBy are opt-in, through [WithIncludeUsername], which Rancher
 // ties to the audit-log-username feature. It is read once when the entry is created. When it is off,
-// nothing is derived or assigned: no username or impersonator is set and no user lookup is made, so
+// nothing is derived or assigned: no identity or impersonator is set and no user lookup is made, so
 // entries keep their previous format for consumers that parse them strictly. The flag is meant to
 // become the default later.
 //
-// [User].Username, and ImpersonatedBy.Username, is the human-readable name. It
-// is chosen in this order:
+// An [Identity] holds the human-readable Username, the Provider ID that authenticated the session
+// and the PrincipalID. A username alone is ambiguous, because the same name can exist on several
+// providers and can change, so it is meant to be read with its provider. Name stays the key for
+// correlation. Each field is optional and the whole Identity is omitted when empty. The same type
+// is used for ImpersonatedBy.
 //
-//  1. The authoritative name the authenticator attached to the request user
-//     with [WithUsername], read through [UsernameInfo]. It is not part of the
-//     user extras, because extras are forwarded as impersonation headers and
-//     checked against the impersonator role.
-//  2. The "username" user extra (see [UsernameFromExtra]).
+// The Identity of a user is chosen in this order:
+//
+//  1. The authoritative identity the authenticator attached to the request user
+//     with [WithIdentity], read through [IdentityInfo]. It is used as a whole and
+//     is not mixed with the other sources, because that could pair a username
+//     with the wrong provider. It is not part of the user extras, because
+//     extras are forwarded as impersonation headers and checked against the
+//     impersonator role.
+//  2. The "username" user extra (see [UsernameFromExtra]). It gives only the
+//     Username, because the extras of a user linked to several providers do not
+//     say which provider a value belongs to.
 //  3. When the entry is written and it is still empty, the user record that the
 //     respective Name refers to: its username, then its display name (see
-//     [UserResolver] and [WithUserResolver]). System identities have no record
-//     and keep an empty Username.
+//     [UserResolver] and [WithUserResolver]). It gives only the Username.
+//     System identities have no record and keep an empty Identity.
 //
-// The authoritative name is attached to the request user object itself, so it
-// is lost whenever that object is replaced. After a user impersonation the
+// The authoritative identity is attached to the request user object itself, so
+// it is lost whenever that object is replaced. After a user impersonation the
 // replacement user has only the extras sent in the Impersonate-Extra-* headers,
-// so the effective Username usually comes from the lookup, and it is never
-// carried over from the real caller. ImpersonatedBy.Username is read from the
-// caller before the replacement, so it keeps the authoritative name.
+// so the effective Identity usually comes from the lookup and has no provider,
+// and it is never carried over from the real caller. ImpersonatedBy.Identity is
+// read from the caller before the replacement, so it keeps the authoritative
+// identity.
 //
 // Rules:
 //   - Do not add fallback usernames to the extras built by the token
@@ -113,12 +123,12 @@
 //     per-user impersonator ClusterRole (pkg/impersonation) only allows the
 //     username values stored in the user's attributes, so an unlisted value is
 //     rejected with "not allowed to impersonate extras".
-//   - No username source may depend on data that the verbosity level drops
+//   - No identity source may depend on data that the verbosity level drops
 //     (request or response headers and bodies). The login name from a login
 //     request body is read regardless of level for this reason.
-//   - Authentication providers decide what a user's name is. The audit package
-//     only reads it. The token authenticator reports the login name of the
-//     principal the token was issued for.
+//   - Authentication providers decide who a user is. The audit package only
+//     reads it. The token authenticator reports the login name, the provider
+//     and the principal ID of the token the session was authenticated with.
 //
 // # Known limitations
 //

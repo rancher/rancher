@@ -16,18 +16,18 @@ import (
 type User struct {
 	// Name is the Rancher user ID (for example "user-h9q7h") for authenticated users, or a
 	// system identity such as "system:unauthenticated". It is not a login name and is opaque
-	// to humans; use Username to identify a person.
+	// to humans; use Identity to identify a person.
 	Name string `json:"name,omitempty"`
 
-	// Username is the human-readable name of the user. It is best-effort and may be empty.
-	// It is not guaranteed to be unique and can change over time, so use Name for correlation.
-	Username string `json:"username,omitempty"`
+	// Identity says who the user is in terms of a person and the auth provider that knows them. It
+	// is best-effort and may be omitted. See [Identity].
+	Identity *Identity `json:"identity,omitempty"`
 
 	Group []string            `json:"group,omitempty"`
 	Extra map[string][]string `json:"extra,omitempty"`
 
 	// ImpersonatedBy is the real authenticated caller. It is set only when the caller successfully
-	// impersonated another user, in which case Name, Username, Group and Extra describe the
+	// impersonated another user, in which case Name, Identity, Group and Extra describe the
 	// impersonated (effective) user. A denied impersonation leaves it unset.
 	ImpersonatedBy *Impersonator `json:"impersonatedBy,omitempty"`
 
@@ -37,10 +37,37 @@ type User struct {
 	// RequestGroups is the --as-group list
 	RequestGroups []string `json:"requestGroups,omitempty"`
 
-	// withUsername is whether Username and ImpersonatedBy are collected for this entry. It is decided
+	// withIdentity is whether Identity and ImpersonatedBy are collected for this entry. It is decided
 	// once when the entry is created, from the audit-log-username feature, so when it is off no
-	// username is looked up or assigned.
-	withUsername bool
+	// identity is looked up or assigned.
+	withIdentity bool
+}
+
+// Identity describes a user as a person known to an auth provider. The user ID in [User].Name stays
+// the key for correlation: a username is not unique across providers and can change, so it is
+// meaningful together with Provider.
+type Identity struct {
+	// Username is the human-readable name of the user, such as the login name.
+	Username string `json:"username,omitempty"`
+
+	// Provider is the ID of the auth provider that authenticated the session, such as "local" or "github".
+	Provider string `json:"provider,omitempty"`
+
+	// PrincipalID is the ID of the provider's principal for the user, such as "github_user://12345".
+	PrincipalID string `json:"principalId,omitempty"`
+}
+
+// IsZero returns whether the identity holds no information.
+func (i Identity) IsZero() bool {
+	return i == Identity{}
+}
+
+// ref returns a pointer to the identity, or nil when it is empty so that it is omitted from the entry.
+func (i Identity) ref() *Identity {
+	if i.IsZero() {
+		return nil
+	}
+	return &i
 }
 
 // Impersonator identifies the real authenticated caller of an impersonated request.
@@ -48,34 +75,34 @@ type Impersonator struct {
 	// Name is the Rancher user ID of the caller, with the same meaning as [User].Name.
 	Name string `json:"name,omitempty"`
 
-	// Username is the human-readable name of the caller, with the same meaning as [User].Username.
-	Username string `json:"username,omitempty"`
+	// Identity is the identity of the caller, with the same meaning as [User].Identity.
+	Identity *Identity `json:"identity,omitempty"`
 
 	Group []string `json:"group,omitempty"`
 }
 
-// SetIdentity sets Name, Username and Group to the effective identity of the request from info.
+// SetIdentity sets Name, Identity and Group to the effective identity of the request from info.
 // Group is replaced, not modified in place, because it shares memory with info.
 //
 // Extra and ImpersonatedBy are left unchanged. Extra is captured when the entry is created, and
 // only the SCIM authenticator replaces it, so the content of existing entries does not change.
 func (u *User) SetIdentity(info user.Info) {
 	u.Name = info.GetName()
-	if u.withUsername {
-		u.Username = UsernameFromInfo(info)
+	if u.withIdentity {
+		u.Identity = IdentityFromInfo(info).ref()
 	}
 	u.Group = info.GetGroups()
 }
 
 // SetImpersonatedBy records real as the authenticated caller that impersonated the effective user. It
-// does nothing unless usernames are collected for the entry.
+// does nothing unless identities are collected for the entry.
 func (u *User) SetImpersonatedBy(real user.Info) {
-	if !u.withUsername {
+	if !u.withIdentity {
 		return
 	}
 	u.ImpersonatedBy = &Impersonator{
 		Name:     real.GetName(),
-		Username: UsernameFromInfo(real),
+		Identity: IdentityFromInfo(real).ref(),
 		Group:    real.GetGroups(),
 	}
 }
@@ -120,75 +147,79 @@ func UsernameFromExtra(extra map[string][]string) string {
 	return username
 }
 
-// fillUsername sets an empty Username, and an empty ImpersonatedBy.Username, from the user record
-// that the respective Name refers to: the user's username, otherwise its display name. It runs when
-// the entry is written, so the names are final. Users without a record, such as system identities,
-// keep an empty Username.
-func (lh *LoggingHandler) fillUsername(u *User) {
-	if !u.withUsername || lh.resolveUser == nil {
+// fillIdentity sets the username of an empty Identity, and of an empty ImpersonatedBy.Identity, from
+// the user record that the respective Name refers to: the user's username, otherwise its display
+// name. It runs when the entry is written, so the identities are final. Users without a record, such
+// as system identities, keep an empty Identity.
+//
+// An identity that already has a provider or principal is left alone. The record does not say which
+// provider a name came from, so adding it could attribute a name to the wrong provider.
+func (lh *LoggingHandler) fillIdentity(u *User) {
+	if !u.withIdentity || lh.resolveUser == nil {
 		return
 	}
-	if u.Username == "" {
-		u.Username = lh.lookupUsername(u.Name)
+	if u.Identity == nil {
+		u.Identity = lh.lookupIdentity(u.Name)
 	}
-	if u.ImpersonatedBy != nil && u.ImpersonatedBy.Username == "" {
-		u.ImpersonatedBy.Username = lh.lookupUsername(u.ImpersonatedBy.Name)
+	if u.ImpersonatedBy != nil && u.ImpersonatedBy.Identity == nil {
+		u.ImpersonatedBy.Identity = lh.lookupIdentity(u.ImpersonatedBy.Name)
 	}
 }
 
-func (lh *LoggingHandler) lookupUsername(userID string) string {
+func (lh *LoggingHandler) lookupIdentity(userID string) *Identity {
 	if userID == "" {
-		return ""
+		return nil
 	}
 	username, displayName, ok := lh.resolveUser(userID)
 	if !ok {
-		return ""
+		return nil
 	}
-	if username != "" {
-		return username
+	if username == "" {
+		username = displayName
 	}
-	return displayName
+	return Identity{Username: username}.ref()
 }
 
-// UsernameInfo is implemented by a user.Info that carries an authoritative human-readable name,
-// chosen by the authenticator for the session. See [WithUsername].
-type UsernameInfo interface {
-	AuditUsername() string
+// IdentityInfo is implemented by a user.Info that carries an authoritative identity, chosen by the
+// authenticator for the session. See [WithIdentity].
+type IdentityInfo interface {
+	AuditIdentity() Identity
 }
 
-type usernameInfo struct {
+type identityInfo struct {
 	user.Info
-	username string
+	identity Identity
 }
 
-func (u usernameInfo) AuditUsername() string { return u.username }
+func (i identityInfo) AuditIdentity() Identity { return i.identity }
 
-// WithUsername returns info carrying username as its authoritative human-readable name. It is kept
-// out of the user extras on purpose: extras are forwarded as impersonation headers and checked
-// against the impersonator role. The name is lost whenever the request user is replaced, for
-// example by impersonation, so it can never describe a different user than the one it was set for.
-// An empty username returns info unchanged.
-func WithUsername(info user.Info, username string) user.Info {
-	if info == nil || username == "" {
+// WithIdentity returns info carrying identity as its authoritative identity. It is kept out of the
+// user extras on purpose: extras are forwarded as impersonation headers and checked against the
+// impersonator role. The identity is lost whenever the request user is replaced, for example by
+// impersonation, so it can never describe a different user than the one it was set for. An empty
+// identity returns info unchanged.
+func WithIdentity(info user.Info, identity Identity) user.Info {
+	if info == nil || identity.IsZero() {
 		return info
 	}
-	return usernameInfo{Info: info, username: username}
+	return identityInfo{Info: info, identity: identity}
 }
 
-// UsernameFromInfo returns the human-readable name for info, or "" if there is none. The
-// authoritative name from [WithUsername] wins, otherwise it is taken from the user extras.
-func UsernameFromInfo(info user.Info) string {
-	if u, ok := info.(UsernameInfo); ok {
-		if username := u.AuditUsername(); username != "" {
-			return username
+// IdentityFromInfo returns the identity for info, which is empty if there is none. The authoritative
+// identity from [WithIdentity] wins as a whole, because mixing it with another source could pair a
+// username with the wrong provider. Otherwise the identity has only the username from the user extras.
+func IdentityFromInfo(info user.Info) Identity {
+	if i, ok := info.(IdentityInfo); ok {
+		if identity := i.AuditIdentity(); !identity.IsZero() {
+			return identity
 		}
 	}
-	return UsernameFromExtra(info.GetExtra())
+	return Identity{Username: UsernameFromExtra(info.GetExtra())}
 }
 
-func getUserInfo(req *http.Request, withUsername bool) *User {
+func getUserInfo(req *http.Request, withIdentity bool) *User {
 	info, _ := request.UserFrom(req.Context())
-	u := &User{Extra: info.GetExtra(), withUsername: withUsername}
+	u := &User{Extra: info.GetExtra(), withIdentity: withIdentity}
 	u.SetIdentity(info)
 	return u
 }

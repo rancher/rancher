@@ -46,7 +46,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			verbosityLevel := auditLog.ResolveVerbosity(req.RequestURI)
 
-			auditLog.fillUsername(user)
+			auditLog.fillIdentity(user)
 
 			auditUser := user
 			if auditLog.writer.ExcludeGroups {

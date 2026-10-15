@@ -98,7 +98,7 @@ func TestUsernameFromExtra(t *testing.T) {
 	}
 }
 
-func TestGetUserInfoUsername(t *testing.T) {
+func TestGetUserInfoIdentity(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := request.WithUser(req.Context(), &user.DefaultInfo{
 		Name:   "user-abc",
@@ -108,65 +108,65 @@ func TestGetUserInfoUsername(t *testing.T) {
 
 	got := getUserInfo(req.WithContext(ctx), true)
 
-	if got.Name != "user-abc" {
-		t.Fatalf("Name = %q, want user-abc", got.Name)
-	}
-	if got.Username != "admin" {
-		t.Fatalf("Username = %q, want admin", got.Username)
-	}
+	assert.Equal(t, "user-abc", got.Name)
+	assert.Equal(t, &Identity{Username: "admin"}, got.Identity, "extras only give the username, not a provider")
 }
 
-func TestUsernameFromInfo(t *testing.T) {
-	extra := map[string][]string{"username": {"from-extra"}}
+func TestIdentityFromInfo(t *testing.T) {
+	extra := map[string][]string{"username": {"from-extra"}, "principalid": {"github_user://1"}}
 	base := &user.DefaultInfo{Name: "u-1", UID: "u-1", Groups: []string{"g"}, Extra: extra}
+	explicit := Identity{Username: "explicit", Provider: "keycloakoidc", PrincipalID: "keycloakoidc_user://abc"}
 
 	tests := []struct {
 		name string
 		info user.Info
-		want string
+		want Identity
 	}{
-		{name: "explicit name wins over extras", info: WithUsername(base, "explicit"), want: "explicit"},
-		{name: "empty explicit name falls back to extras", info: WithUsername(base, ""), want: "from-extra"},
-		{name: "plain info uses extras", info: base, want: "from-extra"},
-		{name: "plain info without extras", info: &user.DefaultInfo{Name: "u-2"}, want: ""},
+		{name: "explicit identity wins over extras", info: WithIdentity(base, explicit), want: explicit},
+		{name: "explicit identity without username is not mixed with extras", info: WithIdentity(base, Identity{Provider: "github"}), want: Identity{Provider: "github"}},
+		{name: "empty explicit identity falls back to extras", info: WithIdentity(base, Identity{}), want: Identity{Username: "from-extra"}},
+		{name: "plain info uses only the username extra", info: base, want: Identity{Username: "from-extra"}},
+		{name: "plain info without extras", info: &user.DefaultInfo{Name: "u-2"}, want: Identity{}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, UsernameFromInfo(tt.info))
+			assert.Equal(t, tt.want, IdentityFromInfo(tt.info))
 		})
 	}
 }
 
-func TestWithUsernameKeepsUserInfo(t *testing.T) {
+func TestWithIdentityKeepsUserInfo(t *testing.T) {
 	base := &user.DefaultInfo{Name: "u-1", UID: "uid-1", Groups: []string{"g"}, Extra: map[string][]string{"k": {"v"}}}
+	identity := Identity{Username: "explicit", Provider: "local"}
 
-	got := WithUsername(base, "explicit")
+	got := WithIdentity(base, identity)
 
 	assert.Equal(t, "u-1", got.GetName())
 	assert.Equal(t, "uid-1", got.GetUID())
 	assert.Equal(t, []string{"g"}, got.GetGroups())
 	assert.Equal(t, map[string][]string{"k": {"v"}}, got.GetExtra())
-	assert.Same(t, base, WithUsername(base, ""), "an empty name must return the info unchanged")
-	assert.Nil(t, WithUsername(nil, "explicit"))
+	assert.Same(t, base, WithIdentity(base, Identity{}), "an empty identity must return the info unchanged")
+	assert.Nil(t, WithIdentity(nil, identity))
 }
 
-func TestGetUserInfoPrefersExplicitUsername(t *testing.T) {
-	info := WithUsername(&user.DefaultInfo{
+func TestGetUserInfoPrefersExplicitIdentity(t *testing.T) {
+	identity := Identity{Username: "explicit", Provider: "github", PrincipalID: "github_user://1"}
+	info := WithIdentity(&user.DefaultInfo{
 		Name:  "u-1",
 		Extra: map[string][]string{"username": {"from-extra"}},
-	}, "explicit")
+	}, identity)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(request.WithUser(req.Context(), info))
 
 	got := getUserInfo(req, true)
 
 	assert.Equal(t, "u-1", got.Name)
-	assert.Equal(t, "explicit", got.Username)
+	assert.Equal(t, &identity, got.Identity)
 	assert.Equal(t, map[string][]string{"username": {"from-extra"}}, got.Extra, "extras must not be changed")
 }
 
-func TestFillUsername(t *testing.T) {
+func TestFillIdentity(t *testing.T) {
 	type record struct{ username, displayName string }
 	users := map[string]record{
 		"u-local":    {username: "admin", displayName: "Default Admin"},
@@ -177,28 +177,29 @@ func TestFillUsername(t *testing.T) {
 		r, ok := users[userID]
 		return r.username, r.displayName, ok
 	}
+	provided := &Identity{Username: "from-extra", Provider: "github"}
 
 	tests := []struct {
 		name     string
 		resolver UserResolver
 		user     User
-		want     string
+		want     *Identity
 	}{
-		{name: "username from the user record", resolver: resolver, user: User{Name: "u-local", withUsername: true}, want: "admin"},
-		{name: "display name when the record has no username", resolver: resolver, user: User{Name: "u-external", withUsername: true}, want: "Jane Doe"},
-		{name: "empty when the record has neither", resolver: resolver, user: User{Name: "u-nameless", withUsername: true}, want: ""},
-		{name: "empty when the user does not exist", resolver: resolver, user: User{Name: "system:unauthenticated", withUsername: true}, want: ""},
-		{name: "existing username is kept", resolver: resolver, user: User{Name: "u-local", Username: "from-extra", withUsername: true}, want: "from-extra"},
-		{name: "empty name is not resolved", resolver: resolver, user: User{withUsername: true}, want: ""},
-		{name: "no resolver", resolver: nil, user: User{Name: "u-local", withUsername: true}, want: ""},
-		{name: "usernames are off", resolver: resolver, user: User{Name: "u-local"}, want: ""},
+		{name: "username from the user record", resolver: resolver, user: User{Name: "u-local", withIdentity: true}, want: &Identity{Username: "admin"}},
+		{name: "display name when the record has no username", resolver: resolver, user: User{Name: "u-external", withIdentity: true}, want: &Identity{Username: "Jane Doe"}},
+		{name: "empty when the record has neither", resolver: resolver, user: User{Name: "u-nameless", withIdentity: true}},
+		{name: "empty when the user does not exist", resolver: resolver, user: User{Name: "system:unauthenticated", withIdentity: true}},
+		{name: "existing identity is kept", resolver: resolver, user: User{Name: "u-local", Identity: provided, withIdentity: true}, want: provided},
+		{name: "empty name is not resolved", resolver: resolver, user: User{withIdentity: true}},
+		{name: "no resolver", resolver: nil, user: User{Name: "u-local", withIdentity: true}},
+		{name: "identities are off", resolver: resolver, user: User{Name: "u-local"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lh := &LoggingHandler{resolveUser: tt.resolver}
-			lh.fillUsername(&tt.user)
-			assert.Equal(t, tt.want, tt.user.Username)
+			lh.fillIdentity(&tt.user)
+			assert.Equal(t, tt.want, tt.user.Identity)
 		})
 	}
 }
@@ -210,17 +211,17 @@ func TestUserSetIdentity(t *testing.T) {
 
 	u := &User{
 		Name:           "old",
-		Username:       "old-name",
+		Identity:       &Identity{Username: "old-name"},
 		Group:          []string{"old"},
 		Extra:          map[string][]string{"old": {"x"}},
 		ImpersonatedBy: &Impersonator{Name: "keep"},
 		RequestUser:    "as-user",
-		withUsername:   true,
+		withIdentity:   true,
 	}
 	u.SetIdentity(info)
 
 	assert.Equal(t, "u-1", u.Name)
-	assert.Equal(t, "alice", u.Username)
+	assert.Equal(t, &Identity{Username: "alice"}, u.Identity)
 	assert.Equal(t, groups, u.Group)
 	assert.Equal(t, map[string][]string{"old": {"x"}}, u.Extra, "SetIdentity must not touch Extra")
 	assert.Equal(t, &Impersonator{Name: "keep"}, u.ImpersonatedBy, "SetIdentity must not touch ImpersonatedBy")
@@ -234,18 +235,19 @@ func TestUserSetIdentity(t *testing.T) {
 
 func TestUserImpersonate(t *testing.T) {
 	realGroups := []string{"real-group"}
-	real := &user.DefaultInfo{Name: "u-real", Groups: realGroups, Extra: map[string][]string{"username": {"alice"}, "requesttokenid": {"token-1"}}}
+	realIdentity := Identity{Username: "alice", Provider: "github", PrincipalID: "github_user://1"}
+	real := WithIdentity(&user.DefaultInfo{Name: "u-real", Groups: realGroups, Extra: map[string][]string{"username": {"alice"}, "requesttokenid": {"token-1"}}}, realIdentity)
 	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"system:authenticated"}}
 
-	u := &User{Extra: real.Extra, withUsername: true}
+	u := &User{Extra: real.GetExtra(), withIdentity: true}
 	u.SetIdentity(real)
 	u.Impersonate(real, effective)
 
 	assert.Equal(t, "u-target", u.Name)
-	assert.Empty(t, u.Username, "the caller's username must not carry over to the impersonated user")
+	assert.Nil(t, u.Identity, "the caller's identity must not carry over to the impersonated user")
 	assert.Equal(t, []string{"system:authenticated"}, u.Group)
-	assert.Equal(t, real.Extra, u.Extra, "Extra is captured at entry and keeps its content")
-	assert.Equal(t, &Impersonator{Name: "u-real", Username: "alice", Group: realGroups}, u.ImpersonatedBy)
+	assert.Equal(t, real.GetExtra(), u.Extra, "Extra is captured at entry and keeps its content")
+	assert.Equal(t, &Impersonator{Name: "u-real", Identity: &realIdentity, Group: realGroups}, u.ImpersonatedBy)
 
 	u.clearGroups()
 	assert.Nil(t, u.Group)
@@ -258,9 +260,9 @@ func TestUserImpersonatedByJSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"name":"u-1"}`, string(plain), "impersonatedBy must be omitted when there is no impersonation")
 
-	imp, err := json.Marshal(&User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice", Group: []string{"g"}}})
+	imp, err := json.Marshal(&User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Identity: &Identity{Username: "alice"}, Group: []string{"g"}}})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"name":"u-target","impersonatedBy":{"name":"u-real","username":"alice","group":["g"]}}`, string(imp))
+	assert.JSONEq(t, `{"name":"u-target","impersonatedBy":{"name":"u-real","identity":{"username":"alice"},"group":["g"]}}`, string(imp))
 }
 
 // TestUserJSONRoundTrip pins the wire format of the audit User. Log consumers parse these keys, so
@@ -277,29 +279,39 @@ func TestUserJSONRoundTrip(t *testing.T) {
 			want: `{}`,
 		},
 		{
-			name: "username is additive to the existing keys",
-			user: User{Name: "user-h9q7h", Username: "alice", Group: []string{"g1"}, Extra: map[string][]string{"username": {"alice"}}},
-			want: `{"name":"user-h9q7h","username":"alice","group":["g1"],"extra":{"username":["alice"]}}`,
+			name: "identity is additive to the existing keys",
+			user: User{
+				Name:     "user-h9q7h",
+				Identity: &Identity{Username: "alice", Provider: "github", PrincipalID: "github_user://12345"},
+				Group:    []string{"g1"}, Extra: map[string][]string{"username": {"alice"}},
+			},
+			want: `{"name":"user-h9q7h","identity":{"username":"alice","provider":"github","principalId":"github_user://12345"},` +
+				`"group":["g1"],"extra":{"username":["alice"]}}`,
 		},
 		{
-			name: "no username keeps the previous shape",
+			name: "identity with only some of its fields",
+			user: User{Name: "u-1", Identity: &Identity{Provider: "local"}},
+			want: `{"name":"u-1","identity":{"provider":"local"}}`,
+		},
+		{
+			name: "no identity keeps the previous shape",
 			user: User{Name: "system:unauthenticated", Group: []string{"system:unauthenticated"}},
 			want: `{"name":"system:unauthenticated","group":["system:unauthenticated"]}`,
 		},
 		{
 			name: "impersonation",
 			user: User{
-				Name: "u-target", Username: "target", Group: []string{"g-target"},
+				Name: "u-target", Identity: &Identity{Username: "target"}, Group: []string{"g-target"},
 				Extra:          map[string][]string{"principalid": {"p"}},
-				ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice", Group: []string{"g-real"}},
+				ImpersonatedBy: &Impersonator{Name: "u-real", Identity: &Identity{Username: "alice", Provider: "local"}, Group: []string{"g-real"}},
 				RequestUser:    "u-target", RequestGroups: []string{"g-target"},
 			},
-			want: `{"name":"u-target","username":"target","group":["g-target"],"extra":{"principalid":["p"]},` +
-				`"impersonatedBy":{"name":"u-real","username":"alice","group":["g-real"]},` +
+			want: `{"name":"u-target","identity":{"username":"target"},"group":["g-target"],"extra":{"principalid":["p"]},` +
+				`"impersonatedBy":{"name":"u-real","identity":{"username":"alice","provider":"local"},"group":["g-real"]},` +
 				`"requestUser":"u-target","requestGroups":["g-target"]}`,
 		},
 		{
-			name: "impersonator without username or groups",
+			name: "impersonator without identity or groups",
 			user: User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}},
 			want: `{"name":"u-target","impersonatedBy":{"name":"u-real"}}`,
 		},
@@ -317,14 +329,14 @@ func TestUserJSONRoundTrip(t *testing.T) {
 		})
 	}
 
-	t.Run("entries written before username existed still parse", func(t *testing.T) {
+	t.Run("entries written before identity existed still parse", func(t *testing.T) {
 		var got User
 		require.NoError(t, json.Unmarshal([]byte(`{"name":"user-abc","group":["g"],"extra":{"k":["v"]}}`), &got))
 		assert.Equal(t, User{Name: "user-abc", Group: []string{"g"}, Extra: map[string][]string{"k": {"v"}}}, got)
 	})
 }
 
-func TestFillUsernameImpersonator(t *testing.T) {
+func TestFillIdentityImpersonator(t *testing.T) {
 	resolver := func(id string) (string, string, bool) {
 		switch id {
 		case "u-real":
@@ -336,18 +348,19 @@ func TestFillUsernameImpersonator(t *testing.T) {
 	}
 	lh := &LoggingHandler{resolveUser: resolver}
 
-	u := &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}, withUsername: true}
-	lh.fillUsername(u)
-	assert.Equal(t, "target", u.Username)
-	assert.Equal(t, "Real Person", u.ImpersonatedBy.Username)
+	u := &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}, withIdentity: true}
+	lh.fillIdentity(u)
+	assert.Equal(t, &Identity{Username: "target"}, u.Identity)
+	assert.Equal(t, &Identity{Username: "Real Person"}, u.ImpersonatedBy.Identity)
 
-	// An impersonator that already has a username keeps it.
-	u = &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice"}, withUsername: true}
-	lh.fillUsername(u)
-	assert.Equal(t, "alice", u.ImpersonatedBy.Username)
+	// An impersonator that already has an identity keeps it.
+	alice := &Identity{Username: "alice", Provider: "github"}
+	u = &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Identity: alice}, withIdentity: true}
+	lh.fillIdentity(u)
+	assert.Equal(t, alice, u.ImpersonatedBy.Identity)
 }
 
-func TestMiddlewareFillsUsernameFromResolver(t *testing.T) {
+func TestMiddlewareFillsIdentityFromResolver(t *testing.T) {
 	resolver := func(userID string) (string, string, bool) {
 		if userID == "u-external" {
 			return "", "Jane Doe", true
@@ -384,17 +397,17 @@ func TestMiddlewareFillsUsernameFromResolver(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
 			if tt.wantUsername == "" {
-				assert.NotContains(t, entry.User, "username")
+				assert.NotContains(t, entry.User, "identity")
 			} else {
-				assert.Equal(t, tt.wantUsername, entry.User["username"])
+				assert.Equal(t, map[string]any{"username": tt.wantUsername}, entry.User["identity"])
 			}
 		})
 	}
 }
 
-// TestMiddlewareOmitsUsernameByDefault checks that the entry format only grows when IncludeUsername
-// is set, and that no user lookup is made otherwise.
-func TestMiddlewareOmitsUsernameByDefault(t *testing.T) {
+// TestMiddlewareOmitsIdentityByDefault checks that the entry format only grows when WithIncludeUsername
+// reports true, and that no user lookup is made otherwise.
+func TestMiddlewareOmitsIdentityByDefault(t *testing.T) {
 	lookups := 0
 	resolver := func(string) (string, string, bool) {
 		lookups++
@@ -407,7 +420,7 @@ func TestMiddlewareOmitsUsernameByDefault(t *testing.T) {
 			u, ok := FromContext(req.Context())
 			require.True(t, ok)
 			u.Impersonate(
-				WithUsername(&user.DefaultInfo{Name: "u-real"}, "alice"),
+				WithIdentity(&user.DefaultInfo{Name: "u-real"}, Identity{Username: "alice", Provider: "local"}),
 				&user.DefaultInfo{Name: "u-target", Extra: map[string][]string{"username": {"target"}}},
 			)
 		}))
@@ -424,7 +437,7 @@ func TestMiddlewareOmitsUsernameByDefault(t *testing.T) {
 	assert.Zero(t, lookups)
 }
 
-// TestMiddlewareUsernameFollowsToggle checks that the option is read for every entry, so that a
+// TestMiddlewareIdentityFollowsToggle checks that the option is read for every entry, so that a
 // dynamic feature flag takes effect without a restart.
 func TestMiddlewareUsernameFollowsToggle(t *testing.T) {
 	enabled := false
@@ -447,17 +460,17 @@ func TestMiddlewareUsernameFollowsToggle(t *testing.T) {
 		return entry.User
 	}
 
-	assert.NotContains(t, serve(), "username")
+	assert.NotContains(t, serve(), "identity")
 	enabled = true
-	assert.Equal(t, "alice", serve()["username"])
+	assert.Equal(t, map[string]any{"username": "alice"}, serve()["identity"])
 	enabled = false
-	assert.NotContains(t, serve(), "username")
+	assert.NotContains(t, serve(), "identity")
 }
 
-// TestUserWithoutUsernameAssignsNothing checks that when usernames are off the identity is still set,
-// but no username or impersonator is derived or assigned.
-func TestUserWithoutUsernameAssignsNothing(t *testing.T) {
-	real := WithUsername(&user.DefaultInfo{Name: "u-real", Extra: map[string][]string{"username": {"alice"}}}, "alice")
+// TestUserWithoutIdentityAssignsNothing checks that when identities are off the name and groups are
+// still set, but no identity or impersonator is derived or assigned.
+func TestUserWithoutIdentityAssignsNothing(t *testing.T) {
+	real := WithIdentity(&user.DefaultInfo{Name: "u-real", Extra: map[string][]string{"username": {"alice"}}}, Identity{Username: "alice", Provider: "local"})
 	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"g"}, Extra: map[string][]string{"username": {"target"}}}
 
 	u := getUserInfo(httptest.NewRequest(http.MethodGet, "/", nil).WithContext(
@@ -466,7 +479,7 @@ func TestUserWithoutUsernameAssignsNothing(t *testing.T) {
 	(&LoggingHandler{resolveUser: func(string) (string, string, bool) {
 		t.Error("the resolver must not be called")
 		return "", "", false
-	}}).fillUsername(u)
+	}}).fillIdentity(u)
 
 	assert.Equal(t, &User{Name: "u-target", Group: []string{"g"}, Extra: real.GetExtra()}, u)
 }

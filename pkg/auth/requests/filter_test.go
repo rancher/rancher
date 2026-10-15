@@ -183,7 +183,7 @@ func TestAuthHeaderHandlerServeHTTPClearsImpersonationHeadersForServiceAccountAu
 	assert.Empty(t, requested.impersonateFoo)
 }
 
-func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
+func TestAuthHeaderHandlerServeHTTPRefreshesAuditIdentity(t *testing.T) {
 	t.Parallel()
 
 	realCaller := &user.DefaultInfo{
@@ -196,22 +196,21 @@ func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
 		name         string
 		effective    *user.DefaultInfo
 		wantName     string
-		wantUsername string
+		wantIdentity map[string]any
 	}{
 		{
 			name:         "request user unchanged",
 			effective:    realCaller,
 			wantName:     "user-admin",
-			wantUsername: "admin",
+			wantIdentity: map[string]any{"username": "admin"},
 		},
 		{
-			name: "impersonated user without username does not keep the real caller's username",
+			name: "impersonated user without identity does not keep the real caller's identity",
 			effective: &user.DefaultInfo{
 				Name:   "user-target",
 				Groups: []string{"system:authenticated"},
 			},
-			wantName:     "user-target",
-			wantUsername: "",
+			wantName: "user-target",
 		},
 		{
 			name: "impersonated user with username",
@@ -221,7 +220,7 @@ func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
 				Extra:  map[string][]string{"username": {"target"}},
 			},
 			wantName:     "user-target",
-			wantUsername: "target",
+			wantIdentity: map[string]any{"username": "target"},
 		},
 	}
 
@@ -251,10 +250,10 @@ func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
 			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
 
 			assert.Equal(t, tt.wantName, entry.User["name"])
-			if tt.wantUsername == "" {
-				assert.NotContains(t, entry.User, "username")
+			if tt.wantIdentity == nil {
+				assert.NotContains(t, entry.User, "identity")
 			} else {
-				assert.Equal(t, tt.wantUsername, entry.User["username"])
+				assert.Equal(t, tt.wantIdentity, entry.User["identity"])
 			}
 		})
 	}
@@ -272,7 +271,7 @@ func (a filterTestAuthenticator) TokenFromRequest(*http.Request) (accessor.Token
 	return nil, nil
 }
 
-func TestAuditUsernameFromAuthenticatorResponse(t *testing.T) {
+func TestAuditIdentityFromAuthenticatorResponse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -280,37 +279,36 @@ func TestAuditUsernameFromAuthenticatorResponse(t *testing.T) {
 		resp         *AuthenticatorResponse
 		swapTo       *user.DefaultInfo // Stands in for the impersonation filter.
 		wantName     string
-		wantUsername string
+		wantIdentity map[string]any
 	}{
 		{
-			name: "explicit username wins over the extra",
+			name: "explicit identity wins over the extra",
 			resp: &AuthenticatorResponse{
 				IsAuthed: true, User: "u-1",
 				Extras:   map[string][]string{"username": {"from-extra"}},
-				Username: "explicit",
+				Identity: audit.Identity{Username: "explicit", Provider: "github", PrincipalID: "github_user://1"},
 			},
 			wantName:     "u-1",
-			wantUsername: "explicit",
+			wantIdentity: map[string]any{"username": "explicit", "provider": "github", "principalId": "github_user://1"},
 		},
 		{
-			name: "no explicit username uses the extra",
+			name: "no explicit identity uses only the username extra",
 			resp: &AuthenticatorResponse{
 				IsAuthed: true, User: "u-1",
 				Extras: map[string][]string{"username": {"from-extra"}},
 			},
 			wantName:     "u-1",
-			wantUsername: "from-extra",
+			wantIdentity: map[string]any{"username": "from-extra"},
 		},
 		{
-			name: "explicit username is dropped when the request user is replaced",
+			name: "explicit identity is dropped when the request user is replaced",
 			resp: &AuthenticatorResponse{
 				IsAuthed: true, User: "u-1",
 				Extras:   map[string][]string{"username": {"from-extra"}},
-				Username: "explicit",
+				Identity: audit.Identity{Username: "explicit", Provider: "github", PrincipalID: "github_user://1"},
 			},
-			swapTo:       &user.DefaultInfo{Name: "u-target"},
-			wantName:     "u-target",
-			wantUsername: "",
+			swapTo:   &user.DefaultInfo{Name: "u-target"},
+			wantName: "u-target",
 		},
 	}
 
@@ -342,10 +340,10 @@ func TestAuditUsernameFromAuthenticatorResponse(t *testing.T) {
 			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
 
 			assert.Equal(t, tt.wantName, entry.User["name"])
-			if tt.wantUsername == "" {
-				assert.NotContains(t, entry.User, "username")
+			if tt.wantIdentity == nil {
+				assert.NotContains(t, entry.User, "identity")
 			} else {
-				assert.Equal(t, tt.wantUsername, entry.User["username"])
+				assert.Equal(t, tt.wantIdentity, entry.User["identity"])
 			}
 		})
 	}

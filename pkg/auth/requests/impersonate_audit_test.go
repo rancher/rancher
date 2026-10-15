@@ -56,7 +56,7 @@ func TestImpersonationAuditUser(t *testing.T) {
 			wantStatus: http.StatusOK,
 			wantUser: map[string]any{
 				"name":     caller,
-				"username": "alice",
+				"identity": map[string]any{"username": "alice"},
 				"group":    []any{"system:authenticated", "caller-group"},
 				"extra":    map[string]any{"username": []any{"alice"}},
 			},
@@ -70,13 +70,13 @@ func TestImpersonationAuditUser(t *testing.T) {
 			wantStatus: http.StatusOK,
 			wantUser: map[string]any{
 				"name":     target,
-				"username": "bob", // Resolved from the user record, not carried over from the caller.
+				"identity": map[string]any{"username": "bob"}, // Resolved from the user record, not carried over from the caller.
 				"group":    []any{"system:authenticated"},
 				// Extra is captured at entry and is not refreshed, exactly as before.
 				"extra": map[string]any{"username": []any{"alice"}},
 				"impersonatedBy": map[string]any{
 					"name":     caller,
-					"username": "alice",
+					"identity": map[string]any{"username": "alice"},
 					"group":    []any{"system:authenticated", "caller-group"},
 				},
 				"requestUser": target,
@@ -91,7 +91,7 @@ func TestImpersonationAuditUser(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 			wantUser: map[string]any{
 				"name":        caller,
-				"username":    "alice",
+				"identity":    map[string]any{"username": "alice"},
 				"group":       []any{"system:authenticated", "caller-group"},
 				"extra":       map[string]any{"username": []any{"alice"}},
 				"requestUser": target,
@@ -108,7 +108,7 @@ func TestImpersonationAuditUser(t *testing.T) {
 			wantStatus: http.StatusOK,
 			wantUser: map[string]any{
 				"name":        caller,
-				"username":    "alice",
+				"identity":    map[string]any{"username": "alice"},
 				"group":       []any{"system:authenticated", "caller-group"},
 				"extra":       map[string]any{"username": []any{"alice"}},
 				"requestUser": sa,
@@ -124,11 +124,11 @@ func TestImpersonationAuditUser(t *testing.T) {
 			wantStatus: http.StatusOK,
 			wantUser: map[string]any{
 				"name":     target,
-				"username": "bob",
+				"identity": map[string]any{"username": "bob"},
 				"extra":    map[string]any{"username": []any{"alice"}},
 				"impersonatedBy": map[string]any{
 					"name":     caller,
-					"username": "alice",
+					"identity": map[string]any{"username": "alice"},
 				},
 				"requestUser": target,
 			},
@@ -172,22 +172,22 @@ func TestImpersonationAuditUser(t *testing.T) {
 	}
 }
 
-// TestImpersonationAuditUserKeepsAuthoritativeCallerName checks that the real caller's authoritative
-// username, which the authenticator attaches to the request user, is recorded in impersonatedBy, while
+// TestImpersonationAuditUserKeepsAuthoritativeCallerIdentity checks that the real caller's authoritative
+// identity, which the authenticator attaches to the request user, is recorded in impersonatedBy, while
 // the impersonated user never inherits it.
-func TestImpersonationAuditUserKeepsAuthoritativeCallerName(t *testing.T) {
+func TestImpersonationAuditUserKeepsAuthoritativeCallerIdentity(t *testing.T) {
 	t.Parallel()
 
 	const (
 		caller = "u-caller"
 		target = "u-target"
 	)
-	callerInfo := audit.WithUsername(&user.DefaultInfo{
+	callerInfo := audit.WithIdentity(&user.DefaultInfo{
 		Name:   caller,
 		UID:    caller,
 		Groups: []string{"system:authenticated"},
 		Extra:  map[string][]string{"username": {"from-extra"}},
-	}, "explicit")
+	}, audit.Identity{Username: "explicit", Provider: "github", PrincipalID: "github_user://1"})
 
 	sarMock := mocks.NewMockSubjectAccessReview(gomock.NewController(t))
 	sarMock.EXPECT().UserCanImpersonateUser(gomock.Any(), caller, []string{"system:authenticated"}, target).Return(true, nil)
@@ -211,10 +211,10 @@ func TestImpersonationAuditUserKeepsAuthoritativeCallerName(t *testing.T) {
 	require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
 
 	assert.Equal(t, target, entry.User["name"])
-	assert.NotContains(t, entry.User, "username", "the target must not inherit the caller's name")
+	assert.NotContains(t, entry.User, "identity", "the target must not inherit the caller's identity")
 	assert.Equal(t, map[string]any{
 		"name":     caller,
-		"username": "explicit",
+		"identity": map[string]any{"username": "explicit", "provider": "github", "principalId": "github_user://1"},
 		"group":    []any{"system:authenticated"},
 	}, entry.User["impersonatedBy"])
 }

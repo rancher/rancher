@@ -463,7 +463,7 @@ func TestTokenAuthenticatorAuditUser(t *testing.T) {
 
 	// serve runs a request through the audit log middleware and the authenticator,
 	// as in production, and returns the written audit log entry. Usernames are on, because that is the
-	// case in which the request user's username could leak into the SCIM entry.
+	// case in which the request user's identity could leak into the SCIM entry.
 	serve := func(t *testing.T, secrets []*v1.Secret, token string, opts audit.WriterOptions, userInfo *user.DefaultInfo) map[string]any {
 		ctrl := gomock.NewController(t)
 		secretCache := fake.NewMockCacheInterface[*v1.Secret](ctrl)
@@ -532,7 +532,7 @@ func TestTokenAuthenticatorAuditUser(t *testing.T) {
 		assert.Equal(t, []string{"system:unauthenticated", "system:cattle:error", "", ""}, userInfo.Groups[:4])
 	})
 
-	t.Run("valid token does not keep a username from the request user", func(t *testing.T) {
+	t.Run("valid token does not keep an identity from the request user", func(t *testing.T) {
 		t.Parallel()
 
 		userInfo := newErrorUser()
@@ -541,7 +541,7 @@ func TestTokenAuthenticatorAuditUser(t *testing.T) {
 		got := serve(t, secrets, validToken, audit.WriterOptions{}, userInfo)["user"].(map[string]any)
 
 		assert.Equal(t, "system:scim:okta", got["name"])
-		assert.NotContains(t, got, "username")
+		assert.NotContains(t, got, "identity")
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
