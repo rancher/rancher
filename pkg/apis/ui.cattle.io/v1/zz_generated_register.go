@@ -28,7 +28,8 @@ import (
 )
 
 var (
-	NavLinkResourceName = "navlinks"
+	NavLinkResourceName            = "navlinks"
+	TableConfigurationResourceName = "tableconfigurations"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -54,6 +55,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&NavLink{},
 		&NavLinkList{},
+		&TableConfiguration{},
+		&TableConfigurationList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

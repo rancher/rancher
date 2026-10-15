@@ -430,7 +430,8 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
+		addRule().apiGroups("ui.cattle.io").resources("tableconfigurations").verbs("get", "list", "watch")
 
 	return role
 }

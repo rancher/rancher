@@ -32,6 +32,7 @@ func init() {
 
 type Interface interface {
 	NavLink() NavLinkController
+	TableConfiguration() TableConfigurationController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -46,4 +47,8 @@ type version struct {
 
 func (v *version) NavLink() NavLinkController {
 	return generic.NewController[*v1.NavLink, *v1.NavLinkList](schema.GroupVersionKind{Group: "ui.cattle.io", Version: "v1", Kind: "NavLink"}, "navlinks", true, v.controllerFactory)
+}
+
+func (v *version) TableConfiguration() TableConfigurationController {
+	return generic.NewNonNamespacedController[*v1.TableConfiguration, *v1.TableConfigurationList](schema.GroupVersionKind{Group: "ui.cattle.io", Version: "v1", Kind: "TableConfiguration"}, "tableconfigurations", v.controllerFactory)
 }

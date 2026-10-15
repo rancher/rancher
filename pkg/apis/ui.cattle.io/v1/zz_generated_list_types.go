@@ -40,3 +40,20 @@ func NewNavLink(namespace, name string, obj NavLink) *NavLink {
 	obj.Namespace = namespace
 	return &obj
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TableConfigurationList is a list of TableConfiguration resources
+type TableConfigurationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []TableConfiguration `json:"items"`
+}
+
+func NewTableConfiguration(namespace, name string, obj TableConfiguration) *TableConfiguration {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("TableConfiguration").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
