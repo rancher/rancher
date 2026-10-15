@@ -3,6 +3,8 @@ package roletemplates
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -37,6 +39,7 @@ type prtbHandler struct {
 	rtClient             mgmtv3.RoleTemplateController
 	nsClient             wcorev1.NamespaceController
 	rbClient             wrbacv1.RoleBindingClient
+	prtbCache            mgmtv3.ProjectRoleTemplateBindingCache
 	clusterName          string
 }
 
@@ -58,6 +61,7 @@ func newPRTBHandler(uc *config.UserContext) (*prtbHandler, error) {
 		rtClient:    uc.Management.Wrangler.Mgmt.RoleTemplate(),
 		nsClient:    uc.Corew.Namespace(),
 		rbClient:    uc.RBACw.RoleBinding(),
+		prtbCache:   uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		clusterName: uc.ClusterName,
 	}, nil
 }
@@ -265,7 +269,7 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 }
 
 // ensureOnlyDesiredClusterRoleBindingsExists takes a list of ClusterRoleBindings and ensures they are the only CRBs that exist for this PRTB.
-// Deletes any CRBs with the prtbOwnerLabel that aren't in the given list.
+// Deletes any CRBs with the prtbOwnerLabel that aren't in the given list, and adopts or prunes CRBs created for the PRTB by legacy RBAC.
 func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.ClusterRoleBinding, prtb *v3.ProjectRoleTemplateBinding) error {
 	// Turn the slice into a map for easier operations.
 	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
@@ -297,6 +301,7 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 	currentCRBs := append(aggregationCRBs.Items, legacyCRBs.Items...)
 
 	// Search for the ClusterRoleBindings that are needed, all others should be removed.
+	deletedCRBs := map[string]bool{}
 	for _, currentCRB := range currentCRBs {
 		if desiredCRB, ok := desiredCRBs[currentCRB.Name]; ok {
 			if rbac.IsClusterRoleBindingContentSame(&currentCRB, desiredCRB) {
@@ -306,6 +311,22 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 		}
 		// Subject and RoleRef can't be updated, so we need to delete and recreate them.
 		if err = rbac.DeleteResource(currentCRB.Name, p.crbClient); err != nil {
+			return err
+		}
+		deletedCRBs[currentCRB.Name] = true
+	}
+
+	// Adopt or prune the project cluster-wide ClusterRoleBindings legacy RBAC created for this PRTB.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyProjectCRBs, err := p.listLegacyProjectClusterRoleBindings(prtb)
+	if err != nil {
+		return err
+	}
+	for _, legacyCRB := range legacyProjectCRBs {
+		if deletedCRBs[legacyCRB.Name] {
+			continue
+		}
+		if err := p.migrateLegacyProjectClusterRoleBinding(&legacyCRB, prtb, desiredCRBs); err != nil {
 			return err
 		}
 	}
@@ -318,6 +339,72 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 		}
 	}
 	return nil
+}
+
+// listLegacyProjectClusterRoleBindings lists the project cluster-wide ClusterRoleBindings (create-ns, <project>-namespaces-*,
+// *-promoted) that legacy RBAC created for the PRTB. Legacy RBAC labels these <ns>_<name>: owner-user, so one binding can
+// be shared by several PRTBs.
+func (p *prtbHandler) listLegacyProjectClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) ([]rbacv1.ClusterRoleBinding, error) {
+	selector := labels.Set{rbac.GetRTBLabel(prtb.ObjectMeta): rbac.LegacyProjectCRBOwnerValue}.AsSelector().String()
+	list, err := p.crbClient.List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list legacy cluster role bindings: %w", err)
+	}
+	if list == nil {
+		return nil, nil
+	}
+	return list.Items, nil
+}
+
+// migrateLegacyProjectClusterRoleBinding removes the PRTB's legacy owner label from a legacy project ClusterRoleBinding.
+// If the binding is still desired, it is adopted in place by adding the aggregation labels, so access isn't interrupted.
+// Otherwise it is deleted, unless another PRTB still owns it. Adopted bindings are removed from desiredCRBs.
+func (p *prtbHandler) migrateLegacyProjectClusterRoleBinding(crb *rbacv1.ClusterRoleBinding, prtb *v3.ProjectRoleTemplateBinding, desiredCRBs map[string]*rbacv1.ClusterRoleBinding) error {
+	crb = crb.DeepCopy()
+	delete(crb.Labels, rbac.GetRTBLabel(prtb.ObjectMeta))
+
+	if desiredCRB, ok := desiredCRBs[crb.Name]; ok && rbac.IsClusterRoleBindingContentSame(crb, desiredCRB) {
+		maps.Copy(crb.Labels, desiredCRB.Labels)
+		if _, err := p.crbClient.Update(crb); err != nil {
+			return fmt.Errorf("failed to adopt legacy cluster role binding %s: %w", crb.Name, err)
+		}
+		delete(desiredCRBs, crb.Name)
+		return nil
+	}
+
+	owned, err := p.hasRemainingOwner(crb)
+	if err != nil {
+		return err
+	}
+	if !owned {
+		return rbac.DeleteResource(crb.Name, p.crbClient)
+	}
+	if _, err := p.crbClient.Update(crb); err != nil {
+		return fmt.Errorf("failed to remove legacy owner label from cluster role binding %s: %w", crb.Name, err)
+	}
+	return nil
+}
+
+// hasRemainingOwner reports whether a ClusterRoleBinding is still owned by an RTB, either through an aggregated owner
+// label or through a legacy owner label whose PRTB still exists.
+func (p *prtbHandler) hasRemainingOwner(crb *rbacv1.ClusterRoleBinding) (bool, error) {
+	for k, v := range crb.Labels {
+		if strings.HasPrefix(k, rbac.PrtbOwnerLabel) || strings.HasPrefix(k, rbac.CrtbOwnerLabel) || k == rtbOwnerLabel {
+			return true, nil
+		}
+		if v != rbac.LegacyProjectCRBOwnerValue {
+			continue
+		}
+		// The label key is a GetRTBLabel, which may be truncated, so it is resolved through the index.
+		prtbs, err := p.prtbCache.GetByIndex(rbac.PRTBByRTBLabelIndex, k)
+		if err != nil {
+			return false, fmt.Errorf("failed to look up owner %s of cluster role binding %s: %w", k, crb.Name, err)
+		}
+		if len(prtbs) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // buildClusterRoleBindingForRules builds a binding when the RoleTemplate has an aggregate role for the given rule type.
