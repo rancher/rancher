@@ -40,7 +40,6 @@ var OriginMap = map[string]string{
 	"coreos-prometheus-config-reloader":                       "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"coreos-prometheus-operator":                              "https://github.com/prometheus-operator/prometheus-operator",
 	"cluster-api-controller":                                  "https://github.com/rancher/cluster-api",
-	"cluster-api-addon-provider-fleet":                        "https://github.com/rancher/cluster-api-addon-provider-fleet",
 	"cluster-api-aws-controller":                              "https://github.com/rancher/cluster-api-provider-aws",
 	"cluster-api-azure-controller":                            "https://github.com/rancher/cluster-api-provider-azure",
 	"cluster-api-gcp-controller":                              "https://github.com/rancher/cluster-api-provider-gcp",
