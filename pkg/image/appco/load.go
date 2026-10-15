@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 const DefaultConfigURL = "https://raw.githubusercontent.com/rancher/artifact-mirror/master/config.yaml"

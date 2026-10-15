@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -19,6 +18,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/user"
+	"sigs.k8s.io/yaml"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
