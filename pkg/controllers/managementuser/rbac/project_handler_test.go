@@ -219,9 +219,9 @@ func TestUpdated(t *testing.T) {
 			wantError:           false,
 		},
 		{
-			name:                "edit role with manage-namespaces is left unchanged",
+			name:                "manage-namespaces is removed from edit role",
 			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule, manageNSRule), newManageNSRole(manageNSRule)},
-			wantError:           false,
+			wantClusterRoles:    []*rbacv1.ClusterRole{newEditNSRole(editNSRule)},
 		},
 		{
 			name: "missing cluster roles",
@@ -234,7 +234,7 @@ func TestUpdated(t *testing.T) {
 		{
 			name:                "missing manage cluster role",
 			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule, manageNSRule)},
-			wantClusterRoles:    []*rbacv1.ClusterRole{newManageNSRole(manageNSRule)},
+			wantClusterRoles:    []*rbacv1.ClusterRole{newManageNSRole(manageNSRule), newEditNSRole(editNSRule)},
 		},
 		{
 			name: "manage cluster role with extra rules",
@@ -242,7 +242,13 @@ func TestUpdated(t *testing.T) {
 				newEditNSRole(editNSRule, manageNSRule),
 				newManageNSRole(manageNSRule, editNSRule),
 			},
-			wantClusterRoles: []*rbacv1.ClusterRole{newManageNSRole(manageNSRule)},
+			wantClusterRoles: []*rbacv1.ClusterRole{newManageNSRole(manageNSRule), newEditNSRole(editNSRule)},
+		},
+		{
+			name:                "edit role update error",
+			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule, manageNSRule), newManageNSRole(manageNSRule)},
+			updError:            fmt.Errorf("unexpected error"),
+			wantError:           true,
 		},
 		{
 			name:      "get error",

@@ -16,6 +16,7 @@ import (
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -161,7 +162,8 @@ func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
 	return err
 }
 
-// ensureNamespaceRolesUpdated makes sure the project's namespaces-manage and namespaces-edit roles exist.
+// ensureNamespaceRolesUpdated makes sure the project's namespaces-manage and namespaces-edit roles exist, and that
+// manage-namespaces is only granted by the namespaces-manage role.
 func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 	if err := p.ensureManageNSRole(project.Name); err != nil {
 		return err
@@ -170,13 +172,32 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 	// The namespace handler maintains the rules of the edit and readonly roles.
 	suffix := projectNSVerbToSuffix[projectNSEditVerb]
 	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
-	_, err := p.m.crLister.Get(roleName)
+	cr, err := p.m.crLister.Get(roleName)
 	if apierrors.IsNotFound(err) {
 		return p.m.createProjectNSRole(roleName, projectNSEditVerb, "")
 	} else if err != nil {
 		return fmt.Errorf("unable to get backing cluster role for project %s: %w", project.Name, err)
 	}
+	return p.removeManageNSFromEditRole(cr)
+}
+
+// removeManageNSFromEditRole removes manage-namespaces from an edit role created before it moved to the
+// namespaces-manage role.
+func (p *pLifecycle) removeManageNSFromEditRole(cr *rbacv1.ClusterRole) error {
+	if !slices.ContainsFunc(cr.Rules, isManageNSRule) {
+		return nil
+	}
+
+	cr = cr.DeepCopy()
+	cr.Rules = slices.DeleteFunc(cr.Rules, isManageNSRule)
+	if _, err := p.m.clusterRoles.Update(cr); err != nil {
+		return fmt.Errorf("unable to remove manage-namespaces from cluster role %s: %w", cr.Name, err)
+	}
 	return nil
+}
+
+func isManageNSRule(rule rbacv1.PolicyRule) bool {
+	return slices.Contains(rule.Verbs, manageNSVerb)
 }
 
 // ensureManageNSRole makes sure the project's namespaces-manage ClusterRole exists and only grants manage-namespaces on
