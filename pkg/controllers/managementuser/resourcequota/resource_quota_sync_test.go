@@ -235,6 +235,28 @@ func TestSetValidated(t *testing.T) {
 		_, err = sc.setValidated(ns, true, "test")
 		assert.NoError(t, err)
 	})
+
+	t.Run("identical false condition is not rewritten, changed message is", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nsMock := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+		nsMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(ns *corev1.Namespace) (*corev1.Namespace, error) {
+			return ns, nil
+		}).Times(2)
+		sc := SyncController{Namespaces: nsMock}
+
+		ns, err := sc.setValidated(&corev1.Namespace{}, false, "Negative")
+		assert.NoError(t, err)
+
+		// the condition timestamp has second resolution, cross a boundary
+		time.Sleep(1100 * time.Millisecond)
+		same, err := sc.setValidated(ns, false, "Negative")
+		assert.NoError(t, err)
+		assert.Equal(t, ns.Annotations, same.Annotations)
+
+		// different message is written
+		_, err = sc.setValidated(ns, false, "Oversubscribed")
+		assert.NoError(t, err)
+	})
 }
 
 func TestUpdateResourceQuota(t *testing.T) {

@@ -543,6 +543,20 @@ func (c *SyncController) getNamespacesLimits(ns *v1.Namespace, projectID string)
 }
 
 func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) (*corev1.Namespace, error) {
+	// The message of a True condition is always stored empty.
+	if value {
+		msg = ""
+	}
+	// avoid updates if status and message are unchanged, the condition's
+	// timestamp alone must not trigger a namespace update and thus a resync
+	curValue, curMsg, found, err := namespaceutil.GetNamespaceCondition(ns, ResourceQuotaValidatedCondition)
+	if err != nil {
+		return ns, err
+	}
+	if found && curValue == value && curMsg == msg {
+		return ns, nil
+	}
+
 	toUpdate := ns.DeepCopy()
 	if err := namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaValidatedCondition, value, msg); err != nil {
 		return ns, err
