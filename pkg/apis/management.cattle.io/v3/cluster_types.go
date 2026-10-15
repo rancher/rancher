@@ -20,8 +20,8 @@ import (
 )
 
 func init() {
-	gob.Register(map[string]interface{}{})
-	gob.Register([]interface{}{})
+	gob.Register(map[string]any{})
+	gob.Register([]any{})
 }
 
 type ClusterConditionType string
@@ -36,17 +36,90 @@ const (
 	ClusterActionRotateEncryptionKey   = "rotateEncryptionKey"
 	ClusterActionSaveAsTemplate        = "saveAsTemplate"
 
-	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
-	ClusterConditionReady           condition.Cond = "Ready"
-	ClusterConditionPending         condition.Cond = "Pending"
-	ClusterConditionCertsGenerated  condition.Cond = "CertsGenerated"
-	ClusterConditionEtcd            condition.Cond = "etcd"
+	// ClusterConditionReady is a summary condition used to summarize the overall state of a cluster.
+	// False and Unknown conditions will have their messages aggregated, truncated at 1024 characters.
+	// If any of the required conditions is False, only conditions from False messages will be aggregated; likewise if
+	// there are no False conditions and any Unknown conditions, their messages will be aggregated.
+	// True condition messages will never be aggregated.
+	// Aggregated messages will be sorted in priority order based on the condition type.
+	// This behavior is based on existing condition paradigms within Rancher for the cluster.management.cattle.io
+	// object, and is subject to change as conditions become more aligned with upstream paradigms.
+	// The ClusterConditionReady condition is aggregated from the following conditions in priority order:
+	// - ClusterConditionPending
+	// - ClusterConditionProvisioned
+	// - ClusterConditionWaiting
+	// - ClusterConditionPreBootstrapped
+	// - ClusterConditionAgentDeployed
+	// - ClusterConditionConnected
+	// - ClusterConditionProbeSucceeded
+	// If none of the required conditions are set, Ready will be set to "Unknown" with a message indicating as such.
+	// When ClusterStatus.ReadyReconciling is true,
+	// It is imperative that any handler that modifies one of these conditions use the
+	// [github.com/rancher/rancher/pkg/cluster.SummarizeCondition] function to aggregate the ClusterConditionReady
+	// condition.
+	ClusterConditionReady condition.Cond = "Ready"
+
+	ClusterConditionPending condition.Cond = "Pending"
+
+	ClusterConditionProvisioned condition.Cond = "Provisioned"
+
+	// ClusterConditionWaiting represents whether the cluster has successfully completed the
+	// [github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer.CheckAPIReadiness] routine and received a
+	// successful results from the downstream cluster's "/readyz" endpoint.
+	// This is functionally similar to the ClusterConditionProbeSucceeded condition, though waiting is not set to
+	// false when the probe fails.
+	// There are notable subtleties in behavior for the various cluster types:
+	// - Provisioned clusters do not set Waiting initially, and this condition is only surfaced when the healthsyncer
+	// probe succeeds.
+	// - Imported clusters set Waiting within the
+	// [github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner.Provisioner] alongside
+	// ClusterConditionPending & ClusterConditionProvisioned.
+	// - Hosted clusters (AKS/EKS/GKE/Alibaba) set this if the associated hypervisor specific cluster object does not
+	// yet exist (Unknown), the cluster's Cluster.Status.ServiceAccountTokenSecret is empty and cannot be populated due
+	// to the remotedialer session not being connected (indicating the cluster is behind a private API endpoint and
+	// therefore the cluster import command must be run manually) (Unknown), as well as when the cluster's
+	// Cluster.Status.ServiceAccountTokenSecret is empty and cannot be populated due to an unrelated error (False).
+	ClusterConditionWaiting condition.Cond = "Waiting"
+
+	// ClusterConditionPreBootstrapped represents whether a cluster has successfully completed the PreBootstrap
+	// procedure.
+	// PreBootstrapping is the act of delivering user requested secrets to the downstream cluster which are required
+	// before the cluster agent can be deployed with its complete feature set.
+	// This routine is only executed for provisioned clusters, though may extend to other cluster types in the future.
 	ClusterConditionPreBootstrapped condition.Cond = "PreBootstrapped"
-	ClusterConditionProvisioned     condition.Cond = "Provisioned"
-	ClusterConditionUpdated         condition.Cond = "Updated"
-	ClusterConditionUpgraded        condition.Cond = "Upgraded"
-	ClusterConditionWaiting         condition.Cond = "Waiting"
-	ClusterConditionRemoved         condition.Cond = "Removed"
+
+	// ClusterConditionAgentDeployed surfaces when the
+	// [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy] handler has succeeded or failed to apply
+	// the updated cluster-agent manifest for a given cluster.
+	ClusterConditionAgentDeployed condition.Cond = "AgentDeployed"
+
+	// ClusterConditionConnected is set when the cluster has successfully connected via the stv-cluster- session.
+	// This required the cluster agent to have deployed through
+	// [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy], as the initial manifest provided by the
+	// ClusterRegistrationToken (if used) has an empty feature set, and thus the steve aggregation server will not
+	// start.
+	ClusterConditionConnected = wcondition.Cond("Connected")
+
+	// ClusterConditionProbeSucceeded surfaces when the cluster uses the [github.com/rancher/remotedialer] tunnel to
+	// query "/readyz". This indicates that the cluster is healthy enough to the point where the
+	// [github.com/rancher/rancher/pkg/controllers/managementuser] controllers can start.
+	ClusterConditionProbeSucceeded condition.Cond = "ProbeSucceeded"
+
+	// ClusterConditionControllersRunning surfaces when the [github.com/rancher/rancher/pkg/clustermanager.Manager]
+	// starts or stops the [github.com/rancher/rancher/pkg/controllers/managementuser] controllers.
+	ClusterConditionControllersRunning condition.Cond = "ControllersRunning"
+
+	ClusterConditionUpdated condition.Cond = "Updated"
+
+	// ClusterConditionRemoved is set once the management cluster object is deleted.
+	// Currently, this condition is not set directly, but only interacted with by copying the RKEControlPlane's Removed
+	// condition when deleting a provisioned cluster.
+	ClusterConditionRemoved condition.Cond = "Removed"
+
+	ClusterConditionCertsGenerated condition.Cond = "CertsGenerated"
+	ClusterConditionEtcd           condition.Cond = "etcd"
+	ClusterConditionUpgraded       condition.Cond = "Upgraded"
+
 	// ClusterConditionNoDiskPressure true when all cluster nodes have sufficient disk
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
@@ -63,11 +136,6 @@ const (
 	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
 	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
 
-	// ClusterConditionAgentDeployed surfaces when the
-	// [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy] handler has succeeded or failed to apply
-	// the updated cluster-agent manifest for a given cluster.
-	ClusterConditionAgentDeployed condition.Cond = "AgentDeployed"
-
 	// ClusterConditionRegistered surfaces when the cluster-agent dials back to Rancher for the first time.
 	// Once set this condition will always remain true.
 	// This condition can be set by either the initial remotedialer connection, or the "stv-cluster-" connection made
@@ -83,13 +151,6 @@ const (
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
 	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
 	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
-
-	// ClusterConditionConnected is set when the cluster has successfully connected via the stv-cluster- session.
-	// This required the cluster agent to have deployed through
-	// [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy], as the initial manifest provided by the
-	// ClusterRegistrationToken (if used) has an empty feature set, and thus the steve aggregation server will not
-	// start.
-	ClusterConditionConnected = wcondition.Cond("Connected")
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -280,7 +341,7 @@ type ClusterStatus struct {
 	AppliedWebhookDeploymentCustomization      *WebhookDeploymentCustomization `json:"appliedWebhookDeploymentCustomization,omitempty"`
 
 	// ReadyReconciling indicates that the cluster's readiness state is currently being managed by provisioning controller.
-	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, ClusterConditionConnected) should avoid updating Ready condition to prevent state flapping.
+	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, ClusterConditionConnected) should avoid updating ClusterConditionReady condition to prevent state flapping.
 	ReadyReconciling bool         `json:"readyReconciling,omitempty"`
 	Info             *ClusterInfo `json:"info,omitempty"`
 }

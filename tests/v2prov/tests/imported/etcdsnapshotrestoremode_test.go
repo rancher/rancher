@@ -565,7 +565,7 @@ func assertImportedClusterHealthy(t *testing.T, clients *clients.Clients, fx *im
 	logrus.Infof("waiting for cluster %s to be Ready after the restore", fx.mgmtCluster.Name)
 
 	err := wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, fx.mgmtCluster, func(obj runtime.Object) (bool, error) {
-		return mgmtv3.Ready.IsTrue(obj.(*mgmtv3.Cluster)), nil
+		return mgmtv3.ClusterConditionReady.IsTrue(obj.(*mgmtv3.Cluster)), nil
 	})
 	handleError(t, clients, fx.mgmtCluster.Name, err)
 

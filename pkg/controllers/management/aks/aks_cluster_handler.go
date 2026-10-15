@@ -3,7 +3,7 @@ package aks
 import (
 	"context"
 	"encoding/base64"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -26,7 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -95,7 +95,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	aksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
 
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return cluster, err
 		}
 
@@ -206,7 +206,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
 				var statusErr error
-				if err == dialer.ErrAgentDisconnected {
+				if errors.Is(err, dialer.ErrAgentDisconnected) {
 					// In this case, the API endpoint is private and rancher is waiting for the import cluster command to be run.
 					cluster, statusErr = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, "waiting for cluster agent to be deployed")
 					if statusErr == nil {
@@ -436,14 +436,14 @@ func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *apimgmtv3.
 	if err != nil {
 		*requiresTunnel = true
 		var dnsError *net.DNSError
-		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
+		if errors.As(err, &dnsError) && !dnsError.IsTemporary {
 			return "", requiresTunnel, nil
 		}
 
 		// In the existence of a proxy, it may be the case that the following error occurs,
 		// in which case rancher should use the tunnel connection to communicate with the cluster.
 		var urlError *url.Error
-		if stderrors.As(err, &urlError) && urlError.Timeout() {
+		if errors.As(err, &urlError) && urlError.Timeout() {
 			return "", requiresTunnel, nil
 		}
 

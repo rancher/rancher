@@ -11,15 +11,22 @@ import (
 )
 
 var Conditions = []string{
+	string(apimgmtv3.ClusterConditionPending),
 	string(apimgmtv3.ClusterConditionProvisioned),
+	string(apimgmtv3.ClusterConditionWaiting),
 	string(apimgmtv3.ClusterConditionPreBootstrapped),
-	string(apimgmtv3.ClusterConditionConnected),
 	string(apimgmtv3.ClusterConditionAgentDeployed),
-	string(apimgmtv3.ClusterConditionUpgraded),
+	string(apimgmtv3.ClusterConditionConnected),
+	string(apimgmtv3.ClusterConditionProbeSucceeded),
+	string(apimgmtv3.ClusterConditionControllersRunning),
 }
 
 func SummarizeCondition(cluster *apimgmtv3.Cluster) {
 	if cluster == nil {
+		return
+	}
+
+	if cluster.Status.ReadyReconciling {
 		return
 	}
 
@@ -35,8 +42,24 @@ func SummarizeCondition(cluster *apimgmtv3.Cluster) {
 	// if priority is important: surface all error messages. if no error messages, surface unknown (progressing).
 	// if only green, mark cluster as Ready
 
+	order := make(map[string]int, len(Conditions))
+	for rank, name := range Conditions {
+		order[name] = rank
+	}
+
+	var existingReady *apimgmtv3.ClusterCondition
+
 	status := corev1.ConditionTrue
 	for _, condition := range clusterConditions {
+		if condition.Type == "Ready" {
+			existingReady = &condition
+			continue
+		}
+
+		if _, ok := order[string(condition.Type)]; !ok {
+			continue
+		}
+
 		if condition.Status == corev1.ConditionFalse {
 			status = corev1.ConditionFalse
 			break
@@ -46,21 +69,19 @@ func SummarizeCondition(cluster *apimgmtv3.Cluster) {
 		}
 	}
 
-	var existingReady *apimgmtv3.ClusterCondition
 	cons := []apimgmtv3.ClusterCondition{}
 	for _, condition := range clusterConditions {
 		if condition.Type == "Ready" {
-			existingReady = &condition
 			continue
 		}
+
+		if _, ok := order[string(condition.Type)]; !ok {
+			continue
+		}
+
 		if condition.Status == status {
 			cons = append(cons, condition)
 		}
-	}
-
-	order := make(map[string]int, len(Conditions))
-	for rank, name := range Conditions {
-		order[name] = rank
 	}
 
 	slices.SortFunc(cons, func(a, b apimgmtv3.ClusterCondition) int {
@@ -84,7 +105,9 @@ func SummarizeCondition(cluster *apimgmtv3.Cluster) {
 	var messages []string
 	if status != corev1.ConditionTrue {
 		for _, condition := range cons {
-			messages = append(messages, condition.Message)
+			if condition.Message != "" {
+				messages = append(messages, condition.Message)
+			}
 		}
 	}
 
@@ -100,6 +123,10 @@ func SummarizeCondition(cluster *apimgmtv3.Cluster) {
 		Message: strings.Join(messages, "; "),
 		Status:  status,
 		Reason:  reason,
+	}
+
+	if len(ready.Message) > 1024 {
+		ready.Message = ready.Message[:1021] + "..."
 	}
 
 	if existingReady != nil {

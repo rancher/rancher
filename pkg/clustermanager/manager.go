@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
@@ -119,13 +120,24 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
-func (m *Manager) markUnavailable(clusterName string) {
+func (m *Manager) MarkControllersNotRunning(clusterName string) {
 	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
-		if !apimgmtv3.ClusterConditionReady.IsFalse(cluster) {
-			apimgmtv3.ClusterConditionReady.False(cluster)
-			m.clusters.UpdateStatus(cluster)
+		if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(cluster) {
+			apimgmtv3.ClusterConditionControllersRunning.False(cluster)
+			pkgcluster.SummarizeCondition(cluster)
+			_, _ = m.clusters.UpdateStatus(cluster)
 		}
 		m.Stop(cluster)
+	}
+}
+
+func (m *Manager) MarkControllersRunning(clusterName string) {
+	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
+		if !apimgmtv3.ClusterConditionControllersRunning.IsTrue(cluster) {
+			apimgmtv3.ClusterConditionControllersRunning.True(cluster)
+			pkgcluster.SummarizeCondition(cluster)
+			_, _ = m.clusters.UpdateStatus(cluster)
+		}
 	}
 }
 
@@ -143,7 +155,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.markUnavailable(cluster.Name)
+		m.MarkControllersNotRunning(cluster.Name)
 		return nil, err
 	}
 	if clusterRecord == nil {
@@ -157,7 +169,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		clusterRecord.cancel()
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.markUnavailable(cluster.Name)
+		m.MarkControllersNotRunning(cluster.Name)
 		return nil, err
 	}
 
@@ -174,9 +186,16 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !r.started {
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
+				// only mark running/not running for owner instance
 				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-				m.markUnavailable(r.clusterRec.Name)
+				if clusterOwner {
+					m.MarkControllersNotRunning(r.clusterRec.Name)
+				}
 				m.Stop(r.clusterRec)
+			} else {
+				if clusterOwner {
+					m.MarkControllersRunning(r.clusterRec.Name)
+				}
 			}
 		}()
 		r.started = true
@@ -214,7 +233,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get(rec.ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			if i == 2 {
-				m.markUnavailable(rec.cluster.ClusterName)
+				m.MarkControllersNotRunning(rec.cluster.ClusterName)
 			}
 			select {
 			case <-rec.ctx.Done():
