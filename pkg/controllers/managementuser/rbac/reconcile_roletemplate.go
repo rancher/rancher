@@ -142,6 +142,7 @@ func (m *manager) removeStaleProjectNamespaceCRBs(binding *v3.ProjectRoleTemplat
 			}
 			continue
 		}
+		crbsToKeep[crb.Name] = true
 		if _, err := m.clusterRoleBindings.Update(crb); err != nil {
 			return err
 		}
