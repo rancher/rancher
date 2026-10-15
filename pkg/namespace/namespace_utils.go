@@ -109,6 +109,26 @@ func IsNamespaceConditionSet(namespace *corev1.Namespace, conditionType string, 
 	return false, nil
 }
 
+// GetNamespaceCondition returns the status and message of the named condition
+// in the namespace's status annotation. found is false if the condition is not
+// present.
+func GetNamespaceCondition(namespace *corev1.Namespace, conditionType string) (conditionStatus bool, message string, found bool, err error) {
+	ann := namespace.ObjectMeta.Annotations[statusAnn]
+	if ann == "" {
+		return false, "", false, nil
+	}
+	s := &status{}
+	if err := json.Unmarshal([]byte(ann), s); err != nil {
+		return false, "", false, err
+	}
+	for _, c := range s.Conditions {
+		if c.Type == conditionType {
+			return c.Status == "True", c.Message, true, nil
+		}
+	}
+	return false, "", false, nil
+}
+
 type status struct {
 	Conditions []condition
 }

@@ -194,6 +194,16 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		}
 	}
 
+	var existingHard, newHard corev1.ResourceList
+	if existing != nil {
+		existingHard = existing.Spec.Hard
+	}
+	if newQuotaSpec != nil {
+		newHard = newQuotaSpec.Hard
+	}
+	logrus.Debugf("CreateResourceQuota: namespace=%q operation=%q existing.hard=%v new.hard=%v",
+		ns.Name, operation, existingHard, newHard)
+
 	var updated *corev1.Namespace
 	var operationErr error
 	switch operation {
@@ -225,10 +235,30 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 			return upd, err
 		}
 		if !isFit {
+			logrus.Debugf("CreateResourceQuota: namespace=%q update skipped, requested quota does not fit", ns.Name)
 			updated = upd
 			break
 		}
 		operationErr = c.updateResourceQuota(existing, newQuotaSpec)
+	case "none":
+		// The requested quota matches the enforcing one, but a previous
+		// invalid request (negative, oversubscribed) may have left the
+		// validated condition False. Revalidate to clear it.
+		if existing == nil || newQuotaSpec == nil || len(newQuotaSpec.Hard) == 0 {
+			break
+		}
+		valid, err := namespaceutil.IsNamespaceConditionSet(ns, ResourceQuotaValidatedCondition, true)
+		if err != nil {
+			return ns, err
+		}
+		if valid {
+			break
+		}
+		_, upd, _, _, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
+		if err != nil {
+			return upd, err
+		}
+		updated = upd
 	case "delete":
 		updatedNs := ns.DeepCopy()
 		delete(updatedNs.Annotations, resourceQuotaAnnotation)
@@ -477,6 +507,8 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 		}
 	}
 
+	logrus.Debugf("validateAndSetNamespaceQuota: namespace=%q setting %s status=%v message=%q",
+		ns.Name, ResourceQuotaValidatedCondition, isFit, msg)
 	validated, err := c.setValidated(updatedNs, isFit, msg)
 
 	return isFit, validated, exceeded, negatives, err
@@ -511,6 +543,20 @@ func (c *SyncController) getNamespacesLimits(ns *v1.Namespace, projectID string)
 }
 
 func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) (*corev1.Namespace, error) {
+	// The message of a True condition is always stored empty.
+	if value {
+		msg = ""
+	}
+	// avoid updates if status and message are unchanged, the condition's
+	// timestamp alone must not trigger a namespace update and thus a resync
+	curValue, curMsg, found, err := namespaceutil.GetNamespaceCondition(ns, ResourceQuotaValidatedCondition)
+	if err != nil {
+		return ns, err
+	}
+	if found && curValue == value && curMsg == msg {
+		return ns, nil
+	}
+
 	toUpdate := ns.DeepCopy()
 	if err := namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaValidatedCondition, value, msg); err != nil {
 		return ns, err
