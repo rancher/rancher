@@ -54,7 +54,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	k8sauthuser "k8s.io/apiserver/pkg/authentication/user"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -270,15 +269,6 @@ func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 	return &mgmtCopy
 }
 
-// deferredStartRetry bounds how long a failed deferred start is retried in-process before it is
-// escalated to UserContext.OnDeferredStartError. Roughly 75 seconds in total.
-var deferredStartRetry = wait.Backoff{
-	Steps:    5,
-	Duration: 5 * time.Second,
-	Factor:   2,
-	Jitter:   0.1,
-}
-
 // DeferredStart returns a starter that registers and starts the cluster's controllers the first
 // time it is called. The starter returns nothing: it runs in the background, so there is no result
 // to hand back by the time it returns, and reporting a failure is its own job rather than the
@@ -287,17 +277,12 @@ func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx conte
 	return w.deferredStart(ctx, w.deferredStartAsync(ctx, register))
 }
 
-// deferredStart returns a starter that runs f in the background, retrying it while it fails.
+// deferredStart returns a starter that runs f in the background.
 //
-// Retrying f is enough to recover from a failed registration, because each attempt registers the
-// handlers again. It is not enough to recover from a controller that failed to start: lasso caches
-// that failure on the sharedController and every later Start returns it without retrying anything,
-// so only a new controller factory can bring it back. Once the retries are exhausted the failure is
-// escalated to OnDeferredStartError to have the whole UserContext, and with it the factory, rebuilt.
+// Failures are escalated to OnDeferredStartError to have the whole UserContext and the factory rebuilt.
 func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() {
-	backoff := deferredStartRetry
 	// The starter is called from controller handlers, so it fires repeatedly. Only the first call
-	// does anything: either f eventually succeeds, or the retries run out and the UserContext is
+	// does anything: either f succeeds, or it fails and the UserContext is
 	// rebuilt, which replaces this starter along with it.
 	var started atomic.Bool
 
@@ -307,23 +292,15 @@ func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() 
 		}
 
 		go func() {
-			var attempts int
-			err := wait.ExponentialBackoffWithContext(ctx, backoff, func(context.Context) (bool, error) {
-				attempts++
-				if err := f(); err != nil {
-					logrus.Warnf("deferred controller start attempt failed for cluster %s: %v", w.ClusterName, err)
-					return false, nil
-				}
-				return true, nil
-			})
+			err := f()
+
 			// A cancelled context means the cluster is already being torn down, so there is nothing
 			// left to recover.
 			if err == nil || ctx.Err() != nil {
 				return
 			}
 
-			logrus.Errorf("deferred controller start failed for cluster %s after %d attempts, rebuilding cluster controllers",
-				w.ClusterName, attempts)
+			logrus.Errorf("deferred controller start failed for cluster %s: %v, rebuilding cluster controllers", w.ClusterName, err)
 			if w.OnDeferredStartError != nil {
 				w.OnDeferredStartError()
 			}
@@ -345,6 +322,8 @@ func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx 
 		}
 
 		if err := w.Start(cancelCtx); err != nil {
+			// Because we cancel this context, this Start cannot be retried. Informers that
+			// managed to start are stopped and can never be restarted.
 			cancel()
 			transaction.Rollback()
 			return err
