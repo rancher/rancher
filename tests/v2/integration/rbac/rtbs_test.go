@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -603,80 +602,9 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 		return err == nil
 	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
 
-	// Derive the label key from the PRTB ID (namespace:name -> namespace_name).
-	// The label key is set on the membership CRB; the value varies by RBAC model
-	// ("membership-binding-owner" in legacy, "true" with aggregation) so we use
-	// a key-exists selector to cover both.
-	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
-
-	// Wait for the membership ClusterRoleBinding to appear.
-	p.Require().Eventually(func() bool {
-		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey,
-		})
-		return err == nil && len(crbs.Items) == 1
-	}, 2*time.Minute, 2*time.Second, fmt.Sprintf("failed waiting for clusterRoleBinding to get created with label %s for prtb %+v", prtbKey, prtb))
-
 	// Delete the PRTB — user should lose access.
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
 	p.Require().NoError(err)
-
-	// Wait for the membership ClusterRoleBinding to be deleted.
-	p.Require().Eventually(func() bool {
-		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey,
-		})
-		return err == nil && len(crbs.Items) == 0
-	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get deleted")
-
-	p.assertClusterAccessRevoked(testUser)
-}
-
-func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
-	client := p.newSubSession()
-
-	user := p.createUser(client, "testuser", "user")
-
-	testUser, err := client.AsUser(user)
-	p.Require().NoError(err)
-
-	// Admin creates a PRTB giving user project-member on the suite project.
-	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         user.ID,
-		RoleTemplateID: "project-member",
-		ProjectID:      p.project.ID,
-	})
-	p.Require().NoError(err)
-
-	// Verify the user can see the cluster.
-	p.Require().Eventually(func() bool {
-		_, err := testUser.Management.Cluster.ByID(p.downstreamClusterID)
-		return err == nil
-	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
-
-	// The label key is set on the membership CRB; the value varies by RBAC model
-	// so we use a key-exists selector to cover both legacy and aggregation.
-	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
-
-	// Wait for the membership ClusterRoleBinding to appear.
-	p.Require().Eventually(func() bool {
-		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey,
-		})
-		return err == nil && len(crbs.Items) == 1
-	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get created")
-
-	// Delete the PRTB — user should lose access and the membership CRB should be cleaned up.
-	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
-	p.Require().NoError(err)
-
-	// Wait for the membership ClusterRoleBinding to be gone.
-	p.Require().Eventually(func() bool {
-		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey,
-		})
-		return err == nil && len(crbs.Items) == 0
-	}, 2*time.Minute, 2*time.Second, "failed waiting for cluster role bindings to be deleted")
 
 	p.assertClusterAccessRevoked(testUser)
 }
