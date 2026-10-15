@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -17,12 +17,12 @@ import (
 
 type clusterHandler struct {
 	cluster          *config.UserContext
-	pnpLister        v3.ProjectNetworkPolicyLister
+	pnpLister        mgmtcontrollers.ProjectNetworkPolicyLister
 	podLister        wcore.PodCache
 	serviceLister    wcore.ServiceCache
-	pLister          v3.ProjectLister
-	clusters         v3.ClusterInterface
-	pnps             v3.ProjectNetworkPolicyInterface
+	pLister          mgmtcontrollers.ProjectLister
+	clusters         mgmtcontrollers.ClusterInterface
+	pnps             mgmtcontrollers.ProjectNetworkPolicyInterface
 	npmgr            *netpolMgr
 	clusterNamespace string
 }
@@ -32,10 +32,10 @@ clusterHandler enqueues resources for creating/deleting network policies
 based on cluster.Annotations[netPolAnnotation] and sets status if successful
 */
 
-func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (ch *clusterHandler) Sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
 		cluster.Name != ch.clusterNamespace || !ch.cluster.IsCluster(cluster) ||
-		!v32.ClusterConditionReady.IsTrue(cluster) {
+		!apimgmtv3.ClusterConditionReady.IsTrue(cluster) {
 		return nil, nil
 	}
 
@@ -77,7 +77,7 @@ func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object,
 	return nil, nil
 }
 
-func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
+func (ch *clusterHandler) createNetworkPolicies(cluster *mgmtcontrollers.Cluster) error {
 	projects, err := ch.pLister.List(cluster.Name, labels.NewSelector())
 	if err != nil {
 		return fmt.Errorf("projectLister: %v", err)
@@ -130,7 +130,7 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 
 // deleteNetworkPolicies removes Rancher created NetworkPolicy resources from the downstream cluster and
 // removes ProjectNetworkPolicy resources from the management cluster
-func (ch *clusterHandler) deleteNetworkPolicies(cluster *v3.Cluster) error {
+func (ch *clusterHandler) deleteNetworkPolicies(cluster *mgmtcontrollers.Cluster) error {
 	// consider nps for deletion if they were created by Rancher, i.e. they have a label: "cattle.io/creator": "norman"
 	set := labels.Set(map[string]string{creatorLabel: creatorNorman})
 	nps, err := ch.npmgr.npLister.List("", set.AsSelector())

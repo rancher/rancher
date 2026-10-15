@@ -12,8 +12,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types/slice"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
@@ -44,15 +45,15 @@ var excludedComponentMap = map[string][]string{
 var componentStatusDisabledRange, _ = semver.ParseRange(">=1.22.0")
 
 type ClusterControllerLifecycle interface {
-	Stop(cluster *v3.Cluster)
+	Stop(cluster *apimgmtv3.Cluster)
 }
 
 type HealthSyncer struct {
 	ctx               context.Context
 	clusterName       string
 	clusterUID        types.UID
-	clusterLister     v3.ClusterLister
-	clusters          v3.ClusterInterface
+	clusterLister     mgmtcontrollers.ClusterLister
+	clusters          mgmtcontrollers.ClusterInterface
 	componentStatuses generic.NonNamespacedClientInterface[*v1.ComponentStatus, *v1.ComponentStatusList]
 	unversionedClient rest.Interface
 }
@@ -80,7 +81,7 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 	}
 }
 
-func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
+func (h *HealthSyncer) getComponentStatus(cluster *apimgmtv3.Cluster) error {
 	// Prior to k8s v1.14, we only needed to list the ComponentStatuses from the user cluster.
 	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
 	// Newer k8s versions have dedicated health endpoints that aggregate checks from other subsystems, including etcd.
@@ -88,7 +89,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
-	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
+	cluster.Status.ComponentStatuses = []apimgmtv3.ClusterComponentStatus{}
 	if cluster.Status.Version == nil {
 		return nil
 	}
@@ -160,13 +161,13 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 	cluster := oldCluster.DeepCopy()
-	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Debugf("Skip updating cluster health - cluster [%s] not provisioned yet", h.clusterName)
 		return nil
 	}
 
 	// cluster condition ready is set to false if connected is false, return to avoid setting it to true incorrectly
-	if v32.ClusterConditionConnected.IsFalse(cluster) {
+	if apimgmtv3.ClusterConditionConnected.IsFalse(cluster) {
 		logrus.Debugf("Skip updating cluster condition ready - cluster agent for [%s] isn't connected yet", h.clusterName)
 		return nil
 	}
@@ -177,7 +178,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 
-	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
+	newObj, err := apimgmtv3.ClusterConditionProbeSucceeded.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
 			if err == nil || i > 1 {
@@ -191,14 +192,16 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		}
 	})
 
+	obj := newObj.(*apimgmtv3.Cluster)
 	if err == nil {
-		v32.ClusterConditionWaiting.True(newObj)
-		v32.ClusterConditionWaiting.Message(newObj, "")
+		apimgmtv3.ClusterConditionWaiting.True(obj)
+		apimgmtv3.ClusterConditionWaiting.Message(obj, "")
 	}
 
-	if !reflect.DeepEqual(oldCluster, newObj) {
+	pkgcluster.SummarizeCondition(obj)
+
+	if !reflect.DeepEqual(oldCluster, obj) {
 		logrus.Tracef("[healthSyncer] update cluster %s", cluster.Name)
-		obj := newObj.(*v3.Cluster)
 		if _, err := h.clusters.UpdateStatus(obj); err != nil {
 			return errors.Wrapf(err, "[updateClusterHealth] Failed to update cluster [%s]", cluster.Name)
 		}
@@ -209,12 +212,12 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	return nil
 }
 
-func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {
+func (h *HealthSyncer) getCluster() (*apimgmtv3.Cluster, error) {
 	return h.clusterLister.Get("", h.clusterName)
 }
 
-func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v32.ClusterComponentStatus {
-	return &v32.ClusterComponentStatus{
+func convertToClusterComponentStatus(cs *v1.ComponentStatus) *apimgmtv3.ClusterComponentStatus {
+	return &apimgmtv3.ClusterComponentStatus{
 		Name:       cs.Name,
 		Conditions: cs.Conditions,
 	}

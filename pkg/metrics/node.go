@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,7 +39,7 @@ var (
 )
 
 const (
-	reportInterval = time.Duration(15 * time.Second)
+	reportInterval = 15 * time.Second
 	logPrefix      = "[prometheus-node-metrics]"
 )
 
@@ -91,7 +90,7 @@ const (
 )
 
 // getNodeInfo uses the v3.Node object and it's corresponding v3.Cluster object to get metric info for a node
-func (m *nodeMetrics) getNodeInfo(node *v3.Node) (*nodeInfo, error) {
+func (m *nodeMetrics) getNodeInfo(node *apimgmtv3.Node) (*nodeInfo, error) {
 	cluster, err := m.clusterCache.Get(node.ObjClusterName())
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster %s for node %s, %v", node.ObjClusterName(), node.Name, err)
@@ -103,8 +102,8 @@ func (m *nodeMetrics) getNodeInfo(node *v3.Node) (*nodeInfo, error) {
 		return nil, fmt.Errorf("associated cluster for node: %s/%s is being deleted", node.Namespace, node.Name)
 	}
 
-	// a node is considered to be active if it is ready and it belongs to a ready cluster
-	isActive := v32.ClusterConditionReady.IsTrue(cluster) && v32.NodeConditionReady.IsTrue(node)
+	// a node is considered to be active if it is ready, and it belongs to a ready cluster
+	isActive := apimgmtv3.ClusterConditionReady.IsTrue(cluster) && apimgmtv3.NodeConditionReady.IsTrue(node)
 
 	provider := cluster.Status.Provider
 	if provider == "" {
@@ -121,7 +120,7 @@ func (m *nodeMetrics) getNodeInfo(node *v3.Node) (*nodeInfo, error) {
 	}, nil
 }
 
-func getNodeCoreCount(node *v3.Node) int {
+func getNodeCoreCount(node *apimgmtv3.Node) int {
 	nodeCap := node.Status.InternalNodeStatus.Capacity
 	if nodeCap == nil || nodeCap.Cpu() == nil {
 		return 0
@@ -138,8 +137,8 @@ func getNodeCoreCount(node *v3.Node) int {
 // setMetrics uses a slice of nodeInfo to set prometheus metrics for nodes and node cores
 func setMetrics(infos []*nodeInfo) {
 	// count nodes and node cores, bucketed by label values
-	nodeGauges := make(map[nodeLabelValues]int, 0)
-	nodeCoreGauges := make(map[nodeLabelValues]int, 0)
+	nodeGauges := make(map[nodeLabelValues]int)
+	nodeCoreGauges := make(map[nodeLabelValues]int)
 	for _, info := range infos {
 		key := info.labelValues
 		_, ok := nodeGauges[key]
@@ -162,7 +161,7 @@ func setMetrics(infos []*nodeInfo) {
 	numNodes.Reset()
 	numCores.Reset()
 
-	// use the built nodeGagues map to update prometheus metrics for nodes
+	// use the built nodeGauges map to update prometheus metrics for nodes
 	for k, v := range nodeGauges {
 		l := prometheus.Labels{
 			nodeProviderLabel:  k.provider,

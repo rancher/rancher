@@ -96,7 +96,7 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	// used because it treats a non-existent conditions as False
 	if hasSession && v3.ClusterConditionConnected.IsTrue(cluster) {
 		return nil
-	} else if !hasSession && v3.ClusterConditionConnected.IsFalse(cluster) && v3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
+	} else if !hasSession && v3.ClusterConditionConnected.IsFalse(cluster) {
 		return nil
 	}
 
@@ -115,22 +115,20 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 	if cluster == nil {
 		return fmt.Errorf("cluster cannot be nil")
 	}
+
+	clusterName := cluster.Name
 	for range 3 {
-		latestCluster, err := c.clusters.Get(cluster.Name, metav1.GetOptions{})
+		cluster, err := c.clusters.Get(clusterName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		v3.ClusterConditionConnected.SetStatusBool(latestCluster, connected)
-		if !connected && v3.ClusterConditionProvisioned.IsTrue(latestCluster) {
-			// For v2prov clusters, only update Ready when the condition is not being managed by the provisioner.
-			if !latestCluster.Status.ReadyReconciling {
-				v3.ClusterConditionReady.False(latestCluster)
-				v3.ClusterConditionReady.Reason(latestCluster, "Disconnected")
-				v3.ClusterConditionReady.Message(latestCluster, "Cluster agent is not connected")
-			}
-		}
+
+		v3.ClusterConditionConnected.SetStatusBool(cluster, connected)
+		pkgcluster.SummarizeCondition(cluster)
+
 		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
-		_, err = c.clusters.UpdateStatus(latestCluster)
+
+		_, err = c.clusters.UpdateStatus(cluster)
 		if apierror.IsConflict(err) {
 			continue
 		}

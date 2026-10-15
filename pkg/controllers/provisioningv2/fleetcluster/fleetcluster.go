@@ -181,9 +181,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 
 func (h *handler) ensureNamespace(name string) error {
 	_, err := h.namespacesClient.Create(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
@@ -211,6 +209,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		return nil, status, err
 	}
 
+	// todo(jhyde): validate this is the right condition
 	if !apimgmtv3.ClusterConditionReady.IsTrue(mgmtCluster) {
 		return nil, status, generic.ErrSkip
 	}
@@ -246,10 +245,8 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		labels["name"] = "local"
 		// default cluster group, used if fleet bundle has no targets, uses hardcoded name label
 		objs = append(objs, &fleet.ClusterGroup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "default",
-				Namespace: cluster.Namespace,
-			},
+			Name:      "default",
+			Namespace: cluster.Namespace,
 			Spec: fleet.ClusterGroupSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"name": "local"},
@@ -292,12 +289,10 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	}
 
 	return append(objs, &fleet.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Name,
-			Namespace:   mgmtCluster.Spec.FleetWorkspaceName,
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Name:        cluster.Name,
+		Namespace:   mgmtCluster.Spec.FleetWorkspaceName,
+		Labels:      labels,
+		Annotations: annotations,
 		Spec: fleet.ClusterSpec{
 			KubeConfigSecret:             clientSecret,
 			KubeConfigSecretNamespace:    cluster.Namespace,

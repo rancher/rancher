@@ -145,7 +145,7 @@ func newCloudCredential(namespace, credName string, data map[string]string) *cor
 	}
 	return &corev1.Secret{
 		Namespace: namespace, Name: credName,
-		Data:       secretData,
+		Data: secretData,
 	}
 }
 
@@ -423,7 +423,7 @@ func TestCAPRKE2Adapter_S3(t *testing.T) {
 	}, nil)
 	secretCache.EXPECT().Get("fleet-default", "s3-ca").Return(&corev1.Secret{
 		Namespace: "fleet-default", Name: "s3-ca",
-		Data:       map[string][]byte{"ca.pem": []byte("ca-content")},
+		Data: map[string][]byte{"ca.pem": []byte("ca-content")},
 	}, nil)
 
 	adapter := newCAPRKE2TestAdapter(secretCache, &controlplanev1beta2.EtcdS3{
