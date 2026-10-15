@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
@@ -124,32 +125,34 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
-// markNotReady sets the Ready condition of cluster to False with the given reason, and cause as the
-// message. It only touches the cluster it was given: if the object with that name has since been
-// deleted, or replaced by a new cluster with the same name, it does nothing. It does not stop
-// anything; callers decide what to stop.
-func (m *Manager) markNotReady(cluster *apimgmtv3.Cluster, reason string, cause error) {
+func (m *Manager) MarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
 	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Debugf("[clustermanager] not marking cluster %s not ready: %v", cluster.Name, err)
 		return
 	}
+
 	if current.UID != cluster.UID {
 		logrus.Debugf("[clustermanager] not marking cluster %s not ready: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
 		return
 	}
 
-	message := cause.Error()
-	if apimgmtv3.ClusterConditionReady.IsFalse(current) &&
-		apimgmtv3.ClusterConditionReady.GetReason(current) == reason &&
-		apimgmtv3.ClusterConditionReady.GetMessage(current) == message {
-		return
+	if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(cluster) {
+		apimgmtv3.ClusterConditionControllersRunning.False(cluster)
+		pkgcluster.SummarizeCondition(cluster)
+		_, _ = m.clusters.UpdateStatus(cluster)
 	}
-	apimgmtv3.ClusterConditionReady.False(current)
-	apimgmtv3.ClusterConditionReady.Reason(current, reason)
-	apimgmtv3.ClusterConditionReady.Message(current, message)
-	if _, err := m.clusters.UpdateStatus(current); err != nil {
-		logrus.Warnf("[clustermanager] failed to mark cluster %s not ready: %v", cluster.Name, err)
+
+	m.Stop(cluster)
+}
+
+func (m *Manager) MarkControllersRunning(clusterName string) {
+	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
+		if !apimgmtv3.ClusterConditionControllersRunning.IsTrue(cluster) {
+			apimgmtv3.ClusterConditionControllersRunning.True(cluster)
+			pkgcluster.SummarizeCondition(cluster)
+			_, _ = m.clusters.UpdateStatus(cluster)
+		}
 	}
 }
 
@@ -167,7 +170,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.markNotReady(cluster, reasonUserControllersFailed, err)
+		m.MarkControllersNotRunning(cluster)
 		m.Stop(cluster)
 		return nil, err
 	}
@@ -182,7 +185,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		clusterRecord.cancel()
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.markNotReady(cluster, reasonUserControllersFailed, err)
+		m.MarkControllersNotRunning(cluster)
 		m.Stop(cluster)
 		return nil, err
 	}
@@ -200,7 +203,17 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !r.started {
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
-				m.handleStartFailure(r, err)
+				m.stopRecord(r)
+				// only mark running/not running for owner instance
+				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
+				if clusterOwner {
+					m.MarkControllersNotRunning(r.clusterRec)
+				}
+				m.Stop(r.clusterRec)
+			} else {
+				if clusterOwner {
+					m.MarkControllersRunning(r.clusterRec.Name)
+				}
 			}
 		}()
 		r.started = true
@@ -228,9 +241,7 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 // cluster's connection details changed while it was starting, and the replacement must keep running.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-	if reason, report := classifyStartError(r.ctx, err); report {
-		m.markNotReady(r.clusterRec, reason, err)
-	}
+	m.MarkControllersNotRunning(r.clusterRec)
 	m.stopRecord(r)
 }
 
@@ -266,7 +277,8 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 				if rec.ctx.Err() != nil || errors.Is(err, dialer.ErrAgentDisconnected) {
 					return err
 				}
-				return fmt.Errorf("%w: %w", errAPIServerUnreachable, err)
+				m.MarkControllersNotRunning(rec.clusterRec)
+				return err
 			}
 			select {
 			case <-rec.ctx.Done():
@@ -334,7 +346,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	select {
 	case <-time.After(10 * time.Minute):
 		rec.cancel()
-		return errControllersSyncTimeout
+		return errors.New("timed out waiting for cluster controllers to start")
 	case err := <-done:
 		return err
 	}
