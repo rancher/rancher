@@ -217,6 +217,7 @@ func TestDeleteLimitRangeAnnotation(t *testing.T) {
 }
 
 func TestSetValidated(t *testing.T) {
+	const statusAnnotationForTest = "cattle.io/status"
 	t.Run("setup changes, second identical not", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		nsMock := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
@@ -241,17 +242,18 @@ func TestSetValidated(t *testing.T) {
 		nsMock := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
 		nsMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(ns *corev1.Namespace) (*corev1.Namespace, error) {
 			return ns, nil
-		}).Times(2)
+		}).Times(1)
 		sc := SyncController{Namespaces: nsMock}
 
-		ns, err := sc.setValidated(&corev1.Namespace{}, false, "Negative")
-		assert.NoError(t, err)
+		// seeded with an old timestamp, so a rewrite would be observable
+		ns := &corev1.Namespace{}
+		assert.NoError(t, namespaceutil.SetNamespaceCondition(ns, -time.Hour, ResourceQuotaValidatedCondition, false, "Negative"))
+		orig := ns.Annotations[statusAnnotationForTest]
 
-		// the condition timestamp has second resolution, cross a boundary
-		time.Sleep(1100 * time.Millisecond)
+		// identical status and message: no client call, annotation untouched
 		same, err := sc.setValidated(ns, false, "Negative")
 		assert.NoError(t, err)
-		assert.Equal(t, ns.Annotations, same.Annotations)
+		assert.Equal(t, orig, same.Annotations[statusAnnotationForTest])
 
 		// different message is written
 		_, err = sc.setValidated(ns, false, "Oversubscribed")
