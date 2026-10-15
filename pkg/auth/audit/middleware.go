@@ -17,7 +17,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			}
 
 			reqTimestamp := time.Now().Format(time.RFC3339)
-			user := getUserInfo(req)
+			user := getUserInfo(req, auditLog.includeUsername != nil && auditLog.includeUsername())
 			keepReqBody := auditLog.level >= auditlogv1.LevelRequest
 			scim := &scimRecord{keepBody: keepReqBody}
 			ctx := context.WithValue(req.Context(), userKeyValue, user)
@@ -44,9 +44,9 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			respTimestamp := time.Now().Format(time.RFC3339)
 
-			auditLog.fillUsername(user)
-
 			verbosityLevel := auditLog.ResolveVerbosity(req.RequestURI)
+
+			auditLog.fillUsername(user)
 
 			auditUser := user
 			if auditLog.writer.ExcludeGroups {

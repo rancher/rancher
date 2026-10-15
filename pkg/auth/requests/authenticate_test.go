@@ -277,7 +277,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		out := &bytes.Buffer{}
 		writer, err := audit.NewWriter(out, audit.WriterOptions{})
 		require.NoError(t, err)
-		handler := ToAuthMiddleware(&authenticator)(audit.NewAuditLogMiddleware(writer)(
+		handler := ToAuthMiddleware(&authenticator)(audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(
 			NewAuthenticatedFilter(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))))
 
 		handler.ServeHTTP(httptest.NewRecorder(), req.Clone(req.Context()))

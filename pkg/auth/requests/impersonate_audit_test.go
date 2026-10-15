@@ -150,7 +150,7 @@ func TestImpersonationAuditUser(t *testing.T) {
 
 			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			ia := &ImpersonatingAuth{sar: sarMock}
-			handler := audit.NewAuditLogMiddleware(writer, resolver)(
+			handler := audit.NewAuditLogMiddleware(writer, resolver, audit.WithIncludeUsername(usernameEnabled))(
 				ia.ImpersonationMiddleware(NewAuthenticatedFilter(next)))
 
 			req := httptest.NewRequest(http.MethodGet, "/k8s/clusters/c-1/api", nil)
@@ -198,7 +198,7 @@ func TestImpersonationAuditUserKeepsAuthoritativeCallerName(t *testing.T) {
 
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	ia := &ImpersonatingAuth{sar: sarMock}
-	handler := audit.NewAuditLogMiddleware(writer)(ia.ImpersonationMiddleware(NewAuthenticatedFilter(next)))
+	handler := audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(ia.ImpersonationMiddleware(NewAuthenticatedFilter(next)))
 
 	req := httptest.NewRequest(http.MethodGet, "/k8s/clusters/c-1/api", nil)
 	req = req.WithContext(request.WithUser(req.Context(), callerInfo))

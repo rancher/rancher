@@ -36,6 +36,11 @@ type User struct {
 
 	// RequestGroups is the --as-group list
 	RequestGroups []string `json:"requestGroups,omitempty"`
+
+	// withUsername is whether Username and ImpersonatedBy are collected for this entry. It is decided
+	// once when the entry is created, from the audit-log-username feature, so when it is off no
+	// username is looked up or assigned.
+	withUsername bool
 }
 
 // Impersonator identifies the real authenticated caller of an impersonated request.
@@ -56,12 +61,18 @@ type Impersonator struct {
 // only the SCIM authenticator replaces it, so the content of existing entries does not change.
 func (u *User) SetIdentity(info user.Info) {
 	u.Name = info.GetName()
-	u.Username = UsernameFromInfo(info)
+	if u.withUsername {
+		u.Username = UsernameFromInfo(info)
+	}
 	u.Group = info.GetGroups()
 }
 
-// SetImpersonatedBy records real as the authenticated caller that impersonated the effective user.
+// SetImpersonatedBy records real as the authenticated caller that impersonated the effective user. It
+// does nothing unless usernames are collected for the entry.
 func (u *User) SetImpersonatedBy(real user.Info) {
+	if !u.withUsername {
+		return
+	}
 	u.ImpersonatedBy = &Impersonator{
 		Name:     real.GetName(),
 		Username: UsernameFromInfo(real),
@@ -114,7 +125,7 @@ func UsernameFromExtra(extra map[string][]string) string {
 // the entry is written, so the names are final. Users without a record, such as system identities,
 // keep an empty Username.
 func (lh *LoggingHandler) fillUsername(u *User) {
-	if lh.resolveUser == nil {
+	if !u.withUsername || lh.resolveUser == nil {
 		return
 	}
 	if u.Username == "" {
@@ -175,9 +186,9 @@ func UsernameFromInfo(info user.Info) string {
 	return UsernameFromExtra(info.GetExtra())
 }
 
-func getUserInfo(req *http.Request) *User {
+func getUserInfo(req *http.Request, withUsername bool) *User {
 	info, _ := request.UserFrom(req.Context())
-	u := &User{Extra: info.GetExtra()}
+	u := &User{Extra: info.GetExtra(), withUsername: withUsername}
 	u.SetIdentity(info)
 	return u
 }

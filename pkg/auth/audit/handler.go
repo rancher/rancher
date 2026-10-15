@@ -37,6 +37,16 @@ func WithUserResolver(resolve UserResolver) Option {
 	}
 }
 
+// WithIncludeUsername sets the function that tells whether the entries get the username of the user and
+// of the impersonator. It is called for every entry, so it can follow a feature flag. Without this
+// option the entries do not get them, so that the entry format only grows for those who opted in, as
+// log consumers may parse entries strictly.
+func WithIncludeUsername(enabled func() bool) Option {
+	return func(lh *LoggingHandler) {
+		lh.includeUsername = enabled
+	}
+}
+
 func NewAuditLogMiddleware(writer *Writer, opts ...Option) auth.Middleware {
 	lh := &LoggingHandler{
 		level:   writer.DefaultPolicyLevel,
@@ -54,7 +64,8 @@ type LoggingHandler struct {
 	level  auditlogv1.Level
 	writer *Writer
 
-	resolveUser UserResolver
+	resolveUser     UserResolver
+	includeUsername func() bool
 
 	errMap  map[string]time.Time
 	errLock *sync.Mutex

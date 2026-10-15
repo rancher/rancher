@@ -240,7 +240,7 @@ func TestAuthHeaderHandlerServeHTTPRefreshesAuditUsername(t *testing.T) {
 				})
 			}
 			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-			handler := audit.NewAuditLogMiddleware(writer)(swapUser(authHeaderHandler{next: next}))
+			handler := audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(swapUser(authHeaderHandler{next: next}))
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(request.WithUser(t.Context(), realCaller))
 			handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -332,7 +332,7 @@ func TestAuditUsernameFromAuthenticatorResponse(t *testing.T) {
 			}
 			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			handler := ToAuthMiddleware(filterTestAuthenticator{resp: tt.resp})(
-				audit.NewAuditLogMiddleware(writer)(swap(authHeaderHandler{next: next})))
+				audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(swap(authHeaderHandler{next: next})))
 
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 
@@ -358,3 +358,6 @@ type filterTestSubjectAccessReviewClient struct {
 func (s filterTestSubjectAccessReviewClient) Create(ctx context.Context, review *authv1.SubjectAccessReview, opts metav1.CreateOptions) (*authv1.SubjectAccessReview, error) {
 	return s.createFunc(ctx, review, opts)
 }
+
+// usernameEnabled stands in for the audit-log-username feature being enabled.
+func usernameEnabled() bool { return true }

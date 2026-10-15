@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -105,7 +106,7 @@ func TestGetUserInfoUsername(t *testing.T) {
 		Extra:  map[string][]string{"username": {"admin"}},
 	})
 
-	got := getUserInfo(req.WithContext(ctx))
+	got := getUserInfo(req.WithContext(ctx), true)
 
 	if got.Name != "user-abc" {
 		t.Fatalf("Name = %q, want user-abc", got.Name)
@@ -158,7 +159,7 @@ func TestGetUserInfoPrefersExplicitUsername(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(request.WithUser(req.Context(), info))
 
-	got := getUserInfo(req)
+	got := getUserInfo(req, true)
 
 	assert.Equal(t, "u-1", got.Name)
 	assert.Equal(t, "explicit", got.Username)
@@ -183,13 +184,14 @@ func TestFillUsername(t *testing.T) {
 		user     User
 		want     string
 	}{
-		{name: "username from the user record", resolver: resolver, user: User{Name: "u-local"}, want: "admin"},
-		{name: "display name when the record has no username", resolver: resolver, user: User{Name: "u-external"}, want: "Jane Doe"},
-		{name: "empty when the record has neither", resolver: resolver, user: User{Name: "u-nameless"}, want: ""},
-		{name: "empty when the user does not exist", resolver: resolver, user: User{Name: "system:unauthenticated"}, want: ""},
-		{name: "existing username is kept", resolver: resolver, user: User{Name: "u-local", Username: "from-extra"}, want: "from-extra"},
-		{name: "empty name is not resolved", resolver: resolver, user: User{}, want: ""},
-		{name: "no resolver", resolver: nil, user: User{Name: "u-local"}, want: ""},
+		{name: "username from the user record", resolver: resolver, user: User{Name: "u-local", withUsername: true}, want: "admin"},
+		{name: "display name when the record has no username", resolver: resolver, user: User{Name: "u-external", withUsername: true}, want: "Jane Doe"},
+		{name: "empty when the record has neither", resolver: resolver, user: User{Name: "u-nameless", withUsername: true}, want: ""},
+		{name: "empty when the user does not exist", resolver: resolver, user: User{Name: "system:unauthenticated", withUsername: true}, want: ""},
+		{name: "existing username is kept", resolver: resolver, user: User{Name: "u-local", Username: "from-extra", withUsername: true}, want: "from-extra"},
+		{name: "empty name is not resolved", resolver: resolver, user: User{withUsername: true}, want: ""},
+		{name: "no resolver", resolver: nil, user: User{Name: "u-local", withUsername: true}, want: ""},
+		{name: "usernames are off", resolver: resolver, user: User{Name: "u-local"}, want: ""},
 	}
 
 	for _, tt := range tests {
@@ -213,6 +215,7 @@ func TestUserSetIdentity(t *testing.T) {
 		Extra:          map[string][]string{"old": {"x"}},
 		ImpersonatedBy: &Impersonator{Name: "keep"},
 		RequestUser:    "as-user",
+		withUsername:   true,
 	}
 	u.SetIdentity(info)
 
@@ -234,7 +237,7 @@ func TestUserImpersonate(t *testing.T) {
 	real := &user.DefaultInfo{Name: "u-real", Groups: realGroups, Extra: map[string][]string{"username": {"alice"}, "requesttokenid": {"token-1"}}}
 	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"system:authenticated"}}
 
-	u := &User{Extra: real.Extra}
+	u := &User{Extra: real.Extra, withUsername: true}
 	u.SetIdentity(real)
 	u.Impersonate(real, effective)
 
@@ -333,13 +336,13 @@ func TestFillUsernameImpersonator(t *testing.T) {
 	}
 	lh := &LoggingHandler{resolveUser: resolver}
 
-	u := &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}}
+	u := &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}, withUsername: true}
 	lh.fillUsername(u)
 	assert.Equal(t, "target", u.Username)
 	assert.Equal(t, "Real Person", u.ImpersonatedBy.Username)
 
 	// An impersonator that already has a username keeps it.
-	u = &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice"}}
+	u = &User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice"}, withUsername: true}
 	lh.fillUsername(u)
 	assert.Equal(t, "alice", u.ImpersonatedBy.Username)
 }
@@ -366,7 +369,7 @@ func TestMiddlewareFillsUsernameFromResolver(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			writer, out := newTestAuditWriter(auditlogv1.LevelNull)
-			handler := NewAuditLogMiddleware(writer, WithUserResolver(resolver))(
+			handler := NewAuditLogMiddleware(writer, WithUserResolver(resolver), WithIncludeUsername(func() bool { return true }))(
 				http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 
 			req := httptest.NewRequest(http.MethodGet, "/v3/clusters", nil)
@@ -387,4 +390,83 @@ func TestMiddlewareFillsUsernameFromResolver(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestMiddlewareOmitsUsernameByDefault checks that the entry format only grows when IncludeUsername
+// is set, and that no user lookup is made otherwise.
+func TestMiddlewareOmitsUsernameByDefault(t *testing.T) {
+	lookups := 0
+	resolver := func(string) (string, string, bool) {
+		lookups++
+		return "resolved", "", true
+	}
+
+	writer, out := newTestAuditWriter(auditlogv1.LevelNull)
+	handler := NewAuditLogMiddleware(writer, WithUserResolver(resolver))(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			u, ok := FromContext(req.Context())
+			require.True(t, ok)
+			u.Impersonate(
+				WithUsername(&user.DefaultInfo{Name: "u-real"}, "alice"),
+				&user.DefaultInfo{Name: "u-target", Extra: map[string][]string{"username": {"target"}}},
+			)
+		}))
+
+	req := httptest.NewRequest(http.MethodGet, "/v3/clusters", nil)
+	req = req.WithContext(request.WithUser(req.Context(), &user.DefaultInfo{Name: "u-real"}))
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	var entry struct {
+		User map[string]any `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+	assert.Equal(t, map[string]any{"name": "u-target"}, entry.User)
+	assert.Zero(t, lookups)
+}
+
+// TestMiddlewareUsernameFollowsToggle checks that the option is read for every entry, so that a
+// dynamic feature flag takes effect without a restart.
+func TestMiddlewareUsernameFollowsToggle(t *testing.T) {
+	enabled := false
+	writer, out := newTestAuditWriter(auditlogv1.LevelNull)
+	handler := NewAuditLogMiddleware(writer, WithIncludeUsername(func() bool { return enabled }))(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+
+	serve := func() map[string]any {
+		out.Reset()
+		req := httptest.NewRequest(http.MethodGet, "/v3/clusters", nil)
+		req = req.WithContext(request.WithUser(req.Context(), &user.DefaultInfo{
+			Name: "u-1", Extra: map[string][]string{"username": {"alice"}},
+		}))
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+
+		var entry struct {
+			User map[string]any `json:"user"`
+		}
+		require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+		return entry.User
+	}
+
+	assert.NotContains(t, serve(), "username")
+	enabled = true
+	assert.Equal(t, "alice", serve()["username"])
+	enabled = false
+	assert.NotContains(t, serve(), "username")
+}
+
+// TestUserWithoutUsernameAssignsNothing checks that when usernames are off the identity is still set,
+// but no username or impersonator is derived or assigned.
+func TestUserWithoutUsernameAssignsNothing(t *testing.T) {
+	real := WithUsername(&user.DefaultInfo{Name: "u-real", Extra: map[string][]string{"username": {"alice"}}}, "alice")
+	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"g"}, Extra: map[string][]string{"username": {"target"}}}
+
+	u := getUserInfo(httptest.NewRequest(http.MethodGet, "/", nil).WithContext(
+		request.WithUser(context.Background(), real)), false)
+	u.Impersonate(real, effective)
+	(&LoggingHandler{resolveUser: func(string) (string, string, bool) {
+		t.Error("the resolver must not be called")
+		return "", "", false
+	}}).fillUsername(u)
+
+	assert.Equal(t, &User{Name: "u-target", Group: []string{"g"}, Extra: real.GetExtra()}, u)
 }

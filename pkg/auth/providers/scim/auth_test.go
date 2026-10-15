@@ -462,7 +462,8 @@ func TestTokenAuthenticatorAuditUser(t *testing.T) {
 	}
 
 	// serve runs a request through the audit log middleware and the authenticator,
-	// as in production, and returns the written audit log entry.
+	// as in production, and returns the written audit log entry. Usernames are on, because that is the
+	// case in which the request user's username could leak into the SCIM entry.
 	serve := func(t *testing.T, secrets []*v1.Secret, token string, opts audit.WriterOptions, userInfo *user.DefaultInfo) map[string]any {
 		ctrl := gomock.NewController(t)
 		secretCache := fake.NewMockCacheInterface[*v1.Secret](ctrl)
@@ -483,7 +484,7 @@ func TestTokenAuthenticatorAuditUser(t *testing.T) {
 			_, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 		})
-		handler := audit.NewAuditLogMiddleware(writer)(auth.Authenticate(next))
+		handler := audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(func() bool { return true }))(auth.Authenticate(next))
 
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/u-abc", strings.NewReader(patchBody))
 		r.Header.Set("Content-Type", "application/scim+json")

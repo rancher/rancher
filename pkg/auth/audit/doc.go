@@ -81,6 +81,12 @@
 //
 // # Username
 //
+// [User].Username and ImpersonatedBy are opt-in, through [WithIncludeUsername], which Rancher
+// ties to the audit-log-username feature. It is read once when the entry is created. When it is off,
+// nothing is derived or assigned: no username or impersonator is set and no user lookup is made, so
+// entries keep their previous format for consumers that parse them strictly. The flag is meant to
+// become the default later.
+//
 // [User].Username, and ImpersonatedBy.Username, is the human-readable name. It
 // is chosen in this order:
 //
