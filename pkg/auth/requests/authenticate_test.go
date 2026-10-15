@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,6 +17,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
@@ -267,6 +269,25 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Equal(t, token.Name, resp.Extras[common.ExtraRequestTokenID][0])
 		require.Len(t, resp.Extras[common.ExtraRequestHost], 1)
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
+	})
+
+	t.Run("audit entry shows the username next to the user ID", func(t *testing.T) {
+		userRefresher.reset()
+
+		out := &bytes.Buffer{}
+		writer, err := audit.NewWriter(out, audit.WriterOptions{})
+		require.NoError(t, err)
+		handler := ToAuthMiddleware(&authenticator)(audit.NewAuditLogMiddleware(writer)(
+			NewAuthenticatedFilter(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))))
+
+		handler.ServeHTTP(httptest.NewRecorder(), req.Clone(req.Context()))
+
+		var entry struct {
+			User map[string]any `json:"user"`
+		}
+		require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+		assert.Equal(t, userID, entry.User["name"])
+		assert.Equal(t, "fake-user", entry.User["username"])
 	})
 
 	t.Run("groups only include the token's auth provider", func(t *testing.T) {
@@ -851,6 +872,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -1516,6 +1538,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)

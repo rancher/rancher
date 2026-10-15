@@ -260,6 +260,67 @@ func TestUserImpersonatedByJSON(t *testing.T) {
 	assert.JSONEq(t, `{"name":"u-target","impersonatedBy":{"name":"u-real","username":"alice","group":["g"]}}`, string(imp))
 }
 
+// TestUserJSONRoundTrip pins the wire format of the audit User. Log consumers parse these keys, so
+// existing ones must not change and new ones must stay additive and omitted when empty.
+func TestUserJSONRoundTrip(t *testing.T) {
+	tests := []struct {
+		name string
+		user User
+		want string
+	}{
+		{
+			name: "empty",
+			user: User{},
+			want: `{}`,
+		},
+		{
+			name: "username is additive to the existing keys",
+			user: User{Name: "user-h9q7h", Username: "alice", Group: []string{"g1"}, Extra: map[string][]string{"username": {"alice"}}},
+			want: `{"name":"user-h9q7h","username":"alice","group":["g1"],"extra":{"username":["alice"]}}`,
+		},
+		{
+			name: "no username keeps the previous shape",
+			user: User{Name: "system:unauthenticated", Group: []string{"system:unauthenticated"}},
+			want: `{"name":"system:unauthenticated","group":["system:unauthenticated"]}`,
+		},
+		{
+			name: "impersonation",
+			user: User{
+				Name: "u-target", Username: "target", Group: []string{"g-target"},
+				Extra:          map[string][]string{"principalid": {"p"}},
+				ImpersonatedBy: &Impersonator{Name: "u-real", Username: "alice", Group: []string{"g-real"}},
+				RequestUser:    "u-target", RequestGroups: []string{"g-target"},
+			},
+			want: `{"name":"u-target","username":"target","group":["g-target"],"extra":{"principalid":["p"]},` +
+				`"impersonatedBy":{"name":"u-real","username":"alice","group":["g-real"]},` +
+				`"requestUser":"u-target","requestGroups":["g-target"]}`,
+		},
+		{
+			name: "impersonator without username or groups",
+			user: User{Name: "u-target", ImpersonatedBy: &Impersonator{Name: "u-real"}},
+			want: `{"name":"u-target","impersonatedBy":{"name":"u-real"}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := json.Marshal(&tt.user)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(data))
+
+			var got User
+			require.NoError(t, json.Unmarshal(data, &got))
+			assert.Equal(t, tt.user, got)
+		})
+	}
+
+	t.Run("entries written before username existed still parse", func(t *testing.T) {
+		var got User
+		require.NoError(t, json.Unmarshal([]byte(`{"name":"user-abc","group":["g"],"extra":{"k":["v"]}}`), &got))
+		assert.Equal(t, User{Name: "user-abc", Group: []string{"g"}, Extra: map[string][]string{"k": {"v"}}}, got)
+	})
+}
+
 func TestFillUsernameImpersonator(t *testing.T) {
 	resolver := func(id string) (string, string, bool) {
 		switch id {
