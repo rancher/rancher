@@ -190,7 +190,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	var err error
 	cluster = cluster.DeepCopy()
 	if masterPlan.Name == "" && workerPlan.Name == "" {
-		if pkgcluster.Enabled(cluster) {
+		if pkgcluster.ImportedVersionManagementEnabled(cluster) {
 			// enter upgrading state
 			if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
 				mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
@@ -219,7 +219,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 		c := strategy.ServerConcurrency
-		if !pkgcluster.Enabled(cluster) {
+		if !pkgcluster.ImportedVersionManagementEnabled(cluster) {
 			c = int(masterPlan.Spec.Concurrency)
 		}
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
@@ -231,7 +231,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	if workerPlan.Name != "" && len(workerPlan.Status.Applying) > 0 {
 		mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 		c := strategy.WorkerConcurrency
-		if !pkgcluster.Enabled(cluster) {
+		if !pkgcluster.ImportedVersionManagementEnabled(cluster) {
 			c = int(workerPlan.Spec.Concurrency)
 		}
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",

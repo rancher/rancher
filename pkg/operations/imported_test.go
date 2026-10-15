@@ -1592,7 +1592,7 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 
 			latest, err := clusters.Get("c-mine", metav1.GetOptions{})
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantPaused, cluster.Paused(latest))
+			assert.Equal(t, tt.wantPaused, cluster.ImportedVersionManagementPaused(latest))
 
 			if !tt.wantPaused && tt.wantUpdate {
 				assert.NotContains(t, latest.Annotations, anno, "unpausing must remove the annotation, not blank it")

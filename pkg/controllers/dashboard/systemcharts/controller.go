@@ -404,7 +404,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = pkgcluster.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -413,7 +413,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = pkgcluster.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				toInstall := versionManagementEnabled && toEnable
@@ -447,7 +447,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = pkgcluster.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -456,7 +456,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = pkgcluster.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				toUninstall := !versionManagementEnabled && noManagedPlan

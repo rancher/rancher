@@ -5,17 +5,17 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 )
 
-// Paused reports whether version management is currently suspended for the cluster. Unlike Enabled
+// ImportedVersionManagementPaused reports whether version management is currently suspended for the cluster. Unlike ImportedVersionManagementEnabled
 // this has no cluster-independent default: absent means not paused.
-func Paused(cluster *v3.Cluster) bool {
+func ImportedVersionManagementPaused(cluster *v3.Cluster) bool {
 	if cluster == nil {
 		return false
 	}
 	return cluster.Annotations[v3.ClusterImportedVersionManagementPausedAnnotation] == "true"
 }
 
-// Enabled checks if version management is enabled for a given cluster
-func Enabled(cluster *v3.Cluster) bool {
+// ImportedVersionManagementEnabled checks if version management is enabled for a given cluster
+func ImportedVersionManagementEnabled(cluster *v3.Cluster) bool {
 	if cluster == nil {
 		return false
 	}

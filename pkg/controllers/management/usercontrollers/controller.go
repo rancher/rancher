@@ -440,10 +440,8 @@ func (c *ClusterLifecycleCleanup) createCleanupImagePullSecrets(userContext *con
 		defaultPullSecretName := name.SafeConcatName("cattle-cleanup", pkgcluster.GeneratePullSecretName(sec.Name), cluster.Name)
 
 		s := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultPullSecretName,
-				Namespace: "default",
-			},
+			Name:      defaultPullSecretName,
+			Namespace: "default",
 			Data: map[string][]byte{
 				corev1.DockerConfigJsonKey: data,
 			},

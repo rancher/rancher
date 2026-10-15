@@ -246,6 +246,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desire
 	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
+
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth || cluster.Status.AssetsImage != desiredCharts
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
@@ -520,7 +521,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
 	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
-	desiredCharts := systemtemplate.GetDesiredAssetsImage(cluster)
+	desiredAssets := systemtemplate.GetDesiredAssetsImage(cluster)
 	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
@@ -553,7 +554,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
-	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredCharts, desiredFeatures, desiredTaints)
+	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredAssets, desiredFeatures, desiredTaints)
 	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated || hashChanged || tokenHashChanged
 
 	if !agentManifestChanged && !pcChanged {
@@ -600,13 +601,13 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredCharts, desiredFeatures, desiredTaints, pcExists)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredAssets, desiredFeatures, desiredTaints, pcExists)
 		if err != nil {
 			return cluster, err
 		}
 		logrus.Tracef("clusterDeploy: deployAgent: agent YAML: %v", string(yaml))
 		var output []byte
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			// This will fail almost always the first time because when we create the namespace in the file it won't have privileges.
 			// This allows for 5*5 seconds for the cluster to be ready to apply the agent YAML before erroring out
 			logrus.Tracef("clusterDeploy: deployAgent: applying agent YAML for cluster [%s], try #%d: %v", cluster.Name, i+1, string(output))
@@ -653,9 +654,9 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.DesiredAuthImage == "fixed" {
 		cluster.Spec.DesiredAuthImage = desiredAuth
 	}
-	cluster.Status.AssetsImage = desiredCharts
+	cluster.Status.AssetsImage = desiredAssets
 	if cluster.Spec.DesiredAssetsImage == "fixed" {
-		cluster.Spec.DesiredAssetsImage = desiredCharts
+		cluster.Spec.DesiredAssetsImage = desiredAssets
 	}
 
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {

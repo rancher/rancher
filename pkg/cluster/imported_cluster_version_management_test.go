@@ -82,7 +82,7 @@ func TestVersionManagementEnabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Enabled(tt.args.cluster); got != tt.want {
+			if got := ImportedVersionManagementEnabled(tt.args.cluster); got != tt.want {
 				t.Errorf("Enabled() = %v, want %v", got, tt.want)
 			}
 		})
@@ -129,7 +129,7 @@ func TestPaused(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Paused(tt.cluster); got != tt.want {
+			if got := ImportedVersionManagementPaused(tt.cluster); got != tt.want {
 				t.Errorf("Paused() = %v, want %v", got, tt.want)
 			}
 		})
