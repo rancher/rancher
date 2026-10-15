@@ -235,7 +235,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 			return upd, err
 		}
 		if !isFit {
-			logrus.Debugf("CreateResourceQuota: namespace=%q update skipped, requested quota does not fit (isFit=%v)", ns.Name, isFit)
+			logrus.Debugf("CreateResourceQuota: namespace=%q update skipped, requested quota does not fit", ns.Name)
 			updated = upd
 			break
 		}
