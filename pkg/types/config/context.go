@@ -300,7 +300,7 @@ func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() 
 				return
 			}
 
-			logrus.Errorf("deferred controller start failed for cluster %s, rebuilding cluster controllers", w.ClusterName)
+			logrus.Errorf("deferred controller start failed for cluster %s: %v, rebuilding cluster controllers", w.ClusterName, err)
 			if w.OnDeferredStartError != nil {
 				w.OnDeferredStartError()
 			}
