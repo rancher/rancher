@@ -130,6 +130,7 @@ scopes:
       - '^pkg/serviceaccounttoken/'
       - '^pkg/systemtokens/'
       - '^pkg/taints/'
+      - '^pkg/types/config/'
       - '^pkg/wrangler/'
       - '^tests/v2prov/tests/general/'
       - '^tests/v2prov/tests/custom/'                 # also operations
