@@ -100,6 +100,7 @@ func TestSetAll(t *testing.T) {
 		assert.Equal(t, finalSetting.Default, test.newSetting.Default, failMsg)
 
 		// If the value is configured by an environment variable, then the source should be "env", otherwise it should be empty.
+		// This includes settings that were previously configured by an env var which has since been removed.
 		assert.True(t, finalSetting.Source == "env" == (test.envVar != nil), failMsg)
 
 		var expectedFallbackVal string
@@ -107,6 +108,10 @@ func TestSetAll(t *testing.T) {
 			// Environment variable takes precedence of everything. Setting's value should match as long as it was set.
 			assert.Equal(t, *test.envVar, finalSetting.Value, failMsg)
 			expectedFallbackVal = *test.envVar
+		} else if test.existingSetting != nil && test.existingSetting.Source == "env" {
+			// The env var that previously configured this setting is gone, so the stale env value must be discarded
+			// and the setting must fall back to its default.
+			assert.Equal(t, "", finalSetting.Value, failMsg)
 		} else if test.existingSetting != nil {
 			expectedFallbackVal = test.existingSetting.Value
 			assert.Equal(t, test.existingSetting.Value, finalSetting.Value, failMsg)
@@ -261,6 +266,32 @@ func populateTestCases() []*testCase {
 			existingSetting: &v3.Setting{
 				Value:   "somethingelse",
 				Default: "abc",
+				Source:  "env",
+			},
+		},
+		{
+			description: "test an existing setting with val and \"env\" source whose env var was removed drops the stale env value and source",
+			newDefVal:   "abc",
+			existingSetting: &v3.Setting{
+				Value:   "stale-env-value",
+				Default: "abc",
+				Source:  "env",
+			},
+		},
+		{
+			description: "test an existing setting with empty val and \"env\" source whose env var was removed drops the source",
+			newDefVal:   "abc",
+			existingSetting: &v3.Setting{
+				Default: "abc",
+				Source:  "env",
+			},
+		},
+		{
+			description: "test an existing setting with val and \"env\" source whose env var was removed also picks up the new default",
+			newDefVal:   "newDef",
+			existingSetting: &v3.Setting{
+				Value:   "stale-env-value",
+				Default: "oldDef",
 				Source:  "env",
 			},
 		},
