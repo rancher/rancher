@@ -67,9 +67,10 @@ type desiredKey struct {
 	installImageOverride string
 }
 
+// desiredValues has exported members for reflect.DeepEqual
 type desiredValues struct {
-	values        map[string]any
-	takeOwnership bool
+	Values        map[string]any
+	TakeOwnership bool
 }
 
 type desired struct {
@@ -243,7 +244,7 @@ func (m *Manager) installCharts(charts map[desiredKey]desiredValues) error {
 }
 
 func (m *Manager) installChart(key desiredKey, values desiredValues) error {
-	err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values.values, values.takeOwnership, key.installImageOverride)
+	err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values.Values, values.TakeOwnership, key.installImageOverride)
 	if errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
 		logrus.Errorf("Failed to find system chart %s, enqueuing chart refresh: %v", key.chartName, err)
 	} else if err != nil {
@@ -258,7 +259,7 @@ func (m *Manager) installChart(key desiredKey, values desiredValues) error {
 			}
 		})
 	}
-	return nil
+	return err
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
@@ -301,8 +302,8 @@ func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVer
 				installImageOverride: installImageOverride,
 			},
 			values: desiredValues{
-				values:        values,
-				takeOwnership: takeOwnership,
+				Values:        values,
+				TakeOwnership: takeOwnership,
 			},
 		}
 	}()
