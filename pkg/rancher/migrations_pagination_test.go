@@ -173,6 +173,8 @@ func TestMigrateEncryptionKeyRotationLeader_Pagination(t *testing.T) {
 		failPage     int
 		leaders      map[string]string // cluster name -> leader annotation
 		getErrs      map[string]error
+		statusErrs   map[string]error
+		updateErrs   map[string]error
 		wantErr      error
 		wantTokens   []string
 		wantStatuses []string
@@ -192,6 +194,29 @@ func TestMigrateEncryptionKeyRotationLeader_Pagination(t *testing.T) {
 			wantTokens:   []string{"", "token-page-1"},
 			wantStatuses: []string{"c3:leader-3"},
 			wantMigrated: true,
+		},
+		{
+			name:         "NotFound on the status update is skipped",
+			leaders:      map[string]string{"c1": "leader-1", "c3": "leader-3"},
+			statusErrs:   map[string]error{"c1": errMigNotFound},
+			wantTokens:   []string{"", "token-page-1"},
+			wantStatuses: []string{"c3:leader-3"},
+			wantMigrated: true,
+		},
+		{
+			name:         "NotFound on the control plane update is skipped",
+			leaders:      map[string]string{"c1": "leader-1", "c3": "leader-3"},
+			updateErrs:   map[string]error{"c1": errMigNotFound},
+			wantTokens:   []string{"", "token-page-1"},
+			wantStatuses: []string{"c1:leader-1", "c3:leader-3"},
+			wantMigrated: true,
+		},
+		{
+			name:       "other error on the status update stops the migration",
+			leaders:    map[string]string{"c1": "leader-1"},
+			statusErrs: map[string]error{"c1": errMigBoom},
+			wantErr:    errMigBoom,
+			wantTokens: []string{""},
 		},
 		{
 			name:       "control plane error stops the migration",
@@ -231,6 +256,9 @@ func TestMigrateEncryptionKeyRotationLeader_Pagination(t *testing.T) {
 				return obj, nil
 			}).AnyTimes()
 			cp.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(obj *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, error) {
+				if err := tc.statusErrs[obj.Name]; err != nil {
+					return nil, err
+				}
 				statuses = append(statuses, obj.Name+":"+obj.Status.RotateEncryptionKeysLeader)
 				return obj, nil
 			}).AnyTimes()
@@ -238,6 +266,9 @@ func TestMigrateEncryptionKeyRotationLeader_Pagination(t *testing.T) {
 				_, hasAnnotation := obj.Annotations[annotation]
 				assert.False(t, hasAnnotation, "the leader annotation must be removed")
 				updates = append(updates, obj.Name)
+				if err := tc.updateErrs[obj.Name]; err != nil {
+					return nil, err
+				}
 				return obj, nil
 			}).AnyTimes()
 
