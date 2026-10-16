@@ -253,9 +253,9 @@ func (s *StatsAggregator) updateVersion(cluster *apimgmtv3.Cluster) {
 // which will force a restart of the deployment. This annotation was used to stop handlers running from when the
 // cluster was running k8s 1.22, however this is applied to every newly created cluster causing unnecessary rollouts.
 func (s *StatsAggregator) removeLegacyUpgradedAnnotation(cluster *apimgmtv3.Cluster) error {
-	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
-	if err != nil {
-		return err
+	userContext, err := s.ClusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
+	if err != nil || userContext == nil {
+		return nil
 	}
 
 	deployment, err := userContext.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", metav1.GetOptions{})

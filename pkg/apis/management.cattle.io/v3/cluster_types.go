@@ -56,7 +56,7 @@ const (
 	// If none of the required conditions are set, Ready will be set to "Unknown" with a message indicating as such.
 	// When ClusterStatus.ReadyReconciling is true,
 	// It is imperative that any handler that modifies one of these conditions use the
-	// [github.com/rancher/rancher/pkg/cluster.SummarizeCondition] function to aggregate the ClusterConditionReady
+	// [github.com/rancher/rancher/pkg/cluster.SummarizeReadyCondition] function to aggregate the ClusterConditionReady
 	// condition.
 	ClusterConditionReady condition.Cond = "Ready"
 
