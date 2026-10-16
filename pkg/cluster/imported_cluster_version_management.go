@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 )
 

@@ -152,6 +152,7 @@ func turtlesMgmtCluster() *apimgmtv3.Cluster {
 func administratedMgmtCluster() *apimgmtv3.Cluster {
 	cluster := mgmtCluster()
 	cluster.Annotations = map[string]string{apimgmtv3.ClusterAdministratedAnnotation: "true"}
+	cluster.Status.Driver = apimgmtv3.ClusterDriverImported
 	return cluster
 }
 

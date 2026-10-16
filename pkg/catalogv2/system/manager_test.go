@@ -16,7 +16,7 @@ import (
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
 	release "helm.sh/helm/v4/pkg/release/v1"
-	repo "helm.sh/helm/v4/pkg/repo/v1"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,8 +31,10 @@ func TestManagerRemovesRelease(t *testing.T) {
 		exactVersion:         "1.2.0",
 		installImageOverride: "some-image",
 	}
-	charts := map[desiredKey]map[string]any{
-		webhook: {"foo": "bar"},
+	charts := map[desiredKey]desiredValues{
+		webhook: {
+			Values: map[string]any{"foo": "bar"},
+		},
 	}
 
 	manager := Manager{desiredCharts: charts}
@@ -40,7 +42,7 @@ func TestManagerRemovesRelease(t *testing.T) {
 	assert.Equal(t, charts, manager.desiredCharts)
 
 	manager.Remove("cattle-system", "rancher-webhook")
-	assert.Equal(t, map[desiredKey]map[string]any{}, manager.desiredCharts)
+	assert.Equal(t, map[desiredKey]desiredValues{}, manager.desiredCharts)
 
 	// Assert that the lookup of key to delete only needs namespace and name.
 	webhook = desiredKey{
@@ -48,10 +50,10 @@ func TestManagerRemovesRelease(t *testing.T) {
 		chartName:   "rancher-webhook",
 		releaseName: "rancher-webhook",
 	}
-	charts[webhook] = map[string]any{}
+	charts[webhook] = desiredValues{Values: map[string]any{}}
 	assert.Equal(t, charts, manager.desiredCharts)
 	manager.Remove("cattle-system", "rancher-webhook")
-	assert.Equal(t, map[desiredKey]map[string]any{}, manager.desiredCharts)
+	assert.Equal(t, map[desiredKey]desiredValues{}, manager.desiredCharts)
 }
 
 func TestStart(t *testing.T) {
@@ -214,10 +216,9 @@ func TestInstallCharts(t *testing.T) {
 		name            string
 		releases        []*release.Release
 		indexedReleases map[string]repo.ChartVersions
-		desiredCharts   map[desiredKey]map[string]any
-		takeOwnership   bool
+		desiredCharts   map[desiredKey]desiredValues
 		expectInstalls  map[string]bool
-		expectedErr     error
+		expectedErrors  map[string]error
 	}{
 		{
 			name:     "Updates charts to desired version",
@@ -227,7 +228,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
 				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2},
 			},
-			desiredCharts: map[desiredKey]map[string]any{
+			desiredCharts: map[desiredKey]desiredValues{
 				{
 					namespace:    "cattle-fleet-system",
 					chartName:    "fleet",
@@ -250,7 +251,6 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"rancher-webhook": true,
 				"fleet":           true,
@@ -265,7 +265,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
 				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2},
 			},
-			desiredCharts: map[desiredKey]map[string]any{
+			desiredCharts: map[desiredKey]desiredValues{
 				{
 					namespace:    "cattle-fleet-system",
 					chartName:    "fleet",
@@ -288,7 +288,6 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
@@ -303,7 +302,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
 				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2, &aksOperatorRepoV3},
 			},
-			desiredCharts: map[desiredKey]map[string]any{
+			desiredCharts: map[desiredKey]desiredValues{
 				{
 					namespace:    "cattle-fleet-system",
 					chartName:    "fleet",
@@ -326,7 +325,6 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
@@ -342,7 +340,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
 				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2, &aksOperatorRepoV3},
 			},
-			desiredCharts: map[desiredKey]map[string]any{
+			desiredCharts: map[desiredKey]desiredValues{
 				{
 					namespace:    "cattle-fleet-system",
 					chartName:    "fleet",
@@ -365,7 +363,6 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           true,
 				"rancher-webhook": true,
@@ -380,7 +377,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
 				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2},
 			},
-			desiredCharts: map[desiredKey]map[string]any{
+			desiredCharts: map[desiredKey]desiredValues{
 				{
 					namespace:    "cattle-fleet-system",
 					chartName:    "fleet",
@@ -403,7 +400,6 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           true,
 				"rancher-webhook": true,
@@ -418,7 +414,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
 				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV3},
 			},
-			desiredCharts: map[desiredKey]map[string]any{
+			desiredCharts: map[desiredKey]desiredValues{
 				{
 					namespace:   "cattle-fleet-system",
 					chartName:   "fleet",
@@ -444,13 +440,15 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
 				"aks-operator":    false,
 			},
-			expectedErr: errors.New("specified version 3.0.0+up1.2.3 doesn't exist in the index"),
+			expectedErrors: map[string]error{
+				"fleet":        errors.New("specified version 3.0.0+up1.2.3 doesn't exist in the index"),
+				"aks-operator": errors.New("no chart version found for aks-operator-2.0.0"),
+			},
 		},
 	}
 
@@ -501,9 +499,7 @@ func TestInstallCharts(t *testing.T) {
 						Return(&upgradeOp, nil)
 
 					pod := v1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
-						},
+						Name: "foo",
 						Status: v1.PodStatus{
 							ContainerStatuses: []v1.ContainerStatus{
 								{
@@ -534,12 +530,13 @@ func TestInstallCharts(t *testing.T) {
 				helmClient:    mockHelmClient,
 				operation:     mockOperationClient,
 			}
-
-			err := manager.installCharts(test.desiredCharts, test.takeOwnership)
-			if test.expectedErr == nil {
-				assert.NoError(t, err)
-			} else {
-				assert.Contains(t, err.Error(), test.expectedErr.Error())
+			for chart, values := range test.desiredCharts {
+				err := manager.installChart(chart, values)
+				if test.expectedErrors != nil && test.expectedErrors[chart.chartName] != nil {
+					assert.Contains(t, err.Error(), test.expectedErrors[chart.chartName].Error())
+				} else {
+					assert.NoError(t, err)
+				}
 			}
 		})
 	}

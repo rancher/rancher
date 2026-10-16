@@ -215,7 +215,7 @@ func (h *handler) setPriorityClass(values map[string]interface{}) {
 
 func (h *handler) setImagePullSecrets(values map[string]any) {
 	var pullSecretsAsStrings []string
-	registry, _ := clusterutil.GetPrivateRegistry(nil)
+	registry, _ := pkgcluster.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()
 	}
