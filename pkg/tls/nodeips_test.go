@@ -88,13 +88,13 @@ func TestCollectNodeIPs_Pagination(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:       "expired token on page 2 resumes",
+			name:       "expired token on page 2 returns an error and does not resume",
 			nodes:      []corev1.Node{node1, node2, node3},
 			pageSize:   2,
 			failPage:   2,
 			failErr:    paginationtest.ExpiredError("resume-token"),
-			wantTokens: []string{"", "token-page-1", "resume-token"},
-			wantIPs:    []string{"10.0.0.1", "198.51.100.1", "10.0.0.3", "198.51.100.3"},
+			wantTokens: []string{"", "token-page-1"},
+			wantErr:    true,
 		},
 	}
 

@@ -426,7 +426,8 @@ func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, 
 		return nil
 	}
 
-	err := pagination.EachPage(listNodes, metav1.ListOptions{}, processNodes)
+	// Use WithoutResume. A resumed list can skip a node and leave its address out of the certificate.
+	err := pagination.EachPage(listNodes, metav1.ListOptions{}, processNodes, pagination.WithoutResume())
 	if err != nil {
 		return nil, err
 	}
