@@ -799,6 +799,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 		pkgcluster.IsAdministrated(cluster) {
 		return false, false, nil // no-op
 	}
+
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
 	driver := cluster.Status.Driver
 	specChanged := false
@@ -810,19 +811,21 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 				break
 			}
 		}
+
 		if cluster.Status.Driver != apimgmtv3.ClusterDriverK3os {
 			cluster.Status.Driver = apimgmtv3.ClusterDriverK3s
 		}
+
 		// only set these values on init, and not for embedded clusters as those shouldn't be upgraded
-		if cluster.Spec.K3sConfig == nil && !isEmbedded {
-			cluster.Spec.K3sConfig = &apimgmtv3.K3sConfig{
-				Version: cluster.Status.Version.String(),
+		if (cluster.Spec.K3sConfig == nil || cluster.Spec.K3sConfig.Version == "") && !isEmbedded {
+			if cluster.Spec.K3sConfig == nil {
+				cluster.Spec.K3sConfig = &apimgmtv3.K3sConfig{}
 			}
+			cluster.Spec.K3sConfig.Version = cluster.Status.Version.String()
 			cluster.Spec.K3sConfig.SetStrategy(1, 1)
 			specChanged = true
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
-
 		_, err := p.DaemonsetLister.Get("cattle-system", "rancher")
 		if apierrors.IsNotFound(err) {
 			cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
@@ -833,10 +836,13 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 			statusChanged := driver != cluster.Status.Driver
 			return statusChanged, false, nil
 		}
-		if cluster.Spec.Rke2Config == nil {
-			cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{
-				Version: cluster.Status.Version.String(),
+
+		// only set these values on init, and not for embedded clusters as those shouldn't be upgraded
+		if (cluster.Spec.Rke2Config == nil || cluster.Spec.Rke2Config.Version == "") && !isEmbedded {
+			if cluster.Spec.Rke2Config == nil {
+				cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{}
 			}
+			cluster.Spec.Rke2Config.Version = cluster.Status.Version.String()
 			cluster.Spec.Rke2Config.SetStrategy(1, 1)
 			specChanged = true
 		}
