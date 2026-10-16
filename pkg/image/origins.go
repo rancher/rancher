@@ -261,6 +261,7 @@ var OriginMap = map[string]string{
 	"pushprox-proxy":                                          "https://github.com/rancher/PushProx",
 	"pushprox":                                                "https://github.com/rancher/PushProx",
 	"rancher":                                                 "https://github.com/rancher/rancher",
+	"rancher-server":                                          "https://github.com/rancher/rancher",
 	"rancher-agent":                                           "https://github.com/rancher/rancher",
 	"rancher-assets":                                          "https://github.com/rancher/rancher-assets",
 	"rancher-csp-adapter":                                     "https://github.com/rancher/csp-adapter",
