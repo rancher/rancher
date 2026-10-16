@@ -176,9 +176,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, token acc
 }
 
 func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	// The principal is looked up using the AuthConfig that issued it, which
-	// may not be the one that issued the token.
-	configName, _, _, err := common.SplitPrincipalID(principalID)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return v3.Principal{}, err
 	}

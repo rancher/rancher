@@ -2007,26 +2007,33 @@ func TestLoginUserPrincipalsUseConfigName(t *testing.T) {
 func TestGetPrincipal(t *testing.T) {
 	t.Parallel()
 
-	provider := &OpenIDCProvider{Name: ProviderName}
-	token := &apiv3.Token{
-		UserPrincipal: apiv3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_user://sub-0001"},
-			LoginName:     "sub-0001",
-			DisplayName:   "Developer",
-			PrincipalType: UserType,
-		},
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(false).AnyTimes()
+	provider := &OpenIDCProvider{Name: ProviderName, UserMGR: userManager}
+	newToken := func(principalID string) *apiv3.Token {
+		return &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+				LoginName:     "sub-0001",
+				DisplayName:   "Developer",
+				PrincipalType: UserType,
+			},
+		}
 	}
+	token := newToken("test-eu-oidc_user://sub-0001")
 
 	tests := []struct {
 		name        string
 		principalID string
 		token       accessor.TokenAccessor
 		want        apiv3.Principal
-		wantErr     bool
+		wantErr     string
 	}{
 		{
 			name:        "user principal for the default config",
 			principalID: "oidc_user://sub-0002",
+			token:       newToken("oidc_user://sub-0001"),
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0002"},
 				DisplayName:   "sub-0002",
@@ -2038,6 +2045,7 @@ func TestGetPrincipal(t *testing.T) {
 		{
 			name:        "user principal for an additional config",
 			principalID: "test-eu-oidc_user://sub-0002",
+			token:       token,
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_user://sub-0002"},
 				DisplayName:   "sub-0002",
@@ -2062,6 +2070,7 @@ func TestGetPrincipal(t *testing.T) {
 		{
 			name:        "group principal for an additional config",
 			principalID: "test-eu-oidc_group://admins",
+			token:       token,
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_group://admins"},
 				DisplayName:   "admins",
@@ -2070,17 +2079,36 @@ func TestGetPrincipal(t *testing.T) {
 			},
 		},
 		{
+			name:        "user principal for another config than the token",
+			principalID: "test-us-oidc_user://sub-0002",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "group principal for another config than the token",
+			principalID: "test-us-oidc_group://admins",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "default config principal with a token from an additional config",
+			principalID: "oidc_user://sub-0002",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
 			name:        "invalid principal type",
 			principalID: "test-eu-oidc_other://admins",
-			wantErr:     true,
+			token:       token,
+			wantErr:     "invalid principal type",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := provider.GetPrincipal(tt.principalID, tt.token)
-			if tt.wantErr {
-				require.Error(t, err)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
 				return
 			}
 

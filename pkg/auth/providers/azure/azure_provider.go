@@ -260,7 +260,7 @@ func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.
 
 func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	var principal apiv3.Principal
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return principal, err
 	}

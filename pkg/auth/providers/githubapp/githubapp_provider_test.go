@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/norman/httperror"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -618,4 +619,20 @@ func (f *fakeUserManager) IsMemberOf(token accessor.TokenAccessor, group apiv3.P
 
 func (f *fakeUserManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	return nil
+}
+
+func TestGetPrincipalRejectsOtherConfig(t *testing.T) {
+	// The provider has no clients configured, so this fails if the principal
+	// is looked up.
+	provider := &Provider{}
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "githubapp-corp_user://1"},
+		},
+	}
+
+	for _, principalID := range []string{"githubapp-it_user://2", "githubapp-it_group://3", "githubapp_user://2"} {
+		_, err := provider.GetPrincipal(principalID, token)
+		assert.True(t, httperror.IsNotFound(err), "expected NotFound for %s, got %v", principalID, err)
+	}
 }

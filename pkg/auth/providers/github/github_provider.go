@@ -342,7 +342,7 @@ const (
 )
 
 func (g *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return apiv3.Principal{}, err
 	}

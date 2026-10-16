@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 )
@@ -56,6 +57,29 @@ func ConfigNameFromToken(token accessor.TokenAccessor) (string, error) {
 	configName, _, _, err := SplitPrincipalID(tokenPrincipalID)
 	if err != nil {
 		return "", fmt.Errorf("invalid principal: %s", tokenPrincipalID)
+	}
+
+	return configName, nil
+}
+
+// ConfigNameForPrincipalLookup returns the name of the AuthConfig that issued
+// the token, which must be the one that issued the principal being looked up.
+//
+// It returns a NotFound error if the principal was issued by another AuthConfig
+// so that users of one AuthConfig can't look up the principals of another.
+func ConfigNameForPrincipalLookup(principalID string, token accessor.TokenAccessor) (string, error) {
+	configName, err := ConfigNameFromToken(token)
+	if err != nil {
+		return "", err
+	}
+
+	principalConfigName, _, _, err := SplitPrincipalID(principalID)
+	if err != nil {
+		return "", err
+	}
+
+	if principalConfigName != configName {
+		return "", httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("principal %s was not issued by %s", principalID, configName))
 	}
 
 	return configName, nil
