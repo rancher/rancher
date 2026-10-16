@@ -182,7 +182,7 @@ require (
 	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/aws-iam-authenticator v0.7.20
 	sigs.k8s.io/cluster-api v1.14.3
-	sigs.k8s.io/cluster-api/api v1.14.2
+	sigs.k8s.io/cluster-api/api v1.14.3
 	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2
 	sigs.k8s.io/yaml v1.6.0
