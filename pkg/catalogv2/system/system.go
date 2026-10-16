@@ -31,7 +31,7 @@ import (
 	"helm.sh/helm/v4/pkg/action"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
 	release "helm.sh/helm/v4/pkg/release/v1"
-	repo "helm.sh/helm/v4/pkg/repo/v1"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,7 +60,7 @@ type desiredKey struct {
 
 type desired struct {
 	key           desiredKey
-	values        map[string]interface{}
+	values        map[string]any
 	takeOwnership bool
 }
 
@@ -90,7 +90,7 @@ type Manager struct {
 	operation             OperationClient
 	content               ContentClient
 	pods                  corecontrollers.PodClient
-	desiredCharts         map[desiredKey]map[string]interface{}
+	desiredCharts         map[desiredKey]map[string]any
 	sync                  chan desired
 	refreshIntervalChange chan struct{}
 	settings              mgmtcontrollers.SettingController
@@ -113,7 +113,7 @@ func NewManager(ctx context.Context,
 		content:               contentManager,
 		pods:                  pods,
 		sync:                  make(chan desired, 10),
-		desiredCharts:         map[desiredKey]map[string]interface{}{},
+		desiredCharts:         map[desiredKey]map[string]any{},
 		refreshIntervalChange: make(chan struct{}, 1),
 		settings:              settings,
 		trigger:               make(chan struct{}, 1),
@@ -162,7 +162,7 @@ func (m *Manager) runSync() {
 	for {
 		select {
 		case <-m.refreshIntervalChange:
-			t = time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
+			t.Reset(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
 		case <-m.ctx.Done():
 			return
 		case <-m.trigger:
@@ -174,7 +174,7 @@ func (m *Manager) runSync() {
 			// newly requested or changed
 			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
 				err := m.installCharts(
-					map[desiredKey]map[string]interface{}{
+					map[desiredKey]map[string]any{
 						desired.key: desired.values,
 					},
 					desired.takeOwnership,
@@ -197,12 +197,12 @@ func getIntervalOrDefault(interval string) time.Duration {
 }
 
 // installCharts installs charts with takeOwnership.
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, takeOwnership bool) error {
+func (m *Manager) installCharts(charts map[desiredKey]map[string]any, takeOwnership bool) error {
 	var errs []error
 
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.chartName, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -244,7 +244,7 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
+func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]any, takeOwnership bool, installImageOverride string) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
@@ -278,7 +278,7 @@ func (m *Manager) Remove(namespace, releaseName string) {
 // If no version is provided, it will try to install the latest version available.
 // If a release with the version to be installed is already installed, or is pending install, upgrade or rollback, this
 // does nothing.
-func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
+func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]any, takeOwnership bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", "", true)
 	if err != nil {
 		return err
@@ -299,7 +299,7 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 	} else if minVersion != "" {
 		v = minVersion
 		// not enforcing exact version install, to keep any possibly newer, already installed version.
-		// This prevents automated downgrades of updates done manually through the web UI, eg. for Fleet.
+		// This prevents automated downgrades of updates done manually through the web UI, e.g. for Fleet.
 	}
 
 	// This method from the Helm fork doesn't return an error when given a non-existent version, unfortunately.
@@ -331,7 +331,7 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 	}
 
 	if desiredValue == nil {
-		desiredValue = map[string]interface{}{}
+		desiredValue = map[string]any{}
 	}
 	// if tolerations are already present we don't change them
 	if v, ok := desiredValue["tolerations"]; !ok || v == nil {
@@ -449,7 +449,7 @@ func podDone(chart string, newPod *v1.Pod) (bool, error) {
 
 // isInstalled gets all releases for a particular namespace and name that has the status action.ListDeployed.
 // It calls the desiredVersionAndValues function with it to return if the chart is installed, the desired version and the desired values for it.
-func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string, isExact bool, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
+func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string, isExact bool, desiredValue map[string]any) (bool, string, map[string]any, error) {
 	releases, err := m.helmClient.ListReleases(namespace, name, action.ListDeployed)
 	if err != nil {
 		return false, "", nil, err
@@ -462,17 +462,17 @@ func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string
 // Callers must provide the desired version. If isExact is true, then the resulting value is the desiredVersion, which
 // may result in a forced upgrade or downgrade. Otherwise, the desiredVersion signifies the latest version, which may
 // or may not be installed, depending on the value of the min version.
-func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVersion string, isExact bool, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
+func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVersion string, isExact bool, desiredValues map[string]any) (bool, string, map[string]any, error) {
 	for _, r := range releases {
 		if r.Info.Status != releasecommon.StatusDeployed {
 			continue
 		}
 		if desiredValues == nil {
-			desiredValues = map[string]interface{}{}
+			desiredValues = map[string]any{}
 		}
 		releaseConfig := r.Config
 		if releaseConfig == nil {
-			releaseConfig = map[string]interface{}{}
+			releaseConfig = map[string]any{}
 		}
 
 		desiredValuesJSON, err := json.Marshal(desiredValues)
@@ -490,7 +490,7 @@ func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVer
 			return false, "", nil, err
 		}
 
-		desiredValues = map[string]interface{}{}
+		desiredValues = map[string]any{}
 		if err := json.Unmarshal(patchedJSON, &desiredValues); err != nil {
 			return false, "", nil, err
 		}
