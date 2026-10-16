@@ -309,32 +309,7 @@ func TestClusterNameValidatorsPagination(t *testing.T) {
 			wantTokens: []string{""},
 		},
 		{
-			name: "expired error on page 2 resumes and finds a later match",
-			steps: func(filler, match v32.Cluster) map[string]pgStep {
-				return map[string]pgStep{
-					"":          {items: []v32.Cluster{filler}, cont: "t1"},
-					"t1":        {err: paginationtest.ExpiredError("new-token")},
-					"new-token": {items: []v32.Cluster{filler}, cont: "t3"},
-					"t3":        {items: []v32.Cluster{match}},
-				}
-			},
-			wantCode:   &conflictCode,
-			wantMsg:    "cluster already exists for",
-			wantTokens: []string{"", "t1", "new-token", "t3"},
-		},
-		{
-			name: "expired error on page 2 resumes and returns nil without a match",
-			steps: func(filler, match v32.Cluster) map[string]pgStep {
-				return map[string]pgStep{
-					"":          {items: []v32.Cluster{filler}, cont: "t1"},
-					"t1":        {err: paginationtest.ExpiredError("new-token")},
-					"new-token": {items: []v32.Cluster{filler}},
-				}
-			},
-			wantTokens: []string{"", "t1", "new-token"},
-		},
-		{
-			name: "expired error on page 2 resumes and finds a match on the resumed page",
+			name: "expired error on page 2 returns a server error and does not resume",
 			steps: func(filler, match v32.Cluster) map[string]pgStep {
 				return map[string]pgStep{
 					"":          {items: []v32.Cluster{filler}, cont: "t1"},
@@ -342,23 +317,10 @@ func TestClusterNameValidatorsPagination(t *testing.T) {
 					"new-token": {items: []v32.Cluster{match}},
 				}
 			},
-			wantCode:   &conflictCode,
-			wantMsg:    "cluster already exists for",
-			wantTokens: []string{"", "t1", "new-token"},
-		},
-		{
-			name: "list error after resume returns a server error",
-			steps: func(filler, match v32.Cluster) map[string]pgStep {
-				return map[string]pgStep{
-					"":          {items: []v32.Cluster{filler}, cont: "t1"},
-					"t1":        {err: paginationtest.ExpiredError("new-token")},
-					"new-token": {err: errors.New("boom")},
-				}
-			},
 			wantCode:   &serverCode,
 			wantMsg:    "failed to confirm",
-			wantCause:  "boom",
-			wantTokens: []string{"", "t1", "new-token"},
+			wantCause:  "continue token expired",
+			wantTokens: []string{"", "t1"},
 		},
 	}
 

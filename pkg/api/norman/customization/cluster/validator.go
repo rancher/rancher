@@ -298,7 +298,8 @@ func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 		}
 		return nil
 	}
-	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
+	// Use WithoutResume. A resumed list can skip a cluster and let a duplicate name pass.
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters, pagination.WithoutResume())
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm clusterName is unique among Rancher AKS clusters %s: %v", msgSuffix, err))
 	}
@@ -407,7 +408,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		}
 		return nil
 	}
-	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
+	// Use WithoutResume. A resumed list can skip a cluster and let a duplicate name pass.
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters, pagination.WithoutResume())
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm displayName is unique among Rancher EKS clusters for region %s: %v", region, err))
 	}
@@ -739,7 +741,8 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 		}
 		return nil
 	}
-	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
+	// Use WithoutResume. A resumed list can skip a cluster and let a duplicate name pass.
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters, pagination.WithoutResume())
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm clusterName is unique among Rancher GKE clusters %s: %v", msgSuffix, err))
 	}
@@ -878,7 +881,8 @@ func validateAliConfigClusterName(client v3.ClusterInterface, spec *v32.ClusterS
 		}
 		return nil
 	}
-	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
+	// Use WithoutResume. A resumed list can skip a cluster and let a duplicate name pass.
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters, pagination.WithoutResume())
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm clusterName is unique among Rancher Alibaba clusters %s: %v", msgSuffix, err))
 	}
