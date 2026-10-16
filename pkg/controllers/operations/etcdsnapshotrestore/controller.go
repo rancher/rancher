@@ -1524,7 +1524,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		return status, err
 	}
 
-	initSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
+	etcdSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -1534,7 +1534,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
-	} else if initSecret == nil {
+	} else if etcdSecret == nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restart", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -1546,12 +1546,51 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		return status, nil
 	}
 
-	serverURL := s.adapter.GetServerURL(initSecret)
+	var controlPlaneSecret *corev1.Secret
+	if ops.IsControlPlane(etcdSecret) {
+		controlPlaneSecret = etcdSecret
+	} else {
+		secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+			WithLabels(plan.Label(capr.ControlPlaneRoleLabel, "true")).
+			WithSorter(plan.DefaultSorter()).
+			Collect()
+		if plan.IsTransient(err) {
+			return status, err
+		} else if err != nil {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+
+			return status, nil
+		} else if len(secrets) == 0 {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+
+			return status, nil
+		}
+
+		controlPlaneSecret = secrets[0]
+	}
+
+	serverURL := s.adapter.GetServerURL(etcdSecret)
 
 	concurrency := 1
 	results := make([]plan.PlanStatus, 0, concurrency)
 
 	for _, secret := range secrets {
+		initSecret := etcdSecret
+		if !ops.IsEtcd(secret) && ops.IsControlPlane(secret) && ops.IsWorker(secret) {
+			initSecret = controlPlaneSecret
+		}
 		nodePlan, err := buildRestartPlan(s, secret, initSecret, serverURL, value, nextStep != "")
 		if err != nil {
 			return status, err
