@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -47,6 +48,7 @@ var (
 			"system:masters",
 		},
 	}
+	errWatch = errors.New("watch channel closed")
 )
 
 type desiredKey struct {
@@ -344,13 +346,8 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 		}
 	}
 
-	timeout := settings.SystemManagedChartsOperationTimeout.Get()
-	t, err := time.ParseDuration(timeout)
-	if err != nil {
-		t = 5 * time.Minute
-	}
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
-		Timeout:                &metav1.Duration{Duration: t},
+		Timeout:                &metav1.Duration{Duration: timeoutOrDefault()},
 		Wait:                   true,
 		Install:                true,
 		MaxHistory:             5,
@@ -380,8 +377,11 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 }
 
 // waitPodDone receives an operation, get its pod and check if it's done and
-// returns nil if it is. If not, creates a watch for the pod with a timeout of 300 seconds
-// that will check if the pod is done and return nil. If the watch timeouts, it returns an error.
+// returns nil if it is. If not, creates a watch for the pod with a timeout of
+// settings.SystemManagedChartsOperationTimeout (default 5 minutes) that will
+// check if the pod is done and return nil. If the watch timeouts, it returns
+// an error. If watchPod returns prematurely due to a watch error, the attempt
+// will be continuously retried until the timeout is reached.
 func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	pod, err := m.pods.Get(op.Status.PodNamespace, op.Status.PodName, metav1.GetOptions{})
 	if err != nil {
@@ -394,15 +394,52 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 		return nil
 	}
 
-	sec := int64(60)
+	timeout := timeoutOrDefault()
+	deadline := time.Now().Add(timeout)
+	resourceVersion := pod.ResourceVersion
+
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return fmt.Errorf("timed out after %s waiting for pod %s/%s to complete", timeout, pod.Namespace, pod.Name)
+		}
+
+		done, lastResourceVersion, err := m.watchPod(op, resourceVersion, remaining)
+		if errors.Is(err, errWatch) {
+			pod, err = m.pods.Get(op.Status.PodNamespace, op.Status.PodName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			resourceVersion = lastResourceVersion
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		if done {
+			return nil
+		}
+
+		if lastResourceVersion != "" {
+			resourceVersion = lastResourceVersion
+		}
+	}
+}
+
+// watchPod opens up a kubernetes watch for a specific pod based on the op's configured pod namespace & name, the
+// requested resourceVersion, and timeout. If any watch errors are detected on the response channel, the sentinel error
+// errWatch is returned which consumers can use to restart the watch.
+func (m *Manager) watchPod(op *catalog.Operation, resourceVersion string, timeout time.Duration) (bool, string, error) {
+	sec := int64(timeout.Seconds()) + 1
 	resp, err := m.pods.Watch(op.Status.PodNamespace, metav1.ListOptions{
-		FieldSelector:   "metadata.name=" + pod.Name,
-		ResourceVersion: pod.ResourceVersion,
+		FieldSelector:   "metadata.name=" + op.Status.PodName,
+		ResourceVersion: resourceVersion,
 		TimeoutSeconds:  &sec,
 	})
 	if err != nil {
-		return err
+		return false, "", err
 	}
+
 	defer func() {
 		go func() {
 			//nolint:revive
@@ -414,18 +451,27 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	}()
 
 	for event := range resp.ResultChan() {
+		if event.Type == watch.Error {
+			return false, "", errWatch
+		}
+
 		newPod, ok := event.Object.(*v1.Pod)
 		if !ok {
 			continue
 		}
+
+		if newPod.ResourceVersion != resourceVersion {
+			resourceVersion = newPod.ResourceVersion
+		}
+
 		if ok, err := podDone(op.Status.Chart, newPod); err != nil {
-			return err
+			return false, resourceVersion, err
 		} else if ok {
-			return nil
+			return true, resourceVersion, nil
 		}
 	}
 
-	return fmt.Errorf("pod %s/%s failed, watch closed", pod.Namespace, pod.Name)
+	return false, resourceVersion, nil
 }
 
 // podDone receives a chart name and a pod. It will check all containers in that pod and
@@ -557,4 +603,12 @@ func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates)
 	}
 
 	return len(releases) != 0, nil
+}
+
+func timeoutOrDefault() time.Duration {
+	t, err := time.ParseDuration(settings.SystemManagedChartsOperationTimeout.Get())
+	if err != nil {
+		return 5 * time.Minute
+	}
+	return t
 }
