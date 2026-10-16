@@ -61,13 +61,14 @@ var (
 	httpStart  = regexp.MustCompile("^http:/([^/])")
 	httpsStart = regexp.MustCompile("^https:/([^/])")
 	badHeaders = map[string]bool{
+		"cf-connecting-ip":  true,
+		"cf-ray":            true,
+		"content-length":    true,
 		"host":                    true,
+		"referer":           true,
 		"transfer-encoding":       true,
-		"content-length":          true,
 		"x-api-auth-header":       true,
 		"x-api-cattleauth-header": true,
-		"cf-connecting-ip":        true,
-		"cf-ray":                  true,
 	}
 	badHeaderPrefixes = []string{
 		"impersonate-",
