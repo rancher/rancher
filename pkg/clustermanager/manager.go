@@ -525,6 +525,14 @@ func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserCont
 	return m.UserContextNoControllersReconnecting(clusterName, true)
 }
 
+type ContextError struct {
+	Message string
+}
+
+func (e *ContextError) Error() string {
+	return e.Message
+}
+
 // UserContextNoControllersReconnecting works like UserContextNoControllers if reconnect is true.
 // Otherwise, it will return an error immediately if the cluster connection fails.
 func (m *Manager) UserContextNoControllersReconnecting(clusterName string, reconnect bool) (*config.UserContext, error) {
@@ -534,7 +542,9 @@ func (m *Manager) UserContextNoControllersReconnecting(clusterName string, recon
 	}
 	ctx, err := m.UserContextFromClusterReconnecting(cluster, reconnect)
 	if ctx == nil && err == nil {
-		return nil, fmt.Errorf("cluster context %s is unavailable", clusterName)
+		return nil, &ContextError{
+			Message: fmt.Sprintf("cluster context %s is unavailable", clusterName),
+		}
 	}
 	return ctx, err
 }

@@ -14,10 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 )
 
-func newMockUserControllersController(t *testing.T, starter *simpleControllerStarter) (*userControllersController, *fake.MockNonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList]) {
+func newMockUserControllersController(t *testing.T, starter *simpleControllerStarter) (*userControllersController, *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]) {
 	ctrl := gomock.NewController(t)
 	clusterLister := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
-	clusterClient := fake.NewMockNonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList](ctrl)
+	clusterClient := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
 	return &userControllersController{
 		starter:       starter,
 		clusterLister: clusterLister,
