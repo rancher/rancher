@@ -270,3 +270,57 @@ func TestPodIPTracker_RejectsArbitraryHostnameInjection(t *testing.T) {
 		t.Errorf("filter(pod IP + extra hostnames) = %v, want only the live pod IP kept", got)
 	}
 }
+
+// TestRancherPodSelector guards the selector resolution that keeps every
+// replica in agreement. The Rancher pod "app" label is the Helm fullname
+// (e.g. "rancher-install"), not the literal "rancher"; the chart exposes it
+// via IMPERATIVE_API_APP_SELECTOR. If this regresses to a hardcoded
+// "app=rancher", HA replicas disagree on the live pod-IP set and churn the
+// shared cert secret. t.Setenv forbids t.Parallel here.
+func TestRancherPodSelector(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		envSet   bool
+		expected string
+	}{
+		{
+			name:     "uses IMPERATIVE_API_APP_SELECTOR when set to the fullname",
+			envValue: "rancher-install",
+			envSet:   true,
+			expected: "app=rancher-install",
+		},
+		{
+			name:     "uses the value verbatim for a plain release name",
+			envValue: "rancher",
+			envSet:   true,
+			expected: "app=rancher",
+		},
+		{
+			name:     "falls back to app=rancher when unset",
+			envSet:   false,
+			expected: "app=rancher",
+		},
+		{
+			name:     "treats empty string as unset and falls back",
+			envValue: "",
+			envSet:   true,
+			expected: "app=rancher",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envSet {
+				t.Setenv(imperativeAPIAppSelectorEnvVar, tt.envValue)
+			} else {
+				// Ensure a value leaking in from the ambient environment
+				// can't mask the unset-fallback case.
+				t.Setenv(imperativeAPIAppSelectorEnvVar, "")
+			}
+			if got := rancherPodSelector(); got != tt.expected {
+				t.Errorf("rancherPodSelector() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
