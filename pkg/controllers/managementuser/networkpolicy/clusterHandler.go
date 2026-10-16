@@ -77,7 +77,7 @@ func (ch *clusterHandler) Sync(key string, cluster *apimgmtv3.Cluster) (runtime.
 	return nil, nil
 }
 
-func (ch *clusterHandler) createNetworkPolicies(cluster *mgmtcontrollers.Cluster) error {
+func (ch *clusterHandler) createNetworkPolicies(cluster *apimgmtv3.Cluster) error {
 	projects, err := ch.pLister.List(cluster.Name, labels.NewSelector())
 	if err != nil {
 		return fmt.Errorf("projectLister: %v", err)
@@ -130,7 +130,7 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *mgmtcontrollers.Cluster
 
 // deleteNetworkPolicies removes Rancher created NetworkPolicy resources from the downstream cluster and
 // removes ProjectNetworkPolicy resources from the management cluster
-func (ch *clusterHandler) deleteNetworkPolicies(cluster *mgmtcontrollers.Cluster) error {
+func (ch *clusterHandler) deleteNetworkPolicies(cluster *apimgmtv3.Cluster) error {
 	// consider nps for deletion if they were created by Rancher, i.e. they have a label: "cattle.io/creator": "norman"
 	set := labels.Set(map[string]string{creatorLabel: creatorNorman})
 	nps, err := ch.npmgr.npLister.List("", set.AsSelector())

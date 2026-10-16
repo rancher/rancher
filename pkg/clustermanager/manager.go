@@ -142,7 +142,7 @@ func (m *Manager) StopAndMarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
 		apimgmtv3.ClusterConditionControllersRunning.False(current)
 		pkgcluster.SummarizeReadyCondition(current)
 		cluster, err := m.clusters.UpdateStatus(current)
-		if err != nil {
+		if err == nil {
 			current = cluster
 		}
 	}
