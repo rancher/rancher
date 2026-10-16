@@ -4,12 +4,15 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -23,6 +26,7 @@ import (
 	"helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -711,4 +715,75 @@ func popQueue(queue workqueue.TypedRateLimitingInterface[releaseKey]) {
 	key, _ := queue.Get()
 	queue.Forget(key)
 	queue.Done(key)
+}
+
+func TestRefreshTakesOwnership(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	mockContentClient := NewMockContentClient(ctrl)
+	mockContentClient.EXPECT().Index("", "rancher-charts", "", true).DoAndReturn(func(_, _, _ string, _ bool) (*repo.IndexFile, error) {
+		return &repo.IndexFile{Entries: map[string]repo.ChartVersions{
+			"rancher-webhook": {{Metadata: &chart.Metadata{Version: "1.0.0"}, URLs: []string{"foo"}}},
+		}}, nil
+	}).AnyTimes()
+
+	// never installed, so every attempt upgrades
+	mockHelmClient := NewMockHelmClient(ctrl)
+	mockHelmClient.EXPECT().ListReleases(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	var takeOwnership []bool
+	mockOperationClient := NewMockOperationClient(ctrl)
+	mockOperationClient.EXPECT().AddCpTaintsToTolerations(gomock.Any()).Return(nil, nil).AnyTimes()
+	mockOperationClient.EXPECT().Upgrade(gomock.Any(), installUser, "", "rancher-charts", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ user.Info, _, _ string, options io.Reader, _ string) (*catalog.Operation, error) {
+			var upgrade types.ChartUpgradeAction
+			if err := json.NewDecoder(options).Decode(&upgrade); err != nil {
+				return nil, err
+			}
+			takeOwnership = append(takeOwnership, upgrade.TakeOwnership)
+			return &catalog.Operation{Status: catalog.OperationStatus{PodNamespace: "cattle-system", PodName: "helm-operation"}}, nil
+		}).AnyTimes()
+
+	mockPodClient := fake.NewMockClientInterface[*v1.Pod, *v1.PodList](ctrl)
+	mockPodClient.EXPECT().Get("cattle-system", "helm-operation", metav1.GetOptions{}).Return(&v1.Pod{
+		Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+			Name:  "helm",
+			State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+		}}},
+	}, nil).AnyTimes()
+
+	m := &Manager{
+		ctx:           context.Background(),
+		content:       mockContentClient,
+		helmClient:    mockHelmClient,
+		operation:     mockOperationClient,
+		pods:          mockPodClient,
+		desiredCharts: map[releaseKey]desired{},
+		queue:         newQueue("test", retryMaxDelay),
+		priorityQueue: newQueue("test-priority", priorityRetryMaxDelay),
+	}
+	t.Cleanup(func() {
+		m.queue.ShutDown()
+		m.priorityQueue.ShutDown()
+	})
+
+	// the initial install uses the requested takeOwnership
+	_ = m.Ensure("cattle-system", "rancher-webhook", "rancher-webhook", "", "1.0.0", map[string]any{"foo": "bar"}, false, "")
+	assert.True(t, m.processNextItem(m.queue))
+	assert.Equal(t, []bool{false}, takeOwnership)
+
+	// refreshes take ownership
+	m.enqueueAll()
+	assert.True(t, m.processNextItem(m.queue))
+	assert.Equal(t, []bool{false, true}, takeOwnership)
+
+	// an unchanged Ensure keeps the chart a refresh
+	_ = m.Ensure("cattle-system", "rancher-webhook", "rancher-webhook", "", "1.0.0", map[string]any{"foo": "bar"}, false, "")
+	assert.Equal(t, 0, m.queue.Len())
+
+	// changed values are installed with the requested takeOwnership again
+	_ = m.Ensure("cattle-system", "rancher-webhook", "rancher-webhook", "", "1.0.0", map[string]any{"foo": "baz"}, false, "")
+	assert.True(t, m.processNextItem(m.queue))
+	assert.Equal(t, []bool{false, true, false}, takeOwnership)
 }
