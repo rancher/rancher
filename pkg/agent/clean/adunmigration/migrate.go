@@ -136,6 +136,10 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 
 	sc, adConfig, err := prepareClientContexts(clientConfig)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Infof("[%v] activedirectory auth config not found, nothing to unmigrate", migrateAdUserOperation)
+			return nil
+		}
 		return err
 	}
 

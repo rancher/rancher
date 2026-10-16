@@ -12,13 +12,16 @@ import (
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -183,11 +186,17 @@ func findLdapUser(guid string, lConn *ldapv3.Conn, adConfig *v3.ActiveDirectoryC
 }
 
 func adConfiguration(sc *config.ScaledContext) (*v3.ActiveDirectoryConfig, error) {
-	authConfigs := sc.Management.AuthConfigs("")
-	secrets := sc.Wrangler.Core.Secret()
+	return loadADConfiguration(sc.Management.AuthConfigs("").ObjectClient().UnstructuredClient(), sc.Wrangler.Core.Secret())
+}
 
-	authConfigObj, err := authConfigs.ObjectClient().UnstructuredClient().Get("activedirectory", metav1.GetOptions{})
+// loadADConfiguration fetches and decodes the activedirectory AuthConfig. If the AuthConfig does not exist, the
+// NotFound error is returned without being logged so that callers can decide how to handle it.
+func loadADConfiguration(authConfigs objectclient.GenericClient, secrets wcorev1.SecretController) (*v3.ActiveDirectoryConfig, error) {
+	authConfigObj, err := authConfigs.Get("activedirectory", metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, err
+		}
 		logrus.Errorf("[%v] failed to obtain activedirectory authConfigObj: %v", migrateAdUserOperation, err)
 		return nil, err
 	}
@@ -268,6 +277,9 @@ func prepareClientContexts(clientConfig *restclient.Config) (*config.ScaledConte
 	sc.Wrangler = wc
 	adConfig, err := adConfiguration(sc)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil, err
+		}
 		logrus.Errorf("[%v] failed to acquire ad configuration: %v", migrateAdUserOperation, err)
 		return nil, nil, err
 	}
