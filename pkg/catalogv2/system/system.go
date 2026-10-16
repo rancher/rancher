@@ -26,9 +26,9 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v4/pkg/action"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
@@ -40,11 +40,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/util/workqueue"
 )
 
 const (
 	defaultInterval = 21600 * time.Second
 	defaultTimeout  = 5 * time.Minute
+
+	// defaultWorkers is the number of charts that can be installed concurrently from the default queue.
+	defaultWorkers = 3
+	// priorityWorkers is the number of charts that can be installed concurrently from the priority queue.
+	priorityWorkers = 1
+
+	retryBaseDelay        = 5 * time.Second
+	retryMaxDelay         = 5 * time.Minute
+	priorityRetryMaxDelay = 30 * time.Second
 )
 
 var (
@@ -56,7 +66,21 @@ var (
 		},
 	}
 	errWatch = errors.New("watch channel closed")
+
+	// priorityReleases are installed from a dedicated queue so that they never wait behind other charts.
+	// remotedialer-proxy is required for the kube-apiserver to reach the imperative API, which Rancher must be
+	// contacted on shortly after startup or it will exit.
+	priorityReleases = map[releaseKey]struct{}{
+		{namespace: namespace.System, releaseName: "remotedialer-proxy"}: {},
+	}
 )
+
+// releaseKey identifies a single helm release. Installs are queued by releaseKey so that a release is never
+// operated on by more than one worker at a time.
+type releaseKey struct {
+	namespace   string
+	releaseName string
+}
 
 type desiredKey struct {
 	namespace            string
@@ -105,9 +129,9 @@ type Manager struct {
 	content               ContentClient
 	pods                  corecontrollers.PodClient
 	desiredMu             sync.RWMutex
-	desiredCharts         map[desiredKey]desiredValues
-	sync                  chan desired
-	syncKey               chan desiredKey
+	desiredCharts         map[releaseKey]desired
+	queue                 workqueue.TypedRateLimitingInterface[releaseKey]
+	priorityQueue         workqueue.TypedRateLimitingInterface[releaseKey]
 	refreshIntervalChange chan struct{}
 	settings              mgmtcontrollers.SettingController
 	trigger               chan struct{}
@@ -128,9 +152,9 @@ func NewManager(ctx context.Context,
 		operation:             ops,
 		content:               contentManager,
 		pods:                  pods,
-		sync:                  make(chan desired, 10),
-		syncKey:               make(chan desiredKey, 10),
-		desiredCharts:         map[desiredKey]desiredValues{},
+		desiredCharts:         map[releaseKey]desired{},
+		queue:                 newQueue("system-charts", retryMaxDelay),
+		priorityQueue:         newQueue("system-charts-priority", priorityRetryMaxDelay),
 		refreshIntervalChange: make(chan struct{}, 1),
 		settings:              settings,
 		trigger:               make(chan struct{}, 1),
@@ -141,8 +165,26 @@ func NewManager(ctx context.Context,
 	return m, nil
 }
 
+func newQueue(name string, maxDelay time.Duration) workqueue.TypedRateLimitingInterface[releaseKey] {
+	return workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[releaseKey](retryBaseDelay, maxDelay),
+		workqueue.TypedRateLimitingQueueConfig[releaseKey]{Name: name},
+	)
+}
+
 func (m *Manager) Start(ctx context.Context) {
 	m.ctx = ctx
+	for range priorityWorkers {
+		go m.runWorker(m.priorityQueue)
+	}
+	for range defaultWorkers {
+		go m.runWorker(m.queue)
+	}
+	go func() {
+		<-ctx.Done()
+		m.priorityQueue.ShutDown()
+		m.queue.ShutDown()
+	}()
 	go m.runSync()
 
 	m.settings.OnChange(ctx, "system-feature-chart-refresh", m.onSetting)
@@ -183,34 +225,61 @@ func (m *Manager) runSync() {
 		case <-m.ctx.Done():
 			return
 		case <-m.trigger:
-			_ = m.installCharts(m.desiredCharts)
+			m.enqueueAll()
 		case <-t.C:
-			_ = m.installCharts(m.desiredCharts)
-		case chart := <-m.sync:
-			m.addDesiredChart(chart)
-		case key := <-m.syncKey:
-			m.desiredMu.RLock()
-			// ensure chart hasn't been removed in the meantime
-			values, ok := m.desiredCharts[key]
-			m.desiredMu.RUnlock()
-			if ok {
-				_ = m.installChart(key, values)
-			}
+			m.enqueueAll()
 		}
 	}
 }
 
-func (m *Manager) addDesiredChart(chart desired) {
-	m.desiredMu.Lock()
-	defer m.desiredMu.Unlock()
+// queueFor returns the queue a release is installed from.
+func (m *Manager) queueFor(key releaseKey) workqueue.TypedRateLimitingInterface[releaseKey] {
+	if _, ok := priorityReleases[key]; ok {
+		return m.priorityQueue
+	}
+	return m.queue
+}
 
-	v, exists := m.desiredCharts[chart.key]
-	if exists && equality.Semantic.DeepEqual(v, chart.values) {
-		return
+// enqueueAll queues every desired chart to be (re)installed.
+func (m *Manager) enqueueAll() {
+	m.desiredMu.RLock()
+	defer m.desiredMu.RUnlock()
+
+	for key := range m.desiredCharts {
+		m.queueFor(key).Add(key)
+	}
+}
+
+func (m *Manager) runWorker(queue workqueue.TypedRateLimitingInterface[releaseKey]) {
+	for m.processNextItem(queue) {
+	}
+}
+
+// processNextItem makes a single install attempt for the next release in the queue. On failure the release is
+// requeued with backoff and the worker moves on, so a failing or slow chart does not block other charts.
+func (m *Manager) processNextItem(queue workqueue.TypedRateLimitingInterface[releaseKey]) bool {
+	key, shutdown := queue.Get()
+	if shutdown {
+		return false
+	}
+	defer queue.Done(key)
+
+	m.desiredMu.RLock()
+	// ensure chart hasn't been removed in the meantime
+	chart, ok := m.desiredCharts[key]
+	m.desiredMu.RUnlock()
+	if !ok {
+		queue.Forget(key)
+		return true
 	}
 
-	m.desiredCharts[chart.key] = chart.values
-	m.sync <- chart
+	if err := m.installChart(chart.key, chart.values); err != nil {
+		queue.AddRateLimited(key)
+		return true
+	}
+
+	queue.Forget(key)
+	return true
 }
 
 // getIntervalOrDefault Converts the input to a time.Duration or returns a default value
@@ -222,42 +291,12 @@ func getIntervalOrDefault(interval string) time.Duration {
 	return time.Duration(i) * time.Second
 }
 
-// installCharts installs charts with takeOwnership.
-func (m *Manager) installCharts(charts map[desiredKey]desiredValues) error {
-	m.desiredMu.RLock()
-	charts = maps.Clone(charts)
-	m.desiredMu.RUnlock()
-
-	var errs []error
-	for key, values := range charts {
-		err := m.installChart(key, values)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) > 0 {
-		return merr.NewErrors(errs...)
-	}
-
-	return nil
-}
-
 func (m *Manager) installChart(key desiredKey, values desiredValues) error {
 	err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values.Values, values.TakeOwnership, key.installImageOverride)
 	if errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
-		logrus.Errorf("Failed to find system chart %s, enqueuing chart refresh: %v", key.chartName, err)
+		logrus.Errorf("Failed to find system chart %s, will retry: %v", key.chartName, err)
 	} else if err != nil {
-		logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
-	}
-
-	if err != nil {
-		time.AfterFunc(5*time.Second, func() {
-			select {
-			case m.syncKey <- key:
-			default:
-			}
-		})
+		logrus.Errorf("Failed to install system chart %s (release name: %s), will retry: %v", key.chartName, key.releaseName, err)
 	}
 	return err
 }
@@ -290,23 +329,34 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
+// Ensure records the chart as desired and, if it is new or has changed, queues it to be installed. It does not block
+// on the install.
 func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]any, takeOwnership bool, installImageOverride string) error {
-	go func() {
-		m.sync <- desired{
-			key: desiredKey{
-				namespace:            namespace,
-				chartName:            chartName,
-				releaseName:          releaseName,
-				minVersion:           minVersion,
-				exactVersion:         exactVersion,
-				installImageOverride: installImageOverride,
-			},
-			values: desiredValues{
-				Values:        values,
-				TakeOwnership: takeOwnership,
-			},
-		}
-	}()
+	chart := desired{
+		key: desiredKey{
+			namespace:            namespace,
+			chartName:            chartName,
+			releaseName:          releaseName,
+			minVersion:           minVersion,
+			exactVersion:         exactVersion,
+			installImageOverride: installImageOverride,
+		},
+		values: desiredValues{
+			Values:        values,
+			TakeOwnership: takeOwnership,
+		},
+	}
+	key := releaseKey{namespace: namespace, releaseName: releaseName}
+
+	m.desiredMu.Lock()
+	defer m.desiredMu.Unlock()
+
+	if existing, ok := m.desiredCharts[key]; ok && existing.key == chart.key && equality.Semantic.DeepEqual(existing.values, chart.values) {
+		return nil
+	}
+
+	m.desiredCharts[key] = chart
+	m.queueFor(key).Add(key)
 	return nil
 }
 
@@ -314,11 +364,7 @@ func (m *Manager) Remove(namespace, releaseName string) {
 	m.desiredMu.Lock()
 	defer m.desiredMu.Unlock()
 
-	for k := range m.desiredCharts {
-		if k.namespace == namespace && k.releaseName == releaseName {
-			delete(m.desiredCharts, k)
-		}
-	}
+	delete(m.desiredCharts, releaseKey{namespace: namespace, releaseName: releaseName})
 }
 
 // install tries to install a new version of a chart.
@@ -381,6 +427,8 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 		return nil
 	}
 
+	// copy so the caller's (and the desired chart's) values are not mutated
+	desiredValue = maps.Clone(desiredValue)
 	if desiredValue == nil {
 		desiredValue = map[string]any{}
 	}
