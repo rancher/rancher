@@ -1772,7 +1772,8 @@ func TestCookieSecurityAttributes(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/", nil)
+			// Server-side requests carry no URL scheme, so Secure must not depend on it.
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
 			tc.setCookie(req, w)
@@ -1786,6 +1787,7 @@ func TestCookieSecurityAttributes(t *testing.T) {
 			}
 			require.NotNil(t, got, "expected cookie %q to be set", tc.cookieName)
 			assert.True(t, got.HttpOnly, "HttpOnly must be true")
+			assert.True(t, got.Secure, "Secure must be true")
 			assert.Equal(t, "/", got.Path, "Path must be /")
 			assert.Equal(t, http.SameSiteLaxMode, got.SameSite, "SameSite must be Lax")
 		})
