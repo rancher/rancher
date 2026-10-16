@@ -140,12 +140,14 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Source = "env"
 				update = true
 			}
-			if !envOk && obj.Source == "env" {
-				obj.Source = ""
-				update = true
-			}
 			if envOk && obj.Value != envValue {
 				obj.Value = envValue
+				update = true
+			}
+			if !envOk && obj.Source == "env" {
+				// The env var that used to configure this setting is gone, so drop the stale env value.
+				obj.Source = ""
+				obj.Value = ""
 				update = true
 			}
 			if obj.Value == "" {
