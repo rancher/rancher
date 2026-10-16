@@ -100,6 +100,9 @@ type desiredValues struct {
 type desired struct {
 	key    desiredKey
 	values desiredValues
+	// refresh is set once the chart is queued by enqueueAll, and cleared when Ensure replaces the chart with new
+	// values. See processNextItem.
+	refresh bool
 }
 
 type HelmClient interface {
@@ -240,12 +243,14 @@ func (m *Manager) queueFor(key releaseKey) workqueue.TypedRateLimitingInterface[
 	return m.queue
 }
 
-// enqueueAll queues every desired chart to be (re)installed.
+// enqueueAll queues every desired chart to be (re)installed, with ownership taken. See processNextItem.
 func (m *Manager) enqueueAll() {
-	m.desiredMu.RLock()
-	defer m.desiredMu.RUnlock()
+	m.desiredMu.Lock()
+	defer m.desiredMu.Unlock()
 
-	for key := range m.desiredCharts {
+	for key, chart := range m.desiredCharts {
+		chart.refresh = true
+		m.desiredCharts[key] = chart
 		m.queueFor(key).Add(key)
 	}
 }
@@ -273,7 +278,16 @@ func (m *Manager) processNextItem(queue workqueue.TypedRateLimitingInterface[rel
 		return true
 	}
 
-	if err := m.installChart(chart.key, chart.values); err != nil {
+	// The initial install of a new or changed chart uses the takeOwnership requested through Ensure, but refreshes
+	// always take ownership. Once installed, fields of a chart's resources can be managed by other field managers;
+	// e.g. the caBundle of the rancher-webhook's WebhookConfigurations is managed by the cluster agent. Without
+	// taking ownership, which forces server-side apply conflicts, upgrading the release would fail on those fields.
+	values := chart.values
+	if chart.refresh {
+		values.TakeOwnership = true
+	}
+
+	if err := m.installChart(chart.key, values); err != nil {
 		queue.AddRateLimited(key)
 		return true
 	}

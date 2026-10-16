@@ -41,10 +41,8 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		clients.Admission.ValidatingWebhookConfiguration(),
 		clients.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, clients)
-	if !features.MCMAgent.Enabled() {
-		if err := webhookchart.Register(ctx, clients, registryOverride); err != nil {
-			return err
-		}
+	if err := webhookchart.Register(ctx, clients, registryOverride); err != nil {
+		return err
 	}
 	if err := systemcharts.Register(ctx, clients, registryOverride); err != nil {
 		return err
