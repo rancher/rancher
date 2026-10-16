@@ -215,7 +215,6 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !r.started {
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
-				m.stopRecord(r)
 				// only mark running/not running for owner instance
 				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
 				if clusterOwner {
@@ -289,7 +288,6 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 				if rec.ctx.Err() != nil || errors.Is(err, dialer.ErrAgentDisconnected) {
 					return err
 				}
-				m.StopAndMarkControllersNotRunning(rec.clusterRec)
 				return err
 			}
 			select {
