@@ -15,6 +15,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -63,6 +64,11 @@ type AuthenticatorResponse struct {
 	UserPrincipal string
 	Groups        []string
 	Extras        map[string][]string
+
+	// Identity is the authoritative identity of the user for this session (username,
+	// provider and principal), shown in the audit log. It is optional and deliberately
+	// not part of Extras, which are forwarded as impersonation headers.
+	Identity audit.Identity
 }
 
 // ClusterRouter returns the cluster ID based on the request URL's path.
@@ -102,12 +108,13 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 		if err != nil {
 			return nil, false, err
 		}
-		return &user.DefaultInfo{
+		info := &user.DefaultInfo{
 			Name:   authResp.User,
 			UID:    authResp.User,
 			Groups: authResp.Groups,
 			Extra:  authResp.Extras,
-		}, authResp.IsAuthed, err
+		}
+		return audit.WithIdentity(info, authResp.Identity), authResp.IsAuthed, err
 	}
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
@@ -252,6 +259,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		UserPrincipal: token.GetUserPrincipal().Name,
 		Groups:        groups,
 		Extras:        extras,
+		Identity:      sessionIdentity(token, authUser),
 	}
 
 	logrus.Debugf("Extras returned %v", authResp.Extras)
@@ -296,6 +304,31 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	logrus.Debugf("auth: Updated lastUsedAt for token %s", token.GetName())
 
 	return authResp, nil
+}
+
+// sessionIdentity returns the identity of the user for the session of the token, which the audit log
+// shows. It comes from the principal the token was issued for, so it is the provider's own answer for
+// this session. Unlike the stored user attributes it cannot be replaced by a provider refresh, and for
+// a user linked to several providers it is the one for this session instead of one of many. A token
+// without a login name falls back to the username of a local user.
+func sessionIdentity(token accessor.TokenAccessor, user *apiv3.User) audit.Identity {
+	principal := token.GetUserPrincipal()
+	userProvider := common.ConfigNameFromPrincipal(principal)
+	if userProvider == "" {
+		userProvider = token.GetAuthProvider()
+	}
+	identity := audit.Identity{
+		Username:    principal.LoginName,
+		Provider:    userProvider,
+		PrincipalID: principal.Name,
+	}
+	if identity.Provider == "" || identity.Provider == "local" {
+		identity.Provider = "local"
+		if identity.Username == "" {
+			identity.Username = user.Username
+		}
+	}
+	return identity
 }
 
 func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *apiv3.UserAttribute) map[string][]string {

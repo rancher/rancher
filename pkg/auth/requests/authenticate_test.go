@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,6 +17,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
@@ -258,6 +260,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Identity.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -266,6 +269,29 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Equal(t, token.Name, resp.Extras[common.ExtraRequestTokenID][0])
 		require.Len(t, resp.Extras[common.ExtraRequestHost], 1)
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
+	})
+
+	t.Run("audit entry shows the identity next to the user ID", func(t *testing.T) {
+		userRefresher.reset()
+
+		out := &bytes.Buffer{}
+		writer, err := audit.NewWriter(out, audit.WriterOptions{})
+		require.NoError(t, err)
+		handler := ToAuthMiddleware(&authenticator)(audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(
+			NewAuthenticatedFilter(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))))
+
+		handler.ServeHTTP(httptest.NewRecorder(), req.Clone(req.Context()))
+
+		var entry struct {
+			User map[string]any `json:"user"`
+		}
+		require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+		assert.Equal(t, userID, entry.User["name"])
+		assert.Equal(t, map[string]any{
+			"username":    "fake-user",
+			"provider":    "fake",
+			"principalId": userPrincipalID,
+		}, entry.User["identity"])
 	})
 
 	t.Run("groups only include the token's auth provider", func(t *testing.T) {
@@ -850,6 +876,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Identity.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -1515,6 +1542,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Identity.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -1808,6 +1836,60 @@ func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
 			for key, values := range tt.want {
 				assert.ElementsMatch(t, values, got[key], key)
 			}
+		})
+	}
+}
+
+func TestSessionIdentity(t *testing.T) {
+	t.Parallel()
+
+	user := &v3.User{Username: "local-user"}
+	token := func(provider, principalID, loginName string) *v3.Token {
+		return &v3.Token{AuthProvider: provider, UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}, LoginName: loginName}}
+	}
+
+	tests := []struct {
+		name  string
+		token *v3.Token
+		want  audit.Identity
+	}{
+		{
+			name:  "local token uses the principal login name",
+			token: token("local", "local://u-1", "local-user"),
+			want:  audit.Identity{Username: "local-user", Provider: "local", PrincipalID: "local://u-1"},
+		},
+		{
+			name:  "external token uses the principal login name and its provider",
+			token: token("keycloakoidc", "keycloakoidc_user://abc", "jane@example.com"),
+			want:  audit.Identity{Username: "jane@example.com", Provider: "keycloakoidc", PrincipalID: "keycloakoidc_user://abc"},
+		},
+		{
+			name:  "principal login name wins over the user's username",
+			token: token("local", "local://u-1", "from-principal"),
+			want:  audit.Identity{Username: "from-principal", Provider: "local", PrincipalID: "local://u-1"},
+		},
+		{
+			name:  "local token without login name uses the user's username",
+			token: token("local", "local://u-1", ""),
+			want:  audit.Identity{Username: "local-user", Provider: "local", PrincipalID: "local://u-1"},
+		},
+		{
+			name:  "legacy token without provider is a local user",
+			token: token("", "", ""),
+			want:  audit.Identity{Username: "local-user", Provider: "local"},
+		},
+		{
+			name:  "external token without login name has no username but keeps its provider",
+			token: token("keycloakoidc", "keycloakoidc_user://abc", ""),
+			want:  audit.Identity{Provider: "keycloakoidc", PrincipalID: "keycloakoidc_user://abc"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, sessionIdentity(tt.token, user))
 		})
 	}
 }

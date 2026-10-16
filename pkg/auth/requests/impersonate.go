@@ -124,13 +124,17 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 				}
 				reqGroup = append(reqGroup, k8sUser.AllAuthenticated)
 
-				userInfo := &k8sUser.DefaultInfo{
+				impersonated := &k8sUser.DefaultInfo{
 					Name:   reqUser,
 					UID:    reqUser,
 					Groups: reqGroup,
 					Extra:  reqExtras,
 				}
-				*req = *req.WithContext(request.WithUser(req.Context(), userInfo))
+				if auditUser != nil {
+					// userInfo is still the authenticated caller here.
+					auditUser.Impersonate(userInfo, impersonated)
+				}
+				*req = *req.WithContext(request.WithUser(req.Context(), impersonated))
 			}
 		}
 
