@@ -373,13 +373,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
 	status := pkgcluster.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil
-
-	var features map[string]bool
-
 	preBootstrap := capr.ShouldPreBootstrap(cluster)
-	if !preBootstrap {
-		features = GetDesiredFeatures(cluster)
-	}
 
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, &TemplateOps{
@@ -391,7 +385,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 		URL:            settings.ServerURL.Get(),
 		IsPreBootstrap: preBootstrap,
 		Cluster:        cluster,
-		AgentFeatures:  features,
+		AgentFeatures:  GetDesiredFeatures(cluster),
 		Taints:         taints,
 		SecretLister:   secretLister,
 		PcExists:       pcExists,
