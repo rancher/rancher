@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -83,7 +83,7 @@ func objects(cluster *provv1.Cluster, dynamic *dynamic.Controller, dynamicSchema
 	return result, nil
 }
 
-func pruneBySchema(data map[string]interface{}, dynamicSchemaSpec v3.DynamicSchemaSpec) {
+func pruneBySchema(data map[string]any, dynamicSchemaSpec v3.DynamicSchemaSpec) {
 	for k := range data {
 		if _, ok := dynamicSchemaSpec.ResourceFields[k]; !ok {
 			delete(data, k)
@@ -185,25 +185,25 @@ func toMachineTemplate(machinePoolName string, cluster *provv1.Cluster, machineP
 	}
 
 	ustr := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"kind":       strings.TrimSuffix(kind, "Config") + "MachineTemplate",
 			"apiVersion": capr.RKEMachineAPIVersion,
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					capr.MachineTemplateClonedFromGroupVersionAnn: gvk.GroupVersion().String(),
 					capr.MachineTemplateClonedFromKindAnn:         gvk.Kind,
 					capr.MachineTemplateClonedFromNameAnn:         machinePool.NodeConfig.Name,
 				},
 				"name":      machinePoolName,
 				"namespace": cluster.Namespace,
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					apply.LabelPrune: "false",
 				},
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"clusterName": cluster.Name,
-				"template": map[string]interface{}{
-					"spec": map[string]interface{}(machinePoolData),
+				"template": map[string]any{
+					"spec": map[string]any(machinePoolData),
 				},
 			},
 		},
@@ -253,7 +253,7 @@ func populateHostnameLengthLimitAnnotation(mp provv1.RKEMachinePool, cluster *pr
 	return nil
 }
 
-func createMachineTemplateHash(dataMap map[string]interface{}) string {
+func createMachineTemplateHash(dataMap map[string]any) string {
 	ustr := &unstructured.Unstructured{Object: dataMap}
 	dataMap = ustr.DeepCopy().Object
 
@@ -306,12 +306,10 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 		commonBootstrapTplName = name.SafeConcatName(cluster.Name, "bootstrap", "template")
 		if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
 			result = append(result, &rkev1.RKEBootstrapTemplate{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: cluster.Namespace,
-					Name:      commonBootstrapTplName,
-					Labels: map[string]string{
-						capr.ClusterNameLabel: cluster.Name,
-					},
+				Namespace: cluster.Namespace,
+				Name:      commonBootstrapTplName,
+				Labels: map[string]string{
+					capr.ClusterNameLabel: cluster.Name,
 				},
 				Spec: rkev1.RKEBootstrapTemplateSpec{
 					ClusterName: cluster.Name,
@@ -387,12 +385,8 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 		}
 
 		machineDeploymentLabels := map[string]string{}
-		for k, v := range machinePool.Labels {
-			machineDeploymentLabels[k] = v
-		}
-		for k, v := range machinePool.MachineDeploymentLabels {
-			machineDeploymentLabels[k] = v
-		}
+		maps.Copy(machineDeploymentLabels, machinePool.Labels)
+		maps.Copy(machineDeploymentLabels, machinePool.MachineDeploymentLabels)
 
 		machineDeploymentLabels[capr.CattleOSLabel] = machineOS
 		machineDeploymentLabels[capr.ClusterNameLabel] = cluster.Name
@@ -427,12 +421,10 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 		// for each machine pool, because they could have different additional userdata.
 		if bootstrapTplName == "" {
 			bootstrapTpl := &rkev1.RKEBootstrapTemplate{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: cluster.Namespace,
-					Name:      machineDeploymentName,
-					Labels: map[string]string{
-						capr.ClusterNameLabel: cluster.Name,
-					},
+				Namespace: cluster.Namespace,
+				Name:      machineDeploymentName,
+				Labels: map[string]string{
+					capr.ClusterNameLabel: cluster.Name,
 				},
 				Spec: rkev1.RKEBootstrapTemplateSpec{
 					ClusterName: cluster.Name,
@@ -454,12 +446,10 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 		}
 
 		machineDeployment := &capi.MachineDeployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:   cluster.Namespace,
-				Name:        machineDeploymentName,
-				Labels:      machineDeploymentLabels,
-				Annotations: deployAnnotations,
-			},
+			Namespace:   cluster.Namespace,
+			Name:        machineDeploymentName,
+			Labels:      machineDeploymentLabels,
+			Annotations: deployAnnotations,
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
 				Replicas:    machinePool.Quantity,
@@ -496,6 +486,7 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 						Deletion: capi.MachineDeletionSpec{
 							NodeDrainTimeoutSeconds: durationToSeconds(machinePool.DrainBeforeDeleteTimeout, cluster),
 						},
+						Version: cluster.Spec.KubernetesVersion,
 					},
 				},
 				Paused: &machinePool.Paused,
@@ -525,9 +516,7 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 		machineDeployment.Spec.Template.Labels[capr.CattleOSLabel] = machineOS
 
 		if len(machinePool.Labels) > 0 {
-			for k, v := range machinePool.Labels {
-				machineDeployment.Spec.Template.Labels[k] = v
-			}
+			maps.Copy(machineDeployment.Spec.Template.Labels, machinePool.Labels)
 			if err := assign(machineDeployment.Spec.Template.Annotations, capr.LabelsAnnotation, machinePool.Labels); err != nil {
 				return nil, err
 			}
@@ -565,10 +554,8 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 	}
 
 	return &capi.MachineHealthCheck{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      machineDeployment.Name,
-			Namespace: machineDeployment.Namespace,
-		},
+		Name:      machineDeployment.Name,
+		Namespace: machineDeployment.Namespace,
 		Spec: capi.MachineHealthCheckSpec{
 			ClusterName: machineDeployment.Spec.ClusterName,
 			Selector: metav1.LabelSelector{ // this health check only applies to machines in this deployment
@@ -602,7 +589,7 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 	}
 }
 
-func assign(labels map[string]string, key string, value interface{}) error {
+func assign(labels map[string]string, key string, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -613,11 +600,9 @@ func assign(labels map[string]string, key string, value interface{}) error {
 
 func rkeCluster(cluster *provv1.Cluster) *rkev1.RKECluster {
 	return &rkev1.RKECluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Name,
-			Namespace:   cluster.Namespace,
-			Annotations: map[string]string{capr.DeleteMissingCustomMachinesAfterAnnotation: cluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation]},
-		},
+		Name:        cluster.Name,
+		Namespace:   cluster.Namespace,
+		Annotations: map[string]string{capr.DeleteMissingCustomMachinesAfterAnnotation: cluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation]},
 	}
 }
 
@@ -638,16 +623,14 @@ func rkeControlPlane(cluster *provv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	}
 	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
 	return &rkev1.RKEControlPlane{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-			Labels: map[string]string{
-				capr.InitNodeMachineIDLabel: cluster.Labels[capr.InitNodeMachineIDLabel],
-			},
-			Annotations: map[string]string{
-				capr.ClusterSpecAnnotation:      b64GZCluster,
-				capr.RKE2PrimeEnabledAnnotation: cluster.Annotations[capr.RKE2PrimeEnabledAnnotation],
-			},
+		Name:      cluster.Name,
+		Namespace: cluster.Namespace,
+		Labels: map[string]string{
+			capr.InitNodeMachineIDLabel: cluster.Labels[capr.InitNodeMachineIDLabel],
+		},
+		Annotations: map[string]string{
+			capr.ClusterSpecAnnotation:      b64GZCluster,
+			capr.RKE2PrimeEnabledAnnotation: cluster.Annotations[capr.RKE2PrimeEnabledAnnotation],
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
 			ClusterConfiguration:     rkeConfig.ClusterConfiguration,
@@ -706,19 +689,17 @@ func capiCluster(cluster *provv1.Cluster, rkeControlPlane *rkev1.RKEControlPlane
 	}
 
 	return &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Name,
-			Namespace:   cluster.Namespace,
-			Annotations: annotations,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion:         ownerAPIVersion,
-					Kind:               ownerGVK.Kind,
-					Name:               cluster.Name,
-					UID:                cluster.UID,
-					Controller:         ptr.To(true),
-					BlockOwnerDeletion: ptr.To(true),
-				},
+		Name:        cluster.Name,
+		Namespace:   cluster.Namespace,
+		Annotations: annotations,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion:         ownerAPIVersion,
+				Kind:               ownerGVK.Kind,
+				Name:               cluster.Name,
+				UID:                cluster.UID,
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			},
 		},
 		Spec: capi.ClusterSpec{
@@ -733,18 +714,16 @@ func beacon(cluster *provv1.Cluster) *planv1alpha1.Beacon {
 	ownerAPIVersion, _ := ownerGVK.ToAPIVersionAndKind()
 
 	return &planv1alpha1.Beacon{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion:         ownerAPIVersion,
-					Kind:               ownerGVK.Kind,
-					Name:               cluster.Name,
-					UID:                cluster.UID,
-					Controller:         ptr.To(true),
-					BlockOwnerDeletion: ptr.To(true),
-				},
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion:         ownerAPIVersion,
+				Kind:               ownerGVK.Kind,
+				Name:               cluster.Name,
+				UID:                cluster.UID,
+				Controller:         new(true),
+				BlockOwnerDeletion: new(true),
 			},
 		},
 	}
@@ -761,5 +740,5 @@ func durationToSeconds(d *metav1.Duration, cluster *provv1.Cluster) *int32 {
 			cluster.Namespace, cluster.Name, d.Duration.String(), math.MaxInt32)
 		s = math.MaxInt32
 	}
-	return ptr.To(int32(s))
+	return new(int32(s))
 }
