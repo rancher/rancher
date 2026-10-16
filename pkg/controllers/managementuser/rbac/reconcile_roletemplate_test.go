@@ -631,6 +631,10 @@ func TestRemoveStaleProjectNamespaceCRBs(t *testing.T) {
 				crbLister:           crbLister,
 				clusterRoleBindings: crbClient,
 			}
+			if test.crbsToKeep == nil {
+				test.crbsToKeep = make(map[string]bool)
+			}
+
 			err := m.removeStaleProjectNamespaceCRBs(test.binding, test.crbsToKeep)
 			if test.wantErr {
 				assert.Error(t, err)
