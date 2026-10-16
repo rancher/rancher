@@ -176,7 +176,7 @@ func findLdapUser(guid string, lConn *ldapv3.Conn, adConfig *v3.ActiveDirectoryC
 
 	entry := result.Entries[0]
 	distinguishedName := entry.DN
-	principal, err := ldap.AttributesToPrincipal(entry.Attributes, distinguishedName, activeDirectoryScope, activeDirecotryName,
+	principal, err := ldap.AttributesToPrincipal(entry.Attributes, distinguishedName, activeDirectoryScope, activeDirectoryName,
 		adConfig.UserObjectClass, adConfig.UserNameAttribute, adConfig.UserLoginAttribute, adConfig.GroupObjectClass, adConfig.GroupNameAttribute, "")
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to generate principal from ldap attributes")

@@ -114,7 +114,7 @@ func TestLoadADConfiguration(t *testing.T) {
 		{
 			name: "AuthConfig exists",
 			client: &fakeAuthConfigClient{obj: &unstructured.Unstructured{Object: map[string]interface{}{
-				"metadata": map[string]interface{}{"name": activeDirecotryName},
+				"metadata": map[string]interface{}{"name": activeDirectoryName},
 				"enabled":  true,
 			}}},
 			wantEnabled: true,
@@ -122,7 +122,7 @@ func TestLoadADConfiguration(t *testing.T) {
 		{
 			name: "AuthConfig does not exist",
 			client: &fakeAuthConfigClient{
-				err: apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "authconfigs"}, activeDirecotryName),
+				err: apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "authconfigs"}, activeDirectoryName),
 			},
 			wantErr:      true,
 			wantNotFound: true,
@@ -147,7 +147,7 @@ func TestLoadADConfiguration(t *testing.T) {
 				assert.Nil(t, adConfig)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, activeDirecotryName, adConfig.Name)
+				assert.Equal(t, activeDirectoryName, adConfig.Name)
 				assert.Equal(t, test.wantEnabled, adConfig.Enabled)
 			}
 

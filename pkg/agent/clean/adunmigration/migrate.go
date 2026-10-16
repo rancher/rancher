@@ -32,7 +32,7 @@ const (
 	migrateCrtbsOperation     = "migrate-ad-crtbs"
 	migratePrtbsOperation     = "migrate-ad-prtbs"
 	migrateGrbsOperation      = "migrate-ad-grbs"
-	activeDirecotryName       = "activedirectory"
+	activeDirectoryName       = "activedirectory"
 	activeDirectoryScope      = "activedirectory_user"
 	activeDirectoryPrefix     = "activedirectory_user://"
 	localPrefix               = "local://"
