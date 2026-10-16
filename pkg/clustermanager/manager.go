@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
@@ -124,32 +125,48 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
-// markNotReady sets the Ready condition of cluster to False with the given reason, and cause as the
-// message. It only touches the cluster it was given: if the object with that name has since been
-// deleted, or replaced by a new cluster with the same name, it does nothing. It does not stop
-// anything; callers decide what to stop.
-func (m *Manager) markNotReady(cluster *apimgmtv3.Cluster, reason string, cause error) {
+func (m *Manager) StopAndMarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
 	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
-		logrus.Debugf("[clustermanager] not marking cluster %s not ready: %v", cluster.Name, err)
-		return
-	}
-	if current.UID != cluster.UID {
-		logrus.Debugf("[clustermanager] not marking cluster %s not ready: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: %v", cluster.Name, err)
 		return
 	}
 
-	message := cause.Error()
-	if apimgmtv3.ClusterConditionReady.IsFalse(current) &&
-		apimgmtv3.ClusterConditionReady.GetReason(current) == reason &&
-		apimgmtv3.ClusterConditionReady.GetMessage(current) == message {
+	if current.UID != cluster.UID {
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
+		m.Stop(cluster)
 		return
 	}
-	apimgmtv3.ClusterConditionReady.False(current)
-	apimgmtv3.ClusterConditionReady.Reason(current, reason)
-	apimgmtv3.ClusterConditionReady.Message(current, message)
-	if _, err := m.clusters.UpdateStatus(current); err != nil {
-		logrus.Warnf("[clustermanager] failed to mark cluster %s not ready: %v", cluster.Name, err)
+
+	if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(current) {
+		apimgmtv3.ClusterConditionControllersRunning.False(current)
+		pkgcluster.SummarizeReadyCondition(current)
+		cluster, err := m.clusters.UpdateStatus(current)
+		if err == nil {
+			current = cluster
+		}
+	}
+
+	m.Stop(current)
+}
+
+func (m *Manager) MarkControllersRunning(cluster *apimgmtv3.Cluster) {
+	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers running: %v", cluster.Name, err)
+		return
+	}
+
+	if current.UID != cluster.UID {
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
+		m.Stop(cluster)
+		return
+	}
+
+	if !apimgmtv3.ClusterConditionControllersRunning.IsTrue(current) {
+		apimgmtv3.ClusterConditionControllersRunning.True(current)
+		pkgcluster.SummarizeReadyCondition(current)
+		_, _ = m.clusters.UpdateStatus(current)
 	}
 }
 
@@ -167,8 +184,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.markNotReady(cluster, reasonUserControllersFailed, err)
-		m.Stop(cluster)
+		m.StopAndMarkControllersNotRunning(cluster)
 		return nil, err
 	}
 	if clusterRecord == nil {
@@ -182,8 +198,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		clusterRecord.cancel()
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.markNotReady(cluster, reasonUserControllersFailed, err)
-		m.Stop(cluster)
+		m.StopAndMarkControllersNotRunning(cluster)
 		return nil, err
 	}
 
@@ -200,7 +215,17 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !r.started {
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
-				m.handleStartFailure(r, err)
+				// only mark running/not running for owner instance
+				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
+				if clusterOwner {
+					m.StopAndMarkControllersNotRunning(r.clusterRec)
+				} else {
+					m.Stop(r.clusterRec)
+				}
+			} else {
+				if clusterOwner {
+					m.MarkControllersRunning(r.clusterRec)
+				}
 			}
 		}()
 		r.started = true
@@ -228,10 +253,7 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 // cluster's connection details changed while it was starting, and the replacement must keep running.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-	if reason, report := classifyStartError(r.ctx, err); report {
-		m.markNotReady(r.clusterRec, reason, err)
-	}
-	m.stopRecord(r)
+	m.StopAndMarkControllersNotRunning(r.clusterRec)
 }
 
 func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
@@ -266,7 +288,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 				if rec.ctx.Err() != nil || errors.Is(err, dialer.ErrAgentDisconnected) {
 					return err
 				}
-				return fmt.Errorf("%w: %w", errAPIServerUnreachable, err)
+				return err
 			}
 			select {
 			case <-rec.ctx.Done():
@@ -289,7 +311,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	// pre-bootstrap the cluster if it's not already bootstrapped
 	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
 	if capr.ShouldPreBootstrap(rec.clusterRec) {
-		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
+		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec)
 		if err != nil {
 			transaction.Rollback()
 			return err
@@ -334,7 +356,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	select {
 	case <-time.After(10 * time.Minute):
 		rec.cancel()
-		return errControllersSyncTimeout
+		return errors.New("timed out waiting for cluster controllers to start")
 	case err := <-done:
 		return err
 	}
@@ -392,10 +414,8 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		Host:        u.String(),
 		Dial:        clusterDialer,
 		BearerToken: string(secret.Data[secretmigrator.SecretKey]),
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData:     append(caBytes, suffix...),
-			NextProtos: []string{"http/1.1"},
-		},
+		CAData:      append(caBytes, suffix...),
+		NextProtos:  []string{"http/1.1"},
 		Timeout:     45 * time.Second,
 		RateLimiter: ratelimit.None,
 		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,
@@ -515,6 +535,14 @@ func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserCont
 	return m.UserContextNoControllersReconnecting(clusterName, true)
 }
 
+type ContextError struct {
+	Message string
+}
+
+func (e *ContextError) Error() string {
+	return e.Message
+}
+
 // UserContextNoControllersReconnecting works like UserContextNoControllers if reconnect is true.
 // Otherwise, it will return an error immediately if the cluster connection fails.
 func (m *Manager) UserContextNoControllersReconnecting(clusterName string, reconnect bool) (*config.UserContext, error) {
@@ -524,7 +552,9 @@ func (m *Manager) UserContextNoControllersReconnecting(clusterName string, recon
 	}
 	ctx, err := m.UserContextFromClusterReconnecting(cluster, reconnect)
 	if ctx == nil && err == nil {
-		return nil, fmt.Errorf("cluster context %s is unavailable", clusterName)
+		return nil, &ContextError{
+			Message: fmt.Sprintf("cluster context %s is unavailable", clusterName),
+		}
 	}
 	return ctx, err
 }

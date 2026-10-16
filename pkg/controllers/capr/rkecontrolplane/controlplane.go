@@ -8,7 +8,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -78,7 +77,7 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 		return status, nil
 	}
 
-	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
+	status.AgentConnected = v3.ClusterConditionConnected.IsTrue(cluster)
 	return status, nil
 }
 

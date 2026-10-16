@@ -8,13 +8,12 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 var (
 	awsProxyEndpoint = v3.ProxyEndpoint{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "rancher-aws-endpoints",
-		},
+		Name: "rancher-aws-endpoints",
 		Spec: v3.ProxyEndpointSpec{
 			Routes: []v3.ProxyEndpointRoute{
 				// https://docs.aws.amazon.com/general/latest/gr/iam-service.html
@@ -39,9 +38,7 @@ var (
 		},
 	}
 	digitalOceanProxyEndpoint = v3.ProxyEndpoint{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "rancher-digitalocean-endpoints",
-		},
+		Name: "rancher-digitalocean-endpoints",
 		Spec: v3.ProxyEndpointSpec{
 			Routes: []v3.ProxyEndpointRoute{
 				{Domain: "api.digitalocean.com"},
@@ -49,9 +46,7 @@ var (
 		},
 	}
 	linodeProxyEndpoint = v3.ProxyEndpoint{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "rancher-linode-endpoints",
-		},
+		Name: "rancher-linode-endpoints",
 		Spec: v3.ProxyEndpointSpec{
 			Routes: []v3.ProxyEndpointRoute{
 				{Domain: "api.linode.com"},
@@ -100,32 +95,41 @@ func endpointExists(name string, clients *wrangler.Context) (*v3.ProxyEndpoint, 
 	return endpoint, true, nil
 }
 
+// CreateOrDisableEndpoint will create an endpoint if it is enabled and does not exist, update the routes if it is
+// enabled and does exist, delete the endpoint if disabled and does exist, or do nothing.
+// This function runs within OnLeader so must be tolerant to errors.
 func createOrDisableEndpoint(endpoint v3.ProxyEndpoint, disabled bool, clients *wrangler.Context) error {
-	existingEndpoint, exists, err := endpointExists(endpoint.Name, clients)
-	if err != nil {
-		return err
-	}
-	if !disabled && !exists {
-		_, err = clients.Mgmt.ProxyEndpoint().Create(&endpoint)
-		if err != nil && !errors.IsAlreadyExists(err) {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, exists, err := endpointExists(endpoint.Name, clients)
+		if err != nil {
 			return err
 		}
-		return nil
-	}
-	if disabled && exists {
-		err = clients.Mgmt.ProxyEndpoint().Delete(endpoint.Name, &v1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+
+		if !disabled && !exists {
+			_, err = clients.Mgmt.ProxyEndpoint().Create(&endpoint)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				return err
+			}
+
+			return nil
+		} else if !disabled {
+			if slices.Equal(current.Spec.Routes, endpoint.Spec.Routes) {
+				return nil
+			}
+
+			current = current.DeepCopy()
+			current.Spec.Routes = endpoint.Spec.Routes
+			_, err = clients.Mgmt.ProxyEndpoint().Update(current)
 			return err
+		} else if exists {
+			err = clients.Mgmt.ProxyEndpoint().Delete(endpoint.Name, &v1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+
+			return nil
 		}
+
 		return nil
-	}
-
-	if !disabled {
-		// if it exists and is not disabled, ensure it has the correct routes
-		existingEndpoint = existingEndpoint.DeepCopy()
-		existingEndpoint.Spec.Routes = endpoint.Spec.Routes
-		_, err = clients.Mgmt.ProxyEndpoint().Update(existingEndpoint)
-	}
-
-	return err
+	})
 }

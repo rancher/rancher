@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"sort"
 	"strconv"
@@ -47,7 +48,6 @@ const (
 	ByETCDSnapshotName     = "by-etcd-snapshot-name"
 
 	creatorIDAnn              = "field.cattle.io/creatorId"
-	administratedAnn          = "provisioning.cattle.io/administrated"
 	mgmtClusterNameAnn        = "provisioning.cattle.io/management-cluster-name"
 	mgmtClusterDisplayNameAnn = "provisioning.cattle.io/management-cluster-display-name"
 	fleetWorkspaceNameAnn     = "provisioning.cattle.io/fleet-workspace-name"
@@ -653,12 +653,10 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	}
 
 	newCluster := &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Status.ClusterName,
-			Labels:      cluster.Labels,
-			Annotations: map[string]string{administratedAnn: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
-		},
-		Spec: spec,
+		Name:        cluster.Status.ClusterName,
+		Labels:      cluster.Labels,
+		Annotations: map[string]string{v3.ClusterAdministratedAnnotation: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
+		Spec:        spec,
 	}
 
 	if mgmtClusterNameAnnVal, ok := cluster.Annotations[mgmtClusterNameAnn]; ok && mgmtClusterNameAnnVal != "" && newCluster.Name == "" {
@@ -680,9 +678,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		return nil, status, err
 	}
 
-	for k, v := range cluster.Annotations {
-		newCluster.Annotations[k] = v
-	}
+	maps.Copy(newCluster.Annotations, cluster.Annotations)
 
 	delete(cluster.Annotations, creatorIDAnn)
 

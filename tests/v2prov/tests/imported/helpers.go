@@ -149,7 +149,7 @@ func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displ
 
 	err = wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
 		mgmtCluster = obj.(*v3.Cluster)
-		return v3.Ready.IsTrue(mgmtCluster), nil
+		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
 	})
 	handleError(t, clients, mgmtCluster.Name, err)
 

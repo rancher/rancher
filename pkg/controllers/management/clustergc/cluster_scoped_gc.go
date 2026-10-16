@@ -78,7 +78,7 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	// run. Clean up only once the replica that owns the cluster reports them stopped, or the removal moved
 	// on without that report, otherwise objects would be left with finalizers nothing removes, and the
 	// cluster's namespace would never go away.
-	if !util.ConditionConcluded(cluster, apisv3.ClusterConditionUserControllersStopped) {
+	if !util.ConditionConcluded(cluster, apisv3.ClusterConditionControllersStopped) {
 		c.enqueueAfter("", cluster.Name, userControllersStoppedRequeue)
 		return cluster, generic.ErrSkip
 	}

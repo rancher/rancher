@@ -129,7 +129,7 @@ type userControllersController struct {
 	ctx           context.Context
 	starter       controllerStarter
 	clusterLister controllers.ClusterCache
-	clusters      controllers.ClusterClient
+	clusters      controllers.ClusterController
 	// identity names this replica when it reports a cluster's user controllers stopped.
 	identity string
 	sessions sessionCloser
@@ -175,6 +175,13 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 		if restartNeeded {
 			action = "restart"
 		}
+		var contextErr *clustermanager.ContextError
+		if errors.As(err, &contextErr) {
+			// discard error in order to prevent unnecessary lasso backoff
+			logrus.Errorf("userControllersController: unable to %s controllers for cluster %s: %v, requeuing in 30 seconds", action, key, err)
+			u.clusters.EnqueueAfter(key, 30*time.Second)
+			return nil, nil
+		}
 		return nil, fmt.Errorf("userControllersController: unable to %s controllers for cluster %s: %w", action, key, err)
 	}
 
@@ -200,11 +207,11 @@ func (u *userControllersController) syncRemoving(cluster *v3.Cluster) error {
 
 	u.starter.Stop(cluster)
 
-	if !u.isOwner(cluster) || v3.ClusterConditionUserControllersStopped.IsTrue(cluster) {
+	if !u.isOwner(cluster) || v3.ClusterConditionControllersStopped.IsTrue(cluster) {
 		return nil
 	}
 	message := fmt.Sprintf("user controllers stopped by %s", u.identity)
-	if err := util.SetCondition(u.clusters, cluster, v3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, reasonStopped, message); err != nil {
+	if err := util.SetCondition(u.clusters, cluster, v3.ClusterConditionControllersStopped, corev1.ConditionTrue, reasonStopped, message); err != nil {
 		return fmt.Errorf("userControllersController: failed to report user controllers stopped for cluster %s: %w", cluster.Name, err)
 	}
 	return nil

@@ -10,9 +10,8 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterutil "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
@@ -405,7 +404,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -414,7 +413,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				toInstall := versionManagementEnabled && toEnable
@@ -448,7 +447,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -457,7 +456,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				toUninstall := !versionManagementEnabled && noManagedPlan
@@ -622,7 +621,7 @@ func (h *handler) setImagePullSecrets(values map[string]interface{}, useObjectRe
 	var pullSecretsAsStrings []string
 	var pullSecretsAsObjectReferences []kcorev1.LocalObjectReference
 
-	registry, _ := clusterutil.GetPrivateRegistry(nil)
+	registry, _ := pkgcluster.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecretsAsObjectReferences = registry.PullSecretsAsObjectReferences()
 		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()

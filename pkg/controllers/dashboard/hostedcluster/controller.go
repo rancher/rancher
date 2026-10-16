@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	cluster2 "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	controllerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -161,7 +161,7 @@ func (h handler) onSettingsChange(_ string, setting *v3.Setting) (*v3.Setting, e
 
 func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition, chartVersion string) error {
 	var pullSecrets []string
-	registry, _ := cluster2.GetPrivateRegistry(nil)
+	registry, _ := pkgcluster.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecrets = registry.PullSecretNamesAsSlice()
 	}
