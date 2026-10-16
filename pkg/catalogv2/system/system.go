@@ -40,6 +40,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+const (
+	defaultInterval = 21600 * time.Second
+	defaultTimeout  = 5 * time.Minute
+)
+
 var (
 	installUser = &user.DefaultInfo{
 		Name: "helm-installer",
@@ -193,7 +198,7 @@ func (m *Manager) runSync() {
 func getIntervalOrDefault(interval string) time.Duration {
 	i, err := strconv.Atoi(interval)
 	if err != nil {
-		return 21600 * time.Second
+		return defaultInterval
 	}
 	return time.Duration(i) * time.Second
 }
@@ -605,10 +610,13 @@ func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates)
 	return len(releases) != 0, nil
 }
 
+// timeoutOrDefault returns the settings.SystemManagedChartsOperationTimeout (default of 5 minutes) or 5 minutes if the
+// setting cannot be parsed. This function is used for configuring the duration of operation timeouts, namely the
+// timeout for an upgrade operation and the timeout for the kubernetes watch for the helm pod's exit status.
 func timeoutOrDefault() time.Duration {
 	t, err := time.ParseDuration(settings.SystemManagedChartsOperationTimeout.Get())
 	if err != nil {
-		return 5 * time.Minute
+		return defaultTimeout
 	}
 	return t
 }
