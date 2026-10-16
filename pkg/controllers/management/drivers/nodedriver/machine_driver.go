@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -99,26 +100,29 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	if driver.Exists() && err == nil && !forceUpdate {
 		// add credential schema
 		credFields := map[string]v32.Field{}
-		pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
+		credFieldMetadata, err := m.resolveCredFieldMetadata(obj)
+		if err != nil {
+			return obj, err
+		}
 		for name, field := range existingSchema.Spec.ResourceFields {
-			if SSHKeyFields[name] || passwordFields[name] || privateCredFields[name] {
+			if SSHKeyFields[name] || credFieldMetadata.password.Has(name) || credFieldMetadata.private.Has(name) {
 				if field.Type != "password" {
 					forceUpdate = true
 					break
 				}
 			}
 			// even if forceUpdate is false, calculate credFields to check if credSchema needs to be updated
-			if privateCredFields[name] || pubCredFields[name] {
+			if credFieldMetadata.private.Has(name) || credFieldMetadata.public.Has(name) {
 				credField := field
-				credField.Required = !optionals[name]
-				if val, ok := defaults[name]; ok {
+				credField.Required = !credFieldMetadata.optional.Has(name)
+				if val, ok := credFieldMetadata.defaults[name]; ok {
 					credField = updateDefault(credField, val, field.Type)
 				}
 				credFields[name] = credField
 			}
 		}
 		if !forceUpdate {
-			return m.createCredSchema(obj, credFields)
+			return m.createCredSchema(obj, credFields, credFieldMetadata.publicList(), credFieldMetadata.privateList())
 		}
 	}
 
@@ -174,7 +178,10 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	}
 	credFields := map[string]v32.Field{}
 	resourceFields := map[string]v32.Field{}
-	pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
+	credFieldMetadata, err := m.resolveCredFieldMetadata(obj)
+	if err != nil {
+		return obj, err
+	}
 	for _, flag := range flags {
 		name, field, err := FlagToField(flag)
 		if err != nil {
@@ -190,14 +197,14 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 			}
 		}
 
-		if privateCredFields[name] || passwordFields[name] || SSHKeyFields[name] {
+		if credFieldMetadata.private.Has(name) || credFieldMetadata.password.Has(name) || SSHKeyFields[name] {
 			field.Type = "password"
 		}
 
-		if pubCredFields[name] || privateCredFields[name] {
+		if credFieldMetadata.public.Has(name) || credFieldMetadata.private.Has(name) {
 			credField := field
-			credField.Required = !optionals[name]
-			if val, ok := defaults[name]; ok {
+			credField.Required = !credFieldMetadata.optional.Has(name)
+			if val, ok := credFieldMetadata.defaults[name]; ok {
 				credField = updateDefault(credField, val, field.Type)
 			}
 			credFields[name] = credField
@@ -239,28 +246,37 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		}
 	}
 
-	return m.createCredSchema(obj, credFields)
+	return m.createCredSchema(obj, credFields, credFieldMetadata.publicList(), credFieldMetadata.privateList())
 }
 
-func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field) (*v32.NodeDriver, error) {
+func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field, publicFields, privateFields []string) (*v32.NodeDriver, error) {
 	name := credentialConfigSchemaName(obj.Spec.DisplayName)
+
 	credSchema, err := m.schemaLister.Get("", name)
 
-	if name == "amazonec2credentialconfig" {
-		credFields["defaultRegion"] = v32.Field{
-			Type:         "string",
-			Description:  "AWS Default Region",
-			DynamicField: true,
-			Create:       true,
-			Update:       true,
+	// Merge any synthetic credential fields (fields not derived from the
+	// driver binary's flags) into the schema's resource fields, applying
+	// their classification to the public/private field lists.
+	public := sets.New(publicFields...)
+	private := sets.New(privateFields...)
+	for fieldName, synthetic := range syntheticCredentialFields[obj.Spec.DisplayName] {
+		credFields[fieldName] = synthetic.field
+		if synthetic.public {
+			public.Insert(fieldName)
+		} else {
+			private.Insert(fieldName)
 		}
 	}
+	publicFields = sortedSetList(public)
+	privateFields = sortedSetList(private)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
 			credentialSchema := &v32.DynamicSchema{
 				Spec: v32.DynamicSchemaSpec{
 					ResourceFields: credFields,
+					PublicFields:   publicFields,
+					PrivateFields:  privateFields,
 				},
 			}
 			credentialSchema.Name = name
@@ -273,18 +289,28 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 				},
 			}
 			_, err := m.schemaClient.Create(credentialSchema)
-			return obj, err
+			if err != nil {
+				return obj, err
+			}
+			return m.syncCredFieldAnnotations(obj, publicFields, privateFields)
 		}
 		return obj, err
-	} else if !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) {
+	}
+
+	needsUpdate := !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) ||
+		!reflect.DeepEqual(credSchema.Spec.PublicFields, publicFields) ||
+		!reflect.DeepEqual(credSchema.Spec.PrivateFields, privateFields)
+	if needsUpdate {
 		toUpdate := credSchema.DeepCopy()
 		toUpdate.Spec.ResourceFields = credFields
+		toUpdate.Spec.PublicFields = publicFields
+		toUpdate.Spec.PrivateFields = privateFields
 		_, err := m.schemaClient.Update(toUpdate)
 		if err != nil {
 			return obj, err
 		}
 	}
-	return obj, nil
+	return m.syncCredFieldAnnotations(obj, publicFields, privateFields)
 }
 
 func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
@@ -468,23 +494,163 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	return nil
 }
 
-func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool, map[string]bool, map[string]string, map[string]bool) {
-	getMap := func(fields string) map[string]bool {
-		data := map[string]bool{}
-		for _, field := range strings.Split(fields, ",") {
-			data[field] = true
-		}
-		return data
+type credentialFieldMetadata struct {
+	public   sets.Set[string]
+	private  sets.Set[string]
+	password sets.Set[string]
+	optional sets.Set[string]
+	defaults map[string]string
+}
+
+// syntheticCredentialField describes a credential schema field that is not
+// derived from the driver binary's flags: its definition plus the
+// public/private classification Rancher applies to it.
+type syntheticCredentialField struct {
+	field  v32.Field
+	public bool
+}
+
+// syntheticCredentialFields defines virtual credential schema fields (fields
+// not derived from the driver binary's flags), keyed by driver display name.
+// Their classification is applied unconditionally alongside the field
+// definition. Because these fields are virtual, they are not part of the
+// driver's declared credential field metadata (see DriverData in
+// pkg/data/management/machinedriver_data.go) and are excluded from the node
+// driver annotation sync (see syncCredFieldAnnotations).
+var syntheticCredentialFields = map[string]map[string]syntheticCredentialField{
+	"amazonec2": {
+		"defaultRegion": {
+			field: v32.Field{
+				Type:         "string",
+				Description:  "AWS Default Region",
+				DynamicField: true,
+				Create:       true,
+				Update:       true,
+			},
+			public: true,
+		},
+	},
+}
+
+func getCredFields(annotations map[string]string) credentialFieldMetadata {
+	return credentialFieldMetadata{
+		public:   parseCredentialFieldSet(annotations["publicCredentialFields"]),
+		private:  parseCredentialFieldSet(annotations["privateCredentialFields"]),
+		password: parseCredentialFieldSet(annotations["passwordFields"]),
+		optional: parseCredentialFieldSet(annotations["optionalCredentialFields"]),
+		defaults: ParseKeyValueString(annotations["defaults"]),
 	}
-	return getMap(annotations["publicCredentialFields"]),
-		getMap(annotations["privateCredentialFields"]),
-		getMap(annotations["passwordFields"]),
-		ParseKeyValueString(annotations["defaults"]),
-		getMap(annotations["optionalCredentialFields"])
+}
+
+// resolveCredFieldMetadata returns the credential field metadata for the given
+// node driver. The node driver annotations seed the metadata, but once the
+// credential config DynamicSchema has PublicFields/PrivateFields populated on
+// its spec, the schema spec is the source of truth and takes precedence over
+// the annotations. The annotations are kept in sync with the spec (see
+// syncCredFieldAnnotations) for backward compatibility.
+func (m *Lifecycle) resolveCredFieldMetadata(obj *v32.NodeDriver) (credentialFieldMetadata, error) {
+	metadata := getCredFields(obj.Annotations)
+	if obj.Spec.DisplayName == "" {
+		return metadata, nil
+	}
+	credSchema, err := m.schemaLister.Get("", credentialConfigSchemaName(obj.Spec.DisplayName))
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// The credential config schema does not exist yet (first
+			// creation): fall back to the annotation-derived values.
+			return metadata, nil
+		}
+		return metadata, err
+	}
+	if len(credSchema.Spec.PublicFields) > 0 {
+		metadata.public = sets.New(credSchema.Spec.PublicFields...)
+	}
+	if len(credSchema.Spec.PrivateFields) > 0 {
+		metadata.private = sets.New(credSchema.Spec.PrivateFields...)
+	}
+	return metadata, nil
+}
+
+// syncCredFieldAnnotations keeps the public/private credential field
+// annotations on the node driver in sync with the authoritative credential
+// config schema spec values, so consumers still reading the annotations
+// observe data consistent with the schema spec. Synthetic (virtual) fields
+// are not part of the driver's declared credential field metadata, so they
+// are excluded from the annotations. The resolved field lists equal the
+// schema spec values whenever the spec is populated, so this is a no-op
+// until the spec diverges from the annotations.
+func (m *Lifecycle) syncCredFieldAnnotations(obj *v32.NodeDriver, publicFields, privateFields []string) (*v32.NodeDriver, error) {
+	public := sets.New(publicFields...)
+	private := sets.New(privateFields...)
+	for fieldName := range syntheticCredentialFields[obj.Spec.DisplayName] {
+		public.Delete(fieldName)
+		private.Delete(fieldName)
+	}
+	changes := credFieldAnnotationChanges(obj.Annotations, sortedSetList(public), sortedSetList(private))
+	if len(changes) == 0 {
+		return obj, nil
+	}
+	toUpdate := obj.DeepCopy()
+	if toUpdate.Annotations == nil {
+		toUpdate.Annotations = make(map[string]string)
+	}
+	for key, val := range changes {
+		toUpdate.Annotations[key] = val
+	}
+	updated, err := m.nodeDriverClient.Update(toUpdate)
+	if err != nil {
+		return obj, errs.Wrap(err, "failed to sync credential field annotations on node driver")
+	}
+	return updated, nil
+}
+
+// credFieldAnnotationChanges returns the credential field annotations that must
+// be updated on the node driver for them to match the given resolved
+// public/private field lists, or nil when they already match. Annotations are
+// compared as sets, so ordering and duplicate differences do not cause
+// updates. Empty resolved lists never clear existing annotations.
+func credFieldAnnotationChanges(annotations map[string]string, publicFields, privateFields []string) map[string]string {
+	changes := map[string]string{}
+	if len(publicFields) > 0 && !parseCredentialFieldSet(annotations["publicCredentialFields"]).Equal(sets.New(publicFields...)) {
+		changes["publicCredentialFields"] = strings.Join(sets.List(sets.New(publicFields...)), ",")
+	}
+	if len(privateFields) > 0 && !parseCredentialFieldSet(annotations["privateCredentialFields"]).Equal(sets.New(privateFields...)) {
+		changes["privateCredentialFields"] = strings.Join(sets.List(sets.New(privateFields...)), ",")
+	}
+	if len(changes) == 0 {
+		return nil
+	}
+	return changes
+}
+
+func parseCredentialFieldSet(fields string) sets.Set[string] {
+	set := sets.New[string]()
+	for _, field := range strings.Split(fields, ",") {
+		if field == "" {
+			continue
+		}
+		set.Insert(field)
+	}
+	return set
+}
+
+func (m credentialFieldMetadata) publicList() []string {
+	return sortedSetList(m.public)
+}
+
+func (m credentialFieldMetadata) privateList() []string {
+	return sortedSetList(m.private)
 }
 
 func credentialConfigSchemaName(driverName string) string {
 	return fmt.Sprintf("%s%s", driverName, "credentialconfig")
+}
+
+func sortedSetList(fields sets.Set[string]) []string {
+	if len(fields) == 0 {
+		return nil
+	}
+	return sets.List(fields)
 }
 
 func updateDefault(credField v32.Field, val, kind string) v32.Field {
