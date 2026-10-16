@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -1292,8 +1293,11 @@ func TestMigrateCAPIMachineLabelsAndAnnotationsToPlanSecret_Pagination(t *testin
 				}
 				machinePagers[selector] = p
 			}
+			// events records the machine list calls and the plan secret list calls in order.
+			var events []string
 			machineCtrl := fake.NewMockControllerInterface[*capi.Machine, *capi.MachineList](ctrl)
 			machineCtrl.EXPECT().List(migTestWorkspace, gomock.Any()).DoAndReturn(func(_ string, opts metav1.ListOptions) (*capi.MachineList, error) {
+				events = append(events, "machines:"+opts.LabelSelector+":"+opts.Continue)
 				p, ok := machinePagers[opts.LabelSelector]
 				require.True(t, ok, "unexpected label selector %q", opts.LabelSelector)
 				items, next, err := p.Serve(opts)
@@ -1307,6 +1311,7 @@ func TestMigrateCAPIMachineLabelsAndAnnotationsToPlanSecret_Pagination(t *testin
 			var secretUpdates, bootstrapUpdates []string
 			secretCtrl := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			secretCtrl.EXPECT().List(migTestWorkspace, gomock.Any()).DoAndReturn(func(_ string, opts metav1.ListOptions) (*corev1.SecretList, error) {
+				events = append(events, "secrets:"+opts.LabelSelector)
 				p, ok := secretPagers[opts.LabelSelector]
 				if !ok {
 					var items []corev1.Secret
@@ -1389,6 +1394,12 @@ func TestMigrateCAPIMachineLabelsAndAnnotationsToPlanSecret_Pagination(t *testin
 					assert.Empty(t, bootstrapUpdates, "machines without plan secrets must not update the bootstrap")
 					return
 				}
+				// The migration handles the machines of a page before it requests the next page.
+				firstSecretList := slices.Index(events, "secrets:"+labels.Set{capr.MachineNameLabel: "m1a"}.String())
+				nextMachinePage := slices.Index(events, "machines:"+labels.Set{capi.ClusterNameLabel: "p1"}.String()+":token-page-1")
+				require.NotEqual(t, -1, firstSecretList)
+				require.NotEqual(t, -1, nextMachinePage)
+				assert.Less(t, firstSecretList, nextMachinePage, "machines of page 1 must be handled before page 2 is listed")
 				assert.Len(t, secretUpdates, tc.wantSecretsUpdate)
 				assert.ElementsMatch(t, []string{"bootstrap-m1a", "bootstrap-m1b", "bootstrap-m2a"}, bootstrapUpdates)
 				for _, p := range secretPagers {

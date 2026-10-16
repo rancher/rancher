@@ -458,12 +458,109 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 		}
 		processProvClusters := func(provClusters *provv1.ClusterList) error {
 			for _, provCluster := range provClusters.Items {
-				var allMachines []capi.Machine
 				listMachines := func(opts metav1.ListOptions) (*capi.MachineList, error) {
 					return w.CAPI.Machine().List(provCluster.Namespace, opts)
 				}
 				processMachines := func(machines *capi.MachineList) error {
-					allMachines = append(allMachines, machines.Items...)
+					for _, machine := range machines.Items {
+						if !machine.Spec.Bootstrap.ConfigRef.IsDefined() || machine.Spec.Bootstrap.ConfigRef.APIGroup != capr.RKEAPIGroup {
+							continue
+						}
+
+						var foundPlanSecrets bool
+						listPlanSecrets := func(opts metav1.ListOptions) (*v1.SecretList, error) {
+							return w.Core.Secret().List(machine.Namespace, opts)
+						}
+						processPlanSecrets := func(planSecrets *v1.SecretList) error {
+							foundPlanSecrets = foundPlanSecrets || len(planSecrets.Items) > 0
+							for _, secret := range planSecrets.Items {
+								if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+									sec, err := w.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+									if apierrors.IsNotFound(err) {
+										return nil
+									}
+									if err != nil {
+										return err
+									}
+
+									sec = sec.DeepCopy()
+									capr.CopyMap(sec.Labels, machine.Labels)
+									capr.CopyMap(sec.Annotations, machine.Annotations)
+									_, err = w.Core.Secret().Update(sec)
+									if apierrors.IsNotFound(err) {
+										return nil
+									}
+									return err
+								}); err != nil {
+									return err
+								}
+							}
+							return nil
+						}
+						planSecretsOpts := metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()}
+						err := pagination.EachPage(listPlanSecrets, planSecretsOpts, processPlanSecrets)
+						if err != nil {
+							return err
+						}
+						if !foundPlanSecrets {
+							continue
+						}
+
+						if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+							bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							if err != nil {
+								return err
+							}
+							bootstrap = bootstrap.DeepCopy()
+							capr.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
+							capr.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
+							if bootstrap.Spec.ClusterName == "" {
+								// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+								// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+								if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
+									bootstrap.Spec.ClusterName = v
+								}
+							}
+							_, err = w.RKE.RKEBootstrap().Update(bootstrap)
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							return err
+						}); err != nil {
+							return err
+						}
+
+						if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+							infraMachine, err := external.GetObjectFromContractVersionedRef(context.TODO(), w.Client, machine.Spec.InfrastructureRef, machine.Namespace)
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							if err != nil {
+								return err
+							}
+
+							d, err := data.Convert(infraMachine.DeepCopyObject())
+							if err != nil {
+								return err
+							}
+
+							if changed, err := capr.InsertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+								return err
+							} else if changed {
+								_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
+								if apierrors.IsNotFound(err) {
+									return nil
+								}
+								return err
+							}
+							return nil
+						}); err != nil {
+							return err
+						}
+					}
 					return nil
 				}
 				machinesOpts := metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterNameLabel: provCluster.Name}.String()}
@@ -476,106 +573,6 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 				err = pagination.EachPage(listMachines, otherMachinesOpts, processMachines)
 				if err != nil {
 					return err
-				}
-
-				for _, machine := range allMachines {
-					if !machine.Spec.Bootstrap.ConfigRef.IsDefined() || machine.Spec.Bootstrap.ConfigRef.APIGroup != capr.RKEAPIGroup {
-						continue
-					}
-
-					var foundPlanSecrets bool
-					listPlanSecrets := func(opts metav1.ListOptions) (*v1.SecretList, error) {
-						return w.Core.Secret().List(machine.Namespace, opts)
-					}
-					processPlanSecrets := func(planSecrets *v1.SecretList) error {
-						foundPlanSecrets = foundPlanSecrets || len(planSecrets.Items) > 0
-						for _, secret := range planSecrets.Items {
-							if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-								sec, err := w.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
-								if apierrors.IsNotFound(err) {
-									return nil
-								}
-								if err != nil {
-									return err
-								}
-
-								sec = sec.DeepCopy()
-								capr.CopyMap(sec.Labels, machine.Labels)
-								capr.CopyMap(sec.Annotations, machine.Annotations)
-								_, err = w.Core.Secret().Update(sec)
-								if apierrors.IsNotFound(err) {
-									return nil
-								}
-								return err
-							}); err != nil {
-								return err
-							}
-						}
-						return nil
-					}
-					planSecretsOpts := metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()}
-					err = pagination.EachPage(listPlanSecrets, planSecretsOpts, processPlanSecrets)
-					if err != nil {
-						return err
-					}
-					if !foundPlanSecrets {
-						continue
-					}
-
-					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
-						if apierrors.IsNotFound(err) {
-							return nil
-						}
-						if err != nil {
-							return err
-						}
-						bootstrap = bootstrap.DeepCopy()
-						capr.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
-						capr.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
-						if bootstrap.Spec.ClusterName == "" {
-							// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
-							// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-							if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
-								bootstrap.Spec.ClusterName = v
-							}
-						}
-						_, err = w.RKE.RKEBootstrap().Update(bootstrap)
-						if apierrors.IsNotFound(err) {
-							return nil
-						}
-						return err
-					}); err != nil {
-						return err
-					}
-
-					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						infraMachine, err := external.GetObjectFromContractVersionedRef(context.TODO(), w.Client, machine.Spec.InfrastructureRef, machine.Namespace)
-						if apierrors.IsNotFound(err) {
-							return nil
-						}
-						if err != nil {
-							return err
-						}
-
-						d, err := data.Convert(infraMachine.DeepCopyObject())
-						if err != nil {
-							return err
-						}
-
-						if changed, err := capr.InsertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
-							return err
-						} else if changed {
-							_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
-							if apierrors.IsNotFound(err) {
-								return nil
-							}
-							return err
-						}
-						return nil
-					}); err != nil {
-						return err
-					}
 				}
 			}
 			return nil
