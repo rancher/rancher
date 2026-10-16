@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/rancher/channelserver/pkg/model"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -390,6 +391,37 @@ func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
 		return spec.DataDirectories.SystemAgent
 	}
 	return "/var/lib/rancher/agent"
+}
+
+// ShellQuote returns s as one literal word for a POSIX shell. It returns s unchanged when every
+// character is a letter, a digit, or one of "_@+:,./-", so existing plans for normal paths keep
+// the same bytes. Otherwise, it wraps s in single quotes and escapes each single quote.
+func ShellQuote(s string) string {
+	safe := s != "" && !strings.ContainsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r) && !strings.ContainsRune("_@+:,./-", r)
+	})
+	if safe {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// PowerShellQuote returns s as one literal string for PowerShell. It uses single quotes and doubles
+// every character that PowerShell treats as a single quote, including the Unicode curly quotes.
+func PowerShellQuote(s string) string {
+	var b strings.Builder
+	b.WriteByte('\'')
+	for _, r := range s {
+		b.WriteRune(r)
+		switch r {
+		case '\'', '\u2018', '\u2019', '\u201A', '\u201B':
+			// PowerShell escapes a quote inside a single-quoted string by doubling it.
+			// For example, it's becomes it''s.
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('\'')
+	return b.String()
 }
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
