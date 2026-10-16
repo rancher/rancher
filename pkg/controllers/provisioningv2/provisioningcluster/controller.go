@@ -377,7 +377,7 @@ func (h *handler) OnRancherClusterChange(obj *provv1.Cluster, status provv1.Clus
 			if mgmtCluster.Status.ReadyReconciling {
 				reconcileCondition(mgmtCluster, capr.Ready, controlPlane, capr.Ready)
 			} else {
-				pkgcluster.SummarizeCondition(mgmtCluster)
+				pkgcluster.SummarizeReadyCondition(mgmtCluster)
 			}
 
 			if !reflect.DeepEqual(oldStatus, mgmtCluster.Status) {

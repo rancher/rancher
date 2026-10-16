@@ -198,7 +198,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		apimgmtv3.ClusterConditionWaiting.Message(obj, "")
 	}
 
-	pkgcluster.SummarizeCondition(obj)
+	pkgcluster.SummarizeReadyCondition(obj)
 
 	if !reflect.DeepEqual(oldCluster, obj) {
 		logrus.Tracef("[healthSyncer] update cluster %s", cluster.Name)

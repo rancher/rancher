@@ -201,7 +201,7 @@ func (s *StatsAggregator) aggregate(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 	s.updateVersion(cluster)
 
 	// Remove "agent.cluster.cattle.io/upgraded-v1.22" annotation
-	err = s.restartAgentDeployment(cluster)
+	err = s.removeLegacyUpgradedAnnotation(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -249,10 +249,10 @@ func (s *StatsAggregator) updateVersion(cluster *apimgmtv3.Cluster) {
 	})
 }
 
-// restartAgentDeployment removes an annotation on the cluster agent deployment template
+// removeLegacyUpgradedAnnotation removes an annotation on the cluster agent deployment template
 // which will force a restart of the deployment. This annotation was used to stop handlers running from when the
 // cluster was running k8s 1.22, however this is applied to every newly created cluster causing unnecessary rollouts.
-func (s *StatsAggregator) restartAgentDeployment(cluster *apimgmtv3.Cluster) error {
+func (s *StatsAggregator) removeLegacyUpgradedAnnotation(cluster *apimgmtv3.Cluster) error {
 	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
 	if err != nil {
 		return err

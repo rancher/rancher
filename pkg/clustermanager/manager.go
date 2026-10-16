@@ -125,34 +125,48 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
-func (m *Manager) MarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
+func (m *Manager) StopAndMarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
 	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
-		logrus.Debugf("[clustermanager] not marking cluster %s not ready: %v", cluster.Name, err)
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: %v", cluster.Name, err)
 		return
 	}
 
 	if current.UID != cluster.UID {
-		logrus.Debugf("[clustermanager] not marking cluster %s not ready: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
+		m.Stop(cluster)
 		return
 	}
 
-	if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(cluster) {
-		apimgmtv3.ClusterConditionControllersRunning.False(cluster)
-		pkgcluster.SummarizeCondition(cluster)
-		_, _ = m.clusters.UpdateStatus(cluster)
+	if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(current) {
+		apimgmtv3.ClusterConditionControllersRunning.False(current)
+		pkgcluster.SummarizeReadyCondition(current)
+		cluster, err := m.clusters.UpdateStatus(current)
+		if err != nil {
+			current = cluster
+		}
 	}
 
-	m.Stop(cluster)
+	m.Stop(current)
 }
 
-func (m *Manager) MarkControllersRunning(clusterName string) {
-	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
-		if !apimgmtv3.ClusterConditionControllersRunning.IsTrue(cluster) {
-			apimgmtv3.ClusterConditionControllersRunning.True(cluster)
-			pkgcluster.SummarizeCondition(cluster)
-			_, _ = m.clusters.UpdateStatus(cluster)
-		}
+func (m *Manager) MarkControllersRunning(cluster *apimgmtv3.Cluster) {
+	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers running: %v", cluster.Name, err)
+		return
+	}
+
+	if current.UID != cluster.UID {
+		logrus.Debugf("[clustermanager] not marking cluster %s controllers running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
+		m.Stop(cluster)
+		return
+	}
+
+	if !apimgmtv3.ClusterConditionControllersRunning.IsTrue(current) {
+		apimgmtv3.ClusterConditionControllersRunning.True(current)
+		pkgcluster.SummarizeReadyCondition(current)
+		_, _ = m.clusters.UpdateStatus(current)
 	}
 }
 
@@ -170,8 +184,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.MarkControllersNotRunning(cluster)
-		m.Stop(cluster)
+		m.StopAndMarkControllersNotRunning(cluster)
 		return nil, err
 	}
 	if clusterRecord == nil {
@@ -185,8 +198,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		clusterRecord.cancel()
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.MarkControllersNotRunning(cluster)
-		m.Stop(cluster)
+		m.StopAndMarkControllersNotRunning(cluster)
 		return nil, err
 	}
 
@@ -207,12 +219,13 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 				// only mark running/not running for owner instance
 				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
 				if clusterOwner {
-					m.MarkControllersNotRunning(r.clusterRec)
+					m.StopAndMarkControllersNotRunning(r.clusterRec)
+				} else {
+					m.Stop(r.clusterRec)
 				}
-				m.Stop(r.clusterRec)
 			} else {
 				if clusterOwner {
-					m.MarkControllersRunning(r.clusterRec.Name)
+					m.MarkControllersRunning(r.clusterRec)
 				}
 			}
 		}()
@@ -241,8 +254,7 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 // cluster's connection details changed while it was starting, and the replacement must keep running.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-	m.MarkControllersNotRunning(r.clusterRec)
-	m.stopRecord(r)
+	m.StopAndMarkControllersNotRunning(r.clusterRec)
 }
 
 func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
@@ -277,7 +289,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 				if rec.ctx.Err() != nil || errors.Is(err, dialer.ErrAgentDisconnected) {
 					return err
 				}
-				m.MarkControllersNotRunning(rec.clusterRec)
+				m.StopAndMarkControllersNotRunning(rec.clusterRec)
 				return err
 			}
 			select {
