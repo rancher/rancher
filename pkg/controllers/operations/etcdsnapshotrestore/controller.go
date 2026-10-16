@@ -1265,13 +1265,13 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 		return status, nil
 	} else if etcdSecret == nil {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for pod cleanup", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for restore")
+		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for pod cleanup")
 
 		return status, nil
 	}
@@ -1298,13 +1298,13 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 			return status, nil
 		} else if len(secrets) == 0 {
-			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: no eligible controlplane leader for pod cleanup", s.op.Namespace, s.op.Name)
 
 			status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 			opv1alpha1.FailedCondition.True(&status)
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+			opv1alpha1.FailedCondition.Message(&status, "no eligible controlplane leader for pod cleanup")
 
 			return status, nil
 		}
@@ -1535,7 +1535,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	} else if etcdSecret == nil {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restart", s.op.Namespace, s.op.Name)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: no eligible etcd leader for restart", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
@@ -1567,13 +1567,13 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 
 			return status, nil
 		} else if len(secrets) == 0 {
-			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: no eligible controlplane leader for restart", s.op.Namespace, s.op.Name)
 
 			status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 			opv1alpha1.FailedCondition.True(&status)
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+			opv1alpha1.FailedCondition.Message(&status, "no eligible controlplane leader for restart")
 
 			return status, nil
 		}
@@ -1588,7 +1588,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 
 	for _, secret := range secrets {
 		initSecret := etcdSecret
-		if !ops.IsEtcd(secret) && ops.IsControlPlane(secret) && ops.IsWorker(secret) {
+		if !ops.IsEtcd(secret) && !ops.IsControlPlane(secret) && ops.IsWorker(secret) {
 			initSecret = controlPlaneSecret
 		}
 		nodePlan, err := buildRestartPlan(s, secret, initSecret, serverURL, value, nextStep != "")
