@@ -14,7 +14,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -28,7 +30,6 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/exp/maps"
 	"helm.sh/helm/v4/pkg/action"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
 	release "helm.sh/helm/v4/pkg/release/v1"
@@ -66,10 +67,14 @@ type desiredKey struct {
 	installImageOverride string
 }
 
-type desired struct {
-	key           desiredKey
+type desiredValues struct {
 	values        map[string]any
 	takeOwnership bool
+}
+
+type desired struct {
+	key    desiredKey
+	values desiredValues
 }
 
 type HelmClient interface {
@@ -98,8 +103,10 @@ type Manager struct {
 	operation             OperationClient
 	content               ContentClient
 	pods                  corecontrollers.PodClient
-	desiredCharts         map[desiredKey]map[string]any
+	desiredMu             sync.RWMutex
+	desiredCharts         map[desiredKey]desiredValues
 	sync                  chan desired
+	syncKey               chan desiredKey
 	refreshIntervalChange chan struct{}
 	settings              mgmtcontrollers.SettingController
 	trigger               chan struct{}
@@ -121,7 +128,8 @@ func NewManager(ctx context.Context,
 		content:               contentManager,
 		pods:                  pods,
 		sync:                  make(chan desired, 10),
-		desiredCharts:         map[desiredKey]map[string]any{},
+		syncKey:               make(chan desiredKey, 10),
+		desiredCharts:         map[desiredKey]desiredValues{},
 		refreshIntervalChange: make(chan struct{}, 1),
 		settings:              settings,
 		trigger:               make(chan struct{}, 1),
@@ -174,25 +182,34 @@ func (m *Manager) runSync() {
 		case <-m.ctx.Done():
 			return
 		case <-m.trigger:
-			_ = m.installCharts(m.desiredCharts, true)
+			_ = m.installCharts(m.desiredCharts)
 		case <-t.C:
-			_ = m.installCharts(m.desiredCharts, true)
-		case desired := <-m.sync:
-			v, exists := m.desiredCharts[desired.key]
-			// newly requested or changed
-			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
-				err := m.installCharts(
-					map[desiredKey]map[string]any{
-						desired.key: desired.values,
-					},
-					desired.takeOwnership,
-				)
-				if err == nil {
-					m.desiredCharts[desired.key] = desired.values
-				}
+			_ = m.installCharts(m.desiredCharts)
+		case chart := <-m.sync:
+			m.addDesiredChart(chart)
+		case key := <-m.syncKey:
+			m.desiredMu.RLock()
+			// ensure chart hasn't been removed in the meantime
+			values, ok := m.desiredCharts[key]
+			m.desiredMu.RUnlock()
+			if ok {
+				_ = m.installChart(key, values)
 			}
 		}
 	}
+}
+
+func (m *Manager) addDesiredChart(chart desired) {
+	m.desiredMu.Lock()
+	defer m.desiredMu.Unlock()
+
+	v, exists := m.desiredCharts[chart.key]
+	if exists && equality.Semantic.DeepEqual(v, chart.values) {
+		return
+	}
+
+	m.desiredCharts[chart.key] = chart.values
+	m.sync <- chart
 }
 
 // getIntervalOrDefault Converts the input to a time.Duration or returns a default value
@@ -205,35 +222,42 @@ func getIntervalOrDefault(interval string) time.Duration {
 }
 
 // installCharts installs charts with takeOwnership.
-func (m *Manager) installCharts(charts map[desiredKey]map[string]any, takeOwnership bool) error {
-
-	charts = maps.Clone[map[desiredKey]map[string]any](charts)
+func (m *Manager) installCharts(charts map[desiredKey]desiredValues) error {
+	m.desiredMu.RLock()
+	charts = maps.Clone(charts)
+	m.desiredMu.RUnlock()
 
 	var errs []error
 	for key, values := range charts {
-		err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride)
-		if errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
-			logrus.Errorf("Failed to find system chart %s, enqueuing chart refresh: %v", key.chartName, err)
-			continue
-		} else if err != nil {
-			logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
+		err := m.installChart(key, values)
+		if err != nil {
 			errs = append(errs, err)
-		} else {
-			delete(charts, key)
 		}
 	}
 
 	if len(errs) > 0 {
-		// retrigger installCharts after 5 seconds
-		time.AfterFunc(5*time.Second, func() {
-			select {
-			case m.trigger <- struct{}{}:
-			default:
-			}
-		})
 		return merr.NewErrors(errs...)
 	}
 
+	return nil
+}
+
+func (m *Manager) installChart(key desiredKey, values desiredValues) error {
+	err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values.values, values.takeOwnership, key.installImageOverride)
+	if errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
+		logrus.Errorf("Failed to find system chart %s, enqueuing chart refresh: %v", key.chartName, err)
+	} else if err != nil {
+		logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
+	}
+
+	if err != nil {
+		time.AfterFunc(5*time.Second, func() {
+			select {
+			case m.syncKey <- key:
+			default:
+			}
+		})
+	}
 	return nil
 }
 
@@ -276,14 +300,19 @@ func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVer
 				exactVersion:         exactVersion,
 				installImageOverride: installImageOverride,
 			},
-			values:        values,
-			takeOwnership: takeOwnership,
+			values: desiredValues{
+				values:        values,
+				takeOwnership: takeOwnership,
+			},
 		}
 	}()
 	return nil
 }
 
 func (m *Manager) Remove(namespace, releaseName string) {
+	m.desiredMu.Lock()
+	defer m.desiredMu.Unlock()
+
 	for k := range m.desiredCharts {
 		if k.namespace == namespace && k.releaseName == releaseName {
 			delete(m.desiredCharts, k)
