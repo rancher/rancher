@@ -60,7 +60,14 @@ func ConditionConcluded(cluster *apimgmtv3.Cluster, cond condition.Cond) bool {
 	return cond.IsTrue(cluster) || cond.IsFalse(cluster)
 }
 
-func SummarizeCondition(cluster *apimgmtv3.Cluster) {
+// SummarizeReadyCondition aggregates the management cluster's important conditions into the
+// [apimgmtv3.ClusterConditionReady] condition.
+// If all conditions are "True", the "Ready" condition is marked "True" with the "ClusterReady" reason and no message.
+// If any conditions are "False", their messages are aggregated and the "Ready" condition is marked "False" with the
+// "ClusterNotReady" reason.
+// If any conditions are "False", their messages are aggregated and the "Ready" condition is marked "Unknown" with the
+// "ClusterProgressing" reason.
+func SummarizeReadyCondition(cluster *apimgmtv3.Cluster) {
 	if cluster == nil {
 		return
 	}
@@ -73,13 +80,6 @@ func SummarizeCondition(cluster *apimgmtv3.Cluster) {
 	if len(clusterConditions) == 0 {
 		return
 	}
-
-	// build list of messages, making sure to truncate if over
-	// for positive conditions that are false, we need to set false
-	// for negative conditions that are true, we also need to set false
-	// if all conditions are positive (good state), then we need to check our unknown conditions
-	// if priority is important: surface all error messages. if no error messages, surface unknown (progressing).
-	// if only green, mark cluster as Ready
 
 	order := make(map[string]int, len(Conditions))
 	for rank, name := range Conditions {

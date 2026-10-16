@@ -124,7 +124,7 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 		}
 
 		v3.ClusterConditionConnected.SetStatusBool(cluster, connected)
-		pkgcluster.SummarizeCondition(cluster)
+		pkgcluster.SummarizeReadyCondition(cluster)
 
 		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
 

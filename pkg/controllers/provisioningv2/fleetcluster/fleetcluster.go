@@ -209,7 +209,6 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		return nil, status, err
 	}
 
-	// todo(jhyde): validate this is the right condition
 	if !apimgmtv3.ClusterConditionReady.IsTrue(mgmtCluster) {
 		return nil, status, generic.ErrSkip
 	}

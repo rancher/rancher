@@ -52,6 +52,7 @@ const (
 	// - ClusterConditionAgentDeployed
 	// - ClusterConditionConnected
 	// - ClusterConditionProbeSucceeded
+	// - ClusterConditionControllersRunning
 	// If none of the required conditions are set, Ready will be set to "Unknown" with a message indicating as such.
 	// When ClusterStatus.ReadyReconciling is true,
 	// It is imperative that any handler that modifies one of these conditions use the
