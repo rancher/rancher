@@ -377,7 +377,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	var features map[string]bool
 
 	preBootstrap := capr.ShouldPreBootstrap(cluster)
-	if preBootstrap {
+	if !preBootstrap {
 		features = GetDesiredFeatures(cluster)
 	}
 
