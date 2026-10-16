@@ -5,10 +5,14 @@ package system
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -19,21 +23,23 @@ import (
 	"helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/workqueue"
 )
 
 func TestManagerRemovesRelease(t *testing.T) {
 	t.Parallel()
-	webhook := desiredKey{
-		namespace:            "cattle-system",
-		chartName:            "rancher-webhook",
-		releaseName:          "rancher-webhook",
-		minVersion:           "1.1.1",
-		exactVersion:         "1.2.0",
-		installImageOverride: "some-image",
-	}
-	charts := map[desiredKey]desiredValues{
+	webhook := releaseKey{namespace: "cattle-system", releaseName: "rancher-webhook"}
+	charts := map[releaseKey]desired{
 		webhook: {
-			Values: map[string]any{"foo": "bar"},
+			key: desiredKey{
+				namespace:            "cattle-system",
+				chartName:            "rancher-webhook",
+				releaseName:          "rancher-webhook",
+				minVersion:           "1.1.1",
+				exactVersion:         "1.2.0",
+				installImageOverride: "some-image",
+			},
+			values: desiredValues{Values: map[string]any{"foo": "bar"}},
 		},
 	}
 
@@ -42,18 +48,7 @@ func TestManagerRemovesRelease(t *testing.T) {
 	assert.Equal(t, charts, manager.desiredCharts)
 
 	manager.Remove("cattle-system", "rancher-webhook")
-	assert.Equal(t, map[desiredKey]desiredValues{}, manager.desiredCharts)
-
-	// Assert that the lookup of key to delete only needs namespace and name.
-	webhook = desiredKey{
-		namespace:   "cattle-system",
-		chartName:   "rancher-webhook",
-		releaseName: "rancher-webhook",
-	}
-	charts[webhook] = desiredValues{Values: map[string]any{}}
-	assert.Equal(t, charts, manager.desiredCharts)
-	manager.Remove("cattle-system", "rancher-webhook")
-	assert.Equal(t, map[desiredKey]desiredValues{}, manager.desiredCharts)
+	assert.Equal(t, map[releaseKey]desired{}, manager.desiredCharts)
 }
 
 func TestStart(t *testing.T) {
@@ -69,11 +64,15 @@ func TestStart(t *testing.T) {
 	mockClusterRepos.EXPECT().OnChange(ctx, "catalog-refresh-trigger", gomock.Any())
 
 	manager := Manager{
-		settings:     mockSettingsController,
-		clusterRepos: mockClusterRepos,
+		settings:      mockSettingsController,
+		clusterRepos:  mockClusterRepos,
+		queue:         newQueue("test", retryMaxDelay),
+		priorityQueue: newQueue("test-priority", priorityRetryMaxDelay),
 	}
 
 	manager.Start(ctx)
+	manager.queue.ShutDown()
+	manager.priorityQueue.ShutDown()
 }
 
 func TestInstallCharts(t *testing.T) {
@@ -523,12 +522,11 @@ func TestInstallCharts(t *testing.T) {
 			}
 
 			manager := Manager{
-				ctx:           context.Background(),
-				content:       mockContentClient,
-				pods:          mockPodClient,
-				desiredCharts: test.desiredCharts,
-				helmClient:    mockHelmClient,
-				operation:     mockOperationClient,
+				ctx:        context.Background(),
+				content:    mockContentClient,
+				pods:       mockPodClient,
+				helmClient: mockHelmClient,
+				operation:  mockOperationClient,
 			}
 			for chart, values := range test.desiredCharts {
 				err := manager.installChart(chart, values)
@@ -540,4 +538,177 @@ func TestInstallCharts(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newQueueTestManager returns a Manager whose installs are driven by listReleases. Returning deployedRelease makes the
+// install a successful no-op, returning an error fails it. Chart versions are always "1.0.0".
+func newQueueTestManager(t *testing.T, chartNames []string, listReleases func(namespace, name string) ([]*release.Release, error)) *Manager {
+	ctrl := gomock.NewController(t)
+
+	mockContentClient := NewMockContentClient(ctrl)
+	mockContentClient.EXPECT().Index("", "rancher-charts", "", true).DoAndReturn(func(_, _, _ string, _ bool) (*repo.IndexFile, error) {
+		entries := map[string]repo.ChartVersions{}
+		for _, name := range chartNames {
+			entries[name] = repo.ChartVersions{{Metadata: &chart.Metadata{Version: "1.0.0"}, URLs: []string{"foo"}}}
+		}
+		return &repo.IndexFile{Entries: entries}, nil
+	}).AnyTimes()
+
+	mockHelmClient := NewMockHelmClient(ctrl)
+	mockHelmClient.EXPECT().ListReleases(gomock.Any(), gomock.Any(), action.ListDeployed).DoAndReturn(func(namespace, name string, _ action.ListStates) ([]*release.Release, error) {
+		return listReleases(namespace, name)
+	}).AnyTimes()
+
+	m := &Manager{
+		ctx:           context.Background(),
+		content:       mockContentClient,
+		helmClient:    mockHelmClient,
+		desiredCharts: map[releaseKey]desired{},
+		queue:         newQueue("test", retryMaxDelay),
+		priorityQueue: newQueue("test-priority", priorityRetryMaxDelay),
+	}
+	// wait for in-flight installs before the mock controller is finished
+	t.Cleanup(func() {
+		m.queue.ShutDownWithDrain()
+		m.priorityQueue.ShutDownWithDrain()
+	})
+	return m
+}
+
+func deployedRelease(namespace, name string) []*release.Release {
+	return []*release.Release{{
+		Namespace: namespace,
+		Name:      name,
+		Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.0.0"}},
+		Info:      &release.Info{Status: releasecommon.StatusDeployed},
+	}}
+}
+
+func ensureTestChart(m *Manager, namespace, name string, values map[string]any) {
+	_ = m.Ensure(namespace, name, name, "", "1.0.0", values, false, "")
+}
+
+func TestPriorityChartNotBlockedByHungCharts(t *testing.T) {
+	t.Parallel()
+
+	var hungCharts []string
+	for i := range defaultWorkers + 1 {
+		hungCharts = append(hungCharts, fmt.Sprintf("hung-%d", i))
+	}
+
+	unblock := make(chan struct{})
+	rdpInstalled := make(chan struct{})
+	var once sync.Once
+	m := newQueueTestManager(t, append(hungCharts, "remotedialer-proxy"), func(namespace, name string) ([]*release.Release, error) {
+		if name == "remotedialer-proxy" {
+			once.Do(func() { close(rdpInstalled) })
+		} else {
+			<-unblock
+		}
+		return deployedRelease(namespace, name), nil
+	})
+	t.Cleanup(func() { close(unblock) })
+
+	for range priorityWorkers {
+		go m.runWorker(m.priorityQueue)
+	}
+	for range defaultWorkers {
+		go m.runWorker(m.queue)
+	}
+
+	// every default worker is stuck on a hung chart before the priority chart is requested
+	for _, name := range hungCharts {
+		ensureTestChart(m, "cattle-system", name, nil)
+	}
+	ensureTestChart(m, namespace.System, "remotedialer-proxy", nil)
+
+	select {
+	case <-rdpInstalled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("remotedialer-proxy was not installed while other charts were hung")
+	}
+}
+
+func TestFailedChartRetriedWithoutBlockingOthers(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	attempts := map[string]int{}
+	m := newQueueTestManager(t, []string{"broken", "good"}, func(namespace, name string) ([]*release.Release, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		attempts[name]++
+		if name == "broken" && attempts[name] == 1 {
+			return nil, errors.New("transient failure")
+		}
+		return deployedRelease(namespace, name), nil
+	})
+	m.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedItemExponentialFailureRateLimiter[releaseKey](time.Millisecond, time.Millisecond))
+
+	ensureTestChart(m, "cattle-system", "broken", nil)
+	ensureTestChart(m, "cattle-system", "good", nil)
+
+	// broken fails and is requeued, good is installed next, then broken is retried and succeeds
+	for range 3 {
+		assert.True(t, m.processNextItem(m.queue))
+	}
+
+	assert.Equal(t, map[string]int{"broken": 2, "good": 1}, attempts)
+	assert.Equal(t, 0, m.queue.Len())
+	assert.Equal(t, 0, m.queue.NumRequeues(releaseKey{namespace: "cattle-system", releaseName: "broken"}))
+}
+
+func TestRemovedChartIsNotInstalled(t *testing.T) {
+	t.Parallel()
+
+	m := newQueueTestManager(t, []string{"fleet"}, func(namespace, name string) ([]*release.Release, error) {
+		t.Errorf("unexpected install of %s/%s", namespace, name)
+		return nil, nil
+	})
+
+	ensureTestChart(m, "cattle-fleet-system", "fleet", nil)
+	m.Remove("cattle-fleet-system", "fleet")
+
+	assert.True(t, m.processNextItem(m.queue))
+	assert.Equal(t, 0, m.queue.Len())
+}
+
+func TestEnsureQueuesOnlyOnChange(t *testing.T) {
+	t.Parallel()
+
+	m := newQueueTestManager(t, nil, func(namespace, name string) ([]*release.Release, error) {
+		t.Errorf("unexpected install of %s/%s", namespace, name)
+		return nil, nil
+	})
+	fleet := releaseKey{namespace: "cattle-fleet-system", releaseName: "fleet"}
+
+	ensureTestChart(m, namespace.System, "remotedialer-proxy", nil)
+	assert.Equal(t, 1, m.priorityQueue.Len())
+	assert.Equal(t, 0, m.queue.Len())
+
+	ensureTestChart(m, fleet.namespace, fleet.releaseName, map[string]any{"foo": "bar"})
+	assert.Equal(t, 1, m.queue.Len())
+	popQueue(m.queue)
+
+	// unchanged
+	ensureTestChart(m, fleet.namespace, fleet.releaseName, map[string]any{"foo": "bar"})
+	assert.Equal(t, 0, m.queue.Len())
+
+	// changed values
+	ensureTestChart(m, fleet.namespace, fleet.releaseName, map[string]any{"foo": "baz"})
+	assert.Equal(t, 1, m.queue.Len())
+	popQueue(m.queue)
+
+	// changed version replaces the existing entry for the release
+	_ = m.Ensure(fleet.namespace, fleet.releaseName, fleet.releaseName, "", "2.0.0", map[string]any{"foo": "baz"}, false, "")
+	assert.Equal(t, 1, m.queue.Len())
+	assert.Len(t, m.desiredCharts, 2)
+	assert.Equal(t, "2.0.0", m.desiredCharts[fleet].key.exactVersion)
+}
+
+// popQueue takes the next item off the queue without installing it.
+func popQueue(queue workqueue.TypedRateLimitingInterface[releaseKey]) {
+	key, _ := queue.Get()
+	queue.Forget(key)
+	queue.Done(key)
 }
