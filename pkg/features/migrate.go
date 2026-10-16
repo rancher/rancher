@@ -92,5 +92,6 @@ func enableRKE2IfClustersExist(feature *v3.Feature, featuresClient managementv3.
 		return nil
 	}
 
-	return pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
+	// Use WithoutResume. A resumed list can skip a matching cluster and leave the feature disabled.
+	return pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters, pagination.WithoutResume())
 }

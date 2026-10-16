@@ -79,6 +79,7 @@ func TestEnableRKE2IfClustersExistPagination(t *testing.T) {
 
 	listErr := errors.New("list failed")
 	updateErr := errors.New("update failed")
+	expiredErr := paginationtest.ExpiredError("token-page-2")
 	plain := []v3.Cluster{paginationTestCluster("a", false)}
 	match := []v3.Cluster{paginationTestCluster("b", false), paginationTestCluster("match", true)}
 
@@ -130,12 +131,12 @@ func TestEnableRKE2IfClustersExistPagination(t *testing.T) {
 			wantListTokens: []string{"", "token-page-1"},
 		},
 		{
-			name:           "resume after expired token",
+			name:           "expired token is returned and the list does not resume",
 			featureValue:   &[]bool{false}[0],
 			pages:          [][]v3.Cluster{plain, plain, match},
-			errAtCall:      map[int]error{1: paginationtest.ExpiredError("token-page-2")},
-			wantUpdates:    1,
-			wantListTokens: []string{"", "token-page-1", "token-page-2"},
+			errAtCall:      map[int]error{1: expiredErr},
+			wantErr:        expiredErr,
+			wantListTokens: []string{"", "token-page-1"},
 		},
 		{
 			name:           "feature value nil does not list",
