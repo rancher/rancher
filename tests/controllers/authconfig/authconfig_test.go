@@ -15,8 +15,10 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -48,8 +50,20 @@ func (s *AuthConfigSuite) SetupSuite() {
 
 	err = factory.BatchCreateCRDs(s.ctx,
 		crd.CRD{
-			SchemaObject: v3.Token{},
+			// A schema generated from v3.Token prunes userPrincipal.metadata.name,
+			// the principal ID that cleanup uses to select tokens by AuthConfig.
+			// Use an open schema instead, matching how Rancher creates this CRD
+			// in production.
+			GVK: schema.GroupVersionKind{
+				Group:   "management.cattle.io",
+				Version: "v3",
+				Kind:    "Token",
+			},
 			NonNamespace: true,
+			Schema: &apiextv1.JSONSchemaProps{
+				Type:                   "object",
+				XPreserveUnknownFields: ptr.To(true),
+			},
 		},
 		crd.CRD{
 			SchemaObject: v3.AuthConfig{},

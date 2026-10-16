@@ -12,7 +12,9 @@ import (
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -80,20 +82,17 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "fetch principal token is nil",
-			principalID: "genericoidc_user://9876543",
-			want: apiv3.Principal{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "genericoidc_user://9876543",
+			name:        "fetch principal from another config",
+			principalID: "genericoidc-eu_user://9876543",
+			token: apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "genericoidc_user://1234567",
+					},
 				},
-				DisplayName:   "9876543",
-				LoginName:     "9876543",
-				PrincipalType: "user",
-				Me:            false,
-				Provider:      ProviderName,
 			},
-			wantErr: false,
+			want:    apiv3.Principal{},
+			wantErr: true,
 		},
 		{
 			name:        "fetch principal called with empty principal",
@@ -161,20 +160,17 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "fetch principal token is nil",
-			principalID: "genericoidc_user://9876543",
-			want: apiv3.Principal{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "genericoidc_user://9876543",
+			name:        "fetch principal from another config",
+			principalID: "genericoidc-eu_user://9876543",
+			token: ext.Token{
+				Spec: ext.TokenSpec{
+					UserPrincipal: ext.TokenPrincipal{
+						Name: "genericoidc_user://1234567",
+					},
 				},
-				DisplayName:   "9876543",
-				LoginName:     "9876543",
-				PrincipalType: "user",
-				Me:            false,
-				Provider:      ProviderName,
 			},
-			wantErr: false,
+			want:    apiv3.Principal{},
+			wantErr: true,
 		},
 		{
 			name:        "fetch principal called with empty principal",
@@ -555,17 +551,27 @@ func TestGenOIDCProviderSearchPrincipalsUserSearchError(t *testing.T) {
 
 func TestGenOIDCProviderPrincipalsUseConfigName(t *testing.T) {
 	const configName = "test-eu-oidc"
+	ctrl := gomock.NewController(t)
+	userMGR := userMocks.NewMockManager(ctrl)
+	userMGR.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(false).AnyTimes()
 	g := &GenOIDCProvider{
 		oidc.OpenIDCProvider{
-			Name: ProviderName,
-			Type: client.GenericOIDCConfigType,
+			Name:    ProviderName,
+			Type:    client.GenericOIDCConfigType,
+			UserMGR: userMGR,
+		},
+	}
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: configName + "_user://testuser"},
 		},
 	}
 
 	t.Run("GetPrincipal round-trips group principal IDs", func(t *testing.T) {
 		principalID := configName + "_group://admins"
 
-		got, err := g.GetPrincipal(principalID, nil)
+		got, err := g.GetPrincipal(principalID, token)
 		assert.NoError(t, err)
 
 		assert.Equal(t, principalID, got.Name)
@@ -577,7 +583,7 @@ func TestGenOIDCProviderPrincipalsUseConfigName(t *testing.T) {
 	t.Run("GetPrincipal round-trips user principal IDs", func(t *testing.T) {
 		principalID := configName + "_user://1234567"
 
-		got, err := g.GetPrincipal(principalID, nil)
+		got, err := g.GetPrincipal(principalID, token)
 		assert.NoError(t, err)
 
 		assert.Equal(t, principalID, got.Name)
@@ -585,12 +591,6 @@ func TestGenOIDCProviderPrincipalsUseConfigName(t *testing.T) {
 	})
 
 	t.Run("SearchPrincipals returns group IDs that match the login group IDs", func(t *testing.T) {
-		token := &apiv3.Token{
-			UserPrincipal: apiv3.Principal{
-				ObjectMeta: metav1.ObjectMeta{Name: configName + "_user://testuser"},
-			},
-		}
-
 		result, err := g.SearchPrincipals("admins", GroupType, token)
 		assert.NoError(t, err)
 
@@ -606,7 +606,7 @@ func TestGenOIDCProviderPrincipalsUseConfigName(t *testing.T) {
 		assert.Equal(t, want, result)
 
 		// The search result must resolve back to the same principal.
-		got, err := g.GetPrincipal(result[0].Name, nil)
+		got, err := g.GetPrincipal(result[0].Name, token)
 		assert.NoError(t, err)
 		assert.Equal(t, result[0].Name, got.Name)
 	})

@@ -2,6 +2,7 @@ package saml
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -815,7 +816,17 @@ func (p *mockLdapProvider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (p *mockLdapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	panic("GetPrincipal Unimplemented!")
+	if !p.isLdapConfigured {
+		return apiv3.Principal{}, ldap.ErrorNotConfigured{}
+	}
+
+	return apiv3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+		DisplayName:   "Bob",
+		LoginName:     "bob",
+		PrincipalType: common.UserPrincipalType,
+		Provider:      p.providerName,
+	}, nil
 }
 
 func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
@@ -1176,26 +1187,32 @@ func TestPerformSamlLoginNotInitialized(t *testing.T) {
 }
 
 func TestGetPrincipal(t *testing.T) {
-	provider := &Provider{name: PingName}
-	token := &apiv3.Token{
-		UserPrincipal: apiv3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://alice"},
-			DisplayName:   "Alice",
-			LoginName:     "alice@example.com",
-			PrincipalType: common.UserPrincipalType,
-		},
+	newToken := func(principalID string) *apiv3.Token {
+		return &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+				DisplayName:   "Alice",
+				LoginName:     "alice@example.com",
+				PrincipalType: common.UserPrincipalType,
+			},
+		}
 	}
+	defaultToken := newToken("ping_user://alice")
+	token := newToken("ping-eu_user://alice")
 
 	tests := []struct {
-		name        string
-		principalID string
-		token       accessor.TokenAccessor
-		want        apiv3.Principal
-		wantErr     bool
+		name         string
+		providerName string
+		ldapProvider *mockLdapProvider
+		principalID  string
+		token        accessor.TokenAccessor
+		want         apiv3.Principal
+		wantErr      string
 	}{
 		{
 			name:        "user principal for the default config",
 			principalID: "ping_user://bob",
+			token:       defaultToken,
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://bob"},
 				DisplayName:   "bob",
@@ -1208,13 +1225,27 @@ func TestGetPrincipal(t *testing.T) {
 			name:        "user principal for another config than the token",
 			principalID: "ping-us_user://bob",
 			token:       token,
-			want: apiv3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: "ping-us_user://bob"},
-				DisplayName:   "bob",
-				LoginName:     "bob",
-				PrincipalType: common.UserPrincipalType,
-				Provider:      PingName,
-			},
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "group principal for another config than the token",
+			principalID: "ping-us_group://admins",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "default config principal with a token from an additional config",
+			principalID: "ping_user://bob",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:         "LDAP search principal for another config than the token",
+			providerName: OKTAName,
+			ldapProvider: &mockLdapProvider{providerName: OKTAName, isLdapConfigured: true},
+			principalID:  "okta-us_user://bob",
+			token:        newToken("okta-eu_user://alice"),
+			wantErr:      "not issued by",
 		},
 		{
 			name:        "user principal matching the token",
@@ -1232,6 +1263,7 @@ func TestGetPrincipal(t *testing.T) {
 		{
 			name:        "group principal for an additional config",
 			principalID: "ping-eu_group://admins",
+			token:       token,
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_group://admins"},
 				DisplayName:   "admins",
@@ -1243,20 +1275,27 @@ func TestGetPrincipal(t *testing.T) {
 		{
 			name:        "invalid principal type",
 			principalID: "ping-eu_other://admins",
-			wantErr:     true,
+			token:       token,
+			wantErr:     "Invalid principal type",
 		},
 		{
 			name:        "invalid principal ID",
 			principalID: "admins",
-			wantErr:     true,
+			token:       token,
+			wantErr:     "invalid principal id",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			provider := &Provider{name: cmp.Or(tt.providerName, PingName), userMGR: &fakeUserManager{}}
+			if tt.ldapProvider != nil {
+				provider.ldapProvider = tt.ldapProvider
+			}
+
 			got, err := provider.GetPrincipal(tt.principalID, tt.token)
-			if tt.wantErr {
-				require.Error(t, err)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
 				return
 			}
 

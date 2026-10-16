@@ -315,6 +315,9 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	if err != nil {
 		return p, err
 	}
+	if _, err := common.ConfigNameForPrincipalLookup(principalID, token); err != nil {
+		return p, err
+	}
 
 	if externalID == "" && principalType == "" {
 		return p, fmt.Errorf("invalid id %v", principalID)
