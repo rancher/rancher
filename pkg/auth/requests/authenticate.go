@@ -313,9 +313,13 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 // without a login name falls back to the username of a local user.
 func sessionIdentity(token accessor.TokenAccessor, user *apiv3.User) audit.Identity {
 	principal := token.GetUserPrincipal()
+	userProvider := common.ConfigNameFromPrincipal(principal)
+	if userProvider == "" {
+		userProvider = token.GetAuthProvider()
+	}
 	identity := audit.Identity{
 		Username:    principal.LoginName,
-		Provider:    token.GetAuthProvider(),
+		Provider:    userProvider,
 		PrincipalID: principal.Name,
 	}
 	if identity.Provider == "" || identity.Provider == "local" {
