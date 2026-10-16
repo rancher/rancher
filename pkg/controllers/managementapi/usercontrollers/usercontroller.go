@@ -129,7 +129,7 @@ type userControllersController struct {
 	ctx           context.Context
 	starter       controllerStarter
 	clusterLister controllers.ClusterCache
-	clusters      controllers.ClusterClient
+	clusters      controllers.ClusterController
 	// identity names this replica when it reports a cluster's user controllers stopped.
 	identity string
 	sessions sessionCloser
@@ -174,6 +174,13 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 		action := "start"
 		if restartNeeded {
 			action = "restart"
+		}
+		var contextErr *clustermanager.ContextError
+		if errors.As(err, &contextErr) {
+			// discard error in order to prevent unnecessary lasso backoff
+			logrus.Errorf("userControllersController: unable to %s controllers for cluster %s: %v, requeuing in 5 seconds", action, key, err)
+			u.clusters.EnqueueAfter(key, 5*time.Second)
+			return nil, nil
 		}
 		return nil, fmt.Errorf("userControllersController: unable to %s controllers for cluster %s: %w", action, key, err)
 	}
