@@ -1673,7 +1673,7 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 				Command:    "/bin/sh",
 				Args: []string{
 					"-c",
-					fmt.Sprintf(TokenHashCommandFormat, dataDir),
+					fmt.Sprintf(TokenHashCommandFormat, capr.ShellQuote(dataDir)),
 				},
 			},
 		},
