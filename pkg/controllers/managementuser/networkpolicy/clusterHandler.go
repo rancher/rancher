@@ -16,14 +16,14 @@ import (
 )
 
 type clusterHandler struct {
-	cluster       *config.UserContext
-	pnpLister     mgmtcontrollers.ProjectNetworkPolicyLister
-	podLister     wcore.PodCache
-	serviceLister wcore.ServiceCache
-	pLister       mgmtcontrollers.ProjectLister
-	clusters      mgmtcontrollers.ClusterInterface
-	pnps          mgmtcontrollers.ProjectNetworkPolicyInterface
-	npmgr         *netpolMgr
+	cluster          *config.UserContext
+	pnpLister        mgmtcontrollers.ProjectNetworkPolicyLister
+	podLister        wcore.PodCache
+	serviceLister    wcore.ServiceCache
+	pLister          mgmtcontrollers.ProjectLister
+	clusters         mgmtcontrollers.ClusterInterface
+	pnps             mgmtcontrollers.ProjectNetworkPolicyInterface
+	npmgr            *netpolMgr
 	clusterNamespace string
 }
 
