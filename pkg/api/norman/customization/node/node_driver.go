@@ -9,7 +9,6 @@ import (
 
 	"encoding/json"
 
-	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -17,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/compose"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 )
 
 const (

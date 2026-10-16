@@ -15,6 +15,14 @@ replace (
 	github.com/stretchr/testify => github.com/stretchr/testify v1.12.1
 	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
+	// gopkg.in/yaml.v2 and v3 are deprecated in favour of the maintained
+	// go.yaml.in/yaml successor modules. Transitive dependencies (butane,
+	// vcontext, aws-iam-authenticator) still import the old module paths.
+	// The replacement version must differ from the go.yaml.in version required
+	// below, because Go rejects the same version for two module paths.
+	gopkg.in/yaml.v2 => go.yaml.in/yaml/v2 v2.4.3
+	gopkg.in/yaml.v3 => go.yaml.in/yaml/v3 v3.0.4
+
 	k8s.io/api => k8s.io/api v0.37.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.37.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.37.1
@@ -81,7 +89,6 @@ require (
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/evanphx/json-patch/v5 v5.9.11
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -146,6 +153,8 @@ require (
 	github.com/urfave/cli v1.22.17
 	github.com/vmware/govmomi v0.56.0
 	go.uber.org/mock v0.6.0
+	go.yaml.in/yaml/v2 v2.4.4
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
 	golang.org/x/net v0.60.0
@@ -158,8 +167,6 @@ require (
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v4 v4.3.0
 	k8s.io/api v0.37.1
 	k8s.io/apiextensions-apiserver v0.37.1
@@ -392,8 +399,6 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/sys v0.48.0 // indirect
@@ -405,6 +410,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cluster-bootstrap v0.37.0 // indirect
 	k8s.io/code-generator v0.37.1 // indirect
 	k8s.io/component-base v0.37.1 // indirect

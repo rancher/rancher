@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	yaml2 "github.com/ghodss/yaml"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -15,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	yaml2 "sigs.k8s.io/yaml"
 )
 
 type noopCloser struct {

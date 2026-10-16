@@ -61,3 +61,12 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+replace (
+	// gopkg.in/yaml.v2 and v3 are deprecated in favour of the maintained
+	// go.yaml.in/yaml successor modules. The replacement version must differ
+	// from the go.yaml.in version required above, because Go rejects the same
+	// version for two module paths.
+	gopkg.in/yaml.v2 => go.yaml.in/yaml/v2 v2.4.3
+	gopkg.in/yaml.v3 => go.yaml.in/yaml/v3 v3.0.5
+)
