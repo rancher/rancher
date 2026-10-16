@@ -28,6 +28,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	"helm.sh/helm/v4/pkg/action"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
 	release "helm.sh/helm/v4/pkg/release/v1"
@@ -205,22 +206,35 @@ func getIntervalOrDefault(interval string) time.Duration {
 
 // installCharts installs charts with takeOwnership.
 func (m *Manager) installCharts(charts map[desiredKey]map[string]any, takeOwnership bool) error {
-	var errs []error
 
+	charts = maps.Clone[map[desiredKey]map[string]any](charts)
+
+	var errs []error
 	for key, values := range charts {
-		for {
-			if err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
-				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.chartName, err)
-				time.Sleep(5 * time.Second)
-				continue
-			} else if err != nil {
-				logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
-				errs = append(errs, err)
-			}
-			break
+		err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride)
+		if errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err) {
+			logrus.Errorf("Failed to find system chart %s, enqueuing chart refresh: %v", key.chartName, err)
+			continue
+		} else if err != nil {
+			logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
+			errs = append(errs, err)
+		} else {
+			delete(charts, key)
 		}
 	}
-	return merr.NewErrors(errs...)
+
+	if len(errs) > 0 {
+		// retrigger installCharts after 5 seconds
+		time.AfterFunc(5*time.Second, func() {
+			select {
+			case m.trigger <- struct{}{}:
+			default:
+			}
+		})
+		return merr.NewErrors(errs...)
+	}
+
+	return nil
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
