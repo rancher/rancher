@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -34,13 +36,13 @@ type fakeExtTokenStore struct {
 	deleteErr error
 }
 
-func (f *fakeExtTokenStore) ListForProvider(provider string) (*ext.TokenList, error) {
+func (f *fakeExtTokenStore) ListForConfig(configName string) (*ext.TokenList, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
 	var items []ext.Token
 	for _, t := range f.tokens {
-		if t.Spec.UserPrincipal.Provider == provider {
+		if tokenConfigName, err := common.ConfigNameFromToken(t); err == nil && tokenConfigName == configName {
 			items = append(items, *t)
 		}
 	}
@@ -114,16 +116,19 @@ func TestRunCleanup(t *testing.T) {
 
 	var tokenStore = map[string]*v3.Token{
 		"local-123": {
-			ObjectMeta:   metav1.ObjectMeta{Name: "local-123"},
-			AuthProvider: "local",
+			ObjectMeta:    metav1.ObjectMeta{Name: "local-123"},
+			AuthProvider:  "local",
+			UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://bob"}},
 		},
 		"azure-123": {
-			ObjectMeta:   metav1.ObjectMeta{Name: "azure-123"},
-			AuthProvider: "azuread",
+			ObjectMeta:    metav1.ObjectMeta{Name: "azure-123"},
+			AuthProvider:  "azuread",
+			UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "azuread_user://alice"}},
 		},
 		"openldap-333": {
-			ObjectMeta:   metav1.ObjectMeta{Name: "openldap-333"},
-			AuthProvider: "openldap",
+			ObjectMeta:    metav1.ObjectMeta{Name: "openldap-333"},
+			AuthProvider:  "openldap",
+			UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "openldap_user://carl"}},
 		},
 	}
 
@@ -131,19 +136,19 @@ func TestRunCleanup(t *testing.T) {
 		"ext-azure-1": {
 			ObjectMeta: metav1.ObjectMeta{Name: "ext-azure-1"},
 			Spec: ext.TokenSpec{
-				UserPrincipal: ext.TokenPrincipal{Provider: "azuread"},
+				UserPrincipal: ext.TokenPrincipal{Name: "azuread_user://alice", Provider: "azuread"},
 			},
 		},
 		"ext-azure-2": {
 			ObjectMeta: metav1.ObjectMeta{Name: "ext-azure-2"},
 			Spec: ext.TokenSpec{
-				UserPrincipal: ext.TokenPrincipal{Provider: "azuread"},
+				UserPrincipal: ext.TokenPrincipal{Name: "azuread_user://alice", Provider: "azuread"},
 			},
 		},
 		"ext-local-1": {
 			ObjectMeta: metav1.ObjectMeta{Name: "ext-local-1"},
 			Spec: ext.TokenSpec{
-				UserPrincipal: ext.TokenPrincipal{Provider: "local"},
+				UserPrincipal: ext.TokenPrincipal{Name: "local://bob", Provider: "local"},
 			},
 		},
 	}
@@ -214,6 +219,131 @@ func TestRunCleanup(t *testing.T) {
 		require.Lenf(t, user.PrincipalIDs, 1, "every user after cleanup must have only one principal ID, got %d", len(user.PrincipalIDs))
 		principalID := user.PrincipalIDs[0]
 		assert.Truef(t, strings.HasPrefix(principalID, "local"), "the only principal ID has 'local' as a prefix, got %s", principalID)
+	}
+}
+
+// TestRunCleanupTokensSelectedByConfigName verifies that when several AuthConfigs
+// share a provider type, disabling one of them only deletes the tokens issued by
+// that config. Token.AuthProvider holds the provider type, so tokens must be
+// selected by the config name prefix of their user principal.
+func TestRunCleanupTokensSelectedByConfigName(t *testing.T) {
+	newToken := func(name, principalID string) *v3.Token {
+		return &v3.Token{
+			ObjectMeta:    metav1.ObjectMeta{Name: name},
+			AuthProvider:  "github",
+			UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}, Provider: "github"},
+		}
+	}
+	newExtToken := func(name, principalID string) *ext.Token {
+		return &ext.Token{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: ext.TokenSpec{
+				UserPrincipal: ext.TokenPrincipal{Name: principalID, Provider: "github"},
+			},
+		}
+	}
+
+	tests := []struct {
+		configName        string
+		wantTokens        []string
+		wantExtTokens     []string
+		wantUsers         []string
+		wantUserPrincipal map[string][]string
+	}{
+		{
+			configName: "github-eu",
+			// carol also has a local password, so the user is kept and reset
+			// to local. Her github-eu tokens must not survive the cleanup,
+			// otherwise they work again when github-eu is re-enabled.
+			wantTokens:    []string{"gh-alice", "local-bob"},
+			wantExtTokens: []string{"ext-gh-alice", "ext-local-bob"},
+			wantUsers:     []string{"alice", "bob", "carol"},
+			wantUserPrincipal: map[string][]string{
+				"alice": {"github_user://1"},
+				"carol": {"local://carol"},
+			},
+		},
+		{
+			configName:    "github",
+			wantTokens:    []string{"gh-eu-carol", "gh-eu-dave", "local-bob"},
+			wantExtTokens: []string{"ext-gh-eu-carol", "ext-gh-eu-dave", "ext-local-bob"},
+			wantUsers:     []string{"bob", "carol", "dave"},
+			wantUserPrincipal: map[string][]string{
+				"carol": {"github-eu_user://3", "local://carol"},
+				"dave":  {"github-eu_user://4"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("disable "+tt.configName, func(t *testing.T) {
+			userStore := map[string]*v3.User{
+				"alice": {
+					ObjectMeta:   metav1.ObjectMeta{Name: "alice"},
+					PrincipalIDs: []string{"github_user://1"},
+				},
+				"bob": {
+					ObjectMeta:   metav1.ObjectMeta{Name: "bob"},
+					PrincipalIDs: []string{"local://bob"},
+				},
+				"carol": {
+					ObjectMeta:   metav1.ObjectMeta{Name: "carol"},
+					PrincipalIDs: []string{"github-eu_user://3", "local://carol"},
+					Password:     "secret",
+				},
+				"dave": {
+					ObjectMeta:   metav1.ObjectMeta{Name: "dave"},
+					PrincipalIDs: []string{"github-eu_user://4"},
+				},
+			}
+
+			localToken := &v3.Token{
+				ObjectMeta:    metav1.ObjectMeta{Name: "local-bob"},
+				AuthProvider:  "local",
+				UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://bob"}, Provider: "local"},
+			}
+			tokenStore := map[string]*v3.Token{
+				"gh-alice":    newToken("gh-alice", "github_user://1"),
+				"gh-eu-carol": newToken("gh-eu-carol", "github-eu_user://3"),
+				"gh-eu-dave":  newToken("gh-eu-dave", "github-eu_user://4"),
+				"local-bob":   localToken,
+			}
+
+			extTokens := map[string]*ext.Token{
+				"ext-gh-alice":    newExtToken("ext-gh-alice", "github_user://1"),
+				"ext-gh-eu-carol": newExtToken("ext-gh-eu-carol", "github-eu_user://3"),
+				"ext-gh-eu-dave":  newExtToken("ext-gh-eu-dave", "github-eu_user://4"),
+				"ext-local-bob": {
+					ObjectMeta: metav1.ObjectMeta{Name: "ext-local-bob"},
+					Spec: ext.TokenSpec{
+						UserPrincipal: ext.TokenPrincipal{Name: "local://bob", Provider: "local"},
+					},
+				},
+			}
+
+			svc := newMockCleanupService(t,
+				map[string]*v3.GlobalRoleBinding{},
+				map[string]*v3.ProjectRoleTemplateBinding{},
+				map[string]*v3.ClusterRoleTemplateBinding{},
+				tokenStore,
+				userStore,
+				map[string]*v1.Secret{},
+				&fakeExtTokenStore{tokens: extTokens},
+			)
+
+			err := svc.Run(&v3.AuthConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: tt.configName},
+				Type:       client.GithubConfigType,
+			})
+			require.NoError(t, err)
+
+			assert.ElementsMatch(t, tt.wantUsers, slices.Collect(maps.Keys(userStore)), "users")
+			for name, principalIDs := range tt.wantUserPrincipal {
+				assert.ElementsMatch(t, principalIDs, userStore[name].PrincipalIDs, "principal IDs of %s", name)
+			}
+			assert.ElementsMatch(t, tt.wantTokens, slices.Collect(maps.Keys(tokenStore)), "tokens")
+			assert.ElementsMatch(t, tt.wantExtTokens, slices.Collect(maps.Keys(extTokens)), "ext tokens")
+		})
 	}
 }
 
@@ -421,26 +551,26 @@ func TestDeleteExtTokens(t *testing.T) {
 			tokens: map[string]*ext.Token{
 				"ext-local": {
 					ObjectMeta: metav1.ObjectMeta{Name: "ext-local"},
-					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "local"}},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Name: "local://bob", Provider: "local"}},
 				},
 			},
 			wantLeft: []string{"ext-local"},
 		},
 		{
-			name:     "deletes only matching provider tokens",
+			name:     "deletes only matching config tokens",
 			provider: "azuread",
 			tokens: map[string]*ext.Token{
 				"ext-azure": {
 					ObjectMeta: metav1.ObjectMeta{Name: "ext-azure"},
-					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "azuread"}},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Name: "azuread_user://alice", Provider: "azuread"}},
 				},
 				"ext-local": {
 					ObjectMeta: metav1.ObjectMeta{Name: "ext-local"},
-					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "local"}},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Name: "local://bob", Provider: "local"}},
 				},
 				"ext-ping": {
 					ObjectMeta: metav1.ObjectMeta{Name: "ext-ping"},
-					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "ping"}},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Name: "ping_user://dan", Provider: "ping"}},
 				},
 			},
 			wantLeft: []string{"ext-local", "ext-ping"},
@@ -458,7 +588,7 @@ func TestDeleteExtTokens(t *testing.T) {
 			tokens: map[string]*ext.Token{
 				"ext-azure": {
 					ObjectMeta: metav1.ObjectMeta{Name: "ext-azure"},
-					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "azuread"}},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Name: "azuread_user://alice", Provider: "azuread"}},
 				},
 			},
 			deleteErr: errors.New("delete failed"),

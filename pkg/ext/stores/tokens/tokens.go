@@ -891,14 +891,17 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
-// ListForProvider returns all ext tokens associated with the named auth
-// provider. It is an internal call invoked by other parts of Rancher.
-func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
+// ListForConfig returns all ext tokens issued by the named AuthConfig. It is an
+// internal call invoked by other parts of Rancher.
+//
+// Several AuthConfigs can share a provider type, so tokens are selected by the
+// config name prefix of their user principal, not by the principal's provider.
+func (t *SystemStore) ListForConfig(configName string) (*ext.TokenList, error) {
 	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
 		SecretKindLabel: SecretKindLabelValue,
 	}).AsSelector())
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider %s: %w", provider, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config %s: %w", configName, err))
 	}
 
 	var tokens []ext.Token
@@ -907,7 +910,7 @@ func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
 		if err != nil {
 			continue
 		}
-		if token.Spec.UserPrincipal.Provider == provider {
+		if tokenConfigName, err := common.ConfigNameFromToken(token); err == nil && tokenConfigName == configName {
 			tokens = append(tokens, *token)
 		}
 	}
