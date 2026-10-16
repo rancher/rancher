@@ -11,6 +11,8 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -34,6 +36,10 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 
 	cluster, err := h.clustersCache.Get(clusterID)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Debugf("[cluster-registration-token] cluster %s not found for CRT %s/%s, will be retried", clusterID, crt.Namespace, crt.Name)
+			return *crtStatus, nil
+		}
 		return *crtStatus, err
 	}
 
