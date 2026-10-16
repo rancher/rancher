@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	ranchercontrollers "github.com/rancher/rancher/pkg/controllers"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/pagination"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,33 +196,32 @@ func (s *Service) deleteProjectRoleTemplateBindings(provider string) error {
 // but will also have a password.
 // This is how Rancher distinguishes fully external users from those who are external, too, but were once local.
 func (s *Service) deleteUsers(provider string) error {
-	users, err := s.userClient.List(metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to list users: %w", err)
-	}
-
-	for _, u := range users.Items {
-		if getProviderNameFromPrincipalNames(u.PrincipalIDs...) != provider {
-			continue
-		}
-		// A fully external user (who was never local) has no password.
-		_, err := s.secretsCache.Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get user secret: %w", err)
-		}
-		if u.Password == "" && apierrors.IsNotFound(err) {
-			err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
+	list := s.userClient.List
+	processUsers := func(users *v3.UserList) error {
+		for _, u := range users.Items {
+			if getProviderNameFromPrincipalNames(u.PrincipalIDs...) != provider {
+				continue
+			}
+			// A fully external user (who was never local) has no password.
+			_, err := s.secretsCache.Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
 			if err != nil && !apierrors.IsNotFound(err) {
-				return err
+				return fmt.Errorf("failed to get user secret: %w", err)
 			}
-		} else {
-			if err := s.resetLocalUser(&u); err != nil {
-				return fmt.Errorf("failed to reset local user: %w", err)
+			if u.Password == "" && apierrors.IsNotFound(err) {
+				err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			} else {
+				if err := s.resetLocalUser(&u); err != nil {
+					return fmt.Errorf("failed to reset local user: %w", err)
+				}
 			}
 		}
+		return nil
 	}
 
-	return nil
+	return pagination.EachPage(list, metav1.ListOptions{}, processUsers)
 }
 
 func (s *Service) deleteTokens(provider string) error {

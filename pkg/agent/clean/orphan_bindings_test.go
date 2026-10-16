@@ -1,3 +1,5 @@
+//go:build !windows
+
 package clean
 
 import (
@@ -8,6 +10,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/pagination/paginationtest"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -525,4 +528,258 @@ func getRoleBindingsNames(bindings []v1.RoleBinding) []string {
 		names[i] = bindings[i].Name
 	}
 	return names
+}
+
+type twoPagePRTBClient struct {
+	fakePRTBClient
+	pager *paginationtest.Pager[v3.ProjectRoleTemplateBinding]
+}
+
+func (c *twoPagePRTBClient) List(_ string, opts metav1.ListOptions) (*v3.ProjectRoleTemplateBindingList, error) {
+	items, next, err := c.pager.Serve(opts)
+	if err != nil {
+		return nil, err
+	}
+	return &v3.ProjectRoleTemplateBindingList{ListMeta: metav1.ListMeta{Continue: next}, Items: items}, nil
+}
+
+type twoPageRoleBindingClient struct {
+	fakeRoleBindingClient
+	pager *paginationtest.Pager[v1.RoleBinding]
+	// deleteErrs maps a role binding name to the error that Delete returns for it.
+	deleteErrs map[string]error
+}
+
+func (c *twoPageRoleBindingClient) Delete(namespace, name string, opts *metav1.DeleteOptions) error {
+	if err, ok := c.deleteErrs[name]; ok {
+		return err
+	}
+	return c.fakeRoleBindingClient.Delete(namespace, name, opts)
+}
+
+func (c *twoPageRoleBindingClient) List(_ string, opts metav1.ListOptions) (*v1.RoleBindingList, error) {
+	items, next, err := c.pager.Serve(opts)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RoleBindingList{ListMeta: metav1.ListMeta{Continue: next}, Items: items}, nil
+}
+
+func TestCleanOrphans_Pagination(t *testing.T) {
+	t.Parallel()
+
+	groupSubjects := []v1.Subject{{Kind: v1.GroupKind, Name: "Dogs"}}
+
+	validPRTB1 := v3.ProjectRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "prtb1",
+			Namespace: "ns1",
+			UID:       "uid-prtb-1",
+		},
+	}
+	validPRTB2 := v3.ProjectRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "prtb2",
+			Namespace: "ns2",
+			UID:       "uid-prtb-2",
+		},
+	}
+
+	rb1 := v1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-valid-1",
+			Namespace: "ns1",
+			Labels: map[string]string{
+				"ns1_prtb1": auth.PrtbInClusterBindingOwner,
+			},
+		},
+		Subjects: groupSubjects,
+	}
+	rb2 := v1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-orphan-1",
+			Namespace: "ns1",
+			Labels: map[string]string{
+				"ns1_unknown": auth.PrtbInClusterBindingOwner,
+			},
+		},
+		Subjects: groupSubjects,
+	}
+	rb3 := v1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-valid-2",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				"ns2_prtb2": auth.PrtbInClusterBindingOwner,
+			},
+		},
+		Subjects: groupSubjects,
+	}
+	rb4 := v1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-orphan-2",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				"ns2_deleted": auth.PrtbInClusterBindingOwner,
+			},
+		},
+		Subjects: groupSubjects,
+	}
+
+	all := []v1.RoleBinding{rb1, rb2, rb3, rb4}
+	prtbs := []v3.ProjectRoleTemplateBinding{validPRTB1, validPRTB2}
+
+	tests := []struct {
+		name            string
+		dryRun          bool
+		prtbPageSize    int
+		rbPageSize      int
+		failPRTBPage    int
+		failPRTBErr     error
+		failRBPage      int
+		deleteErrs      map[string]error
+		wantErrIs       []error
+		wantPRTBTokens  []string
+		wantRBTokens    []string
+		wantRemainingRB []string
+		wantErr         bool
+	}{
+		{
+			name:            "pages of different sizes clean orphans on every page",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-valid-2"},
+		},
+		{
+			name:            "one binding per page cleans orphans on every page",
+			prtbPageSize:    1,
+			rbPageSize:      1,
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1", "token-page-2", "token-page-3"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-valid-2"},
+		},
+		{
+			name:            "single page needs one call per list",
+			prtbPageSize:    10,
+			rbPageSize:      10,
+			wantPRTBTokens:  []string{""},
+			wantRBTokens:    []string{""},
+			wantRemainingRB: []string{"rb-valid-1", "rb-valid-2"},
+		},
+		{
+			name:            "dry run deletes nothing but reads every page",
+			dryRun:          true,
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-orphan-1", "rb-valid-2", "rb-orphan-2"},
+		},
+		{
+			name:            "PRTB list error on page 2 deletes nothing",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			failPRTBPage:    2,
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    nil,
+			wantRemainingRB: []string{"rb-valid-1", "rb-orphan-1", "rb-valid-2", "rb-orphan-2"},
+			wantErr:         true,
+		},
+		{
+			name:            "expired PRTB list fails without resuming and deletes nothing",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			failPRTBPage:    2,
+			failPRTBErr:     paginationtest.ExpiredError("new-token"),
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    nil,
+			wantRemainingRB: []string{"rb-valid-1", "rb-orphan-1", "rb-valid-2", "rb-orphan-2"},
+			wantErr:         true,
+		},
+		{
+			name:            "role binding list error on page 2 keeps the page 1 cleanup",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			failRBPage:      2,
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-valid-2", "rb-orphan-2"},
+			wantErr:         true,
+		},
+		{
+			name:            "role binding list error keeps the delete errors of earlier pages",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			failRBPage:      2,
+			deleteErrs:      map[string]error{"rb-orphan-1": errPgDelete},
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-orphan-1", "rb-valid-2", "rb-orphan-2"},
+			wantErr:         true,
+			wantErrIs:       []error{errPgDelete, paginationtest.ErrListFailed},
+		},
+		{
+			name:            "delete errors on every page are all returned",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			deleteErrs:      map[string]error{"rb-orphan-1": errPgDelete, "rb-orphan-2": errPgUpdate},
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-orphan-1", "rb-valid-2", "rb-orphan-2"},
+			wantErr:         true,
+			wantErrIs:       []error{errPgDelete, errPgUpdate},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			prtbClient := &twoPagePRTBClient{
+				fakePRTBClient: fakePRTBClient{bindings: prtbs},
+				pager:          paginationtest.NewPager(prtbs, tc.prtbPageSize).FailOnPage(tc.failPRTBPage, tc.failPRTBErr),
+			}
+			rbClient := &twoPageRoleBindingClient{
+				fakeRoleBindingClient: fakeRoleBindingClient{bindings: append([]v1.RoleBinding(nil), all...)},
+				pager:                 paginationtest.NewPager(all, tc.rbPageSize).FailOnPage(tc.failRBPage, nil),
+				deleteErrs:            tc.deleteErrs,
+			}
+
+			cleanup := &orphanBindingsCleanup{
+				prtbs:        prtbClient,
+				roleBindings: rbClient,
+				prtbHashes:   make(map[string]struct{}),
+				prtbUIDs:     make(map[string]struct{}),
+			}
+
+			err := cleanup.cleanOrphans(tc.dryRun)
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, want := range tc.wantErrIs {
+				if !errors.Is(err, want) {
+					t.Errorf("expected error %v to wrap %v", err, want)
+				}
+			}
+
+			if got := prtbClient.pager.Tokens(); !reflect.DeepEqual(got, tc.wantPRTBTokens) {
+				t.Errorf("expected PRTB continue tokens %v, got %v", tc.wantPRTBTokens, got)
+			}
+			if got := rbClient.pager.Tokens(); !reflect.DeepEqual(got, tc.wantRBTokens) {
+				t.Errorf("expected role binding continue tokens %v, got %v", tc.wantRBTokens, got)
+			}
+			prtbClient.pager.AssertLimit(t)
+			rbClient.pager.AssertLimit(t)
+
+			remainingNames := getRoleBindingsNames(rbClient.bindings)
+			if !reflect.DeepEqual(remainingNames, tc.wantRemainingRB) {
+				t.Errorf("expected remaining role bindings %v, got %v", tc.wantRemainingRB, remainingNames)
+			}
+		})
+	}
 }

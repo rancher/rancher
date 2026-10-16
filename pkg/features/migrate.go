@@ -4,6 +4,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/pagination"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,21 +74,23 @@ func enableRKE2IfClustersExist(feature *v3.Feature, featuresClient managementv3.
 		return nil
 	}
 
-	clusters, err := mgmtClusterClient.List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
+	listClusters := mgmtClusterClient.List
+	processClusters := func(clusters *v3.ClusterList) error {
+		for _, c := range clusters.Items {
+			if imported.IsAdministratedByProvisioningCluster(&c) {
+				feature = feature.DeepCopy()
+				feature.SetValue(true)
+				feature.Status.LockedValue = feature.Spec.Value
 
-	for _, c := range clusters.Items {
-		if imported.IsAdministratedByProvisioningCluster(&c) {
-			feature = feature.DeepCopy()
-			feature.SetValue(true)
-			feature.Status.LockedValue = feature.Spec.Value
-
-			_, err = featuresClient.Update(feature)
-			return err
+				_, err := featuresClient.Update(feature)
+				if err != nil {
+					return err
+				}
+				return pagination.ErrStop
+			}
 		}
+		return nil
 	}
 
-	return nil
+	return pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
@@ -20,6 +21,7 @@ import (
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/pagination"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -393,6 +395,34 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 	return nil
 }
 
+// fleetWorkspaceNames returns the unique fleet workspace names of all management clusters in list order.
+// An empty name lists all namespaces, so it replaces all other names.
+func fleetWorkspaceNames(clusters v3.ClusterClient) ([]string, error) {
+	var names []string
+	seen := make(map[string]struct{})
+	listMgmtClusters := clusters.List
+	processMgmtClusters := func(mgmtClusters *v32.ClusterList) error {
+		for _, mgmtCluster := range mgmtClusters.Items {
+			name := mgmtCluster.Spec.FleetWorkspaceName
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			names = append(names, name)
+		}
+		return nil
+	}
+	err := pagination.EachPage(listMgmtClusters, metav1.ListOptions{}, processMgmtClusters)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := seen[""]; ok {
+		return []string{""}, nil
+	}
+	return names, nil
+}
+
 func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateFromMachineToPlanSecret)
 	if err != nil || cm == nil {
@@ -403,7 +433,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 		return nil
 	}
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	fleetWorkspaces, err := fleetWorkspaceNames(w.Mgmt.Cluster())
 	if err != nil {
 		return err
 	}
@@ -422,100 +452,138 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 		capr.UnCordonAnnotation:  {},
 	}
 
-	for _, mgmtCluster := range mgmtClusters.Items {
-		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
-		if apierrors.IsNotFound(err) || len(provClusters.Items) == 0 {
-			continue
-		} else if err != nil {
-			return err
+	for _, workspace := range fleetWorkspaces {
+		listProvClusters := func(opts metav1.ListOptions) (*provv1.ClusterList, error) {
+			return w.Provisioning.Cluster().List(workspace, opts)
 		}
-
-		for _, provCluster := range provClusters.Items {
-			machines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterNameLabel: provCluster.Name}.String()})
-			if err != nil {
-				return err
-			}
-
-			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capr.ClusterNameLabel: provCluster.Name}.String()})
-			if err != nil {
-				return err
-			}
-
-			allMachines := append(machines.Items, otherMachines.Items...)
-
-			for _, machine := range allMachines {
-				if !machine.Spec.Bootstrap.ConfigRef.IsDefined() || machine.Spec.Bootstrap.ConfigRef.APIGroup != capr.RKEAPIGroup {
-					continue
+		processProvClusters := func(provClusters *provv1.ClusterList) error {
+			for _, provCluster := range provClusters.Items {
+				var allMachines []capi.Machine
+				listMachines := func(opts metav1.ListOptions) (*capi.MachineList, error) {
+					return w.CAPI.Machine().List(provCluster.Namespace, opts)
 				}
-
-				planSecrets, err := w.Core.Secret().List(machine.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()})
+				processMachines := func(machines *capi.MachineList) error {
+					allMachines = append(allMachines, machines.Items...)
+					return nil
+				}
+				machinesOpts := metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterNameLabel: provCluster.Name}.String()}
+				err := pagination.EachPage(listMachines, machinesOpts, processMachines)
 				if err != nil {
 					return err
 				}
-				if len(planSecrets.Items) == 0 {
-					continue
+
+				otherMachinesOpts := metav1.ListOptions{LabelSelector: labels.Set{capr.ClusterNameLabel: provCluster.Name}.String()}
+				err = pagination.EachPage(listMachines, otherMachinesOpts, processMachines)
+				if err != nil {
+					return err
 				}
 
-				for _, secret := range planSecrets.Items {
+				for _, machine := range allMachines {
+					if !machine.Spec.Bootstrap.ConfigRef.IsDefined() || machine.Spec.Bootstrap.ConfigRef.APIGroup != capr.RKEAPIGroup {
+						continue
+					}
+
+					var foundPlanSecrets bool
+					listPlanSecrets := func(opts metav1.ListOptions) (*v1.SecretList, error) {
+						return w.Core.Secret().List(machine.Namespace, opts)
+					}
+					processPlanSecrets := func(planSecrets *v1.SecretList) error {
+						foundPlanSecrets = foundPlanSecrets || len(planSecrets.Items) > 0
+						for _, secret := range planSecrets.Items {
+							if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+								sec, err := w.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+								if apierrors.IsNotFound(err) {
+									return nil
+								}
+								if err != nil {
+									return err
+								}
+
+								sec = sec.DeepCopy()
+								capr.CopyMap(sec.Labels, machine.Labels)
+								capr.CopyMap(sec.Annotations, machine.Annotations)
+								_, err = w.Core.Secret().Update(sec)
+								if apierrors.IsNotFound(err) {
+									return nil
+								}
+								return err
+							}); err != nil {
+								return err
+							}
+						}
+						return nil
+					}
+					planSecretsOpts := metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()}
+					err = pagination.EachPage(listPlanSecrets, planSecretsOpts, processPlanSecrets)
+					if err != nil {
+						return err
+					}
+					if !foundPlanSecrets {
+						continue
+					}
+
 					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						secret, err := w.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+						bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+						if apierrors.IsNotFound(err) {
+							return nil
+						}
 						if err != nil {
 							return err
 						}
-
-						secret = secret.DeepCopy()
-						capr.CopyMap(secret.Labels, machine.Labels)
-						capr.CopyMap(secret.Annotations, machine.Annotations)
-						_, err = w.Core.Secret().Update(secret)
+						bootstrap = bootstrap.DeepCopy()
+						capr.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
+						capr.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
+						if bootstrap.Spec.ClusterName == "" {
+							// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+							// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+							if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
+								bootstrap.Spec.ClusterName = v
+							}
+						}
+						_, err = w.RKE.RKEBootstrap().Update(bootstrap)
+						if apierrors.IsNotFound(err) {
+							return nil
+						}
 						return err
 					}); err != nil {
 						return err
 					}
-				}
 
-				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
-					if err != nil {
-						return err
-					}
-					bootstrap = bootstrap.DeepCopy()
-					capr.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
-					capr.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
-					if bootstrap.Spec.ClusterName == "" {
-						// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
-						// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-						if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
-							bootstrap.Spec.ClusterName = v
+					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						infraMachine, err := external.GetObjectFromContractVersionedRef(context.TODO(), w.Client, machine.Spec.InfrastructureRef, machine.Namespace)
+						if apierrors.IsNotFound(err) {
+							return nil
 						}
-					}
-					_, err = w.RKE.RKEBootstrap().Update(bootstrap)
-					return err
-				}); err != nil {
-					return err
-				}
+						if err != nil {
+							return err
+						}
 
-				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					infraMachine, err := external.GetObjectFromContractVersionedRef(context.TODO(), w.Client, machine.Spec.InfrastructureRef, machine.Namespace)
-					if err != nil {
-						return err
-					}
+						d, err := data.Convert(infraMachine.DeepCopyObject())
+						if err != nil {
+							return err
+						}
 
-					d, err := data.Convert(infraMachine.DeepCopyObject())
-					if err != nil {
+						if changed, err := capr.InsertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+							return err
+						} else if changed {
+							_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
+							if apierrors.IsNotFound(err) {
+								return nil
+							}
+							return err
+						}
+						return nil
+					}); err != nil {
 						return err
 					}
-
-					if changed, err := capr.InsertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
-						return err
-					} else if changed {
-						_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
-						return err
-					}
-					return err
-				}); err != nil {
-					return err
 				}
 			}
+			return nil
+		}
+		// Skip this workspace if the first list call returns NotFound.
+		err := pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithIgnoreNotFound())
+		if err != nil {
+			return err
 		}
 	}
 
@@ -533,37 +601,39 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 		return nil
 	}
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	for _, mgmtCluster := range mgmtClusters.Items {
-		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			cp, err := w.RKE.RKEControlPlane().Get(mgmtCluster.Spec.FleetWorkspaceName, mgmtCluster.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-			if err != nil {
+	listMgmtClusters := w.Mgmt.Cluster().List
+	processMgmtClusters := func(mgmtClusters *v32.ClusterList) error {
+		for _, mgmtCluster := range mgmtClusters.Items {
+			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cp, err := w.RKE.RKEControlPlane().Get(mgmtCluster.Spec.FleetWorkspaceName, mgmtCluster.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				leader := cp.Annotations["rke.cattle.io/encrypt-key-rotation-leader"]
+				if leader == "" {
+					return nil
+				}
+				cp = cp.DeepCopy()
+				cp.Status.RotateEncryptionKeysLeader = leader
+				cp, err = w.RKE.RKEControlPlane().UpdateStatus(cp)
+				if err != nil {
+					return err
+				}
+				cp = cp.DeepCopy()
+				delete(cp.Annotations, "rke.cattle.io/encrypt-key-rotation-leader")
+				_, err = w.RKE.RKEControlPlane().Update(cp)
+				return err
+			}); err != nil {
 				return err
 			}
-			leader := cp.Annotations["rke.cattle.io/encrypt-key-rotation-leader"]
-			if leader == "" {
-				return nil
-			}
-			cp = cp.DeepCopy()
-			cp.Status.RotateEncryptionKeysLeader = leader
-			cp, err = w.RKE.RKEControlPlane().UpdateStatus(cp)
-			if err != nil {
-				return err
-			}
-			cp = cp.DeepCopy()
-			delete(cp.Annotations, "rke.cattle.io/encrypt-key-rotation-leader")
-			_, err = w.RKE.RKEControlPlane().Update(cp)
-			return err
-		}); err != nil {
-			return err
 		}
+		return nil
+	}
+	if err = pagination.EachPage(listMgmtClusters, metav1.ListOptions{}, processMgmtClusters); err != nil {
+		return err
 	}
 
 	cm.Data[encryptionKeyRotationStatusMigratedKey] = "true"
@@ -580,62 +650,70 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.CAPIContext) error {
 		return nil
 	}
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	fleetWorkspaces, err := fleetWorkspaceNames(w.Mgmt.Cluster())
 	if err != nil {
 		return err
 	}
 
-	for _, mgmtCluster := range mgmtClusters.Items {
-		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
-		if apierrors.IsNotFound(err) || len(provClusters.Items) == 0 {
-			continue
-		} else if err != nil {
-			return err
+	for _, workspace := range fleetWorkspaces {
+		listProvClusters := func(opts metav1.ListOptions) (*provv1.ClusterList, error) {
+			return w.Provisioning.Cluster().List(workspace, opts)
 		}
-		for _, provCluster := range provClusters.Items {
-			if provCluster.Spec.RKEConfig == nil {
-				continue
-			}
-			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
-				if apierrors.IsNotFound(err) {
+		processProvClusters := func(provClusters *provv1.ClusterList) error {
+			for _, provCluster := range provClusters.Items {
+				if provCluster.Spec.RKEConfig == nil {
+					continue
+				}
+				if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return nil
+					} else if err != nil {
+						return err
+					}
+					cluster = cluster.DeepCopy()
+					// search for machine pools without the `dynamic-schema-spec` annotation and apply it
+					for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
+						var spec v32.DynamicSchemaSpec
+						if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
+							continue
+						}
+						nodeConfig := machinePool.NodeConfig
+						if nodeConfig == nil {
+							return fmt.Errorf("machine pool node config must not be nil")
+						}
+						apiVersion := nodeConfig.APIVersion
+						if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
+							continue
+						}
+						ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						specJSON, err := json.Marshal(ds.Spec)
+						if err != nil {
+							return err
+						}
+						cluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
+					}
+					_, err = w.Provisioning.Cluster().Update(cluster)
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							return nil
+						}
+						return err
+					}
 					return nil
-				} else if err != nil {
+				}); err != nil {
 					return err
 				}
-				cluster = cluster.DeepCopy()
-				// search for machine pools without the `dynamic-schema-spec` annotation and apply it
-				for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
-					var spec v32.DynamicSchemaSpec
-					if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
-						continue
-					}
-					nodeConfig := machinePool.NodeConfig
-					if nodeConfig == nil {
-						return fmt.Errorf("machine pool node config must not be nil")
-					}
-					apiVersion := nodeConfig.APIVersion
-					if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
-						continue
-					}
-					ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
-					if err != nil {
-						return err
-					}
-					specJSON, err := json.Marshal(ds.Spec)
-					if err != nil {
-						return err
-					}
-					cluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
-				}
-				_, err = w.Provisioning.Cluster().Update(cluster)
-				if err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				return err
 			}
+			return nil
+		}
+		// Skip this workspace if the first list call returns NotFound.
+		err := pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithIgnoreNotFound())
+		if err != nil {
+			return err
 		}
 	}
 
@@ -653,33 +731,37 @@ func migrateSystemAgentDataDirectory(w *wrangler.CAPIContext) error {
 		return nil
 	}
 
-	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
-	if err != nil {
-		return err
+	listProvClusters := func(opts metav1.ListOptions) (*provv1.ClusterList, error) {
+		return w.Provisioning.Cluster().List("", opts)
 	}
+	processProvClusters := func(provClusters *provv1.ClusterList) error {
+		for _, cluster := range provClusters.Items {
+			systemAgentDataDir := ""
+			envVars := make([]rkev1.EnvVar, 0, len(cluster.Spec.AgentEnvVars))
+			for _, e := range cluster.Spec.AgentEnvVars {
+				if e.Name == capr.SystemAgentDataDirEnvVar {
+					// don't break, the webhook allows duplicate entries and the last one would have been the effective data dir
+					systemAgentDataDir = e.Value
+				} else {
+					envVars = append(envVars, e)
+				}
+			}
+			if systemAgentDataDir == "" {
+				continue
+			}
 
-	for _, cluster := range provClusters.Items {
-		systemAgentDataDir := ""
-		envVars := make([]rkev1.EnvVar, 0, len(cluster.Spec.AgentEnvVars))
-		for _, e := range cluster.Spec.AgentEnvVars {
-			if e.Name == capr.SystemAgentDataDirEnvVar {
-				// don't break, the webhook allows duplicate entries and the last one would have been the effective data dir
-				systemAgentDataDir = e.Value
-			} else {
-				envVars = append(envVars, e)
+			cluster = *cluster.DeepCopy()
+			cluster.Spec.AgentEnvVars = envVars
+			cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
+			_, err := w.Provisioning.Cluster().Update(&cluster)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
 			}
 		}
-		if systemAgentDataDir == "" {
-			continue
-		}
-
-		cluster = *cluster.DeepCopy()
-		cluster.Spec.AgentEnvVars = envVars
-		cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
-		_, err = w.Provisioning.Cluster().Update(&cluster)
-		if err != nil {
-			return err
-		}
+		return nil
+	}
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
+		return err
 	}
 
 	cm.Data[systemAgentVarDirMigratedKey] = "true"
@@ -699,32 +781,36 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 		return nil
 	}
 
-	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
-	if err != nil {
-		return err
+	listProvClusters := func(opts metav1.ListOptions) (*provv1.ClusterList, error) {
+		return w.Provisioning.Cluster().List("", opts)
 	}
-
-	for _, cluster := range provClusters.Items {
-		if mgmtNameRegexp.MatchString(cluster.Name) || cluster.Spec.RKEConfig != nil {
-			// run only for non-legacy imported clusters
-			continue
+	processProvClusters := func(provClusters *provv1.ClusterList) error {
+		for _, cluster := range provClusters.Items {
+			if mgmtNameRegexp.MatchString(cluster.Name) || cluster.Spec.RKEConfig != nil {
+				// run only for non-legacy imported clusters
+				continue
+			}
+			mgmtCluster, err := w.Mgmt.Cluster().Get(cluster.Status.ClusterName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				return err
+			}
+			clusterCopy := mgmtCluster.DeepCopy()
+			// clusterDeploy controller uses GetDesiredAgentImage(mgmtCluster), customizable using Spec.DesiredAgentImage
+			clusterCopy.Spec.DesiredAgentImage = ""
+			// clusterDeploy controller uses GetDesiredAuthImage(mgmtCluster), customizable using Spec.DesiredAuthImage
+			clusterCopy.Spec.DesiredAuthImage = ""
+			// managed by Spec.ImportedConfig.PrivateRegistryURL for imported clusters
+			clusterCopy.Spec.ClusterSecrets.PrivateRegistryURL = ""
+			if _, err := w.Mgmt.Cluster().Update(clusterCopy); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 		}
-		mgmtCluster, err := w.Mgmt.Cluster().Get(cluster.Status.ClusterName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			return err
-		}
-		clusterCopy := mgmtCluster.DeepCopy()
-		// clusterDeploy controller uses GetDesiredAgentImage(mgmtCluster), customizable using Spec.DesiredAgentImage
-		clusterCopy.Spec.DesiredAgentImage = ""
-		// clusterDeploy controller uses GetDesiredAuthImage(mgmtCluster), customizable using Spec.DesiredAuthImage
-		clusterCopy.Spec.DesiredAuthImage = ""
-		// managed by Spec.ImportedConfig.PrivateRegistryURL for imported clusters
-		clusterCopy.Spec.ClusterSecrets.PrivateRegistryURL = ""
-		if _, err := w.Mgmt.Cluster().Update(clusterCopy); err != nil {
-			return err
-		}
+		return nil
+	}
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
+		return err
 	}
 
 	cm.Data[importedClusterManagedFieldsMigratedKey] = "true"
@@ -787,15 +873,19 @@ func managementNodeCleanup(w *wrangler.Context) error {
 		return nil
 	}
 
-	nodes, err := w.Mgmt.Node().List("", metav1.ListOptions{})
-	if err != nil {
-		return err
+	listNodes := func(opts metav1.ListOptions) (*v32.NodeList, error) {
+		return w.Mgmt.Node().List("", opts)
 	}
-
-	for _, node := range nodes.Items {
-		if err := cleanupNodeFinalizers(w, node.Namespace, node.Name); err != nil {
-			return err
+	processNodes := func(nodes *v32.NodeList) error {
+		for _, node := range nodes.Items {
+			if err := cleanupNodeFinalizers(w, node.Namespace, node.Name); err != nil {
+				return err
+			}
 		}
+		return nil
+	}
+	if err = pagination.EachPage(listNodes, metav1.ListOptions{}, processNodes); err != nil {
+		return err
 	}
 
 	cm.Data[managementCleanupCompletedKey] = "true"
@@ -870,44 +960,51 @@ func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) 
 		string(v32.ClusterConditionWaiting):                              {},
 	}
 
-	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
-	if err != nil {
-		return err
+	listProvClusters := func(opts metav1.ListOptions) (*provv1.ClusterList, error) {
+		return w.Provisioning.Cluster().List("", opts)
 	}
+	processProvClusters := func(provClusters *provv1.ClusterList) error {
+		for _, provCluster := range provClusters.Items {
+			if len(provCluster.Status.Conditions) == 0 {
+				continue
+			}
 
-	for _, provCluster := range provClusters.Items {
-		if len(provCluster.Status.Conditions) == 0 {
-			continue
-		}
+			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				} else if err != nil {
+					return err
+				}
 
-		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return nil
-			} else if err != nil {
+				// Filter out management cluster-only conditions
+				filteredConditions := make([]genericcondition.GenericCondition, 0, len(cluster.Status.Conditions))
+				for _, cond := range cluster.Status.Conditions {
+					if _, shouldRemove := mgmtClusterOnlyConditions[cond.Type]; !shouldRemove {
+						filteredConditions = append(filteredConditions, cond)
+					}
+				}
+
+				// Only update if conditions were actually removed
+				if len(filteredConditions) == len(cluster.Status.Conditions) {
+					return nil
+				}
+
+				cluster = cluster.DeepCopy()
+				cluster.Status.Conditions = filteredConditions
+				_, err = w.Provisioning.Cluster().UpdateStatus(cluster)
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}); err != nil {
 				return err
 			}
-
-			// Filter out management cluster-only conditions
-			filteredConditions := make([]genericcondition.GenericCondition, 0, len(cluster.Status.Conditions))
-			for _, cond := range cluster.Status.Conditions {
-				if _, shouldRemove := mgmtClusterOnlyConditions[cond.Type]; !shouldRemove {
-					filteredConditions = append(filteredConditions, cond)
-				}
-			}
-
-			// Only update if conditions were actually removed
-			if len(filteredConditions) == len(cluster.Status.Conditions) {
-				return nil
-			}
-
-			cluster = cluster.DeepCopy()
-			cluster.Status.Conditions = filteredConditions
-			_, err = w.Provisioning.Cluster().UpdateStatus(cluster)
-			return err
-		}); err != nil {
-			return err
 		}
+		return nil
+	}
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
+		return err
 	}
 
 	cm.Data[provisioningClusterMgmtOnlyConditionsCleanedUpKey] = "true"
@@ -926,16 +1023,20 @@ func migrateCRTTokensToSecretsFunc(w *wrangler.Context) error {
 		return nil
 	}
 
-	allCRTs, err := w.Mgmt.ClusterRegistrationToken().List("", metav1.ListOptions{})
-	if err != nil {
-		return err
+	listCRTs := func(opts metav1.ListOptions) (*v32.ClusterRegistrationTokenList, error) {
+		return w.Mgmt.ClusterRegistrationToken().List("", opts)
 	}
-
-	for i := range allCRTs.Items {
-		if err := migrateSingleCRT(w, &allCRTs.Items[i]); err != nil {
-			logrus.Errorf("Failed to migrate CRT %s/%s: %v", allCRTs.Items[i].Namespace, allCRTs.Items[i].Name, err)
-			return err
+	processCRTs := func(allCRTs *v32.ClusterRegistrationTokenList) error {
+		for i := range allCRTs.Items {
+			if err := migrateSingleCRT(w, &allCRTs.Items[i]); err != nil {
+				logrus.Errorf("Failed to migrate CRT %s/%s: %v", allCRTs.Items[i].Namespace, allCRTs.Items[i].Name, err)
+				return err
+			}
 		}
+		return nil
+	}
+	if err = pagination.EachPage(listCRTs, metav1.ListOptions{}, processCRTs); err != nil {
+		return err
 	}
 
 	cm.Data[crtTokensToSecretsMigratedKey] = "true"
@@ -960,48 +1061,55 @@ func migrateExistingRKE2ClustersPrimeAnnotation(w *wrangler.CAPIContext) error {
 		return nil
 	}
 
-	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
-	if err != nil {
-		return err
+	listProvClusters := func(opts metav1.ListOptions) (*provv1.ClusterList, error) {
+		return w.Provisioning.Cluster().List("", opts)
 	}
+	processProvClusters := func(provClusters *provv1.ClusterList) error {
+		for _, provCluster := range provClusters.Items {
+			// Only process RKE2 clusters (those with an RKEConfig and an RKE2 kubernetes version)
+			if provCluster.Spec.RKEConfig == nil {
+				continue
+			}
+			if capr.GetRuntime(provCluster.Spec.KubernetesVersion) != capr.RuntimeRKE2 {
+				continue
+			}
 
-	for _, provCluster := range provClusters.Items {
-		// Only process RKE2 clusters (those with an RKEConfig and an RKE2 kubernetes version)
-		if provCluster.Spec.RKEConfig == nil {
-			continue
-		}
-		if capr.GetRuntime(provCluster.Spec.KubernetesVersion) != capr.RuntimeRKE2 {
-			continue
-		}
+			// Skip if annotation is already set
+			if _, ok := provCluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+				continue
+			}
 
-		// Skip if annotation is already set
-		if _, ok := provCluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
-			continue
-		}
+			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				} else if err != nil {
+					return err
+				}
 
-		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return nil
-			} else if err != nil {
+				// Re-check after fresh get
+				if _, ok := cluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+					return nil
+				}
+
+				cluster = cluster.DeepCopy()
+				if cluster.Annotations == nil {
+					cluster.Annotations = map[string]string{}
+				}
+				cluster.Annotations[capr.RKE2PrimeEnabledAnnotation] = "false"
+				_, err = w.Provisioning.Cluster().Update(cluster)
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}); err != nil {
 				return err
 			}
-
-			// Re-check after fresh get
-			if _, ok := cluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
-				return nil
-			}
-
-			cluster = cluster.DeepCopy()
-			if cluster.Annotations == nil {
-				cluster.Annotations = map[string]string{}
-			}
-			cluster.Annotations[capr.RKE2PrimeEnabledAnnotation] = "false"
-			_, err = w.Provisioning.Cluster().Update(cluster)
-			return err
-		}); err != nil {
-			return err
 		}
+		return nil
+	}
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
+		return err
 	}
 
 	cm.Data[rke2PrimeAnnotationMigratedKey] = "true"
@@ -1090,6 +1198,9 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := w.Mgmt.ClusterRegistrationToken().Get(crt.Namespace, crt.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -1113,6 +1224,9 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 		}
 
 		_, err = w.Mgmt.ClusterRegistrationToken().Update(crtCopy)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	})
 }

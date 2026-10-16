@@ -13,9 +13,11 @@ import (
 	"errors"
 	"os"
 
+	v3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	mgmt "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/pagination"
 	rbaccommon "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -106,47 +108,57 @@ func newOrphanBindingsCleanup(restConfig *rest.Config) (*orphanBindingsCleanup, 
 
 // cleanOrphans finds and deletes orphaned bindings
 func (bc *orphanBindingsCleanup) cleanOrphans(dryRun bool) error {
-	prtbs, err := bc.prtbs.List("", metav1.ListOptions{})
+	// Use WithoutResume. A resumed list can skip a live PRTB,
+	// and the code then treats the role binding of that PRTB as an orphan.
+	listPRTBs := func(opts metav1.ListOptions) (*v3api.ProjectRoleTemplateBindingList, error) {
+		return bc.prtbs.List("", opts)
+	}
+	processPRTBs := func(prtbs *v3api.ProjectRoleTemplateBindingList) error {
+		for i := range prtbs.Items {
+			prtb := prtbs.Items[i]
+			// Build a set of hashed (shortened) PRTB names (that include namespace).
+			if hash := rbaccommon.GetRTBLabel(prtb.ObjectMeta); hash != "" {
+				bc.prtbHashes[hash] = struct{}{}
+			}
+			// Build a PRTB UID set for checking for existence of role binding owner in legacy label case.
+			if uid := string(prtb.UID); uid != "" {
+				bc.prtbUIDs[uid] = struct{}{}
+			}
+		}
+		return nil
+	}
+	err := pagination.EachPage(listPRTBs, metav1.ListOptions{}, processPRTBs, pagination.WithoutResume())
 	if err != nil {
 		return err
-	}
-	for i := range prtbs.Items {
-		prtb := prtbs.Items[i]
-		// Build a set of hashed (shortened) PRTB names (that include namespace).
-		if hash := rbaccommon.GetRTBLabel(prtb.ObjectMeta); hash != "" {
-			bc.prtbHashes[hash] = struct{}{}
-		}
-		// Build a PRTB UID set for checking for existence of role binding owner in legacy label case.
-		if uid := string(prtb.UID); uid != "" {
-			bc.prtbUIDs[uid] = struct{}{}
-		}
 	}
 
 	logrus.Infof("[%v] checking for orphaned rolebindings", orphanBindingsOperation)
 
 	// check all rolebindings against orphan criteria
-	rbs, err := bc.roleBindings.List("", metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
 	var returnErr error
-	for _, rb := range rbs.Items {
-		if bc.isOrphanBinding(&rb) {
-			logrus.Infof("[%v] found orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
-			if dryRun {
-				logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
-				continue
-			}
-			logrus.Infof("[%v] deleting orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
-			err := bc.roleBindings.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				returnErr = errors.Join(returnErr, err)
+	listRoleBindings := func(opts metav1.ListOptions) (*rbacv1.RoleBindingList, error) {
+		return bc.roleBindings.List("", opts)
+	}
+	processRoleBindings := func(rbs *rbacv1.RoleBindingList) error {
+		for _, rb := range rbs.Items {
+			if bc.isOrphanBinding(&rb) {
+				logrus.Infof("[%v] found orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
+				if dryRun {
+					logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
+					continue
+				}
+				logrus.Infof("[%v] deleting orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
+				err := bc.roleBindings.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
+				if err != nil && !k8serrors.IsNotFound(err) {
+					returnErr = errors.Join(returnErr, err)
+				}
 			}
 		}
+		return nil
 	}
-
-	return returnErr
+	err = pagination.EachPage(listRoleBindings, metav1.ListOptions{}, processRoleBindings)
+	// Keep the delete errors from earlier pages when a list call fails.
+	return errors.Join(returnErr, err)
 }
 
 // isOrphanBinding detects whether a role binding is orphaned. Only bindings with a Group subject may be orphans.

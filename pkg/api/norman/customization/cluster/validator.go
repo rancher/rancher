@@ -23,6 +23,7 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	"github.com/rancher/rancher/pkg/pagination"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -278,25 +279,30 @@ func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 	msgSuffix := fmt.Sprintf("in region [%s]", region)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
-	clusters, err := client.List(metav1.ListOptions{})
+	var conflict error
+	listClusters := client.List
+	processClusters := func(clusters *v32.ClusterList) error {
+		for _, cluster := range clusters.Items {
+			if cluster.Spec.AKSConfig == nil {
+				continue
+			}
+			if name != cluster.Spec.AKSConfig.ClusterName {
+				continue
+			}
+			if region != "" && region != cluster.Spec.AKSConfig.ResourceLocation {
+				continue
+			}
+
+			conflict = httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for AKS cluster [%s] "+msgSuffix, name))
+			return pagination.ErrStop
+		}
+		return nil
+	}
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher AKS clusters "+msgSuffix)
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm clusterName is unique among Rancher AKS clusters %s: %v", msgSuffix, err))
 	}
-
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.AKSConfig == nil {
-			continue
-		}
-		if name != cluster.Spec.AKSConfig.ClusterName {
-			continue
-		}
-		if region != "" && region != cluster.Spec.AKSConfig.ResourceLocation {
-			continue
-		}
-
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for AKS cluster [%s] "+msgSuffix, name))
-	}
-	return nil
+	return conflict
 }
 
 // validateAKSNetworkPolicy performs validation around setting enableNetworkPolicy on AKS clusters which turns on Project Network Isolation
@@ -372,32 +378,41 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	amazonCredential, _ := eksConfig["amazonCredentialSecret"].(string)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
-	clusters, err := v.ClusterClient.List(metav1.ListOptions{})
-	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm displayName is unique among Rancher EKS clusters for region %s", region))
+	var conflict error
+	listClusters := v.ClusterClient.List
+	processClusters := func(clusters *v32.ClusterList) error {
+		// Two EKS clusters are the same iff they share account ID + region + cluster name.
+		// On a name+region collision, compare AWS account IDs via STS GetCallerIdentity.
+		for _, cluster := range clusters.Items {
+			if cluster.Spec.EKSConfig == nil {
+				continue
+			}
+			if name != cluster.Spec.EKSConfig.DisplayName {
+				continue
+			}
+			if region != cluster.Spec.EKSConfig.Region {
+				continue
+			}
+			existingCredential := cluster.Spec.EKSConfig.AmazonCredentialSecret
+			if amazonCredential == existingCredential {
+				conflict = httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
+				return pagination.ErrStop
+			}
+			newAccountID := v.eksAccountID(amazonCredential, region)
+			existingAccountID := v.eksAccountID(existingCredential, region)
+			if newAccountID != "" && newAccountID == existingAccountID {
+				conflict = httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
+				return pagination.ErrStop
+			}
+		}
+		return nil
 	}
-
-	// Two EKS clusters are the same iff they share account ID + region + cluster name.
-	// On a name+region collision, compare AWS account IDs via STS GetCallerIdentity.
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.EKSConfig == nil {
-			continue
-		}
-		if name != cluster.Spec.EKSConfig.DisplayName {
-			continue
-		}
-		if region != cluster.Spec.EKSConfig.Region {
-			continue
-		}
-		existingCredential := cluster.Spec.EKSConfig.AmazonCredentialSecret
-		if amazonCredential == existingCredential {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
-		}
-		newAccountID := v.eksAccountID(amazonCredential, region)
-		existingAccountID := v.eksAccountID(existingCredential, region)
-		if newAccountID != "" && newAccountID == existingAccountID {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
-		}
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm displayName is unique among Rancher EKS clusters for region %s: %v", region, err))
+	}
+	if conflict != nil {
+		return conflict
 	}
 
 	if !createFromImport {
@@ -703,27 +718,32 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 	}
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
-	clusters, err := client.List(metav1.ListOptions{})
+	var conflict error
+	listClusters := client.List
+	processClusters := func(clusters *v32.ClusterList) error {
+		for _, cluster := range clusters.Items {
+			if cluster.Spec.GKEConfig == nil {
+				continue
+			}
+			if name != cluster.Spec.GKEConfig.ClusterName {
+				continue
+			}
+			if region != "" && region != cluster.Spec.GKEConfig.Region {
+				continue
+			}
+			if zone != "" && zone != cluster.Spec.GKEConfig.Zone {
+				continue
+			}
+			conflict = httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
+			return pagination.ErrStop
+		}
+		return nil
+	}
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher GKE clusters "+msgSuffix)
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm clusterName is unique among Rancher GKE clusters %s: %v", msgSuffix, err))
 	}
-
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.GKEConfig == nil {
-			continue
-		}
-		if name != cluster.Spec.GKEConfig.ClusterName {
-			continue
-		}
-		if region != "" && region != cluster.Spec.GKEConfig.Region {
-			continue
-		}
-		if zone != "" && zone != cluster.Spec.GKEConfig.Zone {
-			continue
-		}
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
-	}
-	return nil
+	return conflict
 }
 
 func validateGKEPrivateClusterConfig(spec *v32.ClusterSpec) error {
@@ -839,25 +859,30 @@ func validateAliConfigClusterName(client v3.ClusterInterface, spec *v32.ClusterS
 	msgSuffix := fmt.Sprintf("in region [%s]", region)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
-	clusters, err := client.List(metav1.ListOptions{})
+	var conflict error
+	listClusters := client.List
+	processClusters := func(clusters *v32.ClusterList) error {
+		for _, cluster := range clusters.Items {
+			if cluster.Spec.AliConfig == nil {
+				continue
+			}
+			if name != cluster.Spec.AliConfig.ClusterName {
+				continue
+			}
+			if region != "" && region != cluster.Spec.AliConfig.RegionID {
+				continue
+			}
+
+			conflict = httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for Alibaba cluster [%s] "+msgSuffix, name))
+			return pagination.ErrStop
+		}
+		return nil
+	}
+	err := pagination.EachPage(listClusters, metav1.ListOptions{}, processClusters)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher Alibaba clusters "+msgSuffix)
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm clusterName is unique among Rancher Alibaba clusters %s: %v", msgSuffix, err))
 	}
-
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.AliConfig == nil {
-			continue
-		}
-		if name != cluster.Spec.AliConfig.ClusterName {
-			continue
-		}
-		if region != "" && region != cluster.Spec.AliConfig.RegionID {
-			continue
-		}
-
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for Alibaba cluster [%s] "+msgSuffix, name))
-	}
-	return nil
+	return conflict
 }
 
 func validateKeV2ClusterRequest(clusterSpec *v32.ClusterSpec) error {

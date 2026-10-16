@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/pagination"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/apps"
 	appscontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
@@ -412,18 +413,22 @@ func getHostIPs(deployments appscontrollers.DeploymentController, nodes corev1co
 }
 
 func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, error) {
-	nodes, err := nodeController.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	nodeIPs := make([]string, 0, 2*len(nodes.Items))
-	for _, node := range nodes.Items {
-		for _, ip := range node.Status.Addresses {
-			if ip.Type == v1.NodeInternalIP || ip.Type == v1.NodeExternalIP {
-				nodeIPs = append(nodeIPs, ip.Address)
+	nodeIPs := make([]string, 0)
+	listNodes := nodeController.List
+	processNodes := func(nodes *v1.NodeList) error {
+		for _, node := range nodes.Items {
+			for _, ip := range node.Status.Addresses {
+				if ip.Type == v1.NodeInternalIP || ip.Type == v1.NodeExternalIP {
+					nodeIPs = append(nodeIPs, ip.Address)
+				}
 			}
 		}
+		return nil
+	}
+
+	err := pagination.EachPage(listNodes, metav1.ListOptions{}, processNodes)
+	if err != nil {
+		return nil, err
 	}
 
 	return nodeIPs, nil
