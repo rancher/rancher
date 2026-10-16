@@ -36,7 +36,6 @@ func TestEachPage(t *testing.T) {
 		results        []listResult
 		fnErrOnPage    int   // 1-based page that makes fn fail; 0 means never
 		fnErr          error // error that fn returns on fnErrOnPage; defaults to errBoom
-		noResume       bool
 		ignoreNotFound bool
 		wantItems      []string
 		wantTokens     []string // Continue value of each list call
@@ -92,64 +91,21 @@ func TestEachPage(t *testing.T) {
 			wantTokens:  []string{""},
 		},
 		{
-			name: "expired token resumes from the token in the error",
+			name: "expired error on page 2 is returned and the list does not resume",
 			results: []listResult{
 				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("t1-new")},
+				{err: paginationtest.ExpiredError()},
 				{items: []string{"b"}},
 			},
-			wantItems:  []string{"a", "b"},
-			wantTokens: []string{"", "t1", "t1-new"},
-		},
-		{
-			name: "WithoutResume returns the expired error",
-			results: []listResult{
-				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("t1-new")},
-			},
-			noResume:     true,
 			wantItems:    []string{"a"},
 			wantTokens:   []string{"", "t1"},
 			wantErrCheck: apierrors.IsResourceExpired,
 		},
 		{
-			name: "wrapped expired error resumes",
+			name: "wrapped expired error is returned",
 			results: []listResult{
 				{items: []string{"a"}, next: "t1"},
-				{err: fmt.Errorf("list failed: %w", paginationtest.ExpiredError("t1-new"))},
-				{items: []string{"b"}},
-			},
-			wantItems:  []string{"a", "b"},
-			wantTokens: []string{"", "t1", "t1-new"},
-		},
-		{
-			name: "retry counter resets after a successful page",
-			results: []listResult{
-				{items: []string{"a"}, next: "t0"},
-				{err: paginationtest.ExpiredError("t1")},
-				{items: []string{"b"}, next: "t2"},
-				{err: paginationtest.ExpiredError("t3")},
-				{items: []string{"c"}},
-			},
-			wantItems:  []string{"a", "b", "c"},
-			wantTokens: []string{"", "t0", "t1", "t2", "t3"},
-		},
-		{
-			name: "non-expired error after a resume is returned",
-			results: []listResult{
-				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("t1-new")},
-				{err: errBoom},
-			},
-			wantItems:  []string{"a"},
-			wantTokens: []string{"", "t1", "t1-new"},
-			wantErr:    errBoom,
-		},
-		{
-			name: "expired error without a token is returned",
-			results: []listResult{
-				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("")},
+				{err: fmt.Errorf("list failed: %w", paginationtest.ExpiredError())},
 			},
 			wantItems:    []string{"a"},
 			wantTokens:   []string{"", "t1"},
@@ -158,44 +114,9 @@ func TestEachPage(t *testing.T) {
 		{
 			name: "expired error on the first page is returned",
 			results: []listResult{
-				{err: paginationtest.ExpiredError("t1")},
+				{err: paginationtest.ExpiredError()},
 			},
 			wantTokens:   []string{""},
-			wantErrCheck: apierrors.IsResourceExpired,
-		},
-		{
-			name: "expired error that repeats the same token is returned",
-			results: []listResult{
-				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("t1")},
-			},
-			wantItems:    []string{"a"},
-			wantTokens:   []string{"", "t1"},
-			wantErrCheck: apierrors.IsResourceExpired,
-		},
-		{
-			name: "three expired errors in a row still resume",
-			results: []listResult{
-				{items: []string{"a"}, next: "t0"},
-				{err: paginationtest.ExpiredError("t1")},
-				{err: paginationtest.ExpiredError("t2")},
-				{err: paginationtest.ExpiredError("t3")},
-				{items: []string{"b"}},
-			},
-			wantItems:  []string{"a", "b"},
-			wantTokens: []string{"", "t0", "t1", "t2", "t3"},
-		},
-		{
-			name: "four expired errors in a row are limited",
-			results: []listResult{
-				{items: []string{"a"}, next: "t0"},
-				{err: paginationtest.ExpiredError("t1")},
-				{err: paginationtest.ExpiredError("t2")},
-				{err: paginationtest.ExpiredError("t3")},
-				{err: paginationtest.ExpiredError("t4")},
-			},
-			wantItems:    []string{"a"},
-			wantTokens:   []string{"", "t0", "t1", "t2", "t3"},
 			wantErrCheck: apierrors.IsResourceExpired,
 		},
 		{
@@ -223,18 +144,6 @@ func TestEachPage(t *testing.T) {
 			ignoreNotFound: true,
 			wantItems:      []string{"a"},
 			wantTokens:     []string{"", "t1"},
-			wantErrCheck:   apierrors.IsNotFound,
-		},
-		{
-			name: "NotFound after a resume is returned with ignoreNotFound",
-			results: []listResult{
-				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("t2")},
-				{err: notFound},
-			},
-			ignoreNotFound: true,
-			wantItems:      []string{"a"},
-			wantTokens:     []string{"", "t1", "t2"},
 			wantErrCheck:   apierrors.IsNotFound,
 		},
 		{
@@ -270,17 +179,6 @@ func TestEachPage(t *testing.T) {
 			wantTokens:   []string{"", "t1"},
 			wantErrCheck: func(err error) bool { return strings.Contains(err.Error(), "same continue token") },
 		},
-		{
-			name: "same continue token after a resume returns an error",
-			results: []listResult{
-				{items: []string{"a"}, next: "t1"},
-				{err: paginationtest.ExpiredError("t2")},
-				{items: []string{"b"}, next: "t2"},
-			},
-			wantItems:    []string{"a", "b"},
-			wantTokens:   []string{"", "t1", "t2"},
-			wantErrCheck: func(err error) bool { return strings.Contains(err.Error(), "same continue token") },
-		},
 	}
 
 	for _, tc := range tests {
@@ -305,9 +203,6 @@ func TestEachPage(t *testing.T) {
 			var gotItems []string
 			var pages int
 			var options []pagination.Option
-			if tc.noResume {
-				options = append(options, pagination.WithoutResume())
-			}
 			if tc.ignoreNotFound {
 				options = append(options, pagination.WithIgnoreNotFound())
 			}

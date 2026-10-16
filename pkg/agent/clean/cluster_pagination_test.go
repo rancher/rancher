@@ -8,7 +8,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/pagination/paginationtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -124,18 +123,18 @@ func TestCleanupListAndDeletePagination(t *testing.T) {
 			wantDeleted:   []string{},
 		},
 		{
-			name:          "resumes from the continue token of an expired error",
-			listErrs:      map[int]error{1: paginationtest.ExpiredError("new-token")},
-			extraTokens:   map[string]int{"new-token": 1},
-			wantContinues: []string{"", "token-page-1", "new-token", "token-page-2"},
-			wantDeleted:   all,
-		},
-		{
 			name:          "returns the list error of the second page",
 			listErrs:      map[int]error{1: errPgList},
 			wantContinues: []string{"", "token-page-1"},
 			wantDeleted:   []string{"item-0", "item-1"},
 			wantErrs:      []error{errPgList},
+		},
+		{
+			name:          "returns the expired error of the second page and does not resume",
+			listErrs:      map[int]error{1: errPgExpired},
+			wantContinues: []string{"", "token-page-1"},
+			wantDeleted:   []string{"item-0", "item-1"},
+			wantErrs:      []error{errPgExpired},
 		},
 		{
 			name:          "keeps the delete errors of earlier pages when a later list call fails",
@@ -165,7 +164,7 @@ func TestCleanupListAndDeletePagination(t *testing.T) {
 			t.Run(target.name+"/"+tc.name, func(t *testing.T) {
 				pgSetDryRun(t, tc.dryRun)
 
-				pager := newPgPager(all, 2, tc.listErrs, tc.extraTokens)
+				pager := newPgPager(all, 2, tc.listErrs)
 				client := fake.NewClientset()
 				pgServeList(&client.Fake, target.resource, pager, target.build)
 				pgFailOn(&client.Fake, "delete", target.resource, pgPrefixKeys(target.namespace, tc.deleteErrs))
@@ -206,18 +205,18 @@ func TestDeleteJobPagination(t *testing.T) {
 			wantDeleted:   []string{},
 		},
 		{
-			name:          "resumes from the continue token of an expired error",
-			listErrs:      map[int]error{1: paginationtest.ExpiredError("new-token")},
-			extraTokens:   map[string]int{"new-token": 1},
-			wantContinues: []string{"", "token-page-1", "new-token", "token-page-2", "token-page-3"},
-			wantDeleted:   cleanupJobs,
-		},
-		{
 			name:          "returns the list error of the second page",
 			listErrs:      map[int]error{1: errPgList},
 			wantContinues: []string{"", "token-page-1"},
 			wantDeleted:   []string{"cattle-cleanup-a"},
 			wantErrs:      []error{errPgList},
+		},
+		{
+			name:          "returns the expired error of the second page and does not resume",
+			listErrs:      map[int]error{1: errPgExpired},
+			wantContinues: []string{"", "token-page-1"},
+			wantDeleted:   []string{"cattle-cleanup-a"},
+			wantErrs:      []error{errPgExpired},
 		},
 		{
 			name:          "tolerates NotFound on delete",
@@ -238,7 +237,7 @@ func TestDeleteJobPagination(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pgSetDryRun(t, tc.dryRun)
 
-			pager := newPgPager(names, 2, tc.listErrs, tc.extraTokens)
+			pager := newPgPager(names, 2, tc.listErrs)
 			client := fake.NewClientset()
 			pgServeList(&client.Fake, "jobs", pager, func(names []string, next string) runtime.Object {
 				return &batchv1.JobList{ListMeta: pgListMeta(next), Items: pgMap(names, func(n string) batchv1.Job {
@@ -324,7 +323,6 @@ func TestCleanupNamespacesPagination(t *testing.T) {
 		name          string
 		dryRun        bool
 		listErrs      map[int]error
-		extraTokens   map[string]int
 		getErrs       map[string]error
 		updateErrs    map[string]error
 		wantContinues []string
@@ -346,20 +344,20 @@ func TestCleanupNamespacesPagination(t *testing.T) {
 			wantCleaned:   []string{},
 		},
 		{
-			name:          "resumes from the continue token of an expired error",
-			listErrs:      map[int]error{1: paginationtest.ExpiredError("new-token")},
-			extraTokens:   map[string]int{"new-token": 1},
-			wantContinues: []string{"", "token-page-1", "new-token", "token-page-2"},
-			wantUpdated:   dirty,
-			wantCleaned:   dirty,
-		},
-		{
 			name:          "returns the list error of the second page",
 			listErrs:      map[int]error{1: errPgList},
 			wantContinues: []string{"", "token-page-1"},
 			wantUpdated:   []string{"item-0", "item-1"},
 			wantCleaned:   []string{"item-0", "item-1"},
 			wantErrs:      []error{errPgList},
+		},
+		{
+			name:          "returns the expired error of the second page and does not resume",
+			listErrs:      map[int]error{1: errPgExpired},
+			wantContinues: []string{"", "token-page-1"},
+			wantUpdated:   []string{"item-0", "item-1"},
+			wantCleaned:   []string{"item-0", "item-1"},
+			wantErrs:      []error{errPgExpired},
 		},
 		{
 			name:          "tolerates NotFound on get",
@@ -396,7 +394,7 @@ func TestCleanupNamespacesPagination(t *testing.T) {
 				objects = append(objects, &namespaces[i])
 			}
 			client := fake.NewClientset(objects...)
-			pager := newPgPager(pgDirtyNamespaces(), 2, tc.listErrs, tc.extraTokens)
+			pager := newPgPager(pgDirtyNamespaces(), 2, tc.listErrs)
 			pgServeList(&client.Fake, "namespaces", pager, pgNamespaceList)
 			pgFailOn(&client.Fake, "get", "namespaces", tc.getErrs)
 			pgFailOn(&client.Fake, "update", "namespaces", tc.updateErrs)
@@ -441,7 +439,6 @@ func TestGetProjectMonitoringNamespacesPagination(t *testing.T) {
 	tests := []struct {
 		name          string
 		listErrs      map[int]error
-		extraTokens   map[string]int
 		wantContinues []string
 		want          []string
 		wantErr       error
@@ -452,17 +449,16 @@ func TestGetProjectMonitoringNamespacesPagination(t *testing.T) {
 			want:          []string{"cattle-prometheus-p-a", "cattle-prometheus-p-b", "cattle-prometheus-p-d"},
 		},
 		{
-			name:          "resumes from the continue token of an expired error",
-			listErrs:      map[int]error{1: paginationtest.ExpiredError("new-token")},
-			extraTokens:   map[string]int{"new-token": 1},
-			wantContinues: []string{"", "token-page-1", "new-token", "token-page-2"},
-			want:          []string{"cattle-prometheus-p-a", "cattle-prometheus-p-b", "cattle-prometheus-p-d"},
-		},
-		{
 			name:          "returns the list error of the second page",
 			listErrs:      map[int]error{1: errPgList},
 			wantContinues: []string{"", "token-page-1"},
 			wantErr:       errPgList,
+		},
+		{
+			name:          "returns the expired error of the second page and does not resume",
+			listErrs:      map[int]error{1: errPgExpired},
+			wantContinues: []string{"", "token-page-1"},
+			wantErr:       errPgExpired,
 		},
 	}
 
@@ -470,7 +466,7 @@ func TestGetProjectMonitoringNamespacesPagination(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			pager := newPgPager(namespaces, 2, tc.listErrs, tc.extraTokens)
+			pager := newPgPager(namespaces, 2, tc.listErrs)
 			client := fake.NewClientset()
 			pgServeList(&client.Fake, "namespaces", pager, pgNamespaceList)
 

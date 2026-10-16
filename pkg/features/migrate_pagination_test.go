@@ -79,7 +79,7 @@ func TestEnableRKE2IfClustersExistPagination(t *testing.T) {
 
 	listErr := errors.New("list failed")
 	updateErr := errors.New("update failed")
-	expiredErr := paginationtest.ExpiredError("token-page-2")
+	expiredErr := paginationtest.ExpiredError()
 	plain := []v3.Cluster{paginationTestCluster("a", false)}
 	match := []v3.Cluster{paginationTestCluster("b", false), paginationTestCluster("match", true)}
 

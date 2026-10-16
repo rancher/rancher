@@ -107,7 +107,7 @@ func TestFleetWorkspaceNames(t *testing.T) {
 			names:         []string{"fleet-a", "fleet-b"},
 			perPage:       1,
 			failPage:      2,
-			failErr:       paginationtest.ExpiredError("resume-token"),
+			failErr:       paginationtest.ExpiredError(),
 			wantErr:       true,
 			wantListCalls: 2,
 		},
@@ -126,7 +126,6 @@ func TestFleetWorkspaceNames(t *testing.T) {
 			t.Parallel()
 
 			pager := workspaceClusters(tc.names, tc.perPage).FailOnPage(tc.failPage, tc.failErr)
-			pager.ExtraTokens = map[string]int{"resume-token": 1}
 			got, err := fleetWorkspaceNames(mgmtClusterMock(gomock.NewController(t), pager))
 			if tc.wantErr {
 				require.Error(t, err)

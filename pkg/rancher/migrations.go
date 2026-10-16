@@ -89,8 +89,6 @@ type tokenCollectionDeleter interface {
 	DeleteCollection(options *metav1.ListOptions) error
 }
 
-// The migration lists use pagination.WithoutResume. A resumed list can skip objects,
-// and a migration that finished is not run again. A failed migration runs again at the next start.
 func runMigrations(wranglerContext *wrangler.Context) error {
 	if err := migrateLocalUserPasswords(wranglerContext); err != nil {
 		return err
@@ -414,7 +412,7 @@ func fleetWorkspaceNames(clusters v3.ClusterClient) ([]string, error) {
 		}
 		return nil
 	}
-	err := pagination.EachPage(listMgmtClusters, metav1.ListOptions{}, processMgmtClusters, pagination.WithoutResume())
+	err := pagination.EachPage(listMgmtClusters, metav1.ListOptions{}, processMgmtClusters)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +498,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 							return nil
 						}
 						planSecretsOpts := metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()}
-						err := pagination.EachPage(listPlanSecrets, planSecretsOpts, processPlanSecrets, pagination.WithoutResume())
+						err := pagination.EachPage(listPlanSecrets, planSecretsOpts, processPlanSecrets)
 						if err != nil {
 							return err
 						}
@@ -566,13 +564,13 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					return nil
 				}
 				machinesOpts := metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterNameLabel: provCluster.Name}.String()}
-				err := pagination.EachPage(listMachines, machinesOpts, processMachines, pagination.WithoutResume())
+				err := pagination.EachPage(listMachines, machinesOpts, processMachines)
 				if err != nil {
 					return err
 				}
 
 				otherMachinesOpts := metav1.ListOptions{LabelSelector: labels.Set{capr.ClusterNameLabel: provCluster.Name}.String()}
-				err = pagination.EachPage(listMachines, otherMachinesOpts, processMachines, pagination.WithoutResume())
+				err = pagination.EachPage(listMachines, otherMachinesOpts, processMachines)
 				if err != nil {
 					return err
 				}
@@ -580,7 +578,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 			return nil
 		}
 		// Skip this workspace if the first list call returns NotFound.
-		err := pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithoutResume(), pagination.WithIgnoreNotFound())
+		err := pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithIgnoreNotFound())
 		if err != nil {
 			return err
 		}
@@ -637,7 +635,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listMgmtClusters, metav1.ListOptions{}, processMgmtClusters, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listMgmtClusters, metav1.ListOptions{}, processMgmtClusters); err != nil {
 		return err
 	}
 
@@ -716,7 +714,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.CAPIContext) error {
 			return nil
 		}
 		// Skip this workspace if the first list call returns NotFound.
-		err := pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithoutResume(), pagination.WithIgnoreNotFound())
+		err := pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithIgnoreNotFound())
 		if err != nil {
 			return err
 		}
@@ -765,7 +763,7 @@ func migrateSystemAgentDataDirectory(w *wrangler.CAPIContext) error {
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
 		return err
 	}
 
@@ -814,7 +812,7 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
 		return err
 	}
 
@@ -889,7 +887,7 @@ func managementNodeCleanup(w *wrangler.Context) error {
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listNodes, metav1.ListOptions{}, processNodes, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listNodes, metav1.ListOptions{}, processNodes); err != nil {
 		return err
 	}
 
@@ -1008,7 +1006,7 @@ func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) 
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
 		return err
 	}
 
@@ -1040,7 +1038,7 @@ func migrateCRTTokensToSecretsFunc(w *wrangler.Context) error {
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listCRTs, metav1.ListOptions{}, processCRTs, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listCRTs, metav1.ListOptions{}, processCRTs); err != nil {
 		return err
 	}
 
@@ -1113,7 +1111,7 @@ func migrateExistingRKE2ClustersPrimeAnnotation(w *wrangler.CAPIContext) error {
 		}
 		return nil
 	}
-	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters, pagination.WithoutResume()); err != nil {
+	if err = pagination.EachPage(listProvClusters, metav1.ListOptions{}, processProvClusters); err != nil {
 		return err
 	}
 

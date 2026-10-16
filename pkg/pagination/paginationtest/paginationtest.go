@@ -25,11 +25,8 @@ const (
 var ErrListFailed = errors.New("simulated list error")
 
 // ExpiredError returns the error that the API server sends for an expired continue token.
-// The error contains token as the new continue token.
-func ExpiredError(token string) error {
-	err := apierrors.NewResourceExpired("continue token expired")
-	err.ErrStatus.ListMeta.Continue = token
-	return err
+func ExpiredError() error {
+	return apierrors.NewResourceExpired("continue token expired")
 }
 
 // Pager serves a snapshot of items in pages and records every list call.
@@ -41,8 +38,6 @@ type Pager[T any] struct {
 	PerPage int
 	// ListErrs maps the zero-based index of a list call to the error that the call returns instead of a page.
 	ListErrs map[int]error
-	// ExtraTokens maps an additional continue token to the index of the page to serve for it.
-	ExtraTokens map[string]int
 	// Calls records the options of every list call.
 	Calls []metav1.ListOptions
 
@@ -134,9 +129,6 @@ func (p *Pager[T]) bounds(page int) (start, end int, hasNext, ok bool) {
 }
 
 func (p *Pager[T]) pageOf(token string) (int, bool) {
-	if page, ok := p.ExtraTokens[token]; ok {
-		return page, page >= 0
-	}
 	if after, ok := strings.CutPrefix(token, tokenPrefix); ok {
 		page, err := strconv.Atoi(after)
 		return page, err == nil && page >= 0

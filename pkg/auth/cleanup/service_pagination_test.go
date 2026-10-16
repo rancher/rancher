@@ -115,6 +115,7 @@ func TestDeleteUsersPagination(t *testing.T) {
 	t.Parallel()
 
 	listErr := errors.New("list failed")
+	expiredErr := paginationtest.ExpiredError()
 	deleteErr := errors.New("delete failed")
 	notFound := apierrors.NewNotFound(schema.GroupResource{Resource: "users"}, "ext-1")
 
@@ -172,15 +173,16 @@ func TestDeleteUsersPagination(t *testing.T) {
 			wantReset:   []string{"pwd-1"},
 		},
 		{
-			name: "resume after expired token",
+			name: "expired token is returned and the list does not resume",
 			cfg: paginationTestConfig{
 				pages:         paginationTestUserPages(),
 				secrets:       map[string]bool{"secret-1": true},
-				listErrAtCall: map[int]error{1: paginationtest.ExpiredError("token-page-2")},
+				listErrAtCall: map[int]error{1: expiredErr},
 			},
-			wantTokens:  []string{"", "token-page-1", "token-page-2"},
-			wantDeleted: []string{"ext-1", "ext-3"},
-			wantReset:   []string{"pwd-1", "pwd-2"},
+			wantErr:     expiredErr,
+			wantTokens:  []string{"", "token-page-1"},
+			wantDeleted: []string{"ext-1"},
+			wantReset:   []string{"pwd-1"},
 		},
 	}
 

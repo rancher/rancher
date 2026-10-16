@@ -569,6 +569,7 @@ func TestCleanOrphans_Pagination(t *testing.T) {
 	t.Parallel()
 
 	groupSubjects := []v1.Subject{{Kind: v1.GroupKind, Name: "Dogs"}}
+	errExpired := paginationtest.ExpiredError()
 
 	validPRTB1 := v3.ProjectRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -637,6 +638,7 @@ func TestCleanOrphans_Pagination(t *testing.T) {
 		failPRTBPage    int
 		failPRTBErr     error
 		failRBPage      int
+		failRBErr       error
 		deleteErrs      map[string]error
 		wantErrIs       []error
 		wantPRTBTokens  []string
@@ -692,7 +694,7 @@ func TestCleanOrphans_Pagination(t *testing.T) {
 			prtbPageSize:    1,
 			rbPageSize:      2,
 			failPRTBPage:    2,
-			failPRTBErr:     paginationtest.ExpiredError("new-token"),
+			failPRTBErr:     errExpired,
 			wantPRTBTokens:  []string{"", "token-page-1"},
 			wantRBTokens:    nil,
 			wantRemainingRB: []string{"rb-valid-1", "rb-orphan-1", "rb-valid-2", "rb-orphan-2"},
@@ -707,6 +709,18 @@ func TestCleanOrphans_Pagination(t *testing.T) {
 			wantRBTokens:    []string{"", "token-page-1"},
 			wantRemainingRB: []string{"rb-valid-1", "rb-valid-2", "rb-orphan-2"},
 			wantErr:         true,
+		},
+		{
+			name:            "expired role binding list fails without resuming and keeps the page 1 cleanup",
+			prtbPageSize:    1,
+			rbPageSize:      2,
+			failRBPage:      2,
+			failRBErr:       errExpired,
+			wantPRTBTokens:  []string{"", "token-page-1"},
+			wantRBTokens:    []string{"", "token-page-1"},
+			wantRemainingRB: []string{"rb-valid-1", "rb-valid-2", "rb-orphan-2"},
+			wantErr:         true,
+			wantErrIs:       []error{errExpired},
 		},
 		{
 			name:            "role binding list error keeps the delete errors of earlier pages",
@@ -743,7 +757,7 @@ func TestCleanOrphans_Pagination(t *testing.T) {
 			}
 			rbClient := &twoPageRoleBindingClient{
 				fakeRoleBindingClient: fakeRoleBindingClient{bindings: append([]v1.RoleBinding(nil), all...)},
-				pager:                 paginationtest.NewPager(all, tc.rbPageSize).FailOnPage(tc.failRBPage, nil),
+				pager:                 paginationtest.NewPager(all, tc.rbPageSize).FailOnPage(tc.failRBPage, tc.failRBErr),
 				deleteErrs:            tc.deleteErrs,
 			}
 

@@ -24,16 +24,16 @@ import (
 // The fake clientset ignores Limit and Continue, so paginationtest.Pager serves the pages itself and records every call.
 
 var (
-	errPgList   = errors.New("list failed")
-	errPgDelete = errors.New("delete failed")
-	errPgUpdate = errors.New("update failed")
+	errPgList    = errors.New("list failed")
+	errPgDelete  = errors.New("delete failed")
+	errPgUpdate  = errors.New("update failed")
+	errPgExpired = paginationtest.ExpiredError()
 )
 
 // newPgPager returns a pager for a copy of items.
-func newPgPager[T any](items []T, perPage int, listErrs map[int]error, extraTokens map[string]int) *paginationtest.Pager[T] {
+func newPgPager[T any](items []T, perPage int, listErrs map[int]error) *paginationtest.Pager[T] {
 	p := paginationtest.NewPager(items, perPage)
 	p.ListErrs = listErrs
-	p.ExtraTokens = extraTokens
 	return p
 }
 
@@ -162,7 +162,6 @@ type pgScenario struct {
 	name          string
 	dryRun        bool
 	listErrs      map[int]error
-	extraTokens   map[string]int
 	deleteErrs    map[string]error // item name -> error that the delete call returns
 	wantContinues []string
 	wantDeleted   []string // names of the items that get a delete call, in order
@@ -185,7 +184,6 @@ func TestUnusedPullSecretsPagination(t *testing.T) {
 		name        string
 		configured  []string
 		listErrs    map[int]error
-		extraTokens map[string]int
 		deleteErrs  map[string]error
 		wantCalls   []string
 		wantDeleted []string
@@ -209,17 +207,16 @@ func TestUnusedPullSecretsPagination(t *testing.T) {
 			wantDeleted: []string{},
 		},
 		{
-			name:        "resumes from the continue token of an expired error",
-			configured:  []string{"item-1", "item-4"},
-			listErrs:    map[int]error{1: paginationtest.ExpiredError("new-token")},
-			extraTokens: map[string]int{"new-token": 1},
-			wantCalls:   []string{"", "token-page-1", "new-token", "token-page-2"},
-			wantDeleted: []string{"item-0", "item-2", "item-3", "item-5"},
-		},
-		{
 			name:        "deletes nothing when listing the second page fails",
 			configured:  []string{"item-1", "item-4"},
 			listErrs:    map[int]error{1: errPgList},
+			wantCalls:   []string{"", "token-page-1"},
+			wantDeleted: []string{},
+		},
+		{
+			name:        "returns the expired error of the second page and does not resume",
+			configured:  []string{"item-1", "item-4"},
+			listErrs:    map[int]error{1: errPgExpired},
 			wantCalls:   []string{"", "token-page-1"},
 			wantDeleted: []string{},
 		},
@@ -245,7 +242,7 @@ func TestUnusedPullSecretsPagination(t *testing.T) {
 
 			pager := newPgPager(pgMap(names, func(n string) corev1.Secret {
 				return corev1.Secret{ObjectMeta: pgMeta(n, namespace, labels)}
-			}), 2, tc.listErrs, tc.extraTokens)
+			}), 2, tc.listErrs)
 			client := fake.NewClientset()
 			pgServeList(&client.Fake, "secrets", pager, pgSecretList)
 			pgFailOn(&client.Fake, "delete", "secrets", pgPrefixKeys(namespace, tc.deleteErrs))
@@ -297,18 +294,18 @@ func TestRemoveUnusedCattleCredentialsFromPagination(t *testing.T) {
 			wantDeleted:   []string{"cattle-credentials-old0", "cattle-credentials-old4", "cattle-credentials-old6"},
 		},
 		{
-			name:          "resumes from the continue token of an expired error",
-			listErrs:      map[int]error{1: paginationtest.ExpiredError("new-token")},
-			extraTokens:   map[string]int{"new-token": 1},
-			wantContinues: []string{"", "token-page-1", "new-token", "token-page-2", "token-page-3"},
-			wantDeleted:   []string{"cattle-credentials-old0", "cattle-credentials-old4", "cattle-credentials-old6"},
-		},
-		{
 			name:          "returns the list error of the second page",
 			listErrs:      map[int]error{1: errPgList},
 			wantContinues: []string{"", "token-page-1"},
 			wantDeleted:   []string{"cattle-credentials-old0"},
 			wantErrs:      []error{errPgList},
+		},
+		{
+			name:          "returns the expired error of the second page and does not resume",
+			listErrs:      map[int]error{1: errPgExpired},
+			wantContinues: []string{"", "token-page-1"},
+			wantDeleted:   []string{"cattle-credentials-old0"},
+			wantErrs:      []error{errPgExpired},
 		},
 		{
 			name:          "tolerates NotFound on delete and continues",
@@ -327,7 +324,7 @@ func TestRemoveUnusedCattleCredentialsFromPagination(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			pager := newPgPager(secrets, 2, tc.listErrs, tc.extraTokens)
+			pager := newPgPager(secrets, 2, tc.listErrs)
 			client := fake.NewClientset()
 			pgServeList(&client.Fake, "secrets", pager, pgSecretList)
 			pgFailOn(&client.Fake, "delete", "secrets", pgPrefixKeys(namespace, tc.deleteErrs))

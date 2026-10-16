@@ -288,7 +288,7 @@ func TestClusterNameValidatorsPagination(t *testing.T) {
 			steps: func(filler, match v32.Cluster) map[string]pgStep {
 				return map[string]pgStep{
 					"":   {items: []v32.Cluster{filler}, cont: "t1"},
-					"t1": {err: paginationtest.ExpiredError("")},
+					"t1": {err: paginationtest.ExpiredError()},
 				}
 			},
 			wantCode:   &serverCode,
@@ -300,7 +300,7 @@ func TestClusterNameValidatorsPagination(t *testing.T) {
 			name: "expired error on page 1 returns a server error",
 			steps: func(filler, match v32.Cluster) map[string]pgStep {
 				return map[string]pgStep{
-					"": {err: paginationtest.ExpiredError("new-token")},
+					"": {err: paginationtest.ExpiredError()},
 				}
 			},
 			wantCode:   &serverCode,
@@ -313,7 +313,7 @@ func TestClusterNameValidatorsPagination(t *testing.T) {
 			steps: func(filler, match v32.Cluster) map[string]pgStep {
 				return map[string]pgStep{
 					"":          {items: []v32.Cluster{filler}, cont: "t1"},
-					"t1":        {err: paginationtest.ExpiredError("new-token")},
+					"t1":        {err: paginationtest.ExpiredError()},
 					"new-token": {items: []v32.Cluster{match}},
 				}
 			},

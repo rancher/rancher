@@ -92,7 +92,7 @@ func TestCollectNodeIPs_Pagination(t *testing.T) {
 			nodes:      []corev1.Node{node1, node2, node3},
 			pageSize:   2,
 			failPage:   2,
-			failErr:    paginationtest.ExpiredError("resume-token"),
+			failErr:    paginationtest.ExpiredError(),
 			wantTokens: []string{"", "token-page-1"},
 			wantErr:    true,
 		},
@@ -103,7 +103,6 @@ func TestCollectNodeIPs_Pagination(t *testing.T) {
 			t.Parallel()
 
 			pager := paginationtest.NewPager(tc.nodes, tc.pageSize).FailOnPage(tc.failPage, tc.failErr)
-			pager.ExtraTokens = map[string]int{"resume-token": 1}
 			ips, err := collectNodeIPs(&pagedNodeController{pager: pager})
 			if tc.wantErr {
 				require.Error(t, err)

@@ -108,8 +108,6 @@ func newOrphanBindingsCleanup(restConfig *rest.Config) (*orphanBindingsCleanup, 
 
 // cleanOrphans finds and deletes orphaned bindings
 func (bc *orphanBindingsCleanup) cleanOrphans(dryRun bool) error {
-	// Use WithoutResume. A resumed list can skip a live PRTB,
-	// and the code then treats the role binding of that PRTB as an orphan.
 	listPRTBs := func(opts metav1.ListOptions) (*v3api.ProjectRoleTemplateBindingList, error) {
 		return bc.prtbs.List("", opts)
 	}
@@ -127,7 +125,7 @@ func (bc *orphanBindingsCleanup) cleanOrphans(dryRun bool) error {
 		}
 		return nil
 	}
-	err := pagination.EachPage(listPRTBs, metav1.ListOptions{}, processPRTBs, pagination.WithoutResume())
+	err := pagination.EachPage(listPRTBs, metav1.ListOptions{}, processPRTBs)
 	if err != nil {
 		return err
 	}

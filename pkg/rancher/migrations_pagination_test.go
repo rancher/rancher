@@ -346,7 +346,7 @@ func TestMigrateSystemAgentDataDirectory_Pagination(t *testing.T) {
 		{
 			name:        "expired continue token does not resume and does not mark the migration",
 			failPage:    2,
-			failErr:     paginationtest.ExpiredError("resume-token"),
+			failErr:     paginationtest.ExpiredError(),
 			wantErr:     "continue token expired",
 			wantTokens:  []string{"", "token-page-1"},
 			wantUpdated: []string{"c1:/data/a:1"},
@@ -364,7 +364,6 @@ func TestMigrateSystemAgentDataDirectory_Pagination(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := migSetup(t)
 			pager := paginationtest.NewPager(clusters, 2).FailOnPage(tc.failPage, tc.failErr)
-			pager.ExtraTokens = map[string]int{"resume-token": 1}
 			prov := provClusterMock(ctrl, pager)
 
 			var updated []string

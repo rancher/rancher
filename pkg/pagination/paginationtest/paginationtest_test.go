@@ -20,7 +20,6 @@ func TestPagerServe(t *testing.T) {
 		name       string
 		perPage    int
 		failPage   int
-		extra      map[string]int
 		continues  []string
 		want       [][]string
 		wantTokens []string
@@ -60,15 +59,6 @@ func TestPagerServe(t *testing.T) {
 			wantErrs:   []bool{false, true},
 		},
 		{
-			name:       "extra token resumes at a page",
-			perPage:    2,
-			extra:      map[string]int{"new-token": 2},
-			continues:  []string{"new-token"},
-			want:       [][]string{{"e"}},
-			wantTokens: []string{""},
-			wantErrs:   []bool{false},
-		},
-		{
 			name:       "unknown token is an error",
 			perPage:    2,
 			continues:  []string{"bogus"},
@@ -91,7 +81,6 @@ func TestPagerServe(t *testing.T) {
 			t.Parallel()
 
 			p := NewPager(items, tc.perPage).FailOnPage(tc.failPage, nil)
-			p.ExtraTokens = tc.extra
 			for i, token := range tc.continues {
 				got, next, err := p.Serve(metav1.ListOptions{Continue: token, Limit: pagination.PageSize})
 				assert.Equal(t, tc.wantErrs[i], err != nil, "call %d error", i)
@@ -144,12 +133,8 @@ func TestFailOnPageUsesTheGivenError(t *testing.T) {
 func TestExpiredError(t *testing.T) {
 	t.Parallel()
 
-	err := ExpiredError("resume-here")
+	err := ExpiredError()
 	require.True(t, apierrors.IsResourceExpired(err))
-
-	var status apierrors.APIStatus
-	require.True(t, errors.As(err, &status))
-	assert.Equal(t, "resume-here", status.Status().ListMeta.Continue)
 }
 
 func TestPagesPagerServe(t *testing.T) {

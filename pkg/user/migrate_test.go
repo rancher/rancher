@@ -95,6 +95,7 @@ func TestPasswordMigrator_MigrateAll_Pagination(t *testing.T) {
 	}
 
 	errListFailed := errors.New("list failed")
+	errExpired := paginationtest.ExpiredError()
 	errGetFailed := errors.New("get failed")
 	// The secret create returns NotFound when the namespace of the password secrets does not exist.
 	errNamespaceNotFound := apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "cattle-local-user-passwords")
@@ -139,14 +140,15 @@ func TestPasswordMigrator_MigrateAll_Pagination(t *testing.T) {
 			expectedSecrets:      []string{"user1", "user3"},
 		},
 		{
-			name:                 "expired token on page 2 resumes",
+			name:                 "expired token on page 2 is returned and the list does not resume",
 			users:                []apiv3.User{user1, user2, user3},
 			pageSize:             2,
 			failPage:             2,
-			failErr:              paginationtest.ExpiredError("resume-token"),
-			wantTokens:           []string{"", "token-page-1", "resume-token"},
-			expectedUpdatedUsers: []string{"user1", "user2", "user3"},
-			expectedSecrets:      []string{"user1", "user2", "user3"},
+			failErr:              errExpired,
+			wantTokens:           []string{"", "token-page-1"},
+			expectedUpdatedUsers: []string{"user1", "user2"},
+			expectedSecrets:      []string{"user1", "user2"},
+			wantErr:              errExpired,
 		},
 		{
 			name:                 "page 2 list failure aborts with the list error",
@@ -183,7 +185,6 @@ func TestPasswordMigrator_MigrateAll_Pagination(t *testing.T) {
 			t.Parallel()
 
 			pager := paginationtest.NewPager(tc.users, tc.pageSize).FailOnPage(tc.failPage, tc.failErr)
-			pager.ExtraTokens = map[string]int{"resume-token": 1}
 			userClient := &pagedUserClient{pager: pager, deletedUser: tc.deletedUser, getErr: tc.getErr}
 			secretClient := &fakeSecretClient{createErr: tc.secretCreateErr}
 
