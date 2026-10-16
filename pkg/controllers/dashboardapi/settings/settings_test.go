@@ -28,7 +28,6 @@ type testCase struct {
 }
 
 func TestSetAll(t *testing.T) {
-	t.Skip()
 	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	provider := settingsProvider{
 		settings: client,
@@ -281,10 +280,7 @@ func populateTestCases() []*testCase {
 }
 
 func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
-	t.Skip()
-	t.Parallel()
 	t.Run("setting gets regular default on fresh install", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -311,7 +307,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting exists and keeps its default on upgrade having the special upgrade default", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -342,7 +337,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting exists and keeps its default on upgrade in absence of an upgrade default value", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -372,7 +366,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting exists and gets its new default on upgrade in absence of an upgrade default value", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -402,7 +395,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting does not exist and gets a special default on upgrade value on non fresh install", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
