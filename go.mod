@@ -20,7 +20,7 @@ replace (
 	// vcontext, aws-iam-authenticator) still import the old module paths.
 	// The replacement version must differ from the go.yaml.in version required
 	// below, because Go rejects the same version for two module paths.
-	gopkg.in/yaml.v2 => go.yaml.in/yaml/v2 v2.4.3
+	gopkg.in/yaml.v2 => go.yaml.in/yaml/v3 v3.0.5
 	gopkg.in/yaml.v3 => go.yaml.in/yaml/v3 v3.0.4
 
 	k8s.io/api => k8s.io/api v0.37.1
@@ -153,7 +153,7 @@ require (
 	github.com/urfave/cli v1.22.17
 	github.com/vmware/govmomi v0.56.0
 	go.uber.org/mock v0.6.0
-	go.yaml.in/yaml/v2 v2.4.4
+	go.yaml.in/yaml/v3 v3.0.5
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
