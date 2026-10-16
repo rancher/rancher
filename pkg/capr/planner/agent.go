@@ -10,6 +10,10 @@ import (
 )
 
 // generateClusterAgentManifest generates the cluster agent manifest.
+// The generated manifest is dropped into the RKE2/K3s server/manifests directory, which are reconciled on startup.
+// As these manifests are reconciled each time the service is restarted, it is imperative this manifest mirrors the
+// manifest deployed by [github.com/rancher/rancher/pkg/controllers/management/clusterdeploy] in order to prevent
+// thrashing.
 func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]byte, error) {
 	if controlPlane.Spec.ManagementClusterName == "local" {
 		return nil, nil
@@ -20,7 +24,6 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, err
 	}
 
-	// todo(jhyde): mark the cluster as registered the first time the tunnel connects.
 	// Use the default-token when initially rendering the manifest, then switch over to the system token once it exists.
 	desiredTokenName := "default-token"
 	if apimgmtv3.ClusterConditionAgentDeployed.IsTrue(mgmtCluster) {

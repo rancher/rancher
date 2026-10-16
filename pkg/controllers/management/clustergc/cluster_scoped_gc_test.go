@@ -172,7 +172,7 @@ func TestRemoveWaitsForTheUserControllersToStop(t *testing.T) {
 func TestRemoveDoesNotWaitOnceTheRemovalMovedOnWithoutTheReport(t *testing.T) {
 	gc := &gcLifecycle{enqueueAfter: func(string, string, time.Duration) { t.Fatal("unexpected requeue") }}
 	cluster := &apisv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}}
-	apisv3.ClusterConditionUserControllersStopped.False(cluster)
+	apisv3.ClusterConditionControllersStopped.False(cluster)
 
 	// The API refuses every request, so the cleanup itself fails: what matters is that it was attempted.
 	var requests atomic.Int32

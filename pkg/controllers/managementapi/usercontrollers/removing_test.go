@@ -77,9 +77,9 @@ func TestSyncStopsAndReportsOnceTheAgentUninstallIsScheduled(t *testing.T) {
 			require.Len(t, starter.stopped, 1)
 			assert.Equal(t, types.UID("uid-1"), starter.stopped[0].UID)
 			require.NotNil(t, reported)
-			assert.True(t, v3.ClusterConditionUserControllersStopped.IsTrue(reported))
-			assert.Equal(t, reasonStopped, v3.ClusterConditionUserControllersStopped.GetReason(reported))
-			assert.Contains(t, v3.ClusterConditionUserControllersStopped.GetMessage(reported), "rancher-0")
+			assert.True(t, v3.ClusterConditionControllersStopped.IsTrue(reported))
+			assert.Equal(t, reasonStopped, v3.ClusterConditionControllersStopped.GetReason(reported))
+			assert.Contains(t, v3.ClusterConditionControllersStopped.GetMessage(reported), "rancher-0")
 			assert.False(t, starter.startCalled)
 		})
 	}
@@ -101,7 +101,7 @@ func TestSyncDoesNotReportAgainOnceReported(t *testing.T) {
 	starter := simpleControllerStarter{}
 	controller, _ := newMockUserControllersController(t, &starter)
 	cluster := withAgentUninstall(newRemovingCluster("uid-1"), true)
-	v3.ClusterConditionUserControllersStopped.True(cluster)
+	v3.ClusterConditionControllersStopped.True(cluster)
 
 	_, err := controller.sync("c-m-test", cluster)
 
