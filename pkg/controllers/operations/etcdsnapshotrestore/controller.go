@@ -1768,7 +1768,7 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	if initialPass && secret.UID != initSecret.UID {
 		arg := fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
-			arg = fmt.Sprintf("%stoken-file: %q\n", arg, path.Join(dataDir, "server/token"))
+			arg = fmt.Sprintf("%stoken-file: \"%s\"\n", arg, path.Join(dataDir, "server/token"))
 		}
 		nodePlan.Files = append(nodePlan.Files, plan.File{
 			Content: base64.StdEncoding.EncodeToString(
