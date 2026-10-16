@@ -39,7 +39,7 @@ func UnusedPullSecrets(ctx context.Context) {
 }
 
 func unusedPullSecrets(ctx context.Context, secret typedcorev1.SecretInterface, configuredPullSecrets []string) {
-	var secretsToRemove []corev1.Secret
+	var secretsToRemove []string
 	listOpts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=true", cluster.AgentPullSecretLabel),
 	}
@@ -49,7 +49,7 @@ func unusedPullSecrets(ctx context.Context, secret typedcorev1.SecretInterface, 
 	processPullSecrets := func(copiedPullSecrets *corev1.SecretList) error {
 		for _, pullSecret := range copiedPullSecrets.Items {
 			if !slices.Contains(configuredPullSecrets, pullSecret.Name) {
-				secretsToRemove = append(secretsToRemove, pullSecret)
+				secretsToRemove = append(secretsToRemove, pullSecret.Name)
 			}
 		}
 		return nil
@@ -65,15 +65,15 @@ func unusedPullSecrets(ctx context.Context, secret typedcorev1.SecretInterface, 
 	}
 
 	logrus.Infof("removing %d unused pull secrets", len(secretsToRemove))
-	for _, pullSecret := range secretsToRemove {
-		err = secret.Delete(ctx, pullSecret.Name, metav1.DeleteOptions{})
+	for _, name := range secretsToRemove {
+		err = secret.Delete(ctx, name, metav1.DeleteOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				logrus.Errorf("Error deleting pull secret: %v", err)
 			}
 			continue
 		}
-		logrus.Infof("removed unused pull secret %q", pullSecret.Name)
+		logrus.Infof("removed unused pull secret %q", name)
 	}
 
 	logrus.Infof("removed %d unused pull secrets", len(secretsToRemove))
