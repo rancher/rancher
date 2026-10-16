@@ -43,7 +43,6 @@ import (
 )
 
 const (
-	AgentForceDeployAnn        = "io.cattle.agent.force.deploy"
 	AgentRegistrationTokenHash = "io.cattle.agent.registration-token-hash"
 	clusterImage               = "clusterImage"
 	tokenNotReadyRequeueDelay  = 5 * time.Second
@@ -247,7 +246,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desire
 		return true
 	}
 
-	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
+	forceDeploy := cluster.Annotations[apimgmtv3.ClusterAgentForceDeployAnnotation] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth || cluster.Status.AssetsImage != desiredCharts
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
 
@@ -659,8 +658,8 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		cluster.Spec.DesiredAssetsImage = desiredAssets
 	}
 
-	if cluster.Annotations[AgentForceDeployAnn] == "true" {
-		cluster.Annotations[AgentForceDeployAnn] = "false"
+	if cluster.Annotations[apimgmtv3.ClusterAgentForceDeployAnnotation] == "true" {
+		cluster.Annotations[apimgmtv3.ClusterAgentForceDeployAnnotation] = "false"
 	}
 	if tokenHashChanged {
 		cd.updateRegistrationTokenHash(cluster)

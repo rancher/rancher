@@ -10,7 +10,6 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	pkgcluster "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
@@ -277,7 +276,7 @@ func upgradeDone(cluster *mgmtv3.Cluster) *mgmtv3.Cluster {
 	return cluster
 }
 
-// forceDeployIfACEEnabled sets the AgentForceDeployAnn annotation and persists it
+// forceDeployIfACEEnabled sets the [mgmtv3.ClusterAgentForceDeployAnnotation] annotation and persists it
 // via Update() if ACE is enabled. This is done separately from UpdateStatus()
 // because Update() persists metadata while UpdateStatus() persists status.
 func (h *handler) forceDeployIfACEEnabled(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
@@ -287,7 +286,7 @@ func (h *handler) forceDeployIfACEEnabled(cluster *mgmtv3.Cluster) (*mgmtv3.Clus
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
-	cluster.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
+	cluster.Annotations[mgmtv3.ClusterAgentForceDeployAnnotation] = "true"
 	return h.clusterClient.Update(cluster)
 }
 

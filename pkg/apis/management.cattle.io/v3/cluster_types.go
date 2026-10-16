@@ -179,6 +179,11 @@ const (
 	// cluster.provisioning.cattle.io object.
 	ClusterAdministratedAnnotation = "provisioning.cattle.io/administrated"
 
+	// ClusterAgentForceDeployAnnotation is used to mark that the cluster agent should be redeployed regardless of
+	// whether the manifest is up to date with the management Cluster.
+	// Once the cluster agent has been successfully deployed, the annotation is cleared.
+	ClusterAgentForceDeployAnnotation = "io.cattle.agent.force.deploy"
+
 	// ClusterImportedVersionManagementAnnotation indicates whether the version management is enabled for a cluster.
 	// It defines the cluster-level behavior and takes precedence over the 'imported-cluster-version-management' setting.
 	// If its value is system-default, the value of the 'imported-cluster-version-management' setting will be used.
