@@ -200,11 +200,11 @@ func (u *userControllersController) syncRemoving(cluster *v3.Cluster) error {
 
 	u.starter.Stop(cluster)
 
-	if !u.isOwner(cluster) || v3.ClusterConditionUserControllersStopped.IsTrue(cluster) {
+	if !u.isOwner(cluster) || v3.ClusterConditionControllersStopped.IsTrue(cluster) {
 		return nil
 	}
 	message := fmt.Sprintf("user controllers stopped by %s", u.identity)
-	if err := util.SetCondition(u.clusters, cluster, v3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, reasonStopped, message); err != nil {
+	if err := util.SetCondition(u.clusters, cluster, v3.ClusterConditionControllersStopped, corev1.ConditionTrue, reasonStopped, message); err != nil {
 		return fmt.Errorf("userControllersController: failed to report user controllers stopped for cluster %s: %w", cluster.Name, err)
 	}
 	return nil

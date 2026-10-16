@@ -165,7 +165,7 @@ func (c *ClusterLifecycleCleanup) Remove(obj *apimgmtv3.Cluster) (runtime.Object
 	// is recorded. Stopping here as well keeps this replica from waiting on its own informer.
 	c.Manager.Stop(obj)
 
-	if !pkgcluster.ConditionConcluded(obj, apimgmtv3.ClusterConditionUserControllersStopped) {
+	if !pkgcluster.ConditionConcluded(obj, apimgmtv3.ClusterConditionControllersStopped) {
 		if !userControllersStoppedTimedOut(obj) {
 			// Reporting the controllers stopped updates the cluster, which brings it back here. The
 			// requeue covers that update being missed, and the timeout.
@@ -174,7 +174,7 @@ func (c *ClusterLifecycleCleanup) Remove(obj *apimgmtv3.Cluster) (runtime.Object
 		}
 		logrus.Warnf("[cluster-cleanup] no replica reported the user controllers of cluster [%s] stopped within %s, moving on with removing the cluster", obj.Name, userControllersStoppedTimeout)
 		message := fmt.Sprintf("no replica reported the user controllers stopped within %s; every replica stops them once the agent uninstall is recorded", userControllersStoppedTimeout)
-		if err := pkgcluster.SetCondition(c.clusters, obj, apimgmtv3.ClusterConditionUserControllersStopped, corev1.ConditionFalse, reasonUnconfirmed, message); err != nil {
+		if err := pkgcluster.SetCondition(c.clusters, obj, apimgmtv3.ClusterConditionControllersStopped, corev1.ConditionFalse, reasonUnconfirmed, message); err != nil {
 			return obj, fmt.Errorf("[cluster-cleanup] recording unconfirmed user controllers stop for cluster [%s]: %w", obj.Name, err)
 		}
 	}

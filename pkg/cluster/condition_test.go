@@ -40,21 +40,21 @@ func TestSetConditionUpdatesTheLatestCluster(t *testing.T) {
 	stored.ResourceVersion = "2"
 	client := newConditionTestClient(stored, 0)
 
-	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, "Stopped", "done")
+	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionControllersStopped, corev1.ConditionTrue, "Stopped", "done")
 
 	require.NoError(t, err)
 	require.Len(t, client.UpdateStatusCalls(), 1)
 	updated := client.UpdateStatusCalls()[0].In1
 	assert.Equal(t, "2", updated.ResourceVersion, "the update should be made on the latest version")
-	assert.True(t, apimgmtv3.ClusterConditionUserControllersStopped.IsTrue(updated))
-	assert.Equal(t, "Stopped", apimgmtv3.ClusterConditionUserControllersStopped.GetReason(updated))
-	assert.Equal(t, "done", apimgmtv3.ClusterConditionUserControllersStopped.GetMessage(updated))
+	assert.True(t, apimgmtv3.ClusterConditionControllersStopped.IsTrue(updated))
+	assert.Equal(t, "Stopped", apimgmtv3.ClusterConditionControllersStopped.GetReason(updated))
+	assert.Equal(t, "done", apimgmtv3.ClusterConditionControllersStopped.GetMessage(updated))
 }
 
 func TestSetConditionRetriesConflicts(t *testing.T) {
 	client := newConditionTestClient(newConditionTestCluster("uid-1"), 2)
 
-	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, "Stopped", "done")
+	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionControllersStopped, corev1.ConditionTrue, "Stopped", "done")
 
 	require.NoError(t, err)
 	assert.Len(t, client.UpdateStatusCalls(), 3)
@@ -63,12 +63,12 @@ func TestSetConditionRetriesConflicts(t *testing.T) {
 
 func TestSetConditionSkipsAnUnchangedCondition(t *testing.T) {
 	stored := newConditionTestCluster("uid-1")
-	apimgmtv3.ClusterConditionUserControllersStopped.True(stored)
-	apimgmtv3.ClusterConditionUserControllersStopped.Reason(stored, "Stopped")
-	apimgmtv3.ClusterConditionUserControllersStopped.Message(stored, "done")
+	apimgmtv3.ClusterConditionControllersStopped.True(stored)
+	apimgmtv3.ClusterConditionControllersStopped.Reason(stored, "Stopped")
+	apimgmtv3.ClusterConditionControllersStopped.Message(stored, "done")
 	client := newConditionTestClient(stored, 0)
 
-	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, "Stopped", "done")
+	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionControllersStopped, corev1.ConditionTrue, "Stopped", "done")
 
 	require.NoError(t, err)
 	assert.Empty(t, client.UpdateStatusCalls())
@@ -77,7 +77,7 @@ func TestSetConditionSkipsAnUnchangedCondition(t *testing.T) {
 func TestSetConditionRefusesANewClusterWithTheSameName(t *testing.T) {
 	client := newConditionTestClient(newConditionTestCluster("uid-2"), 0)
 
-	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, "Stopped", "done")
+	err := SetCondition(client, newConditionTestCluster("uid-1"), apimgmtv3.ClusterConditionControllersStopped, corev1.ConditionTrue, "Stopped", "done")
 
 	require.Error(t, err)
 	assert.Empty(t, client.UpdateStatusCalls())

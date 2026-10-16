@@ -116,6 +116,21 @@ const (
 	// condition when deleting a provisioned cluster.
 	ClusterConditionRemoved condition.Cond = "Removed"
 
+	// ClusterConditionRoleTemplateBindingsRemoved is set during cluster removal once the cluster's
+	// ClusterRoleTemplateBindings and ProjectRoleTemplateBindings are gone, and with them what they granted in
+	// the downstream cluster, or when that isn't needed. It is False if they were not all gone in time.
+	ClusterConditionRoleTemplateBindingsRemoved condition.Cond = "RoleTemplateBindingsRemoved"
+
+	// ClusterConditionAgentUninstallScheduled is set during cluster removal once the job that uninstalls
+	// the Rancher agent from the downstream cluster has been created, or was not needed. It is False if
+	// the job could not be created.
+	ClusterConditionAgentUninstallScheduled condition.Cond = "AgentUninstallScheduled"
+
+	// ClusterConditionControllersStopped is set during cluster removal by the Rancher replica that
+	// owns the cluster, once it no longer runs the cluster's user controllers. It is False if no replica
+	// reported them stopped in time, for example because no replica could tell it owns the cluster.
+	ClusterConditionControllersStopped condition.Cond = "ControllersStopped"
+
 	ClusterConditionCertsGenerated condition.Cond = "CertsGenerated"
 	ClusterConditionEtcd           condition.Cond = "etcd"
 	ClusterConditionUpgraded       condition.Cond = "Upgraded"
@@ -136,12 +151,6 @@ const (
 	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
 	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
 
-	// ClusterConditionRegistered surfaces when the cluster-agent dials back to Rancher for the first time.
-	// Once set this condition will always remain true.
-	// This condition can be set by either the initial remotedialer connection, or the "stv-cluster-" connection made
-	// when steve aggregation is enabled, though in most cases it will be set by the former.
-	ClusterConditionRegistered condition.Cond = "Registered"
-
 	ClusterConditionGlobalAdminsSynced                   condition.Cond = "GlobalAdminsSynced"
 	ClusterConditionInitialRolesPopulated                condition.Cond = "InitialRolesPopulated"
 	ClusterConditionServiceAccountMigrated               condition.Cond = "ServiceAccountMigrated"
@@ -151,18 +160,6 @@ const (
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
 	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
 	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
-	// ClusterConditionRoleTemplateBindingsRemoved is set during cluster removal once the cluster's
-	// ClusterRoleTemplateBindings and ProjectRoleTemplateBindings are gone, and with them what they granted in
-	// the downstream cluster, or when that isn't needed. It is False if they were not all gone in time.
-	ClusterConditionRoleTemplateBindingsRemoved condition.Cond = "RoleTemplateBindingsRemoved"
-	// ClusterConditionAgentUninstallScheduled is set during cluster removal once the job that uninstalls
-	// the Rancher agent from the downstream cluster has been created, or was not needed. It is False if
-	// the job could not be created.
-	ClusterConditionAgentUninstallScheduled condition.Cond = "AgentUninstallScheduled"
-	// ClusterConditionUserControllersStopped is set during cluster removal by the Rancher replica that
-	// owns the cluster, once it no longer runs the cluster's user controllers. It is False if no replica
-	// reported them stopped in time, for example because no replica could tell it owns the cluster.
-	ClusterConditionUserControllersStopped condition.Cond = "UserControllersStopped"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
