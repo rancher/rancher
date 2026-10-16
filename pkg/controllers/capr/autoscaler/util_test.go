@@ -4,9 +4,35 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+func TestGenerateTokenUserPrincipal(t *testing.T) {
+	originalTokenHashing := features.TokenHashing.Enabled()
+	t.Cleanup(func() {
+		features.TokenHashing.Set(originalTokenHashing)
+	})
+
+	for _, hashing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unhashed", true: "hashed"}[hashing], func(t *testing.T) {
+			features.TokenHashing.Set(hashing)
+			username := "fleet-default-test-cluster-autoscaler"
+			token, err := generateToken(username, "test-cluster", nil)
+			require.NoError(t, err)
+			require.Equal(t, "local://"+username, token.UserPrincipal.Name)
+			require.Equal(t, username, token.UserPrincipal.LoginName)
+			require.Equal(t, "local", token.UserPrincipal.Provider)
+			require.Equal(t, "user", token.UserPrincipal.PrincipalType)
+			configName, err := common.ConfigNameFromToken(token)
+			require.NoError(t, err)
+			require.Equal(t, "local", configName)
+		})
+	}
+}
 
 func TestAutoscalerUserName(t *testing.T) {
 	tests := []struct {

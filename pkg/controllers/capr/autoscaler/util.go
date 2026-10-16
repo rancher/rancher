@@ -35,6 +35,15 @@ func autoscalerUserName(cluster *capi.Cluster) string {
 	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler")
 }
 
+func autoscalerUserPrincipal(username string) v3.Principal {
+	return v3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: "local://" + username},
+		LoginName:     username,
+		Provider:      "local",
+		PrincipalType: "user",
+	}
+}
+
 // globalRoleName generates the global role name for a cluster
 func globalRoleName(cluster *capi.Cluster) string {
 	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler", "global", "role")
@@ -127,11 +136,12 @@ func generateToken(username, clusterName string, owner []metav1.OwnerReference) 
 			Annotations:     map[string]string{},
 			OwnerReferences: owner,
 		},
-		UserID:       username,
-		AuthProvider: "local",
-		IsDerived:    true,
-		Token:        tokenValue,
-		TTLMillis:    autoscalerTokenTTL.Milliseconds(),
+		UserID:        username,
+		AuthProvider:  "local",
+		UserPrincipal: autoscalerUserPrincipal(username),
+		IsDerived:     true,
+		Token:         tokenValue,
+		TTLMillis:     autoscalerTokenTTL.Milliseconds(),
 	}
 
 	if features.TokenHashing.Enabled() {
