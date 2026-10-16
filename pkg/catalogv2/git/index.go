@@ -26,6 +26,11 @@ func buildOrGetIndex(dir string) (*repo.IndexFile, error) {
 		builtIndex    = repo.NewIndexFile()
 	)
 
+	// Most repositories ship an index.yaml at the root, short-circuit if this is the case.
+	if index := rootIndex(dir); index != nil {
+		return index, nil
+	}
+
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, walkErr error) error {
 		if info.Name() == "index.yaml" {
 			if indexPath == "" || len(path) < len(indexPath) {
@@ -72,6 +77,27 @@ func buildOrGetIndex(dir string) (*repo.IndexFile, error) {
 	}
 
 	return builtIndex, nil
+}
+
+// rootIndex loads the repository's own index.yaml, or returns nil if it does not have a usable
+// one so that the caller falls back to walking the tree.
+//
+// A missing or malformed index.yaml is not an error here: the walk in buildOrGetIndex likewise
+// ignores an index.yaml it cannot load and goes on to build an index from the charts it finds.
+func rootIndex(dir string) *repo.IndexFile {
+	path := filepath.Join(dir, "index.yaml")
+
+	// ensureNoSymlinks has already rejected the whole tree if anything in it is a symlink, so
+	// this only confirms the entry exists and is a plain file.
+	if info, err := os.Lstat(path); err != nil || !info.Mode().IsRegular() {
+		return nil
+	}
+
+	index, err := repo.LoadIndexFile(path)
+	if err != nil {
+		return nil
+	}
+	return index
 }
 
 func ensureNoSymlinks(dir string) error {
