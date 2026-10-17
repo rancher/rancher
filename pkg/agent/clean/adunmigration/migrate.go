@@ -32,7 +32,7 @@ const (
 	migrateCrtbsOperation     = "migrate-ad-crtbs"
 	migratePrtbsOperation     = "migrate-ad-prtbs"
 	migrateGrbsOperation      = "migrate-ad-grbs"
-	activeDirecotryName       = "activedirectory"
+	activeDirectoryName       = "activedirectory"
 	activeDirectoryScope      = "activedirectory_user"
 	activeDirectoryPrefix     = "activedirectory_user://"
 	localPrefix               = "local://"
@@ -136,6 +136,10 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 
 	sc, adConfig, err := prepareClientContexts(clientConfig)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Infof("[%v] activedirectory auth config not found, nothing to unmigrate", migrateAdUserOperation)
+			return nil
+		}
 		return err
 	}
 

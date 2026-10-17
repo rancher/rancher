@@ -1,11 +1,19 @@
 package adunmigration
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/rancher/norman/objectclient"
 	"github.com/sirupsen/logrus"
 	logrusTest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestEscapeUUID(t *testing.T) {
@@ -75,6 +83,81 @@ func TestIsGUID(t *testing.T) {
 				assert.Equal(t, hook.LastEntry().Level, logrus.ErrorLevel)
 			}
 			hook.Reset()
+		})
+	}
+}
+
+// fakeAuthConfigClient embeds the GenericClient interface so that only Get needs to be implemented; calling any
+// other method will panic.
+type fakeAuthConfigClient struct {
+	objectclient.GenericClient
+	obj runtime.Object
+	err error
+}
+
+func (f *fakeAuthConfigClient) Get(name string, opts metav1.GetOptions) (runtime.Object, error) {
+	return f.obj, f.err
+}
+
+func TestLoadADConfiguration(t *testing.T) {
+	// Note: because logrus state is global, we cannot use t.Parallel here
+	hook := logrusTest.NewGlobal()
+
+	tests := []struct {
+		name            string
+		client          *fakeAuthConfigClient
+		wantEnabled     bool
+		wantErr         bool
+		wantNotFound    bool
+		wantLoggedError bool
+	}{
+		{
+			name: "AuthConfig exists",
+			client: &fakeAuthConfigClient{obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"metadata": map[string]interface{}{"name": activeDirectoryName},
+				"enabled":  true,
+			}}},
+			wantEnabled: true,
+		},
+		{
+			name: "AuthConfig does not exist",
+			client: &fakeAuthConfigClient{
+				err: apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "authconfigs"}, activeDirectoryName),
+			},
+			wantErr:      true,
+			wantNotFound: true,
+		},
+		{
+			name:            "Other errors are logged",
+			client:          &fakeAuthConfigClient{err: errors.New("connection refused")},
+			wantErr:         true,
+			wantLoggedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer hook.Reset()
+
+			adConfig, err := loadADConfiguration(test.client, nil)
+
+			if test.wantErr {
+				require.Error(t, err)
+				assert.Equal(t, test.wantNotFound, apierrors.IsNotFound(err))
+				assert.Nil(t, adConfig)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, activeDirectoryName, adConfig.Name)
+				assert.Equal(t, test.wantEnabled, adConfig.Enabled)
+			}
+
+			var loggedError bool
+			for _, entry := range hook.AllEntries() {
+				if entry.Level == logrus.ErrorLevel {
+					loggedError = true
+				}
+			}
+			assert.Equal(t, test.wantLoggedError, loggedError)
 		})
 	}
 }
