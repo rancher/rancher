@@ -93,7 +93,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		URL:            url,
 		IsPreBootstrap: false,
 		Cluster:        cluster,
-		AgentFeatures:  nil,
+		AgentFeatures:  systemtemplate.GetDesiredFeatures(cluster),
 		Taints:         nil,
 		SecretLister:   ch.SecretLister,
 		PcExists:       false,

@@ -3,14 +3,19 @@ package clusterregistrationtokens
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	"github.com/rancher/rancher/pkg/features"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,6 +113,67 @@ func TestClusterImportHandler_ValidateAuthImage(t *testing.T) {
 			if tt.wantCode == http.StatusBadRequest {
 				assert.True(t, strings.HasPrefix(resp.Body.String(), "invalid authImage - "))
 			}
+		})
+	}
+}
+
+var cattleFeaturesEnv = regexp.MustCompile(`- name: CATTLE_FEATURES\n\s+value: "([^"]*)"`)
+
+func TestClusterImportHandler_AgentFeatures(t *testing.T) {
+	features.ManagedSystemUpgradeController.Set(true)
+	t.Cleanup(features.ManagedSystemUpgradeController.Unset)
+
+	tests := []struct {
+		name       string
+		cluster    *apimgmtv3.Cluster
+		expectMSUC bool
+	}{
+		{
+			name:    "new cluster",
+			cluster: &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}},
+		},
+		{
+			name: "imported rke2 cluster with version management",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "cluster",
+					Annotations: map[string]string{importedclusterversionmanagement.VersionManagementAnno: "true"},
+				},
+				Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
+			},
+			expectMSUC: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ch := &ClusterImport{
+				Clusters: &fakes.ClusterInterfaceMock{
+					GetFunc: func(name string, opts metav1.GetOptions) (*apimgmtv3.Cluster, error) {
+						return tt.cluster, nil
+					},
+				},
+				SecretIndexer:   newTestSecretIndexer("cluster", "token"),
+				NamespaceLister: newTestNamespaceLister(false),
+			}
+			req := httptest.NewRequest(http.MethodGet, "/v3/import/token_cluster.yaml", nil)
+			req.SetPathValue("filename", "token_cluster.yaml")
+			resp := httptest.NewRecorder()
+
+			ch.ClusterImportHandler(resp, req)
+
+			require.Equal(t, http.StatusOK, resp.Code)
+			match := cattleFeaturesEnv.FindStringSubmatch(resp.Body.String())
+			require.NotNil(t, match, "manifest has no CATTLE_FEATURES env var")
+
+			got := map[string]bool{}
+			for _, kv := range strings.Split(match[1], ",") {
+				name, val, _ := strings.Cut(kv, "=")
+				got[name] = val == "true"
+			}
+			assert.Equal(t, systemtemplate.GetDesiredFeatures(tt.cluster), got)
+			assert.True(t, got[features.MCMAgent.Name()])
+			assert.Equal(t, tt.expectMSUC, got[features.ManagedSystemUpgradeController.Name()])
 		})
 	}
 }
