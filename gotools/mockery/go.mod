@@ -46,4 +46,4 @@ require (
 
 // gopkg.in/yaml.v3 is deprecated in favour of the maintained
 // go.yaml.in/yaml successor modules.
-replace gopkg.in/yaml.v3 => go.yaml.in/yaml/v3 v3.0.4
+replace gopkg.in/yaml.v3 => go.yaml.in/yaml/v3 v3.0.5
