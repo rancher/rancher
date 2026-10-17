@@ -123,6 +123,6 @@ replace (
 	// go.yaml.in/yaml successor modules. The replacement version must differ
 	// from the go.yaml.in version required below, because Go rejects the same
 	// version for two module paths.
-	gopkg.in/yaml.v2 => go.yaml.in/yaml/v2 v2.4.3
+	gopkg.in/yaml.v2 => go.yaml.in/yaml/v2 v2.4.4
 	gopkg.in/yaml.v3 => go.yaml.in/yaml/v3 v3.0.5
 )
