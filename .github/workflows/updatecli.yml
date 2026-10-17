@@ -19,6 +19,7 @@ on:
           - 'all'
           - 'harvester-docker-machine'
           - 'machine'
+          - 'system-upgrade-controller'
           - 'wins-system-agent'
 
 permissions:
