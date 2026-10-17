@@ -295,7 +295,7 @@ ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
 ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION=1.1.11
+ENV CATTLE_API_UI_VERSION=1.2.0
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH=/var/log/auditlog/rancher-api-audit.log
