@@ -17,6 +17,10 @@ spec:
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-pre-upgrade
       restartPolicy: Never
+      tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
+      {{- if .Values.extraTolerations }}
+      {{- toYaml .Values.extraTolerations | nindent 8 }}
+      {{- end }}
 {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 6 }}
