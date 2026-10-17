@@ -34,6 +34,9 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	projectNSEditVerb              = "*"
+	// projectNSManageSuffix is the suffix of the project's namespaces-manage ClusterRole. Unlike the roles in
+	// projectNSVerbToSuffix it doesn't reference the project's namespaces, so the namespace handler doesn't maintain it.
+	projectNSManageSuffix = "manage"
 
 	// initialRolesRequeueInterval is the backstop delay for re-checking whether a namespace's
 	// project RBAC has materialized, used when no watch wakes the reconcile sooner.
@@ -502,7 +505,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 
 			// Create new role
 			if cr == nil {
-				return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName)
+				return n.m.createProjectNSRole(desiredRole, verb, ns.Name)
 			}
 
 			// Check to see if retrieved role has the namespace (small chance cache could have been updated)
@@ -543,7 +546,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 	return nil
 }
 
-func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) error {
+func (m *manager) createProjectNSRole(roleName, verb, ns string) error {
 	roleCli := m.clusterRoles
 
 	cr := &rbacv1.ClusterRole{
@@ -562,29 +565,26 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 			},
 		}
 	}
-	// the verbs passed into this function come from projectNSVerbToSuffix which only contains two verbs, one for read
-	// permissions and one for write. Only the write permission should get the manage-ns verb
-	if verb == projectNSEditVerb {
-		cr = addManageNSPermission(cr, projectName)
-	}
 	_, err := roleCli.Create(cr)
 	return err
 }
 
-func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) *rbacv1.ClusterRole {
-	if clusterRole.Rules == nil {
-		clusterRole.Rules = []rbacv1.PolicyRule{}
+// buildProjectNSManageRole returns the project's namespaces-manage ClusterRole. It grants manage-namespaces on the
+// project, which is what allows namespaces to be created in, or moved into, the project.
+func buildProjectNSManageRole(projectName string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSManageSuffix),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{management.GroupName},
+				Verbs:         []string{manageNSVerb},
+				Resources:     []string{apisV3.ProjectResourceName},
+				ResourceNames: []string{projectName},
+			},
+		},
 	}
-	clusterRole.Rules = append(clusterRole.Rules, rbacv1.PolicyRule{
-		APIGroups:     []string{management.GroupName},
-		Verbs:         []string{manageNSVerb},
-		Resources:     []string{apisV3.ProjectResourceName},
-		ResourceNames: []string{projectName},
-	})
-	if clusterRole.Annotations == nil {
-		clusterRole.Annotations = map[string]string{}
-	}
-	return clusterRole
 }
 
 // addUpdatepsaClusterRole returns a ClusterRole with the updatepsa verb enabled.

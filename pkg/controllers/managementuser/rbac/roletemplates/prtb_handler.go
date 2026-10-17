@@ -26,6 +26,7 @@ const (
 	projectIDAnnotation = "field.cattle.io/projectId"
 	namespaceReadOnly   = "namespaces-readonly"
 	namespaceEdit       = "namespaces-edit"
+	namespaceManage     = "namespaces-manage"
 	namespacesCreate    = "create-ns"
 	updatePSAVerb       = "updatepsa"
 )
@@ -151,7 +152,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 // reconcileClusterRoleBindings handles the promoted, cluster scoped, and namespace Cluster Role Bindings for a PRTB.
 // Promoted CRBs are for the implicit set of global resources that are non-namespace scoped that are given by the PRTB.
 // Cluster scoped CRBs are for the rules a user explicitly declares in the RoleTemplate's ClusterScopedRules field.
-// Namespace CRBs are to give the user either edit or read-only access to the namespaces within the project. Primarily used by the UI.
+// Namespace CRBs are to give the user access to the namespaces within the project, see ProjectNamespaceRoles. Primarily used by the UI.
 func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	crbs := []*rbacv1.ClusterRoleBinding{}
 
@@ -202,23 +203,12 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 	neededCRBs := []*rbacv1.ClusterRoleBinding{}
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 
-	// check if any of the aggregated CR grant namespace creation permission
-	createNamespaceRec := authorizer.AttributesRecord{
-		Verb:            "create",
-		APIGroup:        "",
-		Resource:        "namespaces",
-		ResourceRequest: true,
-	}
-	if rbacAuth.RulesAllow(createNamespaceRec, cr.Rules...) {
-		namespaceCreateCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacesCreate)
+	for _, roleName := range ProjectNamespaceRoles(projectName, cr.Rules) {
+		namespaceCRB, err := rbac.BuildClusterRoleBindingFromRTB(prtb, roleName)
 		if err != nil {
 			return nil, err
 		}
-		namespaceEditCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceEdit)
-		if err != nil {
-			return nil, err
-		}
-		neededCRBs = append(neededCRBs, namespaceCreateCR, namespaceEditCR)
+		neededCRBs = append(neededCRBs, namespaceCRB)
 	}
 
 	// check if any of the aggregated CR grant updatepsa permission
@@ -252,16 +242,53 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 		neededCRBs = append(neededCRBs, namespacePSACRB)
 	}
 
-	if len(neededCRBs) > 0 {
-		return neededCRBs, nil
+	return neededCRBs, nil
+}
+
+// ProjectNamespaceRoles returns the names of the ClusterRoles a project member needs to be bound to for access to the
+// project's namespaces, based on the rules of their RoleTemplates:
+//   - "*" on namespaces gets the project's namespaces-edit role, which grants every verb on the project's namespaces.
+//   - every member without the namespaces-edit role gets the project's namespaces-readonly role.
+//   - create on namespaces gets create-ns, so the member can create namespaces.
+//   - create, update, patch or "*" on namespaces gets the project's namespaces-manage role, so the member can create
+//     namespaces in, or move namespaces into, the project.
+//
+// Any other verbs on the project's namespaces come from the RoleBindings in each project namespace, as Kubernetes
+// applies the namespaces rules of a RoleBinding to the namespace the RoleBinding is in.
+func ProjectNamespaceRoles(projectName string, rules []rbacv1.PolicyRule) []string {
+	allows := func(verb string) bool {
+		attributes := authorizer.AttributesRecord{
+			Verb:            verb,
+			APIGroup:        "",
+			Resource:        "namespaces",
+			ResourceRequest: true,
+		}
+		for _, rule := range rules {
+			if len(rule.ResourceNames) == 0 && rbacAuth.RulesAllow(attributes, rule) {
+				return true
+			}
+		}
+		return false
 	}
 
-	// Didn't have edit access to namespaces, needs read access binding
-	namespaceCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceReadOnly)
-	if err != nil {
-		return nil, err
+	var roles []string
+	canCreate := allows("create")
+	if canCreate {
+		roles = append(roles, namespacesCreate)
 	}
-	return []*rbacv1.ClusterRoleBinding{namespaceCR}, nil
+
+	// Asking for "*" only matches rules that list "*" as a verb, not rules that list every verb individually.
+	if allows(rbacv1.VerbAll) {
+		roles = append(roles, projectName+"-"+namespaceEdit)
+	} else {
+		roles = append(roles, projectName+"-"+namespaceReadOnly)
+	}
+
+	// Rules with "*" as a verb allow create, so they're covered by canCreate.
+	if canCreate || allows("update") || allows("patch") {
+		roles = append(roles, projectName+"-"+namespaceManage)
+	}
+	return roles
 }
 
 // ensureOnlyDesiredClusterRoleBindingsExists takes a list of ClusterRoleBindings and ensures they are the only CRBs that exist for this PRTB.

@@ -104,7 +104,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
+				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
 			},
 			wantError: false,
 		},
@@ -116,10 +116,23 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				addManagePermissionToClusterRole("p-123abc", addNamespaceToClusterRole("otherNamespace", "*", createClusterRoleForProject("p-123abc", namespaceName, "*"))),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
+				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
 				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", "otherNamespace", "*")),
 			},
 			wantError: false,
+		},
+		{
+			name:                "delete old edit without manage-namespaces create new edit",
+			projectNSAnnotation: "c-123xyz:p-123xyz",
+			indexedRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
+				createClusterRoleForProject("p-123abc", namespaceName, "*"),
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+			},
+			wantDeleteRoleNames: []string{createRoleName("p-123abc", "*")},
+			wantError:           false,
 		},
 		{
 			name:                "update old update new edit",
@@ -305,14 +318,6 @@ func TestCreateProjectNSRole(t *testing.T) {
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						Verbs:         []string{"manage-namespaces"},
-						Resources:     []string{"projects"},
-						ResourceNames: []string{"p-123xyz"},
-					},
-				},
 			},
 		},
 		{
@@ -326,28 +331,12 @@ func TestCreateProjectNSRole(t *testing.T) {
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						Verbs:         []string{"manage-namespaces"},
-						Resources:     []string{"projects"},
-						ResourceNames: []string{"p-123xyz"},
-					},
-				},
 			},
 			startingCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
-					},
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						Verbs:         []string{"manage-namespaces"},
-						Resources:     []string{"projects"},
-						ResourceNames: []string{"p-123xyz"},
 					},
 				},
 			},
@@ -383,7 +372,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 		})
 
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb])
-		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName)
+		err := m.createProjectNSRole(roleName, test.verb, test.namespace)
 
 		if test.expectedErr != "" {
 			assert.ErrorContains(t, err, test.expectedErr, test.description)
