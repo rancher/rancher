@@ -6,6 +6,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/pagination"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,18 +32,24 @@ func NewPasswordMigrator(wContext *wrangler.Context) *PasswordMigrator {
 }
 
 func (m *PasswordMigrator) MigrateAll() error {
-	users, err := m.Users.List(metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to list users: %w", err)
-	}
-
-	for _, user := range users.Items {
-		if err := m.Migrate(&user); err != nil {
-			return err
+	list := m.Users.List
+	processUsers := func(users *apiv3.UserList) error {
+		for _, user := range users.Items {
+			if err := m.Migrate(&user); err != nil {
+				// NotFound can also mean that the namespace of the password secrets is missing.
+				// Skip the user only if the user is gone.
+				if errors.IsNotFound(err) {
+					if _, getErr := m.Users.Get(user.Name, metav1.GetOptions{}); errors.IsNotFound(getErr) {
+						continue
+					}
+				}
+				return err
+			}
 		}
+		return nil
 	}
 
-	return nil
+	return pagination.EachPage(list, metav1.ListOptions{}, processUsers)
 }
 
 func (m *PasswordMigrator) Migrate(user *apiv3.User) error {

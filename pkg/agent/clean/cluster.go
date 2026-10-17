@@ -29,7 +29,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/pagination"
 	"github.com/sirupsen/logrus"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -71,7 +75,7 @@ var (
 	}
 )
 
-type getNSFunc func(*kubernetes.Clientset) ([]string, error)
+type getNSFunc func(kubernetes.Interface) ([]string, error)
 
 func Cluster() error {
 	if os.Getenv("DRY_RUN") == "true" {
@@ -203,185 +207,215 @@ var listOptions = metav1.ListOptions{
 	LabelSelector: "cattle.io/creator=norman",
 }
 
-func cleanupNamespaces(client *kubernetes.Clientset) []error {
+func cleanupNamespaces(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of namespaces")
-	namespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return []error{err}
-	}
-
 	var errs []error
 
-	for _, ns := range namespaces.Items {
-		err = tryUpdate(func() error {
-			nameSpace, err := client.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
+	listNamespaces := func(opts metav1.ListOptions) (*corev1.NamespaceList, error) {
+		return client.CoreV1().Namespaces().List(context.TODO(), opts)
+	}
+	processNamespaces := func(namespaces *corev1.NamespaceList) error {
+		for _, ns := range namespaces.Items {
+			err := tryUpdate(func() error {
+				nameSpace, err := client.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
+				if err != nil {
+					if apierror.IsNotFound(err) {
+						return nil
+					}
+					return err
+				}
+
+				var updated bool
+
+				// Cleanup finalizers
+				if len(nameSpace.Finalizers) > 0 {
+					finalizers := []string{}
+					for _, finalizer := range nameSpace.Finalizers {
+						if finalizer != "controller.cattle.io/namespace-auth" {
+							finalizers = append(finalizers, finalizer)
+						}
+					}
+					if len(nameSpace.Finalizers) != len(finalizers) {
+						updated = true
+						nameSpace.Finalizers = finalizers
+					}
+				}
+
+				// Cleanup labels
+				for _, label := range nsLabels {
+					if _, ok := nameSpace.Labels[label]; ok {
+						updated = ok
+						delete(nameSpace.Labels, label)
+					}
+				}
+
+				// Cleanup annotations
+				for _, anno := range nsAnnotations {
+					if _, ok := nameSpace.Annotations[anno]; ok {
+						updated = ok
+						delete(nameSpace.Annotations, anno)
+					}
+				}
+
+				if updated {
+					logrus.Infof("Updating namespace: %v", nameSpace.Name)
+					if !dryRun {
+						_, err = client.CoreV1().Namespaces().Update(context.TODO(), nameSpace, metav1.UpdateOptions{})
+						if err != nil && !apierror.IsNotFound(err) {
+							return err
+						}
+					}
+				}
+
+				return nil
+			})
+
 			if err != nil {
-				if apierror.IsNotFound(err) {
-					return nil
-				}
-				return err
+				errs = append(errs, err)
 			}
-
-			var updated bool
-
-			// Cleanup finalizers
-			if len(nameSpace.Finalizers) > 0 {
-				finalizers := []string{}
-				for _, finalizer := range nameSpace.Finalizers {
-					if finalizer != "controller.cattle.io/namespace-auth" {
-						finalizers = append(finalizers, finalizer)
-					}
-				}
-				if len(nameSpace.Finalizers) != len(finalizers) {
-					updated = true
-					nameSpace.Finalizers = finalizers
-				}
-			}
-
-			// Cleanup labels
-			for _, label := range nsLabels {
-				if _, ok := nameSpace.Labels[label]; ok {
-					updated = ok
-					delete(nameSpace.Labels, label)
-				}
-			}
-
-			// Cleanup annotations
-			for _, anno := range nsAnnotations {
-				if _, ok := nameSpace.Annotations[anno]; ok {
-					updated = ok
-					delete(nameSpace.Annotations, anno)
-				}
-			}
-
-			if updated {
-				logrus.Infof("Updating namespace: %v", nameSpace.Name)
-				if !dryRun {
-					_, err = client.CoreV1().Namespaces().Update(context.TODO(), nameSpace, metav1.UpdateOptions{})
-					if err != nil {
-						return err
-					}
-				}
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			errs = append(errs, err)
 		}
+		return nil
 	}
 
+	err := pagination.EachPage(listNamespaces, metav1.ListOptions{}, processNamespaces)
+	if err != nil {
+		return append(errs, err)
+	}
 	return errs
-
 }
 
-func cleanupClusterRoleBindings(client *kubernetes.Clientset) []error {
+func cleanupClusterRoleBindings(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of clusterRoleBindings")
-	crbs, err := client.RbacV1().ClusterRoleBindings().List(context.TODO(), listOptions)
-	if err != nil {
-		return []error{err}
-	}
-
 	var errs []error
 
-	for _, crb := range crbs.Items {
-		logrus.Infof("Deleting clusterRoleBinding: %v", crb.Name)
-		if !dryRun {
-			err = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), crb.Name, metav1.DeleteOptions{})
-			if err != nil {
-				errs = append(errs, err)
+	listClusterRoleBindings := func(opts metav1.ListOptions) (*rbacv1.ClusterRoleBindingList, error) {
+		return client.RbacV1().ClusterRoleBindings().List(context.TODO(), opts)
+	}
+	processClusterRoleBindings := func(items *rbacv1.ClusterRoleBindingList) error {
+		for _, crb := range items.Items {
+			logrus.Infof("Deleting clusterRoleBinding: %v", crb.Name)
+			if !dryRun {
+				err := client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), crb.Name, metav1.DeleteOptions{})
+				if err != nil && !apierror.IsNotFound(err) {
+					errs = append(errs, err)
+				}
 			}
 		}
+		return nil
+	}
+	err := pagination.EachPage(listClusterRoleBindings, listOptions, processClusterRoleBindings)
+	if err != nil {
+		return append(errs, err)
 	}
 	return errs
 }
 
-func cleanupRoleBindings(client *kubernetes.Clientset) []error {
+func cleanupRoleBindings(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of roleBindings")
-	rbs, err := client.RbacV1().RoleBindings("").List(context.TODO(), listOptions)
-	if err != nil {
-		return []error{err}
-	}
-
 	var errs []error
 
-	for _, rb := range rbs.Items {
-		logrus.Infof("Deleting roleBinding: %v", rb.Name)
-		if !dryRun {
-			err = client.RbacV1().RoleBindings(rb.Namespace).Delete(context.TODO(), rb.Name, metav1.DeleteOptions{})
-			if err != nil {
-				errs = append(errs, err)
+	listRoleBindings := func(opts metav1.ListOptions) (*rbacv1.RoleBindingList, error) {
+		return client.RbacV1().RoleBindings("").List(context.TODO(), opts)
+	}
+	processRoleBindings := func(items *rbacv1.RoleBindingList) error {
+		for _, rb := range items.Items {
+			logrus.Infof("Deleting roleBinding: %v", rb.Name)
+			if !dryRun {
+				err := client.RbacV1().RoleBindings(rb.Namespace).Delete(context.TODO(), rb.Name, metav1.DeleteOptions{})
+				if err != nil && !apierror.IsNotFound(err) {
+					errs = append(errs, err)
+				}
 			}
 		}
+		return nil
+	}
+	err := pagination.EachPage(listRoleBindings, listOptions, processRoleBindings)
+	if err != nil {
+		return append(errs, err)
 	}
 	return errs
 }
 
-func cleanupClusterRoles(client *kubernetes.Clientset) []error {
+func cleanupClusterRoles(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of clusterRoles")
-	crs, err := client.RbacV1().ClusterRoles().List(context.TODO(), listOptions)
-	if err != nil {
-		return []error{err}
-	}
-
 	var errs []error
 
-	for _, cr := range crs.Items {
-		logrus.Infof("Deleting clusterRole: %v", cr.Name)
-		if !dryRun {
-			err = client.RbacV1().ClusterRoles().Delete(context.TODO(), cr.Name, metav1.DeleteOptions{})
-			if err != nil {
-				errs = append(errs, err)
+	listClusterRoles := func(opts metav1.ListOptions) (*rbacv1.ClusterRoleList, error) {
+		return client.RbacV1().ClusterRoles().List(context.TODO(), opts)
+	}
+	processClusterRoles := func(items *rbacv1.ClusterRoleList) error {
+		for _, cr := range items.Items {
+			logrus.Infof("Deleting clusterRole: %v", cr.Name)
+			if !dryRun {
+				err := client.RbacV1().ClusterRoles().Delete(context.TODO(), cr.Name, metav1.DeleteOptions{})
+				if err != nil && !apierror.IsNotFound(err) {
+					errs = append(errs, err)
+				}
 			}
 		}
+		return nil
+	}
+	err := pagination.EachPage(listClusterRoles, listOptions, processClusterRoles)
+	if err != nil {
+		return append(errs, err)
 	}
 	return errs
 }
 
-func cleanUpImagePullSecrets(client *kubernetes.Clientset) []error {
+func cleanUpImagePullSecrets(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of imagePullSecrets")
-	s, err := client.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: cluster.CopiedPullSecretLabel + "=true",
-	})
-	if err != nil {
-		return []error{err}
-	}
 	var errs []error
-	for _, secret := range s.Items {
-		logrus.Infof("Deleting secret %q in namespace %q", secret.Name, secret.Namespace)
-		if !dryRun {
-			err = client.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
-			if err != nil {
-				errs = append(errs, err)
+
+	listImagePullSecrets := func(opts metav1.ListOptions) (*corev1.SecretList, error) {
+		return client.CoreV1().Secrets("").List(context.TODO(), opts)
+	}
+	processImagePullSecrets := func(s *corev1.SecretList) error {
+		for _, secret := range s.Items {
+			logrus.Infof("Deleting secret %q in namespace %q", secret.Name, secret.Namespace)
+			if !dryRun {
+				err := client.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
+				if err != nil && !apierror.IsNotFound(err) {
+					errs = append(errs, err)
+				}
 			}
 		}
+		return nil
+	}
+	imagePullSecretsOpts := metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel + "=true"}
+	err := pagination.EachPage(listImagePullSecrets, imagePullSecretsOpts, processImagePullSecrets)
+	if err != nil {
+		return append(errs, err)
 	}
 	return errs
 }
 
-func cleanupRoles(client *kubernetes.Clientset) []error {
+func cleanupRoles(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of roles")
-	rs, err := client.RbacV1().Roles("").List(context.TODO(), listOptions)
-	if err != nil {
-		return []error{err}
-	}
-
 	var errs []error
 
-	for _, r := range rs.Items {
-		logrus.Infof("Deleting role: %v", r.Name)
-		if !dryRun {
-			err = client.RbacV1().Roles(r.Namespace).Delete(context.TODO(), r.Name, metav1.DeleteOptions{})
-			if err != nil {
-				errs = append(errs, err)
+	listRoles := func(opts metav1.ListOptions) (*rbacv1.RoleList, error) {
+		return client.RbacV1().Roles("").List(context.TODO(), opts)
+	}
+	processRoles := func(items *rbacv1.RoleList) error {
+		for _, r := range items.Items {
+			logrus.Infof("Deleting role: %v", r.Name)
+			if !dryRun {
+				err := client.RbacV1().Roles(r.Namespace).Delete(context.TODO(), r.Name, metav1.DeleteOptions{})
+				if err != nil && !apierror.IsNotFound(err) {
+					errs = append(errs, err)
+				}
 			}
 		}
+		return nil
+	}
+	err := pagination.EachPage(listRoles, listOptions, processRoles)
+	if err != nil {
+		return append(errs, err)
 	}
 	return errs
 }
 
-func cleanupWebhookResources(client *kubernetes.Clientset) []error {
+func cleanupWebhookResources(client kubernetes.Interface) []error {
 	logrus.Info("Starting cleanup of webhook-specific resources")
 	logrus.Infof("Deleting clusterrolebinding %s", usercontrollers.WebhookClusterRoleBindingName)
 	logrus.Infof("Deleting mutatingwebhookconfiguration %s", usercontrollers.WebhookConfigurationName)
@@ -408,28 +442,29 @@ func cleanupWebhookResources(client *kubernetes.Clientset) []error {
 	return errs
 }
 
-func deleteJob(client *kubernetes.Clientset) error {
+func deleteJob(client kubernetes.Interface) error {
 	logrus.Info("Starting cleanup of jobs")
-	jobs, err := client.BatchV1().Jobs("default").List(context.TODO(), listOptions)
-	if err != nil {
-		return err
+	listJobs := func(opts metav1.ListOptions) (*batchv1.JobList, error) {
+		return client.BatchV1().Jobs("default").List(context.TODO(), opts)
 	}
-
-	for _, job := range jobs.Items {
-		prop := metav1.DeletePropagationBackground
-		if strings.HasPrefix(job.Name, "cattle-cleanup") {
-			logrus.Infof("Deleting job: %v", job.Name)
-			if !dryRun {
-				err = client.BatchV1().Jobs("default").Delete(context.TODO(), job.Name, metav1.DeleteOptions{
-					PropagationPolicy: &prop,
-				})
-				if err != nil {
-					return err
+	processJobs := func(jobs *batchv1.JobList) error {
+		for _, job := range jobs.Items {
+			prop := metav1.DeletePropagationBackground
+			if strings.HasPrefix(job.Name, "cattle-cleanup") {
+				logrus.Infof("Deleting job: %v", job.Name)
+				if !dryRun {
+					err := client.BatchV1().Jobs("default").Delete(context.TODO(), job.Name, metav1.DeleteOptions{
+						PropagationPolicy: &prop,
+					})
+					if err != nil && !apierror.IsNotFound(err) {
+						return err
+					}
 				}
 			}
 		}
+		return nil
 	}
-	return nil
+	return pagination.EachPage(listJobs, listOptions, processJobs)
 }
 
 // tryUpdate runs the input func and if the error returned is a conflict error
@@ -463,21 +498,27 @@ func processErrors(errs []error) error {
 	return errors.New(errorString)
 }
 
-func getProjectMonitoringNamespaces(client *kubernetes.Clientset) ([]string, error) {
+func getProjectMonitoringNamespaces(client kubernetes.Interface) ([]string, error) {
 	var list []string
-	nsList, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	listNamespaces := func(opts metav1.ListOptions) (*corev1.NamespaceList, error) {
+		return client.CoreV1().Namespaces().List(context.TODO(), opts)
+	}
+	processNamespaces := func(nsList *corev1.NamespaceList) error {
+		for _, ns := range nsList.Items {
+			value, ok := ns.Labels[nslabels.ProjectIDFieldLabel]
+			if !ok {
+				continue
+			}
+			if _, nsname := monitoring.ProjectMonitoringInfo(value); ns.Name != nsname {
+				continue
+			}
+			list = append(list, ns.Name)
+		}
+		return nil
+	}
+	err := pagination.EachPage(listNamespaces, metav1.ListOptions{}, processNamespaces)
 	if err != nil {
 		return nil, err
-	}
-	for _, ns := range nsList.Items {
-		value, ok := ns.Labels[nslabels.ProjectIDFieldLabel]
-		if !ok {
-			continue
-		}
-		if _, nsname := monitoring.ProjectMonitoringInfo(value); ns.Name != nsname {
-			continue
-		}
-		list = append(list, ns.Name)
 	}
 	return list, nil
 }
