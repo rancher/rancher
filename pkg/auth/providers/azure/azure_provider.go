@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"

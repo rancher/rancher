@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/values"
