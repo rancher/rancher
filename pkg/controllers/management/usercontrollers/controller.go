@@ -533,9 +533,17 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 								},
 							},
 							ImagePullPolicy: corev1.PullAlways,
+							// The job runs in the default namespace, so it has to meet the
+							// restricted Pod Security level a cluster may enforce there.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser:  &[]int64{1000}[0],
-								RunAsGroup: &[]int64{1000}[0],
+								RunAsUser:                &[]int64{1000}[0],
+								RunAsGroup:               &[]int64{1000}[0],
+								RunAsNonRoot:             &[]bool{true}[0],
+								AllowPrivilegeEscalation: &[]bool{false}[0],
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+								SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 							},
 						},
 					},
