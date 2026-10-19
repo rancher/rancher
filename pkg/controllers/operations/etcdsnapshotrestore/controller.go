@@ -124,7 +124,7 @@ const (
 i=0
 
 while [ $i -lt 30 ]; do
-	if $@ >/dev/null 2>&1; then
+	if "$@" >/dev/null 2>&1; then
 		exit 0
 	fi
 	sleep 10
@@ -159,7 +159,7 @@ fi
 
 TMPALLNODES=$(mktemp)
 
-if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
+if ! "$KUBECTL" get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
         echo "Error listing all nodes"
         rm "$TMPALLNODES"
         exit 1
@@ -181,7 +181,7 @@ while IFS='' read -r NODE; do
         done < "$NODENAMESFILE"
         if [ "${FOUND}" != "true" ]; then
                 echo "Deleting node ${NODE}"
-                ${KUBECTL} delete node "${NODE}" --wait=false
+                "$KUBECTL" delete node "${NODE}" --wait=false
         fi
 done < "$TMPALLNODES"
 
