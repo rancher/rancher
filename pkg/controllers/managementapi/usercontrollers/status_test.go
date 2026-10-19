@@ -186,3 +186,37 @@ func TestStatusHandlerDoesNotUpdateAnUpToDateStatus(t *testing.T) {
 	_, err := handler(cluster.Name, cluster)
 	require.NoError(t, err)
 }
+
+func TestSyncStatusReportsFailuresWithAGenericMessage(t *testing.T) {
+	u := newStatusTestController(true, clustermanager.ControllersState{Phase: clustermanager.ControllersFailed, Err: errors.New(`Get "https://10.0.0.1/api/v1/namespaces/kube-system": cluster agent disconnected`)})
+
+	got := syncTestStatus(t, u, newProvisionedCluster())
+
+	assert.Equal(t, controllersFailedMessage, v3.ClusterConditionControllersRunning.GetMessage(got))
+	assert.Contains(t, v3.ClusterConditionReady.GetMessage(got), controllersFailedMessage, "Ready should say why the cluster isn't ready")
+}
+
+func TestStatusHandlerDoesNotUpdateTheStatusForEveryDifferentFailure(t *testing.T) {
+	// Errors change from one attempt to the next even when the cause doesn't; reporting them must not
+	// update the cluster every time.
+	first := newStatusTestController(true, clustermanager.ControllersState{Phase: clustermanager.ControllersFailed, Err: errors.New("dial tcp 10.0.0.1:443: i/o timeout")})
+	cluster := syncTestStatus(t, first, newProvisionedCluster())
+	again := newStatusTestController(true, clustermanager.ControllersState{Phase: clustermanager.ControllersFailed, Err: errors.New("dial tcp 10.0.0.1:443: connect: connection refused")})
+	handler, _ := registerTestStatusHandler(t, again)
+
+	// No UpdateStatus expectation: gomock fails the test if it is called.
+	_, err := handler(cluster.Name, cluster)
+	require.NoError(t, err)
+}
+
+func TestSyncStatusClearsTheFailureOnceRunning(t *testing.T) {
+	failed := newStatusTestController(true, clustermanager.ControllersState{Phase: clustermanager.ControllersFailed, Err: errors.New("boom")})
+	cluster := syncTestStatus(t, failed, newProvisionedCluster())
+	running := newStatusTestController(true, clustermanager.ControllersState{Phase: clustermanager.ControllersRunning, Owner: true, PreBootstrapped: true})
+
+	got := syncTestStatus(t, running, cluster)
+
+	assert.True(t, v3.ClusterConditionControllersRunning.IsTrue(got))
+	assert.Empty(t, v3.ClusterConditionControllersRunning.GetMessage(got))
+	assert.NotContains(t, v3.ClusterConditionReady.GetMessage(got), controllersFailedMessage)
+}
