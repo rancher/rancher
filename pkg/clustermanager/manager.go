@@ -109,6 +109,9 @@ type ControllersState struct {
 
 type record struct {
 	sync.Mutex
+	// clusterRec is the cluster as it was when the record was built. It is the record's own copy, never
+	// the informer's: it is handed to the cluster's controllers, and is compared with later versions of
+	// the cluster to tell whether the record is out of date. It must not be changed.
 	clusterRec      *apimgmtv3.Cluster
 	cluster         *config.UserContext
 	accessControl   types.AccessControl
@@ -561,9 +564,15 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 	}
 	clusterContext.ClusterUID = cluster.UID
 
+	return m.newRecord(ctx, cluster, clusterContext), nil
+}
+
+// newRecord returns a record for cluster that serves clusterContext. cluster is usually the informer's
+// copy, so the record keeps a copy of its own.
+func (m *Manager) newRecord(ctx context.Context, cluster *apimgmtv3.Cluster, clusterContext *config.UserContext) *record {
 	s := &record{
 		cluster:    clusterContext,
-		clusterRec: cluster,
+		clusterRec: cluster.DeepCopy(),
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -573,7 +582,7 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 		m.handleStartFailure(s, errDeferredStart)
 	}
 
-	return s, nil
+	return s
 }
 
 func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext types.StorageContext) (types.AccessControl, error) {

@@ -256,11 +256,17 @@ func (u *userControllersController) checkClusterControllerVersion(cluster *v3.Cl
 func (u *userControllersController) saveClusterControllersVersionAnnotation(cluster *v3.Cluster, value string) (*v3.Cluster, error) {
 	clusterName := cluster.Name
 	cluster = cluster.DeepCopy()
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
 	cluster.Annotations[currentClusterControllersVersion] = value
+
 	cluster, err := u.clusters.Update(cluster)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update cluster %s with annotation indicating its K8s version: %w", clusterName, err)
 	}
+
 	return cluster, nil
 }
 
