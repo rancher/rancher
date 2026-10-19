@@ -167,6 +167,7 @@ scopes:
           - 'wins-agent-install-script'
           - 'chart-default-branch'
           - 'machine-provision-image'
+      - '^pkg/controllers/dashboardapi/settings/settings\.go$' # SetAll resolves every setting's value/source (env, default, stored) on startup
       - path: "^package/Dockerfile"
         substrings:
           - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
