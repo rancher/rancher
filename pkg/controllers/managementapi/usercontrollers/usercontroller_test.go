@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,11 @@ type simpleControllerStarter struct {
 	startCalled bool
 	stopCalled  bool
 	stopped     []*v3.Cluster
+	state       clustermanager.ControllersState
+}
+
+func (s *simpleControllerStarter) ControllersState(*v3.Cluster) clustermanager.ControllersState {
+	return s.state
 }
 
 func (s *simpleControllerStarter) Start(_ context.Context, c *v3.Cluster, _ bool) error {

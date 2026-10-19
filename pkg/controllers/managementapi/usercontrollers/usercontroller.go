@@ -62,6 +62,8 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	}
 
 	scaledContext.Wrangler.Mgmt.Cluster().OnChange(ctx, "user-controllers-controller", u.sync)
+	// Registered after the sync so it reports what the sync just started.
+	controllers.RegisterClusterStatusHandler(ctx, scaledContext.Wrangler.Mgmt.Cluster(), "", "user-controllers-status", u.syncStatus)
 
 	// OnChange is called with the cluster's name only once it's gone, and a cluster recreated under the
 	// same name looks like an update of the old one, so neither tells which cluster went away. The
@@ -122,6 +124,7 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 type controllerStarter interface {
 	Start(ctx context.Context, cluster *v3.Cluster, clusterOwner bool) error
 	Stop(cluster *v3.Cluster)
+	ControllersState(cluster *v3.Cluster) clustermanager.ControllersState
 }
 
 type userControllersController struct {

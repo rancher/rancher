@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
@@ -102,6 +101,11 @@ func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.
 	}
 }
 
+// Stop stops the controllers of cluster and forgets why they last failed to start, if they did. A stop
+// asked for from outside is deliberate - the cluster is gone, or its controllers are being restarted - so
+// an earlier failure no longer describes them, and ControllersState reports them stopped rather than
+// failed. Failures noticed by the manager itself go through stopWithError or handleStartFailure instead,
+// which record the failure after stopping.
 func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 	m.failures.Delete(cluster.UID)
 	obj, ok := m.controllers.Load(cluster.UID)
@@ -109,6 +113,14 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 		return
 	}
 	m.stopRecord(obj.(*record))
+}
+
+// stopWithError stops the controllers of cluster because they couldn't be started with err, and records
+// err so ControllersState reports them failed. err has to be recorded after stopping, since Stop forgets
+// the failure.
+func (m *Manager) stopWithError(cluster *apimgmtv3.Cluster, err error) {
+	m.Stop(cluster)
+	m.failures.Store(cluster.UID, err)
 }
 
 // ControllersState reports the state of the controllers of cluster on this replica. The state of a
@@ -185,59 +197,6 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
-func (m *Manager) StopAndMarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
-	if current := m.markControllersNotRunning(cluster); current != nil {
-		cluster = current
-	}
-	m.Stop(cluster)
-}
-
-// markControllersNotRunning sets the ControllersRunning condition of cluster to False. It returns the
-// cluster as last read or written, or nil if it couldn't be read or was replaced by a new cluster with the
-// same name, which is left alone.
-func (m *Manager) markControllersNotRunning(cluster *apimgmtv3.Cluster) *apimgmtv3.Cluster {
-	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
-	if err != nil {
-		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: %v", cluster.Name, err)
-		return nil
-	}
-
-	if current.UID != cluster.UID {
-		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
-		return nil
-	}
-
-	if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(current) {
-		apimgmtv3.ClusterConditionControllersRunning.False(current)
-		pkgcluster.SummarizeReadyCondition(current)
-		cluster, err := m.clusters.UpdateStatus(current)
-		if err == nil {
-			current = cluster
-		}
-	}
-	return current
-}
-
-func (m *Manager) MarkControllersRunning(cluster *apimgmtv3.Cluster) {
-	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
-	if err != nil {
-		logrus.Debugf("[clustermanager] not marking cluster %s controllers running: %v", cluster.Name, err)
-		return
-	}
-
-	if current.UID != cluster.UID {
-		logrus.Debugf("[clustermanager] not marking cluster %s controllers running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
-		m.Stop(cluster)
-		return
-	}
-
-	if !apimgmtv3.ClusterConditionControllersRunning.IsTrue(current) {
-		apimgmtv3.ClusterConditionControllersRunning.True(current)
-		pkgcluster.SummarizeReadyCondition(current)
-		_, _ = m.clusters.UpdateStatus(current)
-	}
-}
-
 func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) (*record, error) {
 	if !startAllowed(cluster, controllers) {
 		return nil, nil
@@ -252,7 +211,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.StopAndMarkControllersNotRunning(cluster)
+		m.stopWithError(cluster, err)
 		return nil, err
 	}
 	if clusterRecord == nil {
@@ -266,7 +225,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		clusterRecord.cancel()
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.StopAndMarkControllersNotRunning(cluster)
+		m.stopWithError(cluster, err)
 		return nil, err
 	}
 
@@ -300,17 +259,12 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 func (m *Manager) handleStartSuccess(r *record) {
 	r.Lock()
 	r.phase = ControllersRunning
-	owner := r.owner
 	r.Unlock()
 
 	if !m.isActive(r) {
 		return
 	}
 	m.failures.Delete(r.clusterRec.UID)
-	// only mark running/not running for owner instance
-	if owner {
-		m.MarkControllersRunning(r.clusterRec)
-	}
 	m.enqueue(r.clusterRec.Name)
 }
 
@@ -332,23 +286,23 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 // for the cluster to be synced so it is reported. It only acts while r is the cluster's active record: r
 // may already have been stopped or replaced, for example because the cluster's connection details changed
 // while it was starting, and then its failure is not the cluster's, and the replacement must keep running.
+//
+// The cluster is only enqueued when it starts failing. A sync starts the controllers again, so enqueueing
+// every failure would retry a cluster that keeps failing without any delay; later attempts are left to the
+// periodic ownership reconcile.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
 
 	r.Lock()
 	r.phase = ControllersFailed
-	owner := r.owner
 	r.Unlock()
 
 	if !m.stopRecord(r) {
 		return
 	}
-	m.failures.Store(r.clusterRec.UID, err)
-	// only mark running/not running for owner instance
-	if owner {
-		m.markControllersNotRunning(r.clusterRec)
+	if _, alreadyFailing := m.failures.Swap(r.clusterRec.UID, err); !alreadyFailing {
+		m.enqueue(r.clusterRec.Name)
 	}
-	m.enqueue(r.clusterRec.Name)
 }
 
 func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
@@ -403,18 +357,11 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 
-	// pre-bootstrap the cluster if it's not already bootstrapped
-	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
+	// pre-bootstrap the cluster if it's not already bootstrapped. A cluster that doesn't need it counts as
+	// pre-bootstrapped, so its cluster-agent isn't deployed in pre-bootstrap mode.
 	if capr.ShouldPreBootstrap(rec.clusterRec) {
 		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec)
 		if err != nil {
-			transaction.Rollback()
-			return err
-		}
-	} else {
-		// mark as prebootstrapped implicitly in order to prevent cluster-agent from being deployed in prebootstrap mode
-		apimgmtv3.ClusterConditionPreBootstrapped.True(rec.clusterRec)
-		if _, err := m.clusters.Update(rec.clusterRec); err != nil {
 			transaction.Rollback()
 			return err
 		}
@@ -422,6 +369,9 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	rec.Lock()
 	rec.preBootstrapped = true
 	rec.Unlock()
+	// Report it now rather than once the controllers are running, which can take a while: the
+	// cluster-agent is deployed in pre-bootstrap mode until the cluster is marked.
+	m.enqueue(rec.clusterRec.Name)
 
 	if clusterOwner {
 		if err := clusterController.Register(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m); err != nil {

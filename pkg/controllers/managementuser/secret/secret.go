@@ -10,14 +10,12 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
 )
 
 // SecretController listens for secret CUD in management API
@@ -50,7 +48,7 @@ func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.
 		clusterId:         clusterRec.Name,
 	}
 
-	return c.bootstrap(mgmt.Management.Clusters(""), clusterRec)
+	return c.bootstrap()
 }
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
@@ -67,7 +65,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	mgmt.Wrangler.Core.Secret().OnChange(ctx, "secret-resource-synced", resourceSyncController.sync)
 }
 
-func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
+func (c *ResourceSyncController) bootstrap() error {
 	secrets, err := c.upstreamSecrets.List(c.namespace, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list secrets in %v namespace: %w", c.namespace, err)
@@ -92,36 +90,7 @@ func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface
 		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", s.Namespace, s.Name, c.clusterName)
 	}
 
-	if err := markPreBootstrapped(mgmtClusterClient, mgmtCluster); err != nil {
-		return fmt.Errorf("failed to update cluster bootstrap condition for %v: %w", c.clusterName, err)
-	}
-
 	return nil
-}
-
-// markPreBootstrapped sets the PreBootstrapped condition of mgmtCluster to True, on the object passed in
-// as well as on the cluster. mgmtCluster is usually the copy the cluster's controllers were started
-// with, so the update is retried against the latest version of the cluster on conflict. It is never
-// applied to a different cluster that has since taken the same name.
-func markPreBootstrapped(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
-	apimgmtv3.ClusterConditionPreBootstrapped.True(mgmtCluster)
-	toUpdate := mgmtCluster
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err := mgmtClusterClient.UpdateStatus(toUpdate)
-		if !errors.IsConflict(err) {
-			return err
-		}
-		latest, getErr := mgmtClusterClient.Get(mgmtCluster.Name, metav1.GetOptions{})
-		if getErr != nil {
-			return getErr
-		}
-		if latest.UID != mgmtCluster.UID {
-			return fmt.Errorf("cluster %s was replaced (uid %s, expected %s)", mgmtCluster.Name, latest.UID, mgmtCluster.UID)
-		}
-		apimgmtv3.ClusterConditionPreBootstrapped.True(latest)
-		toUpdate = latest
-		return err
-	})
 }
 
 func (c *ResourceSyncController) syncable(obj *corev1.Secret) bool {
