@@ -232,22 +232,37 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
+// start returns the record for cluster, building it if there is none or if the one there is out of date,
+// and starts its controllers if controllers is true.
+//
+// Only a start with controllers - the user controllers' sync - manages the cluster's controllers. A start
+// without them serves a request for a client and leaves running controllers alone: it doesn't replace
+// their record, even with out of date connection details, and it doesn't record its failures. Tearing
+// down the controllers is up to the sync, which it asks for instead.
 func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) (*record, error) {
 	if !startAllowed(cluster, controllers) {
 		return nil, nil
 	}
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
-		if !m.changed(obj.(*record), cluster, controllers, clusterOwner) {
-			return obj.(*record), m.startController(obj.(*record), controllers, clusterOwner)
+		r := obj.(*record)
+		if !m.changed(r, cluster, controllers, clusterOwner) {
+			return r, m.startController(r, controllers, clusterOwner)
 		}
-		// Stop the record that was found to be out of date, not whichever is current by now.
-		m.stopRecord(obj.(*record))
+		if controllers {
+			// Stop the record that was found to be out of date, not whichever is current by now.
+			m.stopRecord(r)
+		} else if !m.stopIfNotStarted(r) {
+			m.enqueue(cluster.Name)
+			return r, nil
+		}
 	}
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.stopWithError(cluster, err)
+		if controllers {
+			m.stopWithError(cluster, err)
+		}
 		return nil, err
 	}
 	if clusterRecord == nil {
@@ -261,11 +276,27 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		clusterRecord.cancel()
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.stopWithError(cluster, err)
 		return nil, err
 	}
 
 	return obj.(*record), nil
+}
+
+// errRecordReplaced is returned when the controllers of a record are to be started after the record was
+// removed. The caller is to start again, which finds the record that replaced it.
+var errRecordReplaced = errors.New("cluster record was replaced while starting its controllers")
+
+// stopIfNotStarted stops r if its controllers haven't been started, and reports whether they hadn't. The
+// check and the stop are done under r's lock, the one startController takes, so r can't have its
+// controllers started in between, and startController won't start them once r is stopped.
+func (m *Manager) stopIfNotStarted(r *record) bool {
+	r.Lock()
+	defer r.Unlock()
+	if r.started {
+		return false
+	}
+	m.stopRecord(r)
+	return true
 }
 
 func (m *Manager) startController(r *record, controllers, clusterOwner bool) error {
@@ -276,6 +307,10 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
+		// r may have been stopped by stopIfNotStarted since the caller found it.
+		if !m.isActive(r) {
+			return errRecordReplaced
+		}
 		r.started = true
 		r.owner = clusterOwner
 		r.phase = ControllersStarting
