@@ -3,6 +3,7 @@ package clustermanager
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -54,7 +55,7 @@ func TestControllersStateReportsAFailureOnceTheRecordIsGone(t *testing.T) {
 	m := &Manager{}
 	cluster := newTestCluster("c-m-test", "uid-1")
 	boom := errors.New("boom")
-	m.failures.Store(cluster.UID, boom)
+	m.failures.Store(cluster.UID, &startFailure{err: boom})
 
 	state := m.ControllersState(cluster)
 
@@ -66,7 +67,7 @@ func TestControllersStatePrefersTheCurrentRecordOverAnEarlierFailure(t *testing.
 	m := &Manager{}
 	r := newStartedTestRecord("c-m-test", "uid-1", false)
 	m.controllers.Store(r.clusterRec.UID, r)
-	m.failures.Store(r.clusterRec.UID, errors.New("boom"))
+	m.failures.Store(r.clusterRec.UID, &startFailure{err: errors.New("boom")})
 
 	assert.Equal(t, ControllersStarting, m.ControllersState(r.clusterRec).Phase)
 }
@@ -74,7 +75,7 @@ func TestControllersStatePrefersTheCurrentRecordOverAnEarlierFailure(t *testing.
 func TestStopForgetsAFailure(t *testing.T) {
 	m := &Manager{}
 	cluster := newTestCluster("c-m-test", "uid-1")
-	m.failures.Store(cluster.UID, errors.New("boom"))
+	m.failures.Store(cluster.UID, &startFailure{err: errors.New("boom")})
 
 	m.Stop(cluster)
 
@@ -101,7 +102,7 @@ func TestHandleStartSuccessRecordsRunningAndEnqueues(t *testing.T) {
 	m := &Manager{clusters: clusters}
 	r := newStartedTestRecord("c-m-test", "uid-1", false)
 	m.controllers.Store(r.clusterRec.UID, r)
-	m.failures.Store(r.clusterRec.UID, errors.New("an earlier start failed"))
+	m.failures.Store(r.clusterRec.UID, &startFailure{err: errors.New("an earlier start failed")})
 
 	m.handleStartSuccess(r)
 
@@ -170,32 +171,61 @@ func TestHandleStartFailureDoesNotWriteTheOwnersCluster(t *testing.T) {
 	assert.Equal(t, ControllersFailed, m.ControllersState(r.clusterRec).Phase)
 }
 
-func TestHandleStartFailureOnlyEnqueuesWhenTheClusterStartsFailing(t *testing.T) {
-	// The sync an enqueue triggers starts the controllers again; enqueueing on every failure would retry
-	// a cluster that keeps failing without any delay.
+func TestHandleStartFailureBacksOffFailuresInARow(t *testing.T) {
 	clusters := newTestClusters(newTestCluster("c-m-test", "uid-1"))
 	m := &Manager{clusters: clusters}
+	fail := func(err error) ControllersState {
+		r := newStartedTestRecord("c-m-test", "uid-1", true)
+		m.controllers.Store(r.clusterRec.UID, r)
+		m.handleStartFailure(r, err)
+		state := m.ControllersState(r.clusterRec)
+		assert.Same(t, err, state.Err, "the latest failure should be reported")
+		return state
+	}
 
-	first := newStartedTestRecord("c-m-test", "uid-1", true)
-	m.controllers.Store(first.clusterRec.UID, first)
-	m.handleStartFailure(first, errors.New("boom"))
+	before := time.Now()
+	first := fail(errors.New("boom"))
+	assert.WithinRange(t, first.RetryAt, before.Add(startRetryBaseDelay), time.Now().Add(startRetryBaseDelay))
 
-	second := newStartedTestRecord("c-m-test", "uid-1", true)
-	m.controllers.Store(second.clusterRec.UID, second)
-	again := errors.New("boom again")
-	m.handleStartFailure(second, again)
+	before = time.Now()
+	second := fail(errors.New("boom again"))
+	assert.WithinRange(t, second.RetryAt, before.Add(2*startRetryBaseDelay), time.Now().Add(2*startRetryBaseDelay))
 
-	assert.Equal(t, []string{"c-m-test"}, enqueued(clusters), "only the first failure should enqueue")
-	assert.Same(t, again, m.ControllersState(second.clusterRec).Err, "the latest failure should be reported")
+	assert.Equal(t, []string{"c-m-test", "c-m-test"}, enqueued(clusters), "every failure should be reported straight away")
+}
 
-	third := newStartedTestRecord("c-m-test", "uid-1", true)
-	m.controllers.Store(third.clusterRec.UID, third)
-	m.handleStartSuccess(third)
-	fourth := newStartedTestRecord("c-m-test", "uid-1", true)
-	m.controllers.Store(fourth.clusterRec.UID, fourth)
-	m.handleStartFailure(fourth, errors.New("boom"))
+func TestHandleStartSuccessResetsTheBackoff(t *testing.T) {
+	clusters := newTestClusters(newTestCluster("c-m-test", "uid-1"))
+	m := &Manager{clusters: clusters}
+	m.failures.Store(types.UID("uid-1"), &startFailure{err: errors.New("boom"), attempts: 5})
 
-	assert.Equal(t, []string{"c-m-test", "c-m-test", "c-m-test"}, enqueued(clusters), "failing again after a success should enqueue")
+	succeeded := newStartedTestRecord("c-m-test", "uid-1", true)
+	m.controllers.Store(succeeded.clusterRec.UID, succeeded)
+	m.handleStartSuccess(succeeded)
+	failed := newStartedTestRecord("c-m-test", "uid-1", true)
+	m.controllers.Store(failed.clusterRec.UID, failed)
+	before := time.Now()
+	m.handleStartFailure(failed, errors.New("boom"))
+
+	assert.WithinRange(t, m.ControllersState(failed.clusterRec).RetryAt, before.Add(startRetryBaseDelay), time.Now().Add(startRetryBaseDelay))
+}
+
+func TestStartRetryDelay(t *testing.T) {
+	assert.Equal(t, startRetryBaseDelay, startRetryDelay(1))
+	assert.Equal(t, 2*startRetryBaseDelay, startRetryDelay(2))
+	assert.Equal(t, 4*startRetryBaseDelay, startRetryDelay(3))
+	assert.Equal(t, startRetryMaxDelay, startRetryDelay(100), "the delay is capped")
+	assert.Equal(t, startRetryMaxDelay, startRetryDelay(math.MaxInt), "the delay is capped without overflowing")
+}
+
+func TestStopWithErrorLeavesTheBackoffToTheCaller(t *testing.T) {
+	// The error is returned from Start, so the controller loop backs the cluster off.
+	m := &Manager{}
+	cluster := newTestCluster("c-m-test", "uid-1")
+
+	m.stopWithError(cluster, errors.New("boom"))
+
+	assert.True(t, m.ControllersState(cluster).RetryAt.IsZero())
 }
 
 func TestStartRecordsAFailureToBuildTheRecord(t *testing.T) {

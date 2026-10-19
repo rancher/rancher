@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -19,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -84,40 +82,7 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 		}()
 	}
 
-	go func() {
-		// temporary measure to recover user controllers not able to successfully start
-		// TODO: find a better way to implement retries for Manager.Start()
-		const fallbackReconcilePeriod = 30 * time.Second
-		fallbackTimer := time.NewTimer(fallbackReconcilePeriod)
-		defer fallbackTimer.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-u.forcedResync():
-			case <-fallbackTimer.C:
-			}
-
-			backoff := wait.Backoff{
-				Steps:    3,
-				Duration: 5 * time.Second,
-				Factor:   1,
-			}
-			if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-				if err := u.reconcileClusterOwnership(); err != nil {
-					logrus.Warnf("Failed to reconcile cluster ownership: %v, retrying...", err)
-					return false, nil
-				}
-				return true, nil
-			}); err != nil {
-				logrus.Errorf("Giving up reconciling cluster ownership after %d attempts", backoff.Steps)
-			}
-
-			// Unlike a ticker, we don't need it to run at a fixed rate, just ensure it's executed at least once every X seconds.
-			fallbackTimer.Reset(fallbackReconcilePeriod)
-		}
-	}()
+	go u.resyncOnOwnershipChanges(ctx)
 }
 
 // controllerStarter starts and stops controllers for a given cluster.
@@ -167,6 +132,12 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 
 	// Skip usercontrollers if cluster is not yet provisioned
 	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		return cluster, nil
+	}
+
+	// A failed start is retried once its backoff is over, not on every sync in between.
+	if wait := time.Until(u.starter.ControllersState(cluster).RetryAt); wait > 0 {
+		u.clusters.EnqueueAfter(key, wait)
 		return cluster, nil
 	}
 
@@ -303,25 +274,41 @@ func clusterVersionChanged(current, new *version.Version) bool {
 	return current.Major() != new.Major() || current.Minor() != new.Minor()
 }
 
-func (u *userControllersController) reconcileClusterOwnership() error {
+// resyncOnOwnershipChanges resyncs every cluster whenever cluster ownership changes, until ctx is done.
+// Ownership changes when replicas come and go, which isn't a change to any cluster, so every cluster is
+// resynced to start or restart its controllers accordingly. Everything else that calls for a start goes
+// through sync already: cluster changes, failed starts once their backoff is over, and errors returned
+// from Start, which the controller loop retries.
+func (u *userControllersController) resyncOnOwnershipChanges(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case _, ok := <-u.forcedResync():
+			if !ok {
+				return
+			}
+		}
+
+		if err := u.resyncClusters(); err != nil {
+			logrus.Warnf("Failed to resync clusters for user controllers: %v", err)
+		}
+	}
+}
+
+// resyncClusters enqueues every cluster whose user controllers may need to be started or restarted on this
+// replica, so sync does it. Starting them from here instead would race the sync of the same cluster.
+func (u *userControllersController) resyncClusters() error {
 	clusters, err := u.clusterLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 
-	var (
-		errs []error
-	)
-
 	for _, cluster := range clusters {
 		if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 			continue
 		}
-
-		if err := u.starter.Start(u.ctx, cluster, u.isOwner(cluster)); err != nil {
-			errs = append(errs, errors.Wrapf(err, "failed to start user controllers for cluster %s", cluster.Name))
-		}
+		u.clusters.Enqueue(cluster.Name)
 	}
-
-	return types.NewErrors(errs...)
+	return nil
 }

@@ -44,11 +44,39 @@ type Manager struct {
 	clusters      mgmtcontrollers.ClusterInterface
 	secretLister  corecontrollers.SecretLister
 	controllers   sync.Map
-	// failures holds, by cluster UID, the error the last start of a cluster's controllers failed with,
-	// so it can still be reported once the failed record is gone.
+	// failures holds, by cluster UID, the *startFailure of the last start of a cluster's controllers, so
+	// it can still be reported once the failed record is gone.
 	failures      sync.Map
 	accessControl types.AccessControl
 	startSem      *semaphore.Weighted
+}
+
+const (
+	// startRetryBaseDelay is how long to wait before starting the controllers of a cluster again after
+	// their first failed start. It doubles with every failure that follows, up to startRetryMaxDelay.
+	startRetryBaseDelay = 5 * time.Second
+	startRetryMaxDelay  = 5 * time.Minute
+)
+
+// errDeferredStart is the failure recorded when controllers registered after the start fail to start.
+var errDeferredStart = errors.New("deferred controllers failed to start")
+
+// startFailure is a failed start of the controllers of a cluster.
+type startFailure struct {
+	err error
+	// attempts is how many starts in a row have failed.
+	attempts int
+	// retryAt is when the controllers may be started again. It is zero if they may be right away.
+	retryAt time.Time
+}
+
+// startRetryDelay returns how long to wait before another start after attempts starts in a row failed.
+func startRetryDelay(attempts int) time.Duration {
+	delay := startRetryBaseDelay
+	for i := 1; i < attempts && delay < startRetryMaxDelay; i++ {
+		delay *= 2
+	}
+	return min(delay, startRetryMaxDelay)
 }
 
 // ControllersPhase is where the controllers of a cluster are in their lifecycle on this replica.
@@ -74,6 +102,9 @@ type ControllersState struct {
 	PreBootstrapped bool
 	// Err is why the last start failed, if Phase is ControllersFailed.
 	Err error
+	// RetryAt is when the controllers may be started again after they failed, if Phase is
+	// ControllersFailed. It is zero if they may be right away.
+	RetryAt time.Time
 }
 
 type record struct {
@@ -118,9 +149,12 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 // stopWithError stops the controllers of cluster because they couldn't be started with err, and records
 // err so ControllersState reports them failed. err has to be recorded after stopping, since Stop forgets
 // the failure.
+//
+// No retry delay is recorded: err is returned to the caller of Start, so the controller loop backs the
+// cluster off itself.
 func (m *Manager) stopWithError(cluster *apimgmtv3.Cluster, err error) {
 	m.Stop(cluster)
-	m.failures.Store(cluster.UID, err)
+	m.failures.Store(cluster.UID, &startFailure{err: err})
 }
 
 // ControllersState reports the state of the controllers of cluster on this replica. The state of a
@@ -134,8 +168,9 @@ func (m *Manager) ControllersState(cluster *apimgmtv3.Cluster) ControllersState 
 			return ControllersState{Phase: r.phase, Owner: r.owner, PreBootstrapped: r.preBootstrapped}
 		}
 	}
-	if err, ok := m.failures.Load(cluster.UID); ok {
-		return ControllersState{Phase: ControllersFailed, Err: err.(error)}
+	if obj, ok := m.failures.Load(cluster.UID); ok {
+		failure := obj.(*startFailure)
+		return ControllersState{Phase: ControllersFailed, Err: failure.err, RetryAt: failure.retryAt}
 	}
 	return ControllersState{Phase: ControllersStopped}
 }
@@ -206,7 +241,8 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		if !m.changed(obj.(*record), cluster, controllers, clusterOwner) {
 			return obj.(*record), m.startController(obj.(*record), controllers, clusterOwner)
 		}
-		m.Stop(obj.(*record).clusterRec)
+		// Stop the record that was found to be out of date, not whichever is current by now.
+		m.stopRecord(obj.(*record))
 	}
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
@@ -287,9 +323,8 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 // may already have been stopped or replaced, for example because the cluster's connection details changed
 // while it was starting, and then its failure is not the cluster's, and the replacement must keep running.
 //
-// The cluster is only enqueued when it starts failing. A sync starts the controllers again, so enqueueing
-// every failure would retry a cluster that keeps failing without any delay; later attempts are left to the
-// periodic ownership reconcile.
+// The failure carries when the controllers may be started again, later with every failure in a row. The
+// sync this enqueues reports the failure straight away but holds off the next start until then.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
 
@@ -300,9 +335,16 @@ func (m *Manager) handleStartFailure(r *record, err error) {
 	if !m.stopRecord(r) {
 		return
 	}
-	if _, alreadyFailing := m.failures.Swap(r.clusterRec.UID, err); !alreadyFailing {
-		m.enqueue(r.clusterRec.Name)
+	attempts := 1
+	if obj, ok := m.failures.Load(r.clusterRec.UID); ok {
+		attempts = obj.(*startFailure).attempts + 1
 	}
+	m.failures.Store(r.clusterRec.UID, &startFailure{
+		err:      err,
+		attempts: attempts,
+		retryAt:  time.Now().Add(startRetryDelay(attempts)),
+	})
+	m.enqueue(r.clusterRec.Name)
 }
 
 func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
@@ -491,14 +533,9 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	clusterContext.OnDeferredStartError = func() {
-		logrus.Errorf("failed to start deferred controllers for cluster %s, stopping cluster agent so they are started again", cluster.Name)
-		// Dropping the record has to come first: it is what makes the next start build a new
-		// UserContext instead of finding this one and leaving it alone.
-		m.stopRecord(s)
-		// Ask for that start rather than waiting up to 30 seconds for the ownership reconcile to
-		// come round, which is documented as a temporary measure anyway. Only this path enqueues -
-		// an expected stop is followed by a start the caller is already making.
-		m.clusters.Controller().Enqueue("", cluster.Name)
+		// Dropping the record is what makes the next start build a new UserContext instead of finding
+		// this one and leaving it alone. Like any failed start, it is retried after a delay.
+		m.handleStartFailure(s, errDeferredStart)
 	}
 
 	return s, nil
