@@ -7,6 +7,7 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/dialer"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,8 +17,13 @@ import (
 )
 
 // newTestClusters returns a cluster client backed by a single stored cluster, or none if stored is nil.
+// Its controller records the clusters that are enqueued, see enqueued.
 func newTestClusters(stored *apimgmtv3.Cluster) *fakes.ClusterInterfaceMock {
+	controller := &fakes.ClusterControllerMock{
+		EnqueueFunc: func(string, string) {},
+	}
 	return &fakes.ClusterInterfaceMock{
+		ControllerFunc: func() v3.ClusterController { return controller },
 		GetFunc: func(name string, _ metav1.GetOptions) (*apimgmtv3.Cluster, error) {
 			if stored == nil || stored.Name != name {
 				return nil, apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "clusters"}, name)
@@ -29,6 +35,15 @@ func newTestClusters(stored *apimgmtv3.Cluster) *fakes.ClusterInterfaceMock {
 			return c, nil
 		},
 	}
+}
+
+// enqueued returns the names of the clusters enqueued through clusters' controller.
+func enqueued(clusters *fakes.ClusterInterfaceMock) []string {
+	var names []string
+	for _, call := range clusters.Controller().(*fakes.ClusterControllerMock).EnqueueCalls() {
+		names = append(names, call.Name)
+	}
+	return names
 }
 
 func newTestCluster(name string, uid types.UID) *apimgmtv3.Cluster {

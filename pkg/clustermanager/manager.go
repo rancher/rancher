@@ -2,7 +2,6 @@ package clustermanager
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -22,10 +21,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	"github.com/rancher/rancher/pkg/dialer"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	corecontrollers "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/accesscontrol"
@@ -43,23 +41,53 @@ import (
 type Manager struct {
 	httpsPort     int
 	ScaledContext *config.ScaledContext
-	clusterLister v3.ClusterLister
-	clusters      v3.ClusterInterface
-	secretLister  v1.SecretLister
+	clusterLister mgmtcontrollers.ClusterLister
+	clusters      mgmtcontrollers.ClusterInterface
+	secretLister  corecontrollers.SecretLister
 	controllers   sync.Map
+	// failures holds, by cluster UID, the error the last start of a cluster's controllers failed with,
+	// so it can still be reported once the failed record is gone.
+	failures      sync.Map
 	accessControl types.AccessControl
 	startSem      *semaphore.Weighted
 }
 
+// ControllersPhase is where the controllers of a cluster are in their lifecycle on this replica.
+type ControllersPhase string
+
+const (
+	// ControllersStopped means no controllers are running for the cluster on this replica.
+	ControllersStopped ControllersPhase = "Stopped"
+	// ControllersStarting means the controllers were asked to start and haven't finished starting yet.
+	ControllersStarting ControllersPhase = "Starting"
+	// ControllersRunning means the controllers started successfully.
+	ControllersRunning ControllersPhase = "Running"
+	// ControllersFailed means the last start failed. Its error is in ControllersState.Err.
+	ControllersFailed ControllersPhase = "Failed"
+)
+
+// ControllersState describes the controllers of a cluster on this replica.
+type ControllersState struct {
+	Phase ControllersPhase
+	// Owner is whether the controllers were started as the cluster's owner.
+	Owner bool
+	// PreBootstrapped is whether the cluster was pre-bootstrapped by the current start.
+	PreBootstrapped bool
+	// Err is why the last start failed, if Phase is ControllersFailed.
+	Err error
+}
+
 type record struct {
 	sync.Mutex
-	clusterRec    *apimgmtv3.Cluster
-	cluster       *config.UserContext
-	accessControl types.AccessControl
-	started       bool
-	owner         bool
-	ctx           context.Context
-	cancel        context.CancelFunc
+	clusterRec      *apimgmtv3.Cluster
+	cluster         *config.UserContext
+	accessControl   types.AccessControl
+	started         bool
+	owner           bool
+	phase           ControllersPhase
+	preBootstrapped bool
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
@@ -75,11 +103,40 @@ func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.
 }
 
 func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
+	m.failures.Delete(cluster.UID)
 	obj, ok := m.controllers.Load(cluster.UID)
 	if !ok {
 		return
 	}
 	m.stopRecord(obj.(*record))
+}
+
+// ControllersState reports the state of the controllers of cluster on this replica. The state of a
+// cluster's current record takes precedence over a failure left by an earlier one.
+func (m *Manager) ControllersState(cluster *apimgmtv3.Cluster) ControllersState {
+	if obj, ok := m.controllers.Load(cluster.UID); ok {
+		r := obj.(*record)
+		r.Lock()
+		defer r.Unlock()
+		if r.started {
+			return ControllersState{Phase: r.phase, Owner: r.owner, PreBootstrapped: r.preBootstrapped}
+		}
+	}
+	if err, ok := m.failures.Load(cluster.UID); ok {
+		return ControllersState{Phase: ControllersFailed, Err: err.(error)}
+	}
+	return ControllersState{Phase: ControllersStopped}
+}
+
+// enqueue asks the cluster controller to sync the cluster named name, so its handlers pick up a change in
+// the state of its controllers.
+func (m *Manager) enqueue(name string) {
+	m.clusters.Controller().Enqueue("", name)
+}
+
+func (m *Manager) isActive(r *record) bool {
+	obj, ok := m.controllers.Load(r.clusterRec.UID)
+	return ok && obj.(*record) == r
 }
 
 // stopRecord stops r and removes it from the manager, but only if it is still the active record for
@@ -90,13 +147,16 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 //
 // Bailing out leaves nothing behind. The entry for a cluster only changes through this function and
 // through the LoadOrStore in start, which only fills an empty one, so a record that is no longer
-// the active one was already cancelled by whoever removed it.
-func (m *Manager) stopRecord(r *record) {
+// the active one was already canceled by whoever removed it.
+//
+// It reports whether r was the active record and was stopped.
+func (m *Manager) stopRecord(r *record) bool {
 	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
-		return
+		return false
 	}
 	logrus.Infof("Stopping cluster agent for %s", r.cluster.ClusterName)
 	r.cancel()
+	return true
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
@@ -126,16 +186,25 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 }
 
 func (m *Manager) StopAndMarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
+	if current := m.markControllersNotRunning(cluster); current != nil {
+		cluster = current
+	}
+	m.Stop(cluster)
+}
+
+// markControllersNotRunning sets the ControllersRunning condition of cluster to False. It returns the
+// cluster as last read or written, or nil if it couldn't be read or was replaced by a new cluster with the
+// same name, which is left alone.
+func (m *Manager) markControllersNotRunning(cluster *apimgmtv3.Cluster) *apimgmtv3.Cluster {
 	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: %v", cluster.Name, err)
-		return
+		return nil
 	}
 
 	if current.UID != cluster.UID {
 		logrus.Debugf("[clustermanager] not marking cluster %s controllers not running: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
-		m.Stop(cluster)
-		return
+		return nil
 	}
 
 	if !apimgmtv3.ClusterConditionControllersRunning.IsFalse(current) {
@@ -146,8 +215,7 @@ func (m *Manager) StopAndMarkControllersNotRunning(cluster *apimgmtv3.Cluster) {
 			current = cluster
 		}
 	}
-
-	m.Stop(current)
+	return current
 }
 
 func (m *Manager) MarkControllersRunning(cluster *apimgmtv3.Cluster) {
@@ -213,25 +281,37 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
-		go func() {
-			if err := m.doStart(r, clusterOwner); err != nil {
-				// only mark running/not running for owner instance
-				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-				if clusterOwner {
-					m.StopAndMarkControllersNotRunning(r.clusterRec)
-				} else {
-					m.Stop(r.clusterRec)
-				}
-			} else {
-				if clusterOwner {
-					m.MarkControllersRunning(r.clusterRec)
-				}
-			}
-		}()
 		r.started = true
 		r.owner = clusterOwner
+		r.phase = ControllersStarting
+		go func() {
+			if err := m.doStart(r, clusterOwner); err != nil {
+				m.handleStartFailure(r, err)
+			} else {
+				m.handleStartSuccess(r)
+			}
+		}()
 	}
 	return nil
+}
+
+// handleStartSuccess records that the controllers of r are running and asks for the cluster to be synced
+// so that is reported. Nothing is recorded if r was stopped or replaced while it was starting.
+func (m *Manager) handleStartSuccess(r *record) {
+	r.Lock()
+	r.phase = ControllersRunning
+	owner := r.owner
+	r.Unlock()
+
+	if !m.isActive(r) {
+		return
+	}
+	m.failures.Delete(r.clusterRec.UID)
+	// only mark running/not running for owner instance
+	if owner {
+		m.MarkControllersRunning(r.clusterRec)
+	}
+	m.enqueue(r.clusterRec.Name)
 }
 
 // startAllowed reports whether a record may be started for cluster. Nothing is started for a cluster being
@@ -248,12 +328,27 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 	return !apimgmtv3.ClusterConditionAgentUninstallScheduled.IsTrue(cluster) && !apimgmtv3.ClusterConditionAgentUninstallScheduled.IsFalse(cluster)
 }
 
-// handleStartFailure reports err, a failure to start the controllers of r, on the cluster r was built
-// for and stops r. It only stops r itself: r may already have been replaced, for example because the
-// cluster's connection details changed while it was starting, and the replacement must keep running.
+// handleStartFailure stops r after its controllers failed to start with err, records the failure and asks
+// for the cluster to be synced so it is reported. It only acts while r is the cluster's active record: r
+// may already have been stopped or replaced, for example because the cluster's connection details changed
+// while it was starting, and then its failure is not the cluster's, and the replacement must keep running.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-	m.StopAndMarkControllersNotRunning(r.clusterRec)
+
+	r.Lock()
+	r.phase = ControllersFailed
+	owner := r.owner
+	r.Unlock()
+
+	if !m.stopRecord(r) {
+		return
+	}
+	m.failures.Store(r.clusterRec.UID, err)
+	// only mark running/not running for owner instance
+	if owner {
+		m.markControllersNotRunning(r.clusterRec)
+	}
+	m.enqueue(r.clusterRec.Name)
 }
 
 func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
@@ -324,6 +419,9 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 			return err
 		}
 	}
+	rec.Lock()
+	rec.preBootstrapped = true
+	rec.Unlock()
 
 	if clusterOwner {
 		if err := clusterController.Register(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m); err != nil {
@@ -366,7 +464,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 // If reconnect is true, the dialer used for connecting this rest.Config will block
 // and retry connecting to the cluster for ~30s if the connection is not available,
 // otherwise return immediately
-func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister, reconnect bool) (*rest.Config, error) {
+func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister corecontrollers.SecretLister, reconnect bool) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -422,46 +520,6 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 	}
 
 	return rc, nil
-}
-
-func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
-	rootCAs := x509.NewCertPool()
-	if len(caCertsPEM) > 0 {
-		caCerts, err := rkecerts.ParseCertsPEM(caCertsPEM)
-		if err != nil {
-			return nil, err
-		}
-		for _, cert := range caCerts {
-			rootCAs.AddCert(cert)
-		}
-	}
-
-	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		certs := make([]*x509.Certificate, len(rawCerts))
-		for i, asn1Data := range rawCerts {
-			cert, err := x509.ParseCertificate(asn1Data)
-			if err != nil {
-				return fmt.Errorf("failed to parse cert")
-			}
-			certs[i] = cert
-		}
-
-		opts := x509.VerifyOptions{
-			Roots:         rootCAs,
-			CurrentTime:   time.Now(),
-			DNSName:       "",
-			Intermediates: x509.NewCertPool(),
-		}
-
-		for i, cert := range certs {
-			if i == 0 {
-				continue
-			}
-			opts.Intermediates.AddCert(cert)
-		}
-		_, err := certs[0].Verify(opts)
-		return err
-	}, nil
 }
 
 func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*record, error) {
