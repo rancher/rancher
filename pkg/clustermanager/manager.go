@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
-	"github.com/rancher/rancher/pkg/dialer"
 	corecontrollers "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -112,8 +111,10 @@ type record struct {
 	// clusterRec is the cluster as it was when the record was built. It is the record's own copy, never
 	// the informer's: it is handed to the cluster's controllers, and is compared with later versions of
 	// the cluster to tell whether the record is out of date. It must not be changed.
-	clusterRec      *apimgmtv3.Cluster
-	cluster         *config.UserContext
+	clusterRec *apimgmtv3.Cluster
+	cluster    *config.UserContext
+	// accessControl is set while the controllers start and read by requests; use getAccessControl and
+	// setAccessControl.
 	accessControl   types.AccessControl
 	started         bool
 	owner           bool
@@ -121,6 +122,18 @@ type record struct {
 	preBootstrapped bool
 	ctx             context.Context
 	cancel          context.CancelFunc
+}
+
+func (r *record) getAccessControl() types.AccessControl {
+	r.Lock()
+	defer r.Unlock()
+	return r.accessControl
+}
+
+func (r *record) setAccessControl(accessControl types.AccessControl) {
+	r.Lock()
+	defer r.Unlock()
+	r.accessControl = accessControl
 }
 
 func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
@@ -414,9 +427,6 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get(rec.ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			if i == 2 {
-				if rec.ctx.Err() != nil || errors.Is(err, dialer.ErrAgentDisconnected) {
-					return err
-				}
 				return err
 			}
 			select {
@@ -470,7 +480,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		defer close(done)
 
 		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
-		rec.accessControl = rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw)
+		rec.setAccessControl(rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw))
 
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
@@ -594,11 +604,12 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 		return m.accessControl, nil
 	}
 
-	if record.accessControl == nil {
+	accessControl := record.getAccessControl()
+	if accessControl == nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cannot determine access, cluster is unavailable")
 	}
 
-	return record.accessControl, nil
+	return accessControl, nil
 }
 
 func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext types.StorageContext) (rest.Interface, error) {
