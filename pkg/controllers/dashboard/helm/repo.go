@@ -117,6 +117,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 		git.ForgetRepo(path)
 		return nil, nil
 	}
+
 	// Ignore OCI Based Helm Repositories
 	if registry.IsOCI(repo.Spec.URL) {
 		return repo, nil
@@ -151,6 +152,17 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 	if isDisabled(repo) {
 		logrus.Infof("skipping repo %s because it is disabled", repo.Name)
 		return setErrorCondition(repo, nil, newStatus, interval, repoCondition, r.clusterRepos)
+	}
+
+	hasDownloadCondition := slices.ContainsFunc(newStatus.Conditions, func(c genericcondition.GenericCondition) bool {
+		return c.Type == string(repoCondition)
+	})
+
+	if !hasDownloadCondition {
+		repo, err = setCondition(repo, nil, newStatus, repoCondition, "downloading", r.clusterRepos)
+		if err != nil {
+			return setErrorCondition(repo, err, newStatus, interval, repoCondition, r.clusterRepos)
+		}
 	}
 
 	return r.download(repo, newStatus, metav1.OwnerReference{
