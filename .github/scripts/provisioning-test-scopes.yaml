@@ -65,7 +65,8 @@ explicit:
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
       - { dist: rke2, regex: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
-      - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance
+      - { dist: k3s,  regex: '^Test_Operation_(SetA|SetC)_.*$' }
+      - { dist: k3s,  regex: '^Test_Operation_SetB_.*$' }
       - { dist: rke2, regex: '^Test_Operation_SetA_.*$', parallelism: 2 }
       - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
@@ -188,7 +189,8 @@ scopes:
     file-paths:
       - path: '^trigger-operations-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-      - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance. This shard is too heavily to parallelize at the moment.
+      - { dist: k3s,  regex: '^Test_Operation_(SetA|SetC)_.*$' }
+      - { dist: k3s,  regex: '^Test_Operation_SetB_.*$' }
       - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
       - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$'}
