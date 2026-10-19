@@ -117,6 +117,7 @@ scopes:
       - '^pkg/controllers/dashboard/fleetcharts/'
       - '^pkg/controllers/dashboard/clusterregistrationtoken/'
       - '^pkg/controllers/dashboard/systemcharts/'
+      - '^pkg/controllers/dashboardapi/settings/settings\.go$'
       - '^pkg/data/dashboard'
       - '^pkg/fleet/'
       - '^pkg/image/'
