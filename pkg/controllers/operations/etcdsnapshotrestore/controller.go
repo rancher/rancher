@@ -10,6 +10,7 @@ import (
 	"path"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -2191,7 +2192,8 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	if rejoining {
 		arg := fmt.Sprintf("server: %q\n", supervisorURL(serverURL, s.adapter.GetSupervisorPort(secret)))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
-			arg = fmt.Sprintf("%stoken-file: \"%s\"\n", arg, path.Join(dataDir, "server/token"))
+			// strconv.Quote writes a YAML double-quoted string, and escapes the quote and the backslash.
+			arg = fmt.Sprintf("%stoken-file: %s\n", arg, strconv.Quote(path.Join(dataDir, "server/token")))
 		}
 		nodePlan.Files = append(nodePlan.Files, plan.File{
 			Content: base64.StdEncoding.EncodeToString(
