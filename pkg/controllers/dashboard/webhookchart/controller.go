@@ -39,7 +39,15 @@ var watchedSettings = map[string]struct{}{
 // Register subscribes to changes that affect the webhook chart and ensures the chart is installed.
 // Called BEFORE systemcharts.Register so the WebhookConfigurations exist before any other system
 // chart install path can transitively touch a resource the webhook validates.
+//
+// It only manages the webhook of the local cluster. Downstream clusters (MCMAgent enabled) run the
+// same dashboard controllers in their cluster agent, where systemcharts manages the webhook; if both
+// did, each would keep replacing the other's desired release with its own values.
 func Register(ctx context.Context, wContext *wrangler.Context, registryOverride string) error {
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
+
 	h := &handler{
 		manager:          wContext.SystemChartsManager,
 		chartsConfig:     chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
@@ -168,13 +176,7 @@ func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
 
 // getLocalWebhookCustomization returns the WebhookDeploymentCustomization from the local
 // management cluster, or nil if the cluster has no customization set.
-// On downstream clusters (MCMAgent enabled), webhook customization is delivered via the
-// rancher-config ConfigMap pushed by the management server's clusterdeploy controller;
-// getChartValues() picks those up, so this returns nil in that context.
 func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomization, error) {
-	if features.MCMAgent.Enabled() {
-		return nil, nil
-	}
 	cluster, err := h.clusterCache.Get("local")
 	if err != nil {
 		return nil, err
@@ -184,11 +186,7 @@ func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomiza
 
 // updateAppliedWebhookCustomization copies the local cluster's WebhookDeploymentCustomization
 // from Spec to Status so drift detection can compare applied vs desired state.
-// No-op on downstream clusters where the management server tracks applied state.
 func (h *handler) updateAppliedWebhookCustomization() error {
-	if features.MCMAgent.Enabled() {
-		return nil
-	}
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cached, err := h.clusterCache.Get("local")
 		if err != nil {

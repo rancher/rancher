@@ -2058,3 +2058,52 @@ func Test_relatedSettings(t *testing.T) {
 		})
 	}
 }
+
+func Test_OnlyTheWebhookTakesOwnership(t *testing.T) {
+	// The cluster agent manages the caBundle of the webhook's WebhookConfigurations, so its upgrades
+	// conflict unless the chart takes ownership. No other system chart needs to.
+	t.Cleanup(func() {
+		features.MCM.Set(originalMCM)
+		features.MCMAgent.Set(originalMCMAgent)
+		_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
+	})
+	features.MCMAgent.Set(true)
+	features.MCM.Set(false)
+	_ = settings.RancherWebhookVersion.Set("2.0.0")
+
+	ctrl := gomock.NewController(t)
+	mocks := testMocks{
+		manager:         chartfake.NewMockManager(ctrl),
+		namespaceCtrl:   fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
+		namespaceCache:  fake.NewMockNonNamespacedCacheInterface[*v1.Namespace](ctrl),
+		configCache:     fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
+		deploymentCache: fake.NewMockCacheInterface[*appsv1.Deployment](ctrl),
+		plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
+		planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
+		clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
+		clusters:        fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl),
+	}
+	notFound := apierrors.NewNotFound(schema.GroupResource{}, "")
+	mocks.configCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFound).AnyTimes()
+	mocks.deploymentCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFound).AnyTimes()
+	mocks.namespaceCtrl.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.planCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	mocks.clusterCache.EXPECT().Get(gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.manager.EXPECT().Uninstall(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.manager.EXPECT().Remove(gomock.Any(), gomock.Any()).AnyTimes()
+
+	takeOwnership := map[string]bool{}
+	mocks.manager.EXPECT().Ensure(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_, chartName, _, _, _ string, _ map[string]any, owned bool, _ string) error {
+			takeOwnership[chartName] = owned
+			return nil
+		}).AnyTimes()
+
+	_, err := mocks.Handler().onRepo("", &catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName}})
+	require.NoError(t, err)
+
+	require.Contains(t, takeOwnership, chart.WebhookChartName, "the webhook is installed on downstream clusters")
+	for chartName, owned := range takeOwnership {
+		require.Equal(t, chartName == chart.WebhookChartName, owned, "chart %q", chartName)
+	}
+}

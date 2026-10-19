@@ -218,7 +218,7 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, false, helmOpInstallImageOverride); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, chartDef.TakeOwnership, helmOpInstallImageOverride); err != nil {
 			logrus.Errorf("[system-charts] failed to ensure chart %q: %v", chartDef.ChartName, err)
 			return repo, err
 		}
@@ -259,11 +259,15 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		{
 			// webhookchart controller manages the webhook on the local cluster (early install).
 			// systemcharts manages it here only for downstream clusters (MCMAgent enabled) so
-			// the same chart version and WDC-driven ConfigMap values are applied there.
+			// the same chart version and WDC-driven ConfigMap values are applied there. The two
+			// must never both manage it: they would keep replacing each other's desired release.
 			ReleaseNamespace:    namespace.System,
 			ReleaseName:         chart.WebhookChartName,
 			ChartName:           chart.WebhookChartName,
 			ExactVersionSetting: settings.RancherWebhookVersion,
+			// The cluster agent manages the caBundle of the webhook's WebhookConfigurations, so
+			// upgrades conflict with it unless the chart takes ownership, as webhookchart does.
+			TakeOwnership: true,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
 					"capi": nil,
