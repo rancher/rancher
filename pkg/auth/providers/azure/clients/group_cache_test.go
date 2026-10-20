@@ -63,7 +63,7 @@ func setupTestCache(t *testing.T) {
 	t.Cleanup(func() {
 		GroupCache = oldGroupCache
 	})
-	gc, err := lru.New(10)
+	gc, err := lru.New[string, v3.Principal](10)
 	require.NoError(t, err)
 	GroupCache = gc
 }

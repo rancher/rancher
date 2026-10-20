@@ -59,10 +59,10 @@ type Provider struct {
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	var err error
-	clients.GroupCache, err = lru.New(settings.AzureGroupCacheSize.GetInt())
+	clients.GroupCache, err = lru.New[string, apiv3.Principal](settings.AzureGroupCacheSize.GetInt())
 	if err != nil {
 		logrus.Warnf("initial azure-group-cache-size was invalid value, setting to 10000 error:%v", err)
-		clients.GroupCache, _ = lru.New(10000)
+		clients.GroupCache, _ = lru.New[string, apiv3.Principal](10000)
 	}
 
 	p := &Provider{

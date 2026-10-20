@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	ownerCache, _ = lru.New(100000)
+	ownerCache, _ = lru.New[key, value](100000)
 )
 
 type key struct {
@@ -49,8 +49,7 @@ func getOwnerWithKind(apiContext *types.APIContext, namespace, ownerKind, name s
 
 	val, ok := ownerCache.Get(key)
 	if ok {
-		value, _ := val.(value)
-		return value.Kind, value.Name, nil
+		return val.Kind, val.Name, nil
 	}
 
 	data := map[string]interface{}{}
