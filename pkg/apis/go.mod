@@ -39,7 +39,7 @@ require (
 	github.com/rancher/aks-operator v1.15.3-rc.3
 	github.com/rancher/ali-operator v1.15.2-rc.2
 	github.com/rancher/eks-operator v1.15.3-rc.2
-	github.com/rancher/fleet/pkg/apis v0.16.3-beta.2
+	github.com/rancher/fleet/pkg/apis v0.16.3-rc.1
 	github.com/rancher/gke-operator v1.15.4-rc.2
 	github.com/rancher/norman v0.9.11
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
