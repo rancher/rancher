@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -148,13 +147,6 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 		action := "start"
 		if restartNeeded {
 			action = "restart"
-		}
-		var contextErr *clustermanager.ContextError
-		if errors.As(err, &contextErr) {
-			// discard error in order to prevent unnecessary lasso backoff
-			logrus.Errorf("userControllersController: unable to %s controllers for cluster %s: %v, requeuing in 30 seconds", action, key, err)
-			u.clusters.EnqueueAfter(key, 30*time.Second)
-			return nil, nil
 		}
 		return nil, fmt.Errorf("userControllersController: unable to %s controllers for cluster %s: %w", action, key, err)
 	}
