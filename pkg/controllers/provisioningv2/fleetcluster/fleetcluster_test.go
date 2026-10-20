@@ -8,14 +8,19 @@ import (
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	fleetpkg "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -385,6 +390,7 @@ func TestClusterCustomization(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			h.clustersCache = newClusterCache(t, ctrl, tt.cachedClusters)
+			h.secretsController = newSecretsController(t, ctrl, nil)
 			objs, _, err := h.createCluster(tt.cluster, tt.status)
 			require.Nil(err)
 			require.NotNil(objs)
@@ -648,6 +654,7 @@ func TestCreateCluster_WithPullSecrets(t *testing.T) {
 			}
 
 			h.clustersCache = newClusterCache(t, ctrl, tt.cachedClusters)
+			h.secretsController = newSecretsController(t, ctrl, nil)
 			objs, _, err := h.createCluster(tt.cluster, tt.status)
 			if objs == nil {
 				t.Errorf("Expected non-nil objs: %v", err)
@@ -1280,6 +1287,7 @@ func TestCreateCluster(t *testing.T) {
 
 			h.clustersCache = newClusterCache(t, ctrl, tt.cachedClusters)
 			h.nodesController = newFakeNodesController(t, ctrl, tt.nodes, tt.cpTaintsLabel)
+			h.secretsController = newSecretsController(t, ctrl, nil)
 
 			objs, _, err := h.createCluster(tt.cluster, tt.status)
 
@@ -1386,4 +1394,269 @@ func newFakeNodesController(t *testing.T, ctrl *gomock.Controller, nodes []corev
 		}
 	}).AnyTimes()
 	return nodesController
+}
+
+// newSecretsController returns a secrets controller whose cache serves
+// secrets and whose Update calls are recorded into updated, if non-nil.
+func newSecretsController(t *testing.T, ctrl *gomock.Controller, updated *[]*corev1.Secret, secrets ...*corev1.Secret) corecontrollers.SecretController {
+	t.Helper()
+	cache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	cache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.Secret, error) {
+		for _, s := range secrets {
+			if s.Namespace == namespace && s.Name == name {
+				return s, nil
+			}
+		}
+		return nil, apierrors.NewNotFound(corev1.Resource("secrets"), name)
+	}).AnyTimes()
+
+	controller := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	controller.EXPECT().Cache().Return(cache).AnyTimes()
+	controller.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+		if updated == nil {
+			t.Errorf("unexpected update of secret %s/%s", s.Namespace, s.Name)
+		} else {
+			*updated = append(*updated, s)
+		}
+		return s, nil
+	}).AnyTimes()
+	return controller
+}
+
+func TestSyncKubeConfigSecretLabel(t *testing.T) {
+	const label = fleetpkg.KubeConfigReferenceableFromLabel
+
+	secretWithLabels := func(labels map[string]string) *corev1.Secret {
+		return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fleet-default",
+			Name:      "imported1-kubeconfig",
+			Labels:    labels,
+		}}
+	}
+
+	tests := []struct {
+		name       string
+		secret     *corev1.Secret
+		workspace  string
+		wantUpdate bool
+		wantLabels map[string]string
+	}{
+		{
+			name:       "labels secret for another workspace",
+			secret:     secretWithLabels(nil),
+			workspace:  "team-a",
+			wantUpdate: true,
+			wantLabels: map[string]string{label: "team-a"},
+		},
+		{
+			name:       "keeps other labels",
+			secret:     secretWithLabels(map[string]string{"cluster.x-k8s.io/cluster-name": "imported1"}),
+			workspace:  "team-a",
+			wantUpdate: true,
+			wantLabels: map[string]string{"cluster.x-k8s.io/cluster-name": "imported1", label: "team-a"},
+		},
+		{
+			name:       "replaces label naming a previous workspace",
+			secret:     secretWithLabels(map[string]string{label: "team-a"}),
+			workspace:  "team-b",
+			wantUpdate: true,
+			wantLabels: map[string]string{label: "team-b"},
+		},
+		{
+			name:      "leaves label naming the workspace",
+			secret:    secretWithLabels(map[string]string{label: "team-a"}),
+			workspace: "team-a",
+		},
+		{
+			name:       "removes label when back in the secret's namespace",
+			secret:     secretWithLabels(map[string]string{label: "team-a", "other": "kept"}),
+			workspace:  "fleet-default",
+			wantUpdate: true,
+			wantLabels: map[string]string{"other": "kept"},
+		},
+		{
+			name:       "removes label when no workspace is assigned",
+			secret:     secretWithLabels(map[string]string{label: "team-a"}),
+			workspace:  "",
+			wantUpdate: true,
+			wantLabels: map[string]string{},
+		},
+		{
+			name:      "nothing to do in the secret's namespace",
+			secret:    secretWithLabels(nil),
+			workspace: "fleet-default",
+		},
+		{
+			name:       "removes empty label in the secret's namespace",
+			secret:     secretWithLabels(map[string]string{label: "", "other": "kept"}),
+			workspace:  "fleet-default",
+			wantUpdate: true,
+			wantLabels: map[string]string{"other": "kept"},
+		},
+		{
+			name:       "removes empty label when no workspace is assigned",
+			secret:     secretWithLabels(map[string]string{label: "", "other": "kept"}),
+			wantUpdate: true,
+			wantLabels: map[string]string{"other": "kept"},
+		},
+		{
+			name:      "missing secret",
+			workspace: "team-a",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			var updated []*corev1.Secret
+			var secrets []*corev1.Secret
+			// The mock cache returns this exact pointer, as a real informer cache would.
+			cached := tt.secret
+			if cached != nil {
+				secrets = append(secrets, cached)
+			}
+			original := cached.DeepCopy()
+			h := &handler{secretsController: newSecretsController(t, ctrl, &updated, secrets...)}
+
+			require.NoError(t, h.syncKubeConfigSecretLabel("fleet-default", "imported1-kubeconfig", tt.workspace))
+			require.Equal(t, original, cached, "cached secret must not be modified")
+
+			if !tt.wantUpdate {
+				require.Empty(t, updated)
+				return
+			}
+			require.Len(t, updated, 1)
+			require.Equal(t, tt.wantLabels, updated[0].Labels)
+			require.NotSame(t, cached, updated[0], "update must use a copy of the cached secret")
+		})
+	}
+}
+
+func TestSyncKubeConfigSecretLabel_CacheError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	cache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	cache.EXPECT().Get("fleet-default", "imported1-kubeconfig").Return(nil, errNotFound)
+	controller := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	controller.EXPECT().Cache().Return(cache)
+
+	h := &handler{secretsController: controller}
+	require.ErrorIs(t, h.syncKubeConfigSecretLabel("fleet-default", "imported1-kubeconfig", "team-a"), errNotFound)
+}
+
+func TestKubeConfigSecretOwner(t *testing.T) {
+	owner := metav1.OwnerReference{
+		APIVersion: provv1.SchemeGroupVersion.String(),
+		Kind:       "Cluster",
+		Name:       "imported1",
+	}
+	secret := func(name string, owners ...metav1.OwnerReference) *corev1.Secret {
+		return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "fleet-default",
+			Name:            name,
+			OwnerReferences: owners,
+		}}
+	}
+	otherKind := owner
+	otherKind.Kind = "Machine"
+	otherGroup := owner
+	otherGroup.APIVersion = "cluster.x-k8s.io/v1beta1"
+
+	tests := []struct {
+		name string
+		obj  runtime.Object
+		want []relatedresource.Key
+	}{
+		{
+			name: "kubeconfig secret of a provisioning cluster",
+			obj:  secret("imported1-kubeconfig", owner),
+			want: []relatedresource.Key{{Namespace: "fleet-default", Name: "imported1"}},
+		},
+		{
+			name: "kubeconfig secret with several owners",
+			obj:  secret("imported1-kubeconfig", otherKind, otherGroup, owner),
+			want: []relatedresource.Key{{Namespace: "fleet-default", Name: "imported1"}},
+		},
+		{
+			name: "other secret of a provisioning cluster",
+			obj:  secret("imported1-registration", owner),
+		},
+		{
+			name: "secret owned by another kind",
+			obj:  secret("imported1-kubeconfig", otherKind),
+		},
+		{
+			name: "secret owned by another group",
+			obj:  secret("imported1-kubeconfig", otherGroup),
+		},
+		{
+			name: "deleted secret",
+			obj:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := kubeConfigSecretOwner("fleet-default", "", tt.obj)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCreateCluster_LabelsKubeConfigSecretForWorkspace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	kubeconfig := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "fleet-default",
+		Name:      "imported1-kubeconfig",
+	}}
+	var updated []*corev1.Secret
+	h := &handler{
+		getPrivateRepoURL:         func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
+		getPrivateRepoPullSecrets: getPrivateRepoSecrets,
+		clustersCache: newClusterCache(t, ctrl, map[string]*apimgmtv3.Cluster{
+			"c-m-abc": newMgmtCluster("c-m-abc", nil, nil, apimgmtv3.ClusterSpec{FleetWorkspaceName: "team-a"}),
+		}),
+		secretsController: newSecretsController(t, ctrl, &updated, kubeconfig),
+	}
+
+	objs, _, err := h.createCluster(
+		&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "imported1"}},
+		provv1.ClusterStatus{ClusterName: "c-m-abc", ClientSecretName: kubeconfig.Name},
+	)
+	require.NoError(t, err)
+
+	require.Len(t, updated, 1)
+	require.Equal(t, "team-a", updated[0].Labels[fleetpkg.KubeConfigReferenceableFromLabel])
+
+	require.Len(t, objs, 1)
+	fleetCluster, ok := objs[0].(*fleet.Cluster)
+	require.True(t, ok)
+	require.Equal(t, "team-a", fleetCluster.Namespace)
+	require.Equal(t, kubeconfig.Name, fleetCluster.Spec.KubeConfigSecret)
+	require.Equal(t, "fleet-default", fleetCluster.Spec.KubeConfigSecretNamespace)
+}
+
+func TestCreateCluster_RemovesKubeConfigSecretLabelWhileNotReady(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	kubeconfig := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "fleet-default",
+		Name:      "imported1-kubeconfig",
+		Labels:    map[string]string{fleetpkg.KubeConfigReferenceableFromLabel: "team-a"},
+	}}
+	mgmtCluster := newMgmtCluster("c-m-abc", nil, nil, apimgmtv3.ClusterSpec{})
+	apimgmtv3.ClusterConditionReady.SetStatus(mgmtCluster, "False")
+	var updated []*corev1.Secret
+	h := &handler{
+		clustersCache:     newClusterCache(t, ctrl, map[string]*apimgmtv3.Cluster{"c-m-abc": mgmtCluster}),
+		secretsController: newSecretsController(t, ctrl, &updated, kubeconfig),
+	}
+
+	_, _, err := h.createCluster(
+		&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "imported1"}},
+		provv1.ClusterStatus{ClusterName: "c-m-abc", ClientSecretName: kubeconfig.Name},
+	)
+	require.ErrorIs(t, err, generic.ErrSkip)
+
+	require.Len(t, updated, 1)
+	require.NotContains(t, updated[0].Labels, fleetpkg.KubeConfigReferenceableFromLabel)
 }
