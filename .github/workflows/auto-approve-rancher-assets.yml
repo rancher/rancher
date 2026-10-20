@@ -1,0 +1,70 @@
+name: Rancher Assets Auto-Approve
+
+# Approves the rancher/rancher-assets/.github/workflows/push-to-rancher.yml
+# generated bump PRs in rancher/rancher once their checks are green,
+# and re-runs failed checks (rancher/rancher's CI is known-flaky).
+# Scheduled, not event-triggered - rancher/rancher's required checks run
+# too long for a single polling job. push-to-rancher.yml creates the PR
+# and requests auto-merge; native GitHub auto-merge (already enabled on
+# rancher/rancher) does the actual merging once approval and checks are
+# both satisfied. This job only supplies the approval and nudges flaky
+# failures, snapshot-style, every run - never waits in-job.
+
+on:
+  schedule:
+    # 00:00, 08:00, 16:00 UTC, Monday through Friday.
+    - cron: '0 0,8,16 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: rancher-assets-auto-approve-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  ci-check-trigger:
+    name: Check/Re-trigger Rancher Assets Release GHAs PRs
+    permissions:
+      actions: read # Read run status/attempts.
+      checks: read # Find which checks failed.
+      id-token: write # Allow Vault action to authenticate with GitHub OIDC.
+      pull-requests: read # List open bump PRs and read their checks.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find failed check runs
+        id: find-failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          pr_numbers=$(gh pr list --repo "$REPO" --state open \
+            --author "rancher-pr-actions-write[bot]" \
+            --base main \
+            --limit 50 \
+            --json number,title \
+            --jq '.[] | select(.title | startswith("[main] Update rancher-assets to ")) | .number')
+
+          if [[ -z "$pr_numbers" ]]; then
+            echo "No open rancher-assets bump PRs."
+            printf 'failed_runs=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          failed_runs=()
+          for pr_number in $pr_numbers; do
+            checks_json=$(gh pr checks "$pr_number" --repo "$REPO" --required --json name,bucket,link) || continue
+
+            links=$(jq -r '.[] | select(.bucket != "pass") | .link' <<<"$checks_json")
+            while IFS= read -r link; do
+              [[ -z "$link" ]] && continue
+              run_id=$(echo "$link" | sed -nE 's#.*/actions/runs/([0-9]+).*#\1#p')
+              [[ -z "$run_id" ]] && continue
+              failed_runs+=("$run_id")
+            done <<<"$links"
+          done
+
+          printf 'failed_runs=%s\n' "${failed_runs[*]}" >> "$GITHUB_OUTPUT"
+
