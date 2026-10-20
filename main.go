@@ -97,9 +97,12 @@ func main() {
 				Value: "simple",
 			},
 			&cli.StringSliceFlag{
-				Name:        "acme-domain",
-				Sources:     cli.EnvVars("ACME_DOMAIN"),
-				Usage:       "Domain to register with LetsEncrypt",
+				Name:    "acme-domain",
+				Sources: cli.EnvVars("ACME_DOMAIN"),
+				Usage:   "Domain to register with LetsEncrypt",
+				// v3 disables trimming for string slices by default; v1
+				// trimmed the space around comma-separated values.
+				Config:      cli.StringConfig{TrimSpace: true},
 				Destination: &config.ACMEDomains,
 			},
 			&cli.BoolFlag{
