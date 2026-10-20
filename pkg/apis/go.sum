@@ -76,8 +76,8 @@ github.com/prometheus/common v0.66.1 h1:h5E0h5/Y8niHc5DlaLlWLArTQI7tMrsfQjHV+d9Z
 github.com/prometheus/common v0.66.1/go.mod h1:gcaUsgf3KfRSwHY4dIMXLPV0K/Wg1oZ8+SbZk/HH/dA=
 github.com/prometheus/procfs v0.16.1 h1:hZ15bTNuirocR6u0JZ6BAHHmwS1p8B4P6MRqxtzMyRg=
 github.com/prometheus/procfs v0.16.1/go.mod h1:teAbpZRB1iIAJYREa1LsoWUXykVXA1KlTmWl8x/U+Is=
-github.com/rancher/aks-operator v1.14.7-rc.2 h1:AWvTN3apFJK+vMjOSmEfYBdlKTXKiefGB1aH2vOCMH0=
-github.com/rancher/aks-operator v1.14.7-rc.2/go.mod h1:miLdCuNz1SgJn42+ZUt6HiWH6z+0nmte9YO4p/wBKmk=
+github.com/rancher/aks-operator v1.14.7-rc.3 h1:8Lv6eaAjH7uW7vSZvy+bJ+3ODiOAdMUx667wjhbCZsA=
+github.com/rancher/aks-operator v1.14.7-rc.3/go.mod h1:miLdCuNz1SgJn42+ZUt6HiWH6z+0nmte9YO4p/wBKmk=
 github.com/rancher/ali-operator v1.14.6-rc.2 h1:0beGlJxWXZUQ47id4g0PpO8HZ/jtPesEc8P68ssUrbQ=
 github.com/rancher/ali-operator v1.14.6-rc.2/go.mod h1:5jzeD4c8o76+QR9+ayJFYMEbszxjzVHxEvmQ0YSbd0k=
 github.com/rancher/eks-operator v1.14.7-rc.2 h1:0ozl7W3m+/tPcJgsfITgpcc28ZxSPTc2SWv/HJXyUgE=
