@@ -77,7 +77,9 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				// This provisioning cluster was created by its management cluster, which would create it
 				// again: ask for the management cluster to be deleted too. It removes this provisioning
 				// cluster itself, see removeProvisioningClusterFinalizer, so there's nothing to wait for.
-				if mgmtCluster.DeletionTimestamp == nil {
+				// A management cluster in another fleet workspace was moved: it created a provisioning
+				// cluster in its new namespace and removes this one, so it is left alone.
+				if mgmtCluster.DeletionTimestamp == nil && cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
 					uid := mgmtCluster.UID
 					err := h.mgmtClusters.Delete(mgmtCluster.Name, &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
 					if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsConflict(err) {

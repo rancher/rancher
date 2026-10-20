@@ -36,7 +36,10 @@ func TestDoClusterRemoveAsksForTheCreatingManagementClusterToBeDeleted(t *testin
 		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "c-12345", Annotations: ownerAnnotations(util.ManagementClusterGVK, "", "c-12345")},
 		Status:     v1.ClusterStatus{ClusterName: "c-12345"},
 	}
-	env.mgmtClusters.EXPECT().Get("c-12345", gomock.Any()).Return(&v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-12345", UID: "mgmt-uid"}}, nil)
+	env.mgmtClusters.EXPECT().Get("c-12345", gomock.Any()).Return(&v3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-12345", UID: "mgmt-uid"},
+		Spec:       v3.ClusterSpec{FleetWorkspaceName: "fleet-default"},
+	}, nil)
 	env.mgmtClusters.EXPECT().Delete("c-12345", gomock.Any()).DoAndReturn(func(_ string, opts *metav1.DeleteOptions) error {
 		require.NotNil(t, opts.Preconditions)
 		assert.Equal(t, types.UID("mgmt-uid"), *opts.Preconditions.UID)
@@ -47,6 +50,26 @@ func TestDoClusterRemoveAsksForTheCreatingManagementClusterToBeDeleted(t *testin
 	_, err := h.doClusterRemove(cluster)()
 
 	assert.ErrorIs(t, err, generic.ErrSkip)
+}
+
+func TestDoClusterRemoveLeavesTheCreatingManagementClusterMovedToAnotherWorkspace(t *testing.T) {
+	// Moving a management cluster to another fleet workspace creates its provisioning cluster in the new
+	// namespace and removes the one in the old namespace: the management cluster must survive.
+	h, env := newCreatorTestHandler(t)
+	cluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "c-12345", Annotations: ownerAnnotations(util.ManagementClusterGVK, "", "c-12345")},
+		Status:     v1.ClusterStatus{ClusterName: "c-12345"},
+	}
+	env.mgmtClusters.EXPECT().Get("c-12345", gomock.Any()).Return(&v3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-12345", UID: "mgmt-uid"},
+		Spec:       v3.ClusterSpec{FleetWorkspaceName: "moved-ws"},
+	}, nil)
+	withUnsyncedCAPI(t, h, env, cluster)
+
+	_, err := h.doClusterRemove(cluster)()
+
+	assert.ErrorIs(t, err, generic.ErrSkip)
+	// The mock fails the test if the management cluster is deleted.
 }
 
 func TestDoClusterRemoveLeavesTheManagementClusterItCreated(t *testing.T) {
