@@ -1,8 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.27.0
-
-toolchain go1.27.2
+go 1.27.2
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -124,7 +122,7 @@ require (
 	github.com/rancher/ali-operator v1.16.0-rc.3
 	github.com/rancher/apiserver v0.10.1
 	github.com/rancher/channelserver v0.12.1
-	github.com/rancher/cluster-api-provider-rke2 v0.25.2
+	github.com/rancher/cluster-api-provider-rke2 v0.27.0
 	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.16.0-rc.3
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.7
@@ -138,7 +136,7 @@ require (
 	github.com/rancher/norman v0.10.1
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
+	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20261019161220-9fa84e587992
@@ -246,10 +244,10 @@ require (
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
-	github.com/coreos/butane v0.28.0 // indirect
+	github.com/coreos/butane v0.29.0 // indirect
 	github.com/coreos/go-json v0.0.0-20230131223807-18775e0fb4fb // indirect
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
-	github.com/coreos/ignition/v2 v2.26.0 // indirect
+	github.com/coreos/ignition/v2 v2.27.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
