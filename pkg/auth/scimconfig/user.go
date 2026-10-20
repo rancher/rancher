@@ -7,11 +7,10 @@ import "strings"
 const UserNameKey = "scimusername"
 
 // UserIdentity returns the SCIM userName and externalId of a user from the user's extras for
-// provider. Stored values come first. When SCIM's ID attribute (cfg.UserIDAttribute) isn't stored,
-// it's read from the user's <provider>_user:// principal, which is built from that attribute.
-//
-// In userName mode the stored "username" comes after the principal, because after a login it holds
-// the login name.
+// provider. The values SCIM wrote come first. When SCIM's ID attribute (cfg.UserIDAttribute) isn't
+// stored, it's read from the user's <provider>_user:// principal, which is built from that
+// attribute. The "username" extra comes last: login writes the login name there, and data written
+// before SCIM had its own key can hold SCIM's userName.
 func UserIdentity(extras map[string][]string, provider string, cfg Config) (userName, externalID string) {
 	principalValue, ok := strings.CutPrefix(firstValue(extras["principalid"]), provider+"_user://")
 	if !ok {
@@ -19,14 +18,14 @@ func UserIdentity(extras map[string][]string, provider string, cfg Config) (user
 	}
 
 	scimUserName := firstValue(extras[UserNameKey])
-	storedUserName := firstValue(extras["username"])
-	storedExternalID := firstValue(extras["externalid"])
+	scimExternalID := firstValue(extras["externalid"])
+	loginName := firstValue(extras["username"])
 
 	switch cfg.UserIDAttribute {
 	case UserIDExternalID:
-		return firstNonEmpty(scimUserName, storedUserName), firstNonEmpty(storedExternalID, principalValue)
+		return firstNonEmpty(scimUserName, loginName), firstNonEmpty(scimExternalID, principalValue)
 	default:
-		return firstNonEmpty(scimUserName, principalValue, storedUserName), storedExternalID
+		return firstNonEmpty(scimUserName, principalValue, loginName), scimExternalID
 	}
 }
 
