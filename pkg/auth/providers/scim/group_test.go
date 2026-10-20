@@ -3881,3 +3881,73 @@ func TestGroupMemberAdditionsAllOrNothing(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 }
+
+func TestRancherGroupMembersDisplayUserName(t *testing.T) {
+	const provider = "okta"
+	const dn = "CN=alice,OU=people,DC=example,DC=com"
+	group := groupPrincipalName(provider, "Engineering")
+
+	tests := []struct {
+		name        string
+		cfg         scimconfig.Config
+		extras      map[string][]string
+		wantDisplay string
+	}{
+		{
+			name: "userName mode reads the principal before the login name",
+			cfg:  scimconfig.Default(),
+			extras: map[string][]string{
+				"principalid": {userPrincipalName(provider, dn)},
+				"username":    {"alice"},
+			},
+			wantDisplay: dn,
+		},
+		{
+			name: "externalId mode reads scimusername before the login name",
+			cfg:  scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID},
+			extras: map[string][]string{
+				"principalid":  {userPrincipalName(provider, "ext-1")},
+				"scimusername": {"alice.scim"},
+				"username":     {"alice"},
+				"externalid":   {"ext-1"},
+			},
+			wantDisplay: "alice.scim",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+				{ObjectMeta: metav1.ObjectMeta{Name: "u-alice"}},
+			}, nil).AnyTimes()
+
+			userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+			userAttributeCache.EXPECT().Get("u-alice").Return(&v3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: "u-alice"},
+				GroupPrincipals: map[string]v3.Principals{
+					provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: group}}}},
+				},
+				ExtraByProvider: map[string]map[string][]string{provider: tt.extras},
+			}, nil).AnyTimes()
+
+			srv := &SCIMServer{
+				userCache:          userCache,
+				userAttributeCache: userAttributeCache,
+				getConfig:          func(string) scimconfig.Config { return tt.cfg },
+			}
+
+			members, err := srv.getRancherGroupMembers(provider, group)
+			require.NoError(t, err)
+			require.Len(t, members, 1)
+			assert.Equal(t, tt.wantDisplay, members[0].Display)
+
+			all, err := srv.getAllRancherGroupMembers(provider)
+			require.NoError(t, err)
+			require.Len(t, all[group], 1)
+			assert.Equal(t, tt.wantDisplay, all[group][0].Display)
+		})
+	}
+}
