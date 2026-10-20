@@ -55,7 +55,7 @@ jobs:
 
           failed_runs=()
           for pr_number in $pr_numbers; do
-            checks_json=$(gh pr checks "$pr_number" --repo "$REPO" --required --json name,bucket,link) || continue
+            checks_json=$(gh pr checks "$pr_number" --repo "$REPO" --json name,bucket,link) || continue
 
             links=$(jq -r '.[] | select(.bucket != "pass") | .link' <<<"$checks_json")
             while IFS= read -r link; do
@@ -67,5 +67,4 @@ jobs:
           done
 
           printf 'failed_runs=%s\n' "${failed_runs[*]}" >> "$GITHUB_OUTPUT"
-
 
