@@ -180,7 +180,7 @@ func (m *Manager) Start(ctx context.Context) {
 	for range priorityWorkers {
 		go m.runWorker(m.priorityQueue)
 	}
-	for range defaultWorkers {
+	for range getWorkersOrDefault() {
 		go m.runWorker(m.queue)
 	}
 	go func() {
@@ -563,7 +563,7 @@ func (m *Manager) watchPod(op *catalog.Operation, resourceVersion string, timeou
 
 	for event := range resp.ResultChan() {
 		if event.Type == watch.Error {
-			return false, "", errWatch
+			return false, resourceVersion, errWatch
 		}
 
 		newPod, ok := event.Object.(*v1.Pod)
@@ -725,4 +725,12 @@ func timeoutOrDefault() time.Duration {
 		return defaultTimeout
 	}
 	return t
+}
+
+func getWorkersOrDefault() int {
+	w := settings.SystemChartsDefaultWorkers.GetInt()
+	if w <= 0 {
+		return defaultWorkers
+	}
+	return w
 }
