@@ -8,11 +8,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	rancherversion "github.com/rancher/rancher/pkg/version"
+	controllerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -376,4 +379,39 @@ func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {
 	})
 	e.count = e.count + 1
 	return e.err
+}
+
+type fakeMigrationConfigMapClient struct {
+	controllerv1.ConfigMapController
+	cm *corev1.ConfigMap
+}
+
+type fakeMigrationConfigMapCache struct {
+	generic.CacheInterface[*corev1.ConfigMap]
+	client *fakeMigrationConfigMapClient
+}
+
+func (c *fakeMigrationConfigMapCache) Get(namespace, name string) (*corev1.ConfigMap, error) {
+	return c.client.Get(namespace, name, metav1.GetOptions{})
+}
+
+func (f *fakeMigrationConfigMapClient) Cache() generic.CacheInterface[*corev1.ConfigMap] {
+	return &fakeMigrationConfigMapCache{client: f}
+}
+
+func (f *fakeMigrationConfigMapClient) Get(namespace, name string, opts metav1.GetOptions) (*corev1.ConfigMap, error) {
+	if f.cm != nil {
+		return f.cm, nil
+	}
+	return nil, apierrors.NewNotFound(corev1.Resource("configmaps"), name)
+}
+
+func (f *fakeMigrationConfigMapClient) Create(cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	f.cm = cm
+	return cm, nil
+}
+
+func (f *fakeMigrationConfigMapClient) Update(cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	f.cm = cm
+	return cm, nil
 }

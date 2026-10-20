@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/pagination"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -32,22 +35,29 @@ func UnusedPullSecrets(ctx context.Context) {
 		logrus.Errorf("Error getting kubernetes client: %v", err)
 		return
 	}
-	secret := k8s.CoreV1().Secrets("cattle-system")
-	copiedPullSecrets, err := secret.List(ctx, metav1.ListOptions{
+	unusedPullSecrets(ctx, k8s.CoreV1().Secrets("cattle-system"), strings.Split(os.Getenv("CATTLE_AGENT_PULL_SECRETS"), ","))
+}
+
+func unusedPullSecrets(ctx context.Context, secret typedcorev1.SecretInterface, configuredPullSecrets []string) {
+	var secretsToRemove []string
+	listOpts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=true", cluster.AgentPullSecretLabel),
-	})
+	}
+	listPullSecrets := func(opts metav1.ListOptions) (*corev1.SecretList, error) {
+		return secret.List(ctx, opts)
+	}
+	processPullSecrets := func(copiedPullSecrets *corev1.SecretList) error {
+		for _, pullSecret := range copiedPullSecrets.Items {
+			if !slices.Contains(configuredPullSecrets, pullSecret.Name) {
+				secretsToRemove = append(secretsToRemove, pullSecret.Name)
+			}
+		}
+		return nil
+	}
+	err := pagination.EachPage(listPullSecrets, listOpts, processPullSecrets)
 	if err != nil {
 		logrus.Errorf("Error listing cattle-cluster-agent-pull-secrets: %v", err)
 		return
-	}
-
-	configuredPullSecrets := strings.Split(os.Getenv("CATTLE_AGENT_PULL_SECRETS"), ",")
-
-	var secretsToRemove []corev1.Secret
-	for _, pullSecret := range copiedPullSecrets.Items {
-		if !slices.Contains(configuredPullSecrets, pullSecret.Name) {
-			secretsToRemove = append(secretsToRemove, pullSecret)
-		}
 	}
 
 	if len(secretsToRemove) == 0 {
@@ -55,13 +65,15 @@ func UnusedPullSecrets(ctx context.Context) {
 	}
 
 	logrus.Infof("removing %d unused pull secrets", len(secretsToRemove))
-	for _, pullSecret := range secretsToRemove {
-		err = secret.Delete(ctx, pullSecret.Name, metav1.DeleteOptions{})
+	for _, name := range secretsToRemove {
+		err = secret.Delete(ctx, name, metav1.DeleteOptions{})
 		if err != nil {
-			logrus.Errorf("Error deleting pull secret: %v", err)
+			if !apierrors.IsNotFound(err) {
+				logrus.Errorf("Error deleting pull secret: %v", err)
+			}
 			continue
 		}
-		logrus.Infof("removed unused pull secret %q", pullSecret.Name)
+		logrus.Infof("removed unused pull secret %q", name)
 	}
 
 	logrus.Infof("removed %d unused pull secrets", len(secretsToRemove))
@@ -94,32 +106,34 @@ func removeUnusedCattleCredentials(ctx context.Context) error {
 		return err
 	}
 
-	s := k8s.CoreV1().Secrets("cattle-system")
+	return removeUnusedCattleCredentialsFrom(ctx, k8s.CoreV1().Secrets("cattle-system"))
+}
 
-	secrets, err := s.List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
+func removeUnusedCattleCredentialsFrom(ctx context.Context, s typedcorev1.SecretInterface) error {
+	listSecrets := func(opts metav1.ListOptions) (*corev1.SecretList, error) {
+		return s.List(ctx, opts)
 	}
+	processSecrets := func(secrets *corev1.SecretList) error {
+		for _, sec := range secrets.Items {
+			if !strings.HasPrefix(sec.Name, "cattle-credentials-") {
+				continue
+			}
 
-	for _, sec := range secrets.Items {
-		if !strings.HasPrefix(sec.Name, "cattle-credentials-") {
-			continue
-		}
+			if sec.Name == os.Getenv("CATTLE_CREDENTIAL_NAME") {
+				continue
+			}
 
-		if sec.Name == os.Getenv("CATTLE_CREDENTIAL_NAME") {
-			continue
-		}
+			if time.Since(sec.CreationTimestamp.Time) < time.Hour {
+				continue
+			}
 
-		if time.Since(sec.CreationTimestamp.Time) < time.Hour {
-			continue
+			logrus.Infof("Deleting unused cattle-credentials secret: %s", sec.Name)
+			err := s.Delete(ctx, sec.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 		}
-
-		logrus.Infof("Deleting unused cattle-credentials secret: %s", sec.Name)
-		err = s.Delete(ctx, sec.Name, metav1.DeleteOptions{})
-		if err != nil {
-			return err
-		}
+		return nil
 	}
-
-	return nil
+	return pagination.EachPage(listSecrets, metav1.ListOptions{}, processSecrets)
 }
