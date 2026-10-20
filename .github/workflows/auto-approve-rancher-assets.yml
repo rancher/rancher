@@ -87,3 +87,28 @@ jobs:
           repositories: |
             ${{ github.event.repository.name }}
           permission-actions: write
+
+      - name: Re-trigger failed runs
+        if: steps.find-failures.outputs.failed_runs != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_IDS: ${{ steps.find-failures.outputs.failed_runs }}
+          MAX_RETRIES: 5
+        run: |
+          set -euo pipefail
+
+          for run_id in $(printf '%s\n' $RUN_IDS | sort -u); do
+            attempt=$(gh api "repos/$REPO/actions/runs/$run_id" --jq '.run_attempt') || {
+              echo "Could not read run $run_id, skipping."
+              continue
+            }
+
+            if (( attempt < MAX_RETRIES )); then
+              echo "Re-running failed run $run_id (attempt $attempt of $MAX_RETRIES)"
+              gh run rerun "$run_id" --repo "$REPO" --failed || echo "Rerun request failed, will retry next schedule."
+            else
+              echo "Run $run_id already failed $attempt times - not retrying automatically. Needs human attention."
+              # TODO: real alerting mechanism, not designed yet.
+            fi
+          done
