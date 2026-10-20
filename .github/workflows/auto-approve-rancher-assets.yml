@@ -163,3 +163,27 @@ jobs:
           repositories: |
             ${{ github.event.repository.name }}
           permission-pull-requests: write
+
+      - name: Approve PR
+        if: steps.eligibility.outputs.eligible_prs != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBERS: ${{ steps.eligibility.outputs.eligible_prs }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          for pr_number in $PR_NUMBERS; do
+            review_decision=$(gh pr view "$pr_number" --repo "$REPO" \
+              --json reviewDecision --jq '.reviewDecision')
+
+            if [[ "$review_decision" == "APPROVED" ]]; then
+              echo "PR #$pr_number is currently approved."
+              continue
+            fi
+
+            gh pr review "$pr_number" \
+              --repo "$REPO" \
+              --approve \
+              --body "Auto-approving Rancher Assets PR with auto-merge enabled."
+          done
