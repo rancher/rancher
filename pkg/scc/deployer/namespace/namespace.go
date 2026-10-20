@@ -81,21 +81,24 @@ func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 
 		// Check if namespace is actually gone after removing finalizers
 		var getErr error
-		retryErr := backoff.Retry(
-			func() error {
+		_, retryErr := backoff.Retry(ctx,
+			func() (struct{}, error) {
 				var ns *corev1.Namespace
 				ns, getErr = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
 				if getErr != nil && !errors.IsNotFound(getErr) {
-					return nil
+					return struct{}{}, nil
 				}
 
 				if ns != nil {
-					return fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
+					return struct{}{}, fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
 				}
 
-				return nil
+				return struct{}{}, nil
 			},
-			backoff.WithMaxRetries(backoff.NewConstantBackOff(3), 3),
+			// Initial attempt plus three retries, matching the previous
+			// WithMaxRetries(..., 3) behaviour.
+			backoff.WithBackOff(backoff.NewConstantBackOff(3)),
+			backoff.WithMaxTries(4),
 		)
 		if retryErr != nil {
 			return fmt.Errorf("encountered error while waiting for namespace to clean up: %w", retryErr)
