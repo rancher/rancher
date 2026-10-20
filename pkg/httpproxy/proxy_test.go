@@ -504,7 +504,7 @@ func TestIsBadHeader(t *testing.T) {
 		key   string
 		isBad bool
 	}{
-		{"X-Forwarded-Proto", false},
+		{"X-Forwarded-Proto", true},
 		{"Accept-Language", false},
 		{"Accept", false},
 		{"impersonate-user", true},
