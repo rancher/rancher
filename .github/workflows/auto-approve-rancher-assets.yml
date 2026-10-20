@@ -45,7 +45,7 @@ jobs:
             --base main \
             --limit 50 \
             --json number,title \
-            --jq '.[] | select(.title | startswith("[main] Update rancher-assets to ")) | .number')
+            --jq '.[] | select(.title | contains("Update rancher-assets to")) | .number')
 
           if [[ -z "$pr_numbers" ]]; then
             echo "No open rancher-assets bump PRs."
@@ -67,4 +67,5 @@ jobs:
           done
 
           printf 'failed_runs=%s\n' "${failed_runs[*]}" >> "$GITHUB_OUTPUT"
+
 
