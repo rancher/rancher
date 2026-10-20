@@ -622,8 +622,8 @@ github.com/prometheus/otlptranslator v1.0.0 h1:s0LJW/iN9dkIH+EnhiD3BlkkP5QVIUVEo
 github.com/prometheus/otlptranslator v1.0.0/go.mod h1:vRYWnXvI6aWGpsdY/mOT/cbeVRBlPWtBNDb7kGR3uKM=
 github.com/prometheus/procfs v0.22.0 h1:6q9+/JL9IKAPbCmBrv9n5O5Ty3NKnciV5X7YGw0oics=
 github.com/prometheus/procfs v0.22.0/go.mod h1:CvmFr/GVhIjIvWJZW3tgkODBQMRIf0EyWMQLHCHab58=
-github.com/rancher/aks-operator v1.16.0-rc.4 h1:/Jqtf03M+jXNUuzarCVzty9tRO0Fj4TYOzeKmpGKmh0=
-github.com/rancher/aks-operator v1.16.0-rc.4/go.mod h1:T/c3ngz/89TEONAwU/OuQdmNdSoQYwwI+9QNWNiWuYg=
+github.com/rancher/aks-operator v1.16.0-rc.5 h1:ldAw1RA+6AlkxZBemucHq1n0cneLOlRMMfrjF8GTEKM=
+github.com/rancher/aks-operator v1.16.0-rc.5/go.mod h1:T/c3ngz/89TEONAwU/OuQdmNdSoQYwwI+9QNWNiWuYg=
 github.com/rancher/ali-operator v1.16.0-rc.3 h1:urr48sqec36QZBZi9UTjZphGSj3pznNuFsX13UtaKsw=
 github.com/rancher/ali-operator v1.16.0-rc.3/go.mod h1:4bmLWdv7SEcxGzivxBcUwBtwXNB63JfOFzlA+uQusPY=
 github.com/rancher/apiserver v0.10.1 h1:BYZYPcwIq2FFgbFqKJsk8Y8q4ARpqvMHzgxSltd+jh4=
