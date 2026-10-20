@@ -31,72 +31,72 @@ const (
 )
 
 func resetPassword() {
-	app := cli.NewApp()
-	app.Description = "Reset the password for the default admin user"
-
-	app.Action = func(c *cli.Context) error {
-		kubeConfigPath := os.ExpandEnv("$HOME/.kube/config")
-		if _, err := os.Stat(kubeConfigPath); err != nil {
-			kubeConfigPath = ""
-		}
-
-		conf, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-		if err != nil {
-			return fmt.Errorf("Couldn't get kubeconfig. %v", err)
-		}
-
-		client, err := v3.NewForConfig(*conf)
-		if err != nil {
-			return errors.Errorf("Couldn't get kubernetes client. %v", err)
-		}
-
-		set := labels.Set(map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"})
-		admins, err := client.Users("").List(v1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			return errors.Errorf("Couldn't get default admin user. %v", err)
-		}
-
-		count := len(admins.Items)
-		if count != 1 {
-			var users []string
-			for _, u := range admins.Items {
-				users = append(users, u.Name)
+	app := &cli.Command{
+		Description: "Reset the password for the default admin user",
+		Action: func(_ context.Context, _ *cli.Command) error {
+			kubeConfigPath := os.ExpandEnv("$HOME/.kube/config")
+			if _, err := os.Stat(kubeConfigPath); err != nil {
+				kubeConfigPath = ""
 			}
-			return errors.Errorf("%v users were found with %v label. They are %v. Can only reset the default admin password when there is exactly one user with this label",
-				count, set, users)
-		}
 
-		admin := admins.Items[0]
-		pass := generatePassword(length)
-		wranglerContext, err := wrangler.NewContext(context.Background(), nil, conf)
-		if err != nil {
-			return fmt.Errorf("couldn't create wrangler context %w", err)
-		}
-		err = wranglerContext.ControllerFactory.SharedCacheFactory().StartGVK(context.Background(), schema.GroupVersionKind{
-			Group:   "",
-			Version: "v1",
-			Kind:    "Secret",
-		})
-		wranglerContext.ControllerFactory.SharedCacheFactory().WaitForCacheSync(context.Background())
-		if err != nil {
-			return fmt.Errorf("couldn't start wrangler cache for secrets %w", err)
-		}
-		pwdCreator := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
-		if err := pwdCreator.SetPassword(&admin, string(pass)); err != nil {
-			return fmt.Errorf("couldn't set password %w", err)
-		}
-		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
+			conf, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+			if err != nil {
+				return fmt.Errorf("Couldn't get kubeconfig. %v", err)
+			}
 
-		admin.MustChangePassword = true
-		_, err = wranglerContext.Mgmt.User().Update(&admin)
-		if err != nil {
-			return fmt.Errorf("couldn't update user must change password %w", err)
-		}
+			client, err := v3.NewForConfig(*conf)
+			if err != nil {
+				return errors.Errorf("Couldn't get kubernetes client. %v", err)
+			}
 
-		return err
+			set := labels.Set(map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"})
+			admins, err := client.Users("").List(v1.ListOptions{LabelSelector: set.String()})
+			if err != nil {
+				return errors.Errorf("Couldn't get default admin user. %v", err)
+			}
+
+			count := len(admins.Items)
+			if count != 1 {
+				var users []string
+				for _, u := range admins.Items {
+					users = append(users, u.Name)
+				}
+				return errors.Errorf("%v users were found with %v label. They are %v. Can only reset the default admin password when there is exactly one user with this label",
+					count, set, users)
+			}
+
+			admin := admins.Items[0]
+			pass := generatePassword(length)
+			wranglerContext, err := wrangler.NewContext(context.Background(), nil, conf)
+			if err != nil {
+				return fmt.Errorf("couldn't create wrangler context %w", err)
+			}
+			err = wranglerContext.ControllerFactory.SharedCacheFactory().StartGVK(context.Background(), schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Secret",
+			})
+			wranglerContext.ControllerFactory.SharedCacheFactory().WaitForCacheSync(context.Background())
+			if err != nil {
+				return fmt.Errorf("couldn't start wrangler cache for secrets %w", err)
+			}
+			pwdCreator := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
+			if err := pwdCreator.SetPassword(&admin, string(pass)); err != nil {
+				return fmt.Errorf("couldn't set password %w", err)
+			}
+			fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
+
+			admin.MustChangePassword = true
+			_, err = wranglerContext.Mgmt.User().Update(&admin)
+			if err != nil {
+				return fmt.Errorf("couldn't update user must change password %w", err)
+			}
+
+			return err
+		},
 	}
 
-	err := app.Run(os.Args)
+	err := app.Run(context.Background(), os.Args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
