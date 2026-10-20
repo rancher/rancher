@@ -73,7 +73,8 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				if !apierrors.IsNotFound(err) {
 					return "", err
 				}
-			} else if util.CreatedBy(cluster, util.ManagementClusterGVK, "", mgmtCluster.Name) {
+			} else if util.CreatedBy(cluster, util.ManagementClusterGVK, "", mgmtCluster.Name) &&
+				cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
 				// This provisioning cluster was created by its management cluster, which would create it
 				// again: ask for the management cluster to be deleted too. It removes this provisioning
 				// cluster itself, see removeProvisioningClusterFinalizer, so there's nothing to wait for.
