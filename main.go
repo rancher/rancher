@@ -201,7 +201,11 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	_ = app.Run(context.Background(), os.Args)
+	// v3 only routes action and exit-coder errors through ExitErrHandler;
+	// usage errors are returned, so surface them instead of exiting 0.
+	if err := app.Run(context.Background(), os.Args); err != nil {
+		logrus.Fatal(err)
+	}
 }
 
 func initLogs(c *cli.Command, cfg rancher.Options) {
