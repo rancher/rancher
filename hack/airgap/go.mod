@@ -5,7 +5,7 @@ go 1.27.0
 toolchain go1.27.2
 
 replace (
-	github.com/containerd/containerd/v2 => github.com/containerd/containerd/v2 v2.3.6 // CVE-2024-40635
+	github.com/containerd/containerd/v2 => github.com/containerd/containerd/v2 v2.3.7 // CVE-2024-40635
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.5.2 // containers/storage v1.59.1 uses securejoin.OpenInRoot/Reopen, removed in v0.6.0
 	github.com/docker/docker => github.com/moby/moby v28.5.2+incompatible // CVE-2025-54388
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.5 // CVE-2025-27144
