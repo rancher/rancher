@@ -27,5 +27,6 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 	RegisterOperations(ctx,
 		wrangler.K8s,
 		wrangler.Core.Pod(),
-		wrangler.Catalog.Operation())
+		wrangler.Catalog.Operation(),
+		wrangler.Catalog.App())
 }
