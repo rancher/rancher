@@ -8,6 +8,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/wrangler/v3/pkg/gvk"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,7 +45,7 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 	if cluster.Status.Info != nil {
 		provisioningClusterRef = cluster.Status.Info.ProvisioningClusterRef
 	}
-	if provisioningClusterRef == nil && provCluster != nil && cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if provisioningClusterRef == nil && provCluster != nil && pkgcluster.IsAdministrated(cluster) {
 		gvk, _ := gvk.Get(provCluster)
 		provisioningClusterRef = &corev1.ObjectReference{
 			Namespace: provCluster.Namespace,
@@ -148,7 +149,7 @@ func (h *handler) getMachineProvider(cluster *v3.Cluster, provCluster *v1.Cluste
 		}
 	}
 
-	if cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if pkgcluster.IsAdministrated(cluster) {
 		// couldn't find provCluster for v2prov clusters, will set provider=imported incorrectly if we don't return here.
 		return ""
 	}

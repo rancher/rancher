@@ -4,12 +4,11 @@ import (
 	"context"
 	"reflect"
 	"regexp"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -26,7 +25,6 @@ const (
 	nodeRoleControlPlane       = "node-role.kubernetes.io/controlplane"
 	nodeRoleControlPlaneHyphen = "node-role.kubernetes.io/control-plane"
 	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
-	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
 
 	// quietPeriod marks the minimum period between sync calls for the same Cluster
 	quietPeriod = time.Second * 10
@@ -68,13 +66,13 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	machinesClient.AddHandler(ctx, "cluster-stats", s.machineChanged)
 }
 
-func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (s *StatsAggregator) sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
 	if cluster == nil {
 		s.lastReconcile.Delete(key)
 		return nil, nil
 	}
 
-	if d := s.getMininumWaitTime(key); d > 0 {
+	if d := s.getMinimumWaitTime(key); d > 0 {
 		// re-enqueue this controller after the quiet period
 		s.Clusters.Controller().EnqueueAfter(cluster.Namespace, cluster.Name, d)
 		return nil, nil
@@ -87,7 +85,7 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 	return updated, err
 }
 
-func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
+func (s *StatsAggregator) getMinimumWaitTime(key string) time.Duration {
 	if v, ok := s.lastReconcile.Load(key); ok {
 		lastReconcile := v.(time.Time)
 		if wait := quietPeriod - time.Since(lastReconcile); wait > 0 {
@@ -99,14 +97,14 @@ func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
 	return 0
 }
 
-func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
+func (s *StatsAggregator) aggregate(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
 	workerCounts := make(map[string]int)
-	var machines []*v3.Node
+	var machines []*apimgmtv3.Node
 	// only include worker nodes
 	for _, m := range allMachines {
 		// if none are set, then nodes syncer has not completed
@@ -176,10 +174,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 			lcpu.Add(*limits.Cpu())
 		}
 
-		if v32.ClusterConditionNoDiskPressure.IsTrue(machine) {
+		if apimgmtv3.ClusterConditionNoDiskPressure.IsTrue(machine) {
 			condDisk = v1.ConditionFalse
 		}
-		if v32.ClusterConditionNoMemoryPressure.IsTrue(machine) {
+		if apimgmtv3.ClusterConditionNoMemoryPressure.IsTrue(machine) {
 			condMem = v1.ConditionFalse
 		}
 	}
@@ -188,43 +186,27 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	cluster.Status.Allocatable = v1.ResourceList{v1.ResourcePods: apods, v1.ResourceMemory: amem, v1.ResourceCPU: acpu}
 	cluster.Status.Requested = v1.ResourceList{v1.ResourcePods: rpods, v1.ResourceMemory: rmem, v1.ResourceCPU: rcpu}
 	cluster.Status.Limits = v1.ResourceList{v1.ResourcePods: lpods, v1.ResourceMemory: lmem, v1.ResourceCPU: lcpu}
+
 	if condDisk == v1.ConditionTrue {
-		v32.ClusterConditionNoDiskPressure.True(cluster)
+		apimgmtv3.ClusterConditionNoDiskPressure.True(cluster)
 	} else {
-		v32.ClusterConditionNoDiskPressure.False(cluster)
+		apimgmtv3.ClusterConditionNoDiskPressure.False(cluster)
 	}
 	if condMem == v1.ConditionTrue {
-		v32.ClusterConditionNoMemoryPressure.True(cluster)
+		apimgmtv3.ClusterConditionNoMemoryPressure.True(cluster)
 	} else {
-		v32.ClusterConditionNoMemoryPressure.False(cluster)
+		apimgmtv3.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
-	var oldVersion int
-	if cluster.Status.Version != nil {
-		oldVersion, err = minorVersion(cluster)
-		if err != nil {
-			return nil, err
-		}
-	}
-	versionChanged := s.updateVersion(cluster)
+	s.updateVersion(cluster)
 
-	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
-	// the cluster agent in order to restart controllers that will no longer work
-	// with the new API.
-	if versionChanged && !cluster.Spec.Internal {
-		newVersion, err := minorVersion(cluster)
-		if err != nil {
-			return nil, err
-		}
-		if newVersion >= 22 && oldVersion <= 21 {
-			err := s.restartAgentDeployment(cluster)
-			if err != nil {
-				return nil, err
-			}
-		}
+	// Remove "agent.cluster.cattle.io/upgraded-v1.22" annotation
+	err = s.removeLegacyUpgradedAnnotation(cluster)
+	if err != nil {
+		return nil, err
 	}
 
-	if statusChanged(origStatus, &cluster.Status) || versionChanged {
+	if statusChanged(origStatus, &cluster.Status) {
 		// Use UpdateStatus to only update the status subresource - Update() ignores status changes.
 		// Return nil to avoid norman's redundant Update() write-back.
 		if _, err := s.Clusters.UpdateStatus(cluster); err != nil {
@@ -234,62 +216,64 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	return nil, nil
 }
 
-func minorVersion(cluster *v3.Cluster) (int, error) {
-	minorVersion := numericReg.ReplaceAllString(cluster.Status.Version.Minor, "")
-	return strconv.Atoi(minorVersion)
-}
-
-func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
-	updated := false
+func (s *StatsAggregator) updateVersion(cluster *apimgmtv3.Cluster) {
 	userContext, err := s.ClusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
-	if err == nil {
-		callWithTimeout(func() {
-			// This has the tendency to timeout
-			version, err := userContext.K8sClient.Discovery().ServerVersion()
-			if err == nil {
-				if version != nil {
-					// These fields can vary depending on the node serving the request
-					// Since they are not consumed, we omit them from the status to avoid unnecessary flickering of the fields
-					version.BuildDate, version.Platform = "", ""
-				}
-
-				isClusterVersionOk := cluster.Status.Version != nil
-				isNewVersionOk := version != nil
-				if isClusterVersionOk != isNewVersionOk ||
-					(isClusterVersionOk && *cluster.Status.Version != *version) {
-					cluster.Status.Version = version
-					updated = true
-				}
-			}
-		})
+	if err != nil {
+		return
 	}
-	return updated
+
+	callWithTimeout(func() {
+		// This has the tendency to timeout
+		version, err := userContext.K8sClient.Discovery().ServerVersion()
+		if err != nil {
+			return
+		}
+
+		if version != nil {
+			// These fields can vary depending on the node serving the request
+			// Since they are not consumed, we omit them from the status to avoid unnecessary flickering of the fields
+			version.BuildDate, version.Platform = "", ""
+		}
+
+		if version == nil {
+			return
+		}
+
+		currentVersionOk := cluster.Status.Version != nil
+		versionOk := version != nil
+
+		// if we don't have an older version recorded, the new one could not be queried, or they are both populated and different
+		if currentVersionOk != versionOk || (currentVersionOk && *cluster.Status.Version != *version) {
+			cluster.Status.Version = version
+		}
+	})
 }
 
-// restartAgentDeployment sets an annotation on the cluster agent deployment template
-// which will force a restart of the deployment. This is used when the cluster is
-// upgraded to >=1.22 to ensure that controllers that are not compatible with v1.22 APIs
-// are stopped, and controllers that are only compatible with v1.22 are started.
-func (s *StatsAggregator) restartAgentDeployment(cluster *v3.Cluster) error {
-	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
-	if err != nil {
-		return err
-	}
-	deployment, err := userContext.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	if apierrors.IsNotFound(err) {
+// removeLegacyUpgradedAnnotation removes an annotation on the cluster agent deployment template
+// which will force a restart of the deployment. This annotation was used to stop handlers running from when the
+// cluster was running k8s 1.22, however this is applied to every newly created cluster causing unnecessary rollouts.
+func (s *StatsAggregator) removeLegacyUpgradedAnnotation(cluster *apimgmtv3.Cluster) error {
+	userContext, err := s.ClusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
+	if err != nil || userContext == nil {
 		return nil
 	}
-	// Add annotation to the agent deployment template in order to force a restart
-	if deployment.Spec.Template.Annotations == nil {
-		deployment.Spec.Template.Annotations = make(map[string]string)
+
+	deployment, err := userContext.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
 	}
-	if deployment.Spec.Template.Annotations[agentVersionUpgraded] != "true" {
+
+	if deployment.Spec.Template.Annotations == nil {
+		return nil
+	}
+
+	// Add annotation to the agent deployment template in order to force a restart
+	if deployment.Spec.Template.Annotations["agent.cluster.cattle.io/upgraded-v1.22"] != "" {
 		logrus.Tracef("statsAggregator: updated cluster %s to v1.22, annotating agent deployment", cluster.Name)
 		toUpdate := deployment.DeepCopy()
-		toUpdate.Spec.Template.Annotations[agentVersionUpgraded] = "true"
+		delete(toUpdate.Spec.Template.Annotations, "agent.cluster.cattle.io/upgraded-v1.22")
 		_, err = userContext.Apps.Deployments("cattle-system").Update(toUpdate)
 		if err != nil {
 			return err
@@ -298,30 +282,38 @@ func (s *StatsAggregator) restartAgentDeployment(cluster *v3.Cluster) error {
 	return nil
 }
 
-func statusChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
-	if !reflect.DeepEqual(existingCluster.Conditions, newCluster.Conditions) {
+func statusChanged(currentStatus, newStatus *apimgmtv3.ClusterStatus) bool {
+	if !reflect.DeepEqual(currentStatus.Conditions, newStatus.Conditions) {
 		return true
 	}
 
-	if existingCluster.LinuxWorkerCount != newCluster.LinuxWorkerCount ||
-		existingCluster.WindowsWorkerCount != newCluster.WindowsWorkerCount ||
-		existingCluster.NodeCount != newCluster.NodeCount {
+	if currentStatus.LinuxWorkerCount != newStatus.LinuxWorkerCount ||
+		currentStatus.WindowsWorkerCount != newStatus.WindowsWorkerCount ||
+		currentStatus.NodeCount != newStatus.NodeCount {
 		return true
 	}
 
-	if resourceListChanged(existingCluster.Capacity, newCluster.Capacity) {
+	if resourceListChanged(currentStatus.Capacity, newStatus.Capacity) {
 		return true
 	}
 
-	if resourceListChanged(existingCluster.Allocatable, newCluster.Allocatable) {
+	if resourceListChanged(currentStatus.Allocatable, newStatus.Allocatable) {
 		return true
 	}
 
-	if resourceListChanged(existingCluster.Requested, newCluster.Requested) {
+	if resourceListChanged(currentStatus.Requested, newStatus.Requested) {
 		return true
 	}
 
-	if resourceListChanged(existingCluster.Limits, newCluster.Limits) {
+	if resourceListChanged(currentStatus.Limits, newStatus.Limits) {
+		return true
+	}
+
+	currentVersionOk := currentStatus.Version != nil
+	versionOk := newStatus.Version != nil
+
+	// if we don't have an older version recorded, the new one could not be queried, or they are both populated and different
+	if currentVersionOk != versionOk || (currentVersionOk && *currentStatus.Version != *newStatus.Version) {
 		return true
 	}
 
@@ -355,12 +347,12 @@ func callWithTimeout(do func()) {
 	}
 }
 
-func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
+func (s *StatsAggregator) machineChanged(_ string, machine *apimgmtv3.Node) (runtime.Object, error) {
 	if machine == nil {
 		return nil, nil
 	}
 
-	if d := s.getMininumWaitTime(machine.Namespace); d > 0 {
+	if d := s.getMinimumWaitTime(machine.Namespace); d > 0 {
 		s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
 	} else {
 		// EnqueueAfter with a zero duration short-circuits to workqueue.Add, bypassing the rate-limiter
@@ -370,11 +362,10 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 	return nil, nil
 }
 
-func isTaintedNoExecuteNoSchedule(m *v3.Node) bool {
-	for _, taint := range m.Spec.InternalNodeSpec.Taints {
-		isETCDOrControlPlane := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD ||
-			taint.Key == nodeRoleControlPlaneHyphen
-		if isETCDOrControlPlane && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
+func isTaintedNoExecuteNoSchedule(machine *apimgmtv3.Node) bool {
+	for _, taint := range machine.Spec.InternalNodeSpec.Taints {
+		isServer := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD || taint.Key == nodeRoleControlPlaneHyphen
+		if isServer && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
 			return true
 		}
 	}

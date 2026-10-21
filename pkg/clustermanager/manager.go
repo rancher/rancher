@@ -2,7 +2,6 @@ package clustermanager
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -20,11 +19,9 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
-	"github.com/rancher/rancher/pkg/dialer"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	corecontrollers "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/accesscontrol"
@@ -42,23 +39,107 @@ import (
 type Manager struct {
 	httpsPort     int
 	ScaledContext *config.ScaledContext
-	clusterLister v3.ClusterLister
-	clusters      v3.ClusterInterface
-	secretLister  v1.SecretLister
+	clusterLister mgmtcontrollers.ClusterLister
+	clusters      mgmtcontrollers.ClusterInterface
+	secretLister  corecontrollers.SecretLister
 	controllers   sync.Map
+	// failures holds, by cluster UID, the *startFailure of the last start of a cluster's controllers, so
+	// it can still be reported once the failed record is gone.
+	failures sync.Map
+	// failuresLock makes each change to failures atomic with the change to controllers that goes with
+	// it: a failure is not to be recorded once its record was stopped deliberately, nor forgotten by a
+	// record that was replaced in the meantime. A record's own lock can't do that, since a cluster's
+	// failure outlives its records. It is taken while holding the lock of the record concerned, if any,
+	// never the other way around, and no record's lock is taken while holding it.
+	failuresLock  sync.Mutex
 	accessControl types.AccessControl
 	startSem      *semaphore.Weighted
 }
 
+const (
+	// startRetryBaseDelay is how long to wait before starting the controllers of a cluster again after
+	// their first failed start. It doubles with every failure that follows, up to startRetryMaxDelay.
+	startRetryBaseDelay = 5 * time.Second
+	startRetryMaxDelay  = 5 * time.Minute
+)
+
+// errDeferredStart is the failure recorded when controllers registered after the start fail to start.
+var errDeferredStart = errors.New("deferred controllers failed to start")
+
+// startFailure is a failed start of the controllers of a cluster.
+type startFailure struct {
+	err error
+	// attempts is how many starts in a row have failed.
+	attempts int
+	// retryAt is when the controllers may be started again. It is zero if they may be right away.
+	retryAt time.Time
+}
+
+// startRetryDelay returns how long to wait before another start after attempts starts in a row failed.
+func startRetryDelay(attempts int) time.Duration {
+	delay := startRetryBaseDelay
+	for i := 1; i < attempts && delay < startRetryMaxDelay; i++ {
+		delay *= 2
+	}
+	return min(delay, startRetryMaxDelay)
+}
+
+// ControllersPhase is where the controllers of a cluster are in their lifecycle on this replica.
+type ControllersPhase string
+
+const (
+	// ControllersStopped means no controllers are running for the cluster on this replica.
+	ControllersStopped ControllersPhase = "Stopped"
+	// ControllersStarting means the controllers were asked to start and haven't finished starting yet.
+	ControllersStarting ControllersPhase = "Starting"
+	// ControllersRunning means the controllers started successfully.
+	ControllersRunning ControllersPhase = "Running"
+	// ControllersFailed means the last start failed. Its error is in ControllersState.Err.
+	ControllersFailed ControllersPhase = "Failed"
+)
+
+// ControllersState describes the controllers of a cluster on this replica.
+type ControllersState struct {
+	Phase ControllersPhase
+	// Owner is whether the controllers were started as the cluster's owner.
+	Owner bool
+	// PreBootstrapped is whether the cluster was pre-bootstrapped by the current start.
+	PreBootstrapped bool
+	// Err is why the last start failed, if Phase is ControllersFailed.
+	Err error
+	// RetryAt is when the controllers may be started again after they failed, if Phase is
+	// ControllersFailed. It is zero if they may be right away.
+	RetryAt time.Time
+}
+
 type record struct {
 	sync.Mutex
-	clusterRec    *apimgmtv3.Cluster
-	cluster       *config.UserContext
-	accessControl types.AccessControl
-	started       bool
-	owner         bool
-	ctx           context.Context
-	cancel        context.CancelFunc
+	// clusterRec is the cluster as it was when the record was built. It is the record's own copy, never
+	// the informer's: it is handed to the cluster's controllers, and is compared with later versions of
+	// the cluster to tell whether the record is out of date. It must not be changed.
+	clusterRec *apimgmtv3.Cluster
+	cluster    *config.UserContext
+	// accessControl is set while the controllers start and read by requests; use getAccessControl and
+	// setAccessControl.
+	accessControl   types.AccessControl
+	started         bool
+	owner           bool
+	phase           ControllersPhase
+	preBootstrapped bool
+	ctx             context.Context
+	cancel          context.CancelFunc
+}
+
+func (r *record) getAccessControl() types.AccessControl {
+	r.Lock()
+	defer r.Unlock()
+	return r.accessControl
+}
+
+func (r *record) setAccessControl(accessControl types.AccessControl) {
+	r.Lock()
+	defer r.Unlock()
+	r.accessControl = accessControl
 }
 
 func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
@@ -73,12 +154,78 @@ func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.
 	}
 }
 
+// Stop stops the controllers of cluster and forgets why they last failed to start, if they did. A stop
+// asked for from outside is deliberate - the cluster is gone, or its controllers are being restarted - so
+// an earlier failure no longer describes them, and ControllersState reports them stopped rather than
+// failed. Failures noticed by the manager itself go through stopWithError or handleStartFailure instead,
+// which record the failure after stopping.
 func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
-	obj, ok := m.controllers.Load(cluster.UID)
-	if !ok {
-		return
+	m.stop(cluster, nil)
+}
+
+// stopWithError stops the controllers of cluster because they couldn't be started with err, and records
+// err so ControllersState reports them failed.
+//
+// No retry delay is recorded: err is returned to the caller of Start, so the controller loop backs the
+// cluster off itself.
+func (m *Manager) stopWithError(cluster *apimgmtv3.Cluster, err error) {
+	m.stop(cluster, &startFailure{err: err})
+}
+
+// stop stops the record of cluster and sets its failure to failure, or forgets it if failure is nil, as one
+// change.
+func (m *Manager) stop(cluster *apimgmtv3.Cluster, failure *startFailure) {
+	var r *record
+	if obj, ok := m.controllers.Load(cluster.UID); ok {
+		r = obj.(*record)
+		r.Lock()
+		defer r.Unlock()
 	}
-	m.stopRecord(obj.(*record))
+
+	m.failuresLock.Lock()
+	defer m.failuresLock.Unlock()
+
+	if r != nil {
+		m.stopRecord(r)
+	}
+	if failure == nil {
+		m.failures.Delete(cluster.UID)
+	} else {
+		m.failures.Store(cluster.UID, failure)
+	}
+}
+
+// ControllersState reports the state of the controllers of cluster on this replica. The state of a
+// cluster's current record takes precedence over a failure left by an earlier one.
+func (m *Manager) ControllersState(cluster *apimgmtv3.Cluster) ControllersState {
+	if obj, ok := m.controllers.Load(cluster.UID); ok {
+		r := obj.(*record)
+		r.Lock()
+		defer r.Unlock()
+		if r.started {
+			return ControllersState{Phase: r.phase, Owner: r.owner, PreBootstrapped: r.preBootstrapped}
+		}
+	}
+
+	m.failuresLock.Lock()
+	defer m.failuresLock.Unlock()
+
+	if obj, ok := m.failures.Load(cluster.UID); ok {
+		failure := obj.(*startFailure)
+		return ControllersState{Phase: ControllersFailed, Err: failure.err, RetryAt: failure.retryAt}
+	}
+	return ControllersState{Phase: ControllersStopped}
+}
+
+// enqueue asks the cluster controller to sync the cluster named name, so its handlers pick up a change in
+// the state of its controllers.
+func (m *Manager) enqueue(name string) {
+	m.clusters.Controller().Enqueue("", name)
+}
+
+func (m *Manager) isActive(r *record) bool {
+	obj, ok := m.controllers.Load(r.clusterRec.UID)
+	return ok && obj.(*record) == r
 }
 
 // stopRecord stops r and removes it from the manager, but only if it is still the active record for
@@ -89,13 +236,16 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 //
 // Bailing out leaves nothing behind. The entry for a cluster only changes through this function and
 // through the LoadOrStore in start, which only fills an empty one, so a record that is no longer
-// the active one was already cancelled by whoever removed it.
-func (m *Manager) stopRecord(r *record) {
+// the active one was already canceled by whoever removed it.
+//
+// It reports whether r was the active record and was stopped.
+func (m *Manager) stopRecord(r *record) bool {
 	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
-		return
+		return false
 	}
 	logrus.Infof("Stopping cluster agent for %s", r.cluster.ClusterName)
 	r.cancel()
+	return true
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
@@ -124,51 +274,37 @@ func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	return record.cluster.RESTConfig, nil
 }
 
-// markNotReady sets the Ready condition of cluster to False with the given reason, and cause as the
-// message. It only touches the cluster it was given: if the object with that name has since been
-// deleted, or replaced by a new cluster with the same name, it does nothing. It does not stop
-// anything; callers decide what to stop.
-func (m *Manager) markNotReady(cluster *apimgmtv3.Cluster, reason string, cause error) {
-	current, err := m.clusters.Get(cluster.Name, metav1.GetOptions{})
-	if err != nil {
-		logrus.Debugf("[clustermanager] not marking cluster %s not ready: %v", cluster.Name, err)
-		return
-	}
-	if current.UID != cluster.UID {
-		logrus.Debugf("[clustermanager] not marking cluster %s not ready: it was replaced (uid %s, expected %s)", cluster.Name, current.UID, cluster.UID)
-		return
-	}
-
-	message := cause.Error()
-	if apimgmtv3.ClusterConditionReady.IsFalse(current) &&
-		apimgmtv3.ClusterConditionReady.GetReason(current) == reason &&
-		apimgmtv3.ClusterConditionReady.GetMessage(current) == message {
-		return
-	}
-	apimgmtv3.ClusterConditionReady.False(current)
-	apimgmtv3.ClusterConditionReady.Reason(current, reason)
-	apimgmtv3.ClusterConditionReady.Message(current, message)
-	if _, err := m.clusters.UpdateStatus(current); err != nil {
-		logrus.Warnf("[clustermanager] failed to mark cluster %s not ready: %v", cluster.Name, err)
-	}
-}
-
+// start returns the record for cluster, building it if there is none or if the one there is out of date,
+// and starts its controllers if controllers is true.
+//
+// Only a start with controllers - the user controllers' sync - manages the cluster's controllers. A start
+// without them serves a request for a client and leaves running controllers alone: it doesn't replace
+// their record, even with out of date connection details, and it doesn't record its failures. Tearing
+// down the controllers is up to the sync, which it asks for instead.
 func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) (*record, error) {
 	if !startAllowed(cluster, controllers) {
 		return nil, nil
 	}
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
-		if !m.changed(obj.(*record), cluster, controllers, clusterOwner) {
-			return obj.(*record), m.startController(obj.(*record), controllers, clusterOwner)
+		r := obj.(*record)
+		if !m.changed(r, cluster, controllers, clusterOwner) {
+			return r, m.startController(r, controllers, clusterOwner)
 		}
-		m.Stop(obj.(*record).clusterRec)
+		if controllers {
+			// Stop the record that was found to be out of date, not whichever is current by now.
+			m.stopRecord(r)
+		} else if !m.stopIfNotStarted(r) {
+			m.enqueue(cluster.Name)
+			return r, nil
+		}
 	}
 
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
-		m.markNotReady(cluster, reasonUserControllersFailed, err)
-		m.Stop(cluster)
+		if controllers {
+			m.stopWithError(cluster, err)
+		}
 		return nil, err
 	}
 	if clusterRecord == nil {
@@ -180,14 +316,31 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 		// Another goroutine installed a record for this cluster first. The one just built was never
 		// started, but it holds a cancel func that would otherwise live as long as the manager.
 		clusterRecord.cancel()
+	} else {
+		m.clusters.Controller().Enqueue("", cluster.Name)
 	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
-		m.markNotReady(cluster, reasonUserControllersFailed, err)
-		m.Stop(cluster)
 		return nil, err
 	}
 
 	return obj.(*record), nil
+}
+
+// errRecordReplaced is returned when the controllers of a record are to be started after the record was
+// removed. The caller is to start again, which finds the record that replaced it.
+var errRecordReplaced = errors.New("cluster record was replaced while starting its controllers")
+
+// stopIfNotStarted stops r if its controllers haven't been started, and reports whether they hadn't. The
+// check and the stop are done under r's lock, the one startController takes, so r can't have its
+// controllers started in between, and startController won't start them once r is stopped.
+func (m *Manager) stopIfNotStarted(r *record) bool {
+	r.Lock()
+	defer r.Unlock()
+	if r.started {
+		return false
+	}
+	m.stopRecord(r)
+	return true
 }
 
 func (m *Manager) startController(r *record, controllers, clusterOwner bool) error {
@@ -198,15 +351,40 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
+		// r may have been stopped by stopIfNotStarted since the caller found it.
+		if !m.isActive(r) {
+			return errRecordReplaced
+		}
+		r.started = true
+		r.owner = clusterOwner
+		r.phase = ControllersStarting
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
 				m.handleStartFailure(r, err)
+			} else {
+				m.handleStartSuccess(r)
 			}
 		}()
-		r.started = true
-		r.owner = clusterOwner
 	}
 	return nil
+}
+
+// handleStartSuccess records that the controllers of r are running and asks for the cluster to be synced
+// so that is reported. Nothing is recorded if r was stopped or replaced while it was starting.
+func (m *Manager) handleStartSuccess(r *record) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.phase = ControllersRunning
+
+	m.failuresLock.Lock()
+	defer m.failuresLock.Unlock()
+
+	if !m.isActive(r) {
+		return
+	}
+	m.failures.Delete(r.clusterRec.UID)
+	m.enqueue(r.clusterRec.Name)
 }
 
 // startAllowed reports whether a record may be started for cluster. Nothing is started for a cluster being
@@ -223,18 +401,42 @@ func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
 	return !apimgmtv3.ClusterConditionAgentUninstallScheduled.IsTrue(cluster) && !apimgmtv3.ClusterConditionAgentUninstallScheduled.IsFalse(cluster)
 }
 
-// handleStartFailure reports err, a failure to start the controllers of r, on the cluster r was built
-// for and stops r. It only stops r itself: r may already have been replaced, for example because the
-// cluster's connection details changed while it was starting, and the replacement must keep running.
+// handleStartFailure stops r after its controllers failed to start with err, records the failure and asks
+// for the cluster to be synced so it is reported. It only acts while r is the cluster's active record: r
+// may already have been stopped or replaced, for example because the cluster's connection details changed
+// while it was starting, and then its failure is not the cluster's, and the replacement must keep running.
+//
+// The failure carries when the controllers may be started again, later with every failure in a row. The
+// sync this enqueues reports the failure straight away but holds off the next start until then.
 func (m *Manager) handleStartFailure(r *record, err error) {
 	logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
-	if reason, report := classifyStartError(r.ctx, err); report {
-		m.markNotReady(r.clusterRec, reason, err)
+
+	r.Lock()
+	defer r.Unlock()
+
+	r.phase = ControllersFailed
+
+	m.failuresLock.Lock()
+	defer m.failuresLock.Unlock()
+
+	if !m.stopRecord(r) {
+		return
 	}
-	m.stopRecord(r)
+	attempts := 1
+	if obj, ok := m.failures.Load(r.clusterRec.UID); ok {
+		attempts = obj.(*startFailure).attempts + 1
+	}
+	m.failures.Store(r.clusterRec.UID, &startFailure{
+		err:      err,
+		attempts: attempts,
+		retryAt:  time.Now().Add(startRetryDelay(attempts)),
+	})
+	m.enqueue(r.clusterRec.Name)
 }
 
 func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
+	r.Lock()
+	defer r.Unlock()
 	existing := r.clusterRec
 	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
 		existing.Status.ServiceAccountTokenSecret != cluster.Status.ServiceAccountTokenSecret ||
@@ -263,10 +465,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get(rec.ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			if i == 2 {
-				if rec.ctx.Err() != nil || errors.Is(err, dialer.ErrAgentDisconnected) {
-					return err
-				}
-				return fmt.Errorf("%w: %w", errAPIServerUnreachable, err)
+				return err
 			}
 			select {
 			case <-rec.ctx.Done():
@@ -286,22 +485,21 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 
-	// pre-bootstrap the cluster if it's not already bootstrapped
-	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
+	// pre-bootstrap the cluster if it's not already bootstrapped. A cluster that doesn't need it counts as
+	// pre-bootstrapped, so its cluster-agent isn't deployed in pre-bootstrap mode.
 	if capr.ShouldPreBootstrap(rec.clusterRec) {
-		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
+		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec)
 		if err != nil {
 			transaction.Rollback()
 			return err
 		}
-	} else {
-		// mark as prebootstrapped implicitly in order to prevent cluster-agent from being deployed in prebootstrap mode
-		apimgmtv3.ClusterConditionPreBootstrapped.True(rec.clusterRec)
-		if _, err := m.clusters.Update(rec.clusterRec); err != nil {
-			transaction.Rollback()
-			return err
-		}
 	}
+	rec.Lock()
+	rec.preBootstrapped = true
+	rec.Unlock()
+	// Report it now rather than once the controllers are running, which can take a while: the
+	// cluster-agent is deployed in pre-bootstrap mode until the cluster is marked.
+	m.enqueue(rec.clusterRec.Name)
 
 	if clusterOwner {
 		if err := clusterController.Register(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m); err != nil {
@@ -320,7 +518,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		defer close(done)
 
 		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
-		rec.accessControl = rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw)
+		rec.setAccessControl(rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw))
 
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
@@ -334,7 +532,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	select {
 	case <-time.After(10 * time.Minute):
 		rec.cancel()
-		return errControllersSyncTimeout
+		return errors.New("timed out waiting for cluster controllers to start")
 	case err := <-done:
 		return err
 	}
@@ -344,7 +542,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 // If reconnect is true, the dialer used for connecting this rest.Config will block
 // and retry connecting to the cluster for ~30s if the connection is not available,
 // otherwise return immediately
-func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister, reconnect bool) (*rest.Config, error) {
+func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister corecontrollers.SecretLister, reconnect bool) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -392,56 +590,14 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		Host:        u.String(),
 		Dial:        clusterDialer,
 		BearerToken: string(secret.Data[secretmigrator.SecretKey]),
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData:     append(caBytes, suffix...),
-			NextProtos: []string{"http/1.1"},
-		},
+		CAData:      append(caBytes, suffix...),
+		NextProtos:  []string{"http/1.1"},
 		Timeout:     45 * time.Second,
 		RateLimiter: ratelimit.None,
 		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,
 	}
 
 	return rc, nil
-}
-
-func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
-	rootCAs := x509.NewCertPool()
-	if len(caCertsPEM) > 0 {
-		caCerts, err := rkecerts.ParseCertsPEM(caCertsPEM)
-		if err != nil {
-			return nil, err
-		}
-		for _, cert := range caCerts {
-			rootCAs.AddCert(cert)
-		}
-	}
-
-	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		certs := make([]*x509.Certificate, len(rawCerts))
-		for i, asn1Data := range rawCerts {
-			cert, err := x509.ParseCertificate(asn1Data)
-			if err != nil {
-				return fmt.Errorf("failed to parse cert")
-			}
-			certs[i] = cert
-		}
-
-		opts := x509.VerifyOptions{
-			Roots:         rootCAs,
-			CurrentTime:   time.Now(),
-			DNSName:       "",
-			Intermediates: x509.NewCertPool(),
-		}
-
-		for i, cert := range certs {
-			if i == 0 {
-				continue
-			}
-			opts.Intermediates.AddCert(cert)
-		}
-		_, err := certs[0].Verify(opts)
-		return err
-	}, nil
 }
 
 func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*record, error) {
@@ -456,24 +612,25 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 	}
 	clusterContext.ClusterUID = cluster.UID
 
+	return m.newRecord(ctx, cluster, clusterContext), nil
+}
+
+// newRecord returns a record for cluster that serves clusterContext. cluster is usually the informer's
+// copy, so the record keeps a copy of its own.
+func (m *Manager) newRecord(ctx context.Context, cluster *apimgmtv3.Cluster, clusterContext *config.UserContext) *record {
 	s := &record{
 		cluster:    clusterContext,
-		clusterRec: cluster,
+		clusterRec: cluster.DeepCopy(),
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	clusterContext.OnDeferredStartError = func() {
-		logrus.Errorf("failed to start deferred controllers for cluster %s, stopping cluster agent so they are started again", cluster.Name)
-		// Dropping the record has to come first: it is what makes the next start build a new
-		// UserContext instead of finding this one and leaving it alone.
-		m.stopRecord(s)
-		// Ask for that start rather than waiting up to 30 seconds for the ownership reconcile to
-		// come round, which is documented as a temporary measure anyway. Only this path enqueues -
-		// an expected stop is followed by a start the caller is already making.
-		m.clusters.Controller().Enqueue("", cluster.Name)
+		// Dropping the record is what makes the next start build a new UserContext instead of finding
+		// this one and leaving it alone. Like any failed start, it is retried after a delay.
+		m.handleStartFailure(s, errDeferredStart)
 	}
 
-	return s, nil
+	return s
 }
 
 func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext types.StorageContext) (types.AccessControl, error) {
@@ -485,11 +642,12 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 		return m.accessControl, nil
 	}
 
-	if record.accessControl == nil {
+	accessControl := record.getAccessControl()
+	if accessControl == nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cannot determine access, cluster is unavailable")
 	}
 
-	return record.accessControl, nil
+	return accessControl, nil
 }
 
 func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext types.StorageContext) (rest.Interface, error) {
@@ -515,6 +673,14 @@ func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserCont
 	return m.UserContextNoControllersReconnecting(clusterName, true)
 }
 
+type ContextError struct {
+	Message string
+}
+
+func (e *ContextError) Error() string {
+	return e.Message
+}
+
 // UserContextNoControllersReconnecting works like UserContextNoControllers if reconnect is true.
 // Otherwise, it will return an error immediately if the cluster connection fails.
 func (m *Manager) UserContextNoControllersReconnecting(clusterName string, reconnect bool) (*config.UserContext, error) {
@@ -524,7 +690,9 @@ func (m *Manager) UserContextNoControllersReconnecting(clusterName string, recon
 	}
 	ctx, err := m.UserContextFromClusterReconnecting(cluster, reconnect)
 	if ctx == nil && err == nil {
-		return nil, fmt.Errorf("cluster context %s is unavailable", clusterName)
+		return nil, &ContextError{
+			Message: fmt.Sprintf("cluster context %s is unavailable", clusterName),
+		}
 	}
 	return ctx, err
 }

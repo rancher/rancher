@@ -8,20 +8,19 @@ import (
 	"sort"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	rancherv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	rnetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
-	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
-	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	networkingcontrollers "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	knetworkingv1 "k8s.io/api/networking/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
@@ -43,25 +42,25 @@ const (
 var ErrNodeNotFound = errors.New("node not found")
 
 type netpolMgr struct {
-	clusterLister    v3.ClusterLister
-	clusters         rancherv1.ClusterCache
-	nsLister         wcore.NamespaceCache
-	nodeLister       wcore.NodeCache
-	projects         v3.ProjectInterface
-	npLister         rnetworkingv1.NetworkPolicyLister
-	npClient         rnetworkingv1.Interface
-	projLister       v3.ProjectLister
+	clusterLister    mgmtcontrollers.ClusterLister
+	clusters         provcontrollers.ClusterCache
+	nsLister         corecontrollers.NamespaceCache
+	nodeLister       corecontrollers.NodeCache
+	projects         mgmtcontrollers.ProjectInterface
+	npLister         networkingcontrollers.NetworkPolicyLister
+	npClient         networkingcontrollers.Interface
+	projLister       mgmtcontrollers.ProjectLister
 	clusterNamespace string
 }
 
-func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
-	existing, err := npmgr.npLister.Get(np.Namespace, np.Name)
+func (n *netpolMgr) program(np *networkingv1.NetworkPolicy) error {
+	existing, err := n.npLister.Get(np.Namespace, np.Name)
 	logrus.Debugf("netpolMgr: program: existing=%+v, err=%v", existing, err)
 	if err != nil {
-		if kerrors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logrus.Debugf("netpolMgr: program: about to create np=%+v", *np)
-			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Create(np)
-			if err != nil && !kerrors.IsAlreadyExists(err) && !kerrors.IsForbidden(err) {
+			_, err = n.npClient.NetworkPolicies(np.Namespace).Create(np)
+			if err != nil && !apierrors.IsAlreadyExists(err) && !apierrors.IsForbidden(err) {
 				return fmt.Errorf("netpolMgr: program: error creating network policy err=%v", err)
 			}
 		} else {
@@ -71,7 +70,7 @@ func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
 		logrus.Debugf("netpolMgr: program: existing=%+v", existing)
 		if existing.DeletionTimestamp == nil && !reflect.DeepEqual(existing.Spec, np.Spec) {
 			logrus.Debugf("netpolMgr: program: about to update np=%+v", *np)
-			_, err = npmgr.npClient.NetworkPolicies(np.Namespace).Update(np)
+			_, err = n.npClient.NetworkPolicies(np.Namespace).Update(np)
 			if err != nil {
 				return fmt.Errorf("netpolMgr: program: error updating network policy err=%v", err)
 			}
@@ -82,34 +81,34 @@ func (npmgr *netpolMgr) program(np *knetworkingv1.NetworkPolicy) error {
 	return nil
 }
 
-func (npmgr *netpolMgr) delete(policyNamespace, policyName string) error {
-	existing, err := npmgr.npLister.Get(policyNamespace, policyName)
+func (n *netpolMgr) delete(policyNamespace, policyName string) error {
+	existing, err := n.npLister.Get(policyNamespace, policyName)
 	logrus.Debugf("netpolMgr: delete: existing=%+v, err=%v", existing, err)
 	if err != nil {
-		if kerrors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("netpolMgr: delete: got unexpected error while getting network policy=%v", err)
 	}
 	logrus.Debugf("netpolMgr: delete: existing=%+v", existing)
-	err = npmgr.npClient.NetworkPolicies(existing.Namespace).Delete(existing.Name, &v1.DeleteOptions{})
+	err = n.npClient.NetworkPolicies(existing.Namespace).Delete(existing.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("netpolMgr: delete: error deleting network policy err=%v", err)
 	}
 	return nil
 }
 
-func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace string) error {
+func (n *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace string) error {
 	logrus.Debugf("netpolMgr: programNetworkPolicy: projectID=%v", projectID)
 	// Get namespaces belonging to project
 	set := labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: projectID})
-	namespaces, err := npmgr.nsLister.List(set.AsSelector())
+	namespaces, err := n.nsLister.List(set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("netpolMgr: couldn't list namespaces with projectID %v err=%v", projectID, err)
 	}
 	logrus.Debugf("netpolMgr: programNetworkPolicy: namespaces=%+v", namespaces)
 
-	systemNamespaces, systemProjectID, err := npmgr.getSystemNSInfo(clusterNamespace)
+	systemNamespaces, systemProjectID, err := n.getSystemNSInfo(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: programNetworkPolicy getSystemNamespaces: err=%v", err)
 	}
@@ -123,7 +122,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 		// we also guard against overriding existing network policies, the default network policy for a namespace in the system project
 		// will only be added if there are no other network policies in the namespace (network policies are additive)
 		if systemNamespaces[aNS.Name] {
-			npmgr.delete(aNS.Name, defaultNamespacePolicyName)
+			n.delete(aNS.Name, defaultNamespacePolicyName)
 
 			// this requirement includes objects with no creatorLabel or a value != creatorNorman
 			labelReq, err := labels.NewRequirement(creatorLabel, selection.NotEquals, []string{creatorNorman})
@@ -131,7 +130,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 				return err
 			}
 			// select user network policies, which are ones that don't have a label with creator == norman
-			nps, err := npmgr.npLister.List(aNS.Name, labels.NewSelector().Add(*labelReq))
+			nps, err := n.npLister.List(aNS.Name, labels.NewSelector().Add(*labelReq))
 			if err != nil {
 				return err
 			}
@@ -144,7 +143,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 
 			// program default network policy for system project based namespace
 			logrus.Debugf("netPolMgr: programming %s for namespace=%s in project=%s", defaultSystemProjectNamespacePolicyName, aNS.Name, id)
-			if err := npmgr.program(generateAllowAllNetworkPolicy(aNS, systemProjectID)); err != nil {
+			if err := n.program(generateAllowAllNetworkPolicy(aNS, systemProjectID)); err != nil {
 				return fmt.Errorf(
 					"netPolMgr: programNetworkPolicy: error programming network policy %s for system project based namespace=%s err=%v",
 					defaultSystemProjectNamespacePolicyName, aNS.Name, err,
@@ -155,10 +154,10 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 
 		// namespace is not in system project, so ensure it doesn't have the default policy for system project based namespaces
 		if id != systemProjectID {
-			npmgr.delete(aNS.Name, defaultSystemProjectNamespacePolicyName)
+			n.delete(aNS.Name, defaultSystemProjectNamespacePolicyName)
 		}
 		if id == "" {
-			npmgr.delete(aNS.Name, defaultNamespacePolicyName)
+			n.delete(aNS.Name, defaultNamespacePolicyName)
 			continue
 		}
 		if aNS.DeletionTimestamp != nil {
@@ -167,7 +166,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 		}
 
 		np := generateDefaultNamespaceNetworkPolicy(aNS, projectID, systemProjectID)
-		if err := npmgr.program(np); err != nil {
+		if err := n.program(np); err != nil {
 			return fmt.Errorf("netpolMgr: programNetworkPolicy: error programming default network policy for ns=%v err=%v", aNS.Name, err)
 		}
 	}
@@ -181,8 +180,8 @@ const (
 	calicoIPv6AddrAnno        = "projectcalico.org/IPv6Address"
 )
 
-func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
-	nodes, err := npmgr.nodeLister.List(labels.Everything())
+func (n *netpolMgr) handleHostNetwork(clusterNamespace string) error {
+	nodes, err := n.nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("couldn't list nodes err=%v", err)
 	}
@@ -192,7 +191,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		node = nodes[0]
 	}
 
-	cni, err := npmgr.getClusterCNI(clusterNamespace, node)
+	cni, err := n.getClusterCNI(clusterNamespace, node)
 	if err != nil {
 		return err
 	}
@@ -205,7 +204,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 	// RKE2 deploys calico with VXLAN routing.
 	// When calico sends traffic to pods, the source IP address changes to either the IPIP tunnel address or the VXLAN tunnel address,
 	// depending on the routing mode. These are the IPs that the host network policy needs to use.
-	var policies []knetworkingv1.NetworkPolicyPeer
+	var policies []networkingv1.NetworkPolicyPeer
 	for _, node := range nodes {
 		// for calico, we get the IPs for the hn-nodes policy from the tunnel address annotations, which are managed by calico-node
 		if cni == calicoNetworkPlugin {
@@ -218,10 +217,10 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 				logrus.Errorf("netpolMgr: handleHostNetwork: calico: couldn't get tunnel address for node %v err=%v", node.Name, err)
 				continue
 			}
-			ipBlock := knetworkingv1.IPBlock{
+			ipBlock := networkingv1.IPBlock{
 				CIDR: tunnelAddr + "/32",
 			}
-			policies = append(policies, knetworkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
+			policies = append(policies, networkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
 			continue
 		}
 
@@ -232,10 +231,10 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 			logrus.Errorf("netpolMgr: handleHostNetwork: couldn't parse PodCIDR(%v) for node %v err=%v", node.Spec.PodCIDR, node.Name, err)
 			continue
 		}
-		ipBlock := knetworkingv1.IPBlock{
+		ipBlock := networkingv1.IPBlock{
 			CIDR: podCIDRFirstIP.String() + "/32",
 		}
-		policies = append(policies, knetworkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
+		policies = append(policies, networkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
 	}
 
 	// set the policies on the resource
@@ -253,19 +252,19 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return np.Spec.Ingress[0].From[i].IPBlock.CIDR < np.Spec.Ingress[0].From[j].IPBlock.CIDR
 	})
 
-	namespaces, err := npmgr.nsLister.List(labels.Everything())
+	namespaces, err := n.nsLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces err=%v", err)
 	}
 
-	systemNamespaces, _, err := npmgr.getSystemNSInfo(clusterNamespace)
+	systemNamespaces, _, err := n.getSystemNSInfo(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: handleHostNetwork getSystemNamespaces: err=%v", err)
 	}
 	for _, aNS := range namespaces {
 		projectID := aNS.Labels[nslabels.ProjectIDFieldLabel]
 		if systemNamespaces[aNS.Name] || projectID == "" {
-			npmgr.delete(aNS.Name, hostNetworkPolicyName)
+			n.delete(aNS.Name, hostNetworkPolicyName)
 			continue
 		}
 		if aNS.DeletionTimestamp != nil || aNS.Status.Phase == corev1.NamespaceTerminating {
@@ -278,7 +277,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 
 		logrus.Debugf("netpolMgr: handleHostNetwork: aNS=%+v", aNS)
 
-		np.OwnerReferences = []v1.OwnerReference{
+		np.OwnerReferences = []metav1.OwnerReference{
 			{
 				APIVersion: "v1",
 				Kind:       "Namespace",
@@ -287,7 +286,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 			},
 		}
 		np.Namespace = aNS.Name
-		if err := npmgr.program(np); err != nil {
+		if err := n.program(np); err != nil {
 			logrus.Errorf("netpolMgr: handleHostNetwork: error programming hostNetwork network policy for ns=%v err=%v", aNS.Name, err)
 		}
 	}
@@ -295,33 +294,33 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 }
 
 // getClusterCNI returns the cluster's CNI name if it is found or an api error
-func (npmgr *netpolMgr) getClusterCNI(clusterName string, node *corev1.Node) (string, error) {
-	cluster, err := npmgr.clusterLister.Get("", clusterName)
+func (n *netpolMgr) getClusterCNI(clusterName string, node *corev1.Node) (string, error) {
+	cluster, err := n.clusterLister.Get("", clusterName)
 	if err != nil {
 		return "", err
 	}
 
 	// this returns the CNI for provisioned RKE2 clusters
 	if isProvisionedRke2Cluster(cluster) {
-		return npmgr.getRKE2ClusterCNI(cluster)
+		return n.getRKE2ClusterCNI(cluster)
 	}
 
 	// this returns the CNI for imported RKE2 clusters
 	if cluster.Spec.Rke2Config != nil {
-		return npmgr.getImportedRke2ClusterCNI(node)
+		return n.getImportedRke2ClusterCNI(node)
 	}
 
 	return "", nil
 }
 
 // isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster
-func isProvisionedRke2Cluster(cluster *v3.Cluster) bool {
-	return cluster.Status.Provider == v32.ClusterDriverRke2 && imported.IsAdministratedByProvisioningCluster(cluster)
+func isProvisionedRke2Cluster(cluster *apimgmtv3.Cluster) bool {
+	return cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 && pkgcluster.IsAdministrated(cluster)
 }
 
 // getRKE2ClusterCNI returns the RKE2 cluster CNI name if it is found, or an api error
-func (npmgr *netpolMgr) getRKE2ClusterCNI(mgmtCluster *v3.Cluster) (string, error) {
-	clusters, err := npmgr.clusters.GetByIndex(cluster2.ByCluster, mgmtCluster.Name)
+func (n *netpolMgr) getRKE2ClusterCNI(mgmtCluster *apimgmtv3.Cluster) (string, error) {
+	clusters, err := n.clusters.GetByIndex(provv2.ByCluster, mgmtCluster.Name)
 	if err != nil {
 		return "", err
 	}
@@ -346,7 +345,7 @@ func (npmgr *netpolMgr) getRKE2ClusterCNI(mgmtCluster *v3.Cluster) (string, erro
 // we're relying on node annotations.
 // This method currently only retrieves the CNI if it's set to Calico.
 // TODO: Revise the approach if we begin storing CNI information in the provisioning.cattle.io/v1 cluster object.
-func (npmgr *netpolMgr) getImportedRke2ClusterCNI(node *corev1.Node) (string, error) {
+func (n *netpolMgr) getImportedRke2ClusterCNI(node *corev1.Node) (string, error) {
 	if node != nil {
 		if node.Annotations[calicoIPv4AddrAnno] != "" || node.Annotations[calicoIPv6AddrAnno] != "" {
 			return calicoNetworkPlugin, nil
@@ -356,10 +355,10 @@ func (npmgr *netpolMgr) getImportedRke2ClusterCNI(node *corev1.Node) (string, er
 	return "", ErrNodeNotFound
 }
 
-func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]bool, string, error) {
+func (n *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]bool, string, error) {
 	systemNamespaces := map[string]bool{}
 	set := labels.Set(map[string]string{systemProjectLabel: "true"})
-	projects, err := npmgr.projLister.List(clusterNamespace, set.AsSelector())
+	projects, err := n.projLister.List(clusterNamespace, set.AsSelector())
 	systemProjectID := ""
 	if err != nil {
 		return nil, systemProjectID, err
@@ -379,7 +378,7 @@ func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]boo
 		return nil, systemProjectID, fmt.Errorf("sytemNamespaces: system project id cannot be empty")
 	}
 	set = labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID})
-	namespaces, err := npmgr.nsLister.List(set.AsSelector())
+	namespaces, err := n.nsLister.List(set.AsSelector())
 	if err != nil {
 		return nil, systemProjectID,
 			fmt.Errorf("sytemNamespaces: couldn't list namespaces err=%v", err)
@@ -392,102 +391,96 @@ func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]boo
 	return systemNamespaces, systemProjectID, nil
 }
 
-func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string, systemProjectID string) *knetworkingv1.NetworkPolicy {
-	return &knetworkingv1.NetworkPolicy{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      defaultNamespacePolicyName,
-			Namespace: aNS.Name,
-			Labels: map[string]string{
-				nslabels.ProjectIDFieldLabel: projectID,
-				creatorLabel:                 creatorNorman,
-			},
+func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string, systemProjectID string) *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		Name:      defaultNamespacePolicyName,
+		Namespace: aNS.Name,
+		Labels: map[string]string{
+			nslabels.ProjectIDFieldLabel: projectID,
+			creatorLabel:                 creatorNorman,
 		},
-		Spec: knetworkingv1.NetworkPolicySpec{
+		Spec: networkingv1.NetworkPolicySpec{
 			// An empty PodSelector selects all pods in this Namespace.
-			PodSelector: v1.LabelSelector{},
-			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
-					From: []knetworkingv1.NetworkPolicyPeer{
+					From: []networkingv1.NetworkPolicyPeer{
 						{
-							NamespaceSelector: &v1.LabelSelector{
+							NamespaceSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: projectID},
 							},
 						},
 						{
-							NamespaceSelector: &v1.LabelSelector{
+							NamespaceSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID},
 							},
 						},
 					},
 				},
 			},
-			PolicyTypes: []knetworkingv1.PolicyType{
-				knetworkingv1.PolicyTypeIngress,
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
 			},
 		},
 	}
 }
 
-func generateAllowAllNetworkPolicy(ns *corev1.Namespace, systemProjectID string) *knetworkingv1.NetworkPolicy {
-	return &knetworkingv1.NetworkPolicy{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      defaultSystemProjectNamespacePolicyName,
-			Namespace: ns.Name,
-			Labels: map[string]string{
-				nslabels.ProjectIDFieldLabel: systemProjectID,
-				creatorLabel:                 creatorNorman,
-			},
+func generateAllowAllNetworkPolicy(ns *corev1.Namespace, systemProjectID string) *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		Name:      defaultSystemProjectNamespacePolicyName,
+		Namespace: ns.Name,
+		Labels: map[string]string{
+			nslabels.ProjectIDFieldLabel: systemProjectID,
+			creatorLabel:                 creatorNorman,
 		},
-		Spec: knetworkingv1.NetworkPolicySpec{
+		Spec: networkingv1.NetworkPolicySpec{
 			// An empty PodSelector selects all pods in this Namespace.
-			PodSelector: v1.LabelSelector{},
-			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{},
 			},
-			Egress: []knetworkingv1.NetworkPolicyEgressRule{
+			Egress: []networkingv1.NetworkPolicyEgressRule{
 				{},
 			},
-			PolicyTypes: []knetworkingv1.PolicyType{
-				knetworkingv1.PolicyTypeIngress,
-				knetworkingv1.PolicyTypeEgress,
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
 			},
 		},
 	}
 }
 
-func generateNodesNetworkPolicy() *knetworkingv1.NetworkPolicy {
-	return &knetworkingv1.NetworkPolicy{
-		ObjectMeta: v1.ObjectMeta{
-			Name: hostNetworkPolicyName,
-			Labels: map[string]string{
-				creatorLabel: creatorNorman,
-			},
+func generateNodesNetworkPolicy() *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		Name: hostNetworkPolicyName,
+		Labels: map[string]string{
+			creatorLabel: creatorNorman,
 		},
-		Spec: knetworkingv1.NetworkPolicySpec{
-			PodSelector: v1.LabelSelector{},
-			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
-					From: []knetworkingv1.NetworkPolicyPeer{},
+					From: []networkingv1.NetworkPolicyPeer{},
 				},
 			},
-			PolicyTypes: []knetworkingv1.PolicyType{
-				knetworkingv1.PolicyTypeIngress,
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
 			},
 		},
 	}
 }
 
-func portToString(port knetworkingv1.NetworkPolicyPort) string {
+func portToString(port networkingv1.NetworkPolicyPort) string {
 	return fmt.Sprintf("%v/%v", port.Port, port.Protocol)
 }
 
-func (npmgr *netpolMgr) SyncDefaultNetworkPolicies(key string, np *rnetworkingv1.NetworkPolicy) (runtime.Object, error) {
+func (n *netpolMgr) SyncDefaultNetworkPolicies(key string, np *networkingcontrollers.NetworkPolicy) (runtime.Object, error) {
 	nsName, npName := splitKey(key)
 	if npName != defaultNamespacePolicyName && npName != defaultSystemProjectNamespacePolicyName && npName != hostNetworkPolicyName {
 		return nil, nil
 	}
 
-	disabled, err := isNetworkPolicyDisabled(npmgr.clusterNamespace, npmgr.clusterLister)
+	disabled, err := isNetworkPolicyDisabled(n.clusterNamespace, n.clusterLister)
 	if err != nil {
 		return nil, err
 	}
@@ -502,17 +495,17 @@ func (npmgr *netpolMgr) SyncDefaultNetworkPolicies(key string, np *rnetworkingv1
 	}
 
 	if npName == hostNetworkPolicyName {
-		if err := npmgr.handleHostNetwork(npmgr.clusterNamespace); err != nil {
+		if err := n.handleHostNetwork(n.clusterNamespace); err != nil {
 			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: error handling host network policy: %v", err)
 		}
 	} else {
-		namespace, err := npmgr.nsLister.Get(nsName)
+		namespace, err := n.nsLister.Get(nsName)
 		if err != nil {
 			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: failed to get namespace %s: %v", nsName, err)
 		}
 
 		projectID := namespace.Labels[nslabels.ProjectIDFieldLabel]
-		if err := npmgr.programNetworkPolicy(projectID, npmgr.clusterNamespace); err != nil {
+		if err := n.programNetworkPolicy(projectID, n.clusterNamespace); err != nil {
 			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: failed to program network policy for project %s: %v", projectID, err)
 		}
 	}

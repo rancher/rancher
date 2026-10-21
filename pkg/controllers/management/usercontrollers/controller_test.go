@@ -78,7 +78,7 @@ func TestRemoveDoesNotScheduleTheAgentUninstallTwice(t *testing.T) {
 func TestRemoveFinishesOnceTheControllersAreStopped(t *testing.T) {
 	cluster := newRemoveTestCluster()
 	v32.ClusterConditionAgentUninstallScheduled.True(cluster)
-	v32.ClusterConditionUserControllersStopped.True(cluster)
+	v32.ClusterConditionControllersStopped.True(cluster)
 	lifecycle, env := newRemoveTestEnv(cluster.DeepCopy())
 
 	obj, err := lifecycle.Remove(cluster)
@@ -173,8 +173,8 @@ func TestRemoveMovesOnWhenNoReplicaReportsTheControllersStopped(t *testing.T) {
 
 	require.NoError(t, err, "the finalizer should be removed")
 	assert.Nil(t, obj)
-	assert.True(t, v32.ClusterConditionUserControllersStopped.IsFalse(env.stored))
-	assert.Equal(t, reasonUnconfirmed, v32.ClusterConditionUserControllersStopped.GetReason(env.stored))
+	assert.True(t, v32.ClusterConditionControllersStopped.IsFalse(env.stored))
+	assert.Equal(t, reasonUnconfirmed, v32.ClusterConditionControllersStopped.GetReason(env.stored))
 	assert.Empty(t, env.controller.EnqueueAfterCalls())
 }
 
@@ -189,5 +189,5 @@ func TestRemoveGivesTheControllersTheirTimeFromTheUninstallNotFromTheDeletion(t 
 	_, err := lifecycle.Remove(cluster)
 
 	assert.ErrorIs(t, err, generic.ErrSkip, "the uninstall was only just recorded")
-	assert.Empty(t, v32.ClusterConditionUserControllersStopped.GetStatus(env.stored))
+	assert.Empty(t, v32.ClusterConditionControllersStopped.GetStatus(env.stored))
 }

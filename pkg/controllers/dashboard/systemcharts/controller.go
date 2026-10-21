@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sync"
 	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterutil "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
@@ -84,6 +84,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deployment:                     wContext.Apps.Deployment(),
 		deploymentCache:                wContext.Apps.Deployment().Cache(),
 		clusterRepo:                    wContext.Catalog.ClusterRepo(),
+		clusterRepoCache:               wContext.Catalog.ClusterRepo().Cache(),
 		clusterCache:                   wContext.Mgmt.Cluster().Cache(),
 		clusters:                       wContext.Mgmt.Cluster(),
 		plan:                           wContext.Upgrade.Plan(),
@@ -96,6 +97,10 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
+	// The index of the repo is built by another handler of the ClusterRepo, which keeps the repo's
+	// handlers waiting for minutes while it updates the repo's git checkout, more than once at startup.
+	// Ensuring the charts as soon as the index is written keeps their install from waiting on that.
+	wContext.Core.ConfigMap().OnChange(ctx, "bootstrap-charts-index", h.onIndexConfigMap)
 
 	relatedresource.WatchClusterScoped(ctx, "bootstrap-charts", relatedFeatures, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Feature())
 
@@ -123,6 +128,7 @@ type handler struct {
 	deployment                     deploymentControllers.DeploymentController
 	deploymentCache                deploymentControllers.DeploymentCache
 	clusterRepo                    catalogcontrollers.ClusterRepoController
+	clusterRepoCache               catalogcontrollers.ClusterRepoCache
 	secrets                        corecontrollers.SecretController
 	mutatingWebhookConfigurations  admissionregcontrollers.MutatingWebhookConfigurationController
 	validatingWebhookConfiguration admissionregcontrollers.ValidatingWebhookConfigurationController
@@ -132,12 +138,17 @@ type handler struct {
 	plan                           plancontrolers.PlanController
 	planCache                      plancontrolers.PlanCache
 	registryOverride               string
+	// repoLock serializes onRepo, which runs for both the repo and its index ConfigMap.
+	repoLock sync.Mutex
 }
 
 func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
 	if repo == nil || repo.Name != repoName {
 		return repo, nil
 	}
+
+	h.repoLock.Lock()
+	defer h.repoLock.Unlock()
 
 	systemDefaultRegistry := settings.SystemDefaultRegistry.Get()
 	var helmOpInstallImageOverride string
@@ -219,7 +230,7 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, false, helmOpInstallImageOverride); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, chartDef.TakeOwnership, helmOpInstallImageOverride); err != nil {
 			logrus.Errorf("[system-charts] failed to ensure chart %q: %v", chartDef.ChartName, err)
 			return repo, err
 		}
@@ -260,11 +271,15 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		{
 			// webhookchart controller manages the webhook on the local cluster (early install).
 			// systemcharts manages it here only for downstream clusters (MCMAgent enabled) so
-			// the same chart version and WDC-driven ConfigMap values are applied there.
+			// the same chart version and WDC-driven ConfigMap values are applied there. The two
+			// must never both manage it: they would keep replacing each other's desired release.
 			ReleaseNamespace:    namespace.System,
 			ReleaseName:         chart.WebhookChartName,
 			ChartName:           chart.WebhookChartName,
 			ExactVersionSetting: settings.RancherWebhookVersion,
+			// The cluster agent manages the caBundle of the webhook's WebhookConfigurations, so
+			// upgrades conflict with it unless the chart takes ownership, as webhookchart does.
+			TakeOwnership: true,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
 					"capi": nil,
@@ -405,7 +420,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -414,7 +429,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				toInstall := versionManagementEnabled && toEnable
@@ -448,7 +463,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				if isInHarvesterLocal() {
@@ -457,7 +472,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
-						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+						versionManagementEnabled = pkgcluster.ImportedVersionManagementEnabled(cluster)
 					}
 				}
 				toUninstall := !versionManagementEnabled && noManagedPlan
@@ -622,7 +637,7 @@ func (h *handler) setImagePullSecrets(values map[string]interface{}, useObjectRe
 	var pullSecretsAsStrings []string
 	var pullSecretsAsObjectReferences []kcorev1.LocalObjectReference
 
-	registry, _ := clusterutil.GetPrivateRegistry(nil)
+	registry, _ := pkgcluster.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecretsAsObjectReferences = registry.PullSecretsAsObjectReferences()
 		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()
@@ -662,6 +677,37 @@ func relatedSettings(_, _ string, obj runtime.Object) ([]relatedresource.Key, er
 		}
 	}
 	return nil, nil
+}
+
+// onIndexConfigMap ensures the charts when the index of the rancher-charts repo is written. The ConfigMap is
+// identified by its owner, as it is written before the repo's status names it; until the status is updated, installs
+// fail to find the index and are retried shortly after. This function is implemented as a handler as opposed to a
+// relatedresource because a relatedresource will reenqueue the key, whereas this processes immediately; processing
+// immediately is safe because the [catalog.ClusterRepo] is not modified by onRepo, and the charts manager only
+// enqueues keys itself.
+func (h *handler) onIndexConfigMap(_ string, cm *kcorev1.ConfigMap) (*kcorev1.ConfigMap, error) {
+	if cm == nil || cm.Namespace != namespace.System || !slices.ContainsFunc(cm.OwnerReferences, isRancherChartsRepo) {
+		return cm, nil
+	}
+
+	repo, err := h.clusterRepoCache.Get(repoName)
+	if errors.IsNotFound(err) {
+		return cm, nil
+	}
+	if err != nil {
+		return cm, err
+	}
+	if !slices.ContainsFunc(cm.OwnerReferences, func(ref metav1.OwnerReference) bool { return ref.UID == repo.UID }) {
+		// The index of a repo that was replaced since.
+		return cm, nil
+	}
+
+	_, err = h.onRepo("", repo)
+	return cm, err
+}
+
+func isRancherChartsRepo(ref metav1.OwnerReference) bool {
+	return ref.Kind == "ClusterRepo" && ref.Name == repoName
 }
 
 func relatedConfigMaps(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
