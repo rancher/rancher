@@ -33,6 +33,7 @@ func (u *userControllersController) syncStatus(cluster *v3.Cluster, status v3.Cl
 	}
 
 	// cluster is the status handler's own copy, so it can be changed in place.
+	cluster = cluster.DeepCopy()
 	cluster.Status = status
 	before := slices.Clone(cluster.Status.Conditions)
 
