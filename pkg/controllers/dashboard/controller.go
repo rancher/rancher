@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -49,6 +50,11 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	}
 
 	clusterconnected.Register(ctx, clients)
+
+	if features.SCIM.Enabled() {
+		// Registered here, not with the management controllers, because SCIM is served without MCM too.
+		scim.RegisterTokenExpiry(ctx, clients.Core.Secret(), clients.Mgmt.Setting())
+	}
 
 	if features.MCM.Enabled() {
 		hostedcluster.Register(ctx, clients)
