@@ -140,8 +140,10 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
+	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
+		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -152,7 +154,7 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride, name)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name, podTolerations)
 }
 
 // Upgrade gets the upgrade commands using the given namespace, name and options and gets the user using the isApp flag as false.
@@ -163,8 +165,10 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
+	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
+		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -175,7 +179,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride, name)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name, podTolerations)
 }
 
 // Install gets the install commands using the given namespace, name and options and gets the user using the isApp flag as false.
@@ -186,8 +190,10 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
+	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
+		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -198,7 +204,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride, name)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name, podTolerations)
 }
 
 // decodeParams decodes the request using its url and v1 group version into the target object
@@ -784,7 +790,7 @@ func namespace(ns string) string {
 // createOperation creates an operation and its pod, along with its roles and roleBinding.
 // Uses the Operations.Impersonator and Operations.ops to do it.
 // Returns the created catalog.Operation struct
-func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string, clusterRepoName string) (*catalog.Operation, error) {
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string, clusterRepoName string, podTolerations []corev1.Toleration) (*catalog.Operation, error) {
 	if status.Action == "uninstall" {
 		if err := s.deleteReleasePullSecrets(status.Namespace, status.Release); err != nil {
 			return nil, err
@@ -801,7 +807,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
-	pod, podOptions := s.createPod(secretData, imageOverride, status.Tolerations)
+	pod, podOptions := s.createPod(secretData, imageOverride, podTolerations)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
