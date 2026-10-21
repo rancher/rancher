@@ -42,7 +42,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.17.0-beta.2
 	github.com/rancher/gke-operator v1.16.0-rc.4
 	github.com/rancher/norman v0.10.1
-	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
+	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
 	github.com/rancher/wrangler/v3 v3.8.0-rc.3
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
