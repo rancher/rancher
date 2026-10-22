@@ -216,15 +216,15 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	var groups []string
-	hitProvider := false
+	hitConfig := false
 	if attribs != nil {
-		authp := token.GetAuthProvider()
-		for provider, gps := range attribs.GroupPrincipals {
-			if provider != authp {
-				continue
-			}
-			hitProvider = true
-			for _, principal := range gps.Items {
+		configName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			configName = token.GetAuthProvider()
+		}
+		if principals, ok := attribs.GroupPrincipals[configName]; ok {
+			hitConfig = true
+			for _, principal := range principals.Items {
 				name := strings.TrimPrefix(principal.Name, "local://")
 				groups = append(groups, name)
 			}
@@ -232,7 +232,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	// fallback to legacy token.GroupPrincipals
-	if !hitProvider {
+	if !hitConfig {
 		for _, principal := range token.GetGroupPrincipals() {
 			// TODO This is a short cut for now. Will actually need to lookup groups in future
 			name := strings.TrimPrefix(principal.Name, "local://")
@@ -529,7 +529,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token, error: %v", err)
 		}
 	} else {
-		storedToken = objs[0].(*v3.Token)
+		storedToken = objs[0].(*apiv3.Token)
 	}
 
 	if tokenClaims != nil {
