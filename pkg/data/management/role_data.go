@@ -223,6 +223,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
+		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
+		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
+		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("own").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
