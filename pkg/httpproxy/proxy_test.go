@@ -3,6 +3,7 @@ package httpproxy
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -242,6 +243,10 @@ func TestIsBadHeader(t *testing.T) {
 		{"Content-Length", true},
 		{"X-API-Auth-Header", true},
 		{"X-API-CattleAuth-Header", true},
+		{"Authorization", true},
+		{"authorization", true},
+		{"Cookie", true},
+		{"cookie", true},
 		{"CF-Connecting-IP", true},
 		{"CF-Ray", true},
 	}
@@ -251,4 +256,92 @@ func TestIsBadHeader(t *testing.T) {
 			assert.Equal(t, test.isBad, isBadHeader(test.key))
 		})
 	}
+}
+
+// TestProxyOutgoingHeaders checks the outgoing Cookie and Authorization
+// headers for each authentication path.
+func TestProxyOutgoingHeaders(t *testing.T) {
+	p := &proxy{
+		prefix: "/proxy/",
+		validHostsSupplier: func() []string {
+			return []string{"api.example.com"}
+		},
+	}
+	tests := []struct {
+		name          string
+		headers       map[string]string
+		wantErr       bool
+		wantAuth      string // "" = no Authorization header at all
+		wantExtraName string
+		wantExtraVal  string
+	}{
+		{
+			name:    "no auth headers",
+			headers: map[string]string{},
+		},
+		{
+			name:     "X-API-Auth-Header",
+			headers:  map[string]string{APIAuth: "Bearer plain"},
+			wantAuth: "Bearer plain",
+		},
+		{
+			name:     "CattleAuth without a known signer",
+			headers:  map[string]string{CattleAuth: "token abc"},
+			wantAuth: "token abc",
+		},
+		{
+			name:          "arbitrary signer",
+			headers:       map[string]string{CattleAuth: "arbitrary headers=X-Extra=one"},
+			wantExtraName: "X-Extra",
+			wantExtraVal:  "one",
+		},
+		{
+			name:    "bearer signer error",
+			headers: map[string]string{CattleAuth: "bearer credID=cattle-global-data:cc-x passwordField=accessToken"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/meta/proxy/api.example.com/v2/regions", nil)
+			req.Header.Set(AuthHeader, "Bearer token-abc:secret")
+			req.Header.Set(Cookie, "R_SESS=token-abc:secret; other=1")
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+			err := p.proxy(req)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Empty(t, req.Header.Values(Cookie))
+			if tt.wantAuth == "" {
+				assert.Empty(t, req.Header.Values(AuthHeader))
+			} else {
+				assert.Equal(t, []string{tt.wantAuth}, req.Header.Values(AuthHeader))
+			}
+			if tt.wantExtraName != "" {
+				assert.Equal(t, tt.wantExtraVal, req.Header.Get(tt.wantExtraName))
+			}
+		})
+	}
+}
+
+// TestProxyAPICookieWithSigner checks X-Api-Cookie-Header becomes the
+// outgoing Cookie header when a signer is used.
+func TestProxyAPICookieWithSigner(t *testing.T) {
+	p := &proxy{
+		prefix: "/proxy/",
+		validHostsSupplier: func() []string {
+			return []string{"api.example.com"}
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/meta/proxy/api.example.com/v2/regions", nil)
+	req.Header.Set(Cookie, "R_SESS=token-abc:secret")
+	req.Header.Set(APICookie, "mine=1")
+	req.Header.Set(CattleAuth, "arbitrary headers=X-Extra=one")
+	assert.NoError(t, p.proxy(req))
+	assert.Equal(t, []string{"mine=1"}, req.Header.Values(Cookie))
+	assert.Empty(t, req.Header.Values(APICookie))
 }
