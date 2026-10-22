@@ -77,3 +77,26 @@ func getMockAuthConfig() map[string]any {
 		},
 	}
 }
+
+func TestIsValidUserExtraAttribute(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		key  string
+		want bool
+	}{
+		{key: common.UserAttributePrincipalID, want: true},
+		{key: common.UserAttributeUserName, want: true},
+		{key: "PrincipalID", want: true},
+		{key: "externalid", want: false},
+		{key: "email", want: false},
+		{key: "", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, common.IsValidUserExtraAttribute(tt.key))
+		})
+	}
+}

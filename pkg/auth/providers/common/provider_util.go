@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -44,6 +45,14 @@ func stringToK8sTimeHookFunc() mapstructure.DecodeHookFunc {
 		stdTime, err := time.Parse(time.RFC3339, data.(string))
 		return metav1.Time{Time: stdTime}, err
 	}
+}
+
+// userExtraAttributes are the ExtraByProvider keys that are sent as user extras.
+var userExtraAttributes = map[string]bool{UserAttributePrincipalID: true, UserAttributeUserName: true}
+
+// IsValidUserExtraAttribute reports whether key is a recognized extra attribute for user propagation.
+func IsValidUserExtraAttribute(key string) bool {
+	return userExtraAttributes[strings.ToLower(key)]
 }
 
 // GetCommonUserExtraAttributes is a helper containing the default

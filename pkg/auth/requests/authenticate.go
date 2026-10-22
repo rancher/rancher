@@ -294,17 +294,28 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *a
 
 	ap := token.GetAuthProvider()
 	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
+		// Only principalid and username (common.IsValidUserExtraAttribute)
+		// are sent as request extras. The downstream impersonator role allows
+		// only those keys, so any other stored attribute would make
+		// downstream requests fail impersonation.
 		if ap == "local" || ap == "" {
 			// Gather all extraInfo for all external auth providers present in the userAttributes.
 			for _, extra := range attribs.ExtraByProvider {
 				for key, value := range extra {
-					extraInfo[key] = append(extraInfo[key], value...)
+					if common.IsValidUserExtraAttribute(key) {
+						extraInfo[key] = append(extraInfo[key], value...)
+					}
 				}
 			}
 			return extraInfo
 		}
 		// AuthProvider is set in the token.
-		if extraInfo, ok := attribs.ExtraByProvider[ap]; ok {
+		if extra, ok := attribs.ExtraByProvider[ap]; ok {
+			for key, value := range extra {
+				if common.IsValidUserExtraAttribute(key) {
+					extraInfo[key] = value
+				}
+			}
 			return extraInfo
 		}
 	}
