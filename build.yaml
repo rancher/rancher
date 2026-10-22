@@ -5,5 +5,5 @@ turtlesVersion: 110.0.3+up0.27.3
 cspAdapterMinVersion: 110.0.0+up10.0.0
 defaultShellVersion: rancher/shell:v0.8.2
 fleetVersion: 110.0.3+up0.16.3-rc.2
-defaultSccOperatorImage: rancher/scc-operator:v0.5.3-rc.1
+defaultSccOperatorImage: rancher/scc-operator:v0.5.3-rc.2
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
