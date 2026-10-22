@@ -21,14 +21,16 @@ func TestParseMetadataFixture(t *testing.T) {
 	if err := parseMetadata(fixture(t, "component.json"), &metadata); err != nil {
 		t.Fatal(err)
 	}
-	if len(metadata.Branches) != 4 {
-		t.Fatalf("expected 4 branches, got %d", len(metadata.Branches))
+	if len(metadata.Branches) != 5 {
+		t.Fatalf("expected 5 branches, got %d", len(metadata.Branches))
 	}
 	foundChart := false
-	for _, artifact := range metadata.Branches[1].Versions[0].Artifacts {
-		if artifact.Version == "9.58.0" {
-			foundChart = true
-			break
+	for _, version := range metadata.Branches[1].Versions {
+		for _, artifact := range version.Artifacts {
+			if artifact.Version == "9.58.0" {
+				foundChart = true
+				break
+			}
 		}
 	}
 	if !foundChart {
@@ -51,17 +53,20 @@ func TestSelectMappingsFixture(t *testing.T) {
 	}
 
 	selected, warnings := selectMappings(metadata, existing)
-	if len(warnings) != 1 {
-		t.Fatalf("expected one incomplete-stream warning, got %v", warnings)
+	if len(warnings) != 2 {
+		t.Fatalf("expected warnings for both streams without charts, got %v", warnings)
 	}
-	if selected[35] != (mapping{ImageTag: "1.35.1-9.1", ChartVersion: "9.58.0"}) {
+	if selected[35] != (mapping{ImageTag: "1.35.2-12.1", ChartVersion: "9.59.0"}) {
 		t.Fatalf("unexpected 1.35 selection: %#v", selected[35])
 	}
-	if selected[34] != (mapping{ImageTag: "1.34.2-5.1", ChartVersion: "9.53.0"}) {
+	if selected[34] != (mapping{ImageTag: "1.34.3-10.2", ChartVersion: "9.53.0"}) {
 		t.Fatalf("unexpected 1.34 selection: %#v", selected[34])
 	}
-	if selected[32] != existing[32] || selected[31] != existing[31] {
-		t.Fatalf("incomplete and absent streams must preserve existing mappings: %#v", selected)
+	if selected[36] != (mapping{ImageTag: "1.36.1-4.1", ChartVersion: "9.59.0"}) {
+		t.Fatalf("unexpected 1.36 selection with existing chart fallback: %#v", selected[36])
+	}
+	if selected[32] != (mapping{ImageTag: "1.32.7-11.1", ChartVersion: "9.50.1"}) || selected[31] != existing[31] {
+		t.Fatalf("incomplete streams should update available artifacts and absent streams should be preserved: %#v", selected)
 	}
 }
 

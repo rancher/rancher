@@ -15,6 +15,12 @@
       "branch_name": "1.35",
       "versions": [
         {
+          "version_number": "1.35.2",
+          "artifacts": [
+            {"name": "kubernetes-cluster-autoscaler:1.35.2-12.1", "packaging_format": "CONTAINER"}
+          ]
+        },
+        {
           "version_number": "1.35.1",
           "artifacts": [
             {"name": "kubernetes-cluster-autoscaler:1.35.1-8.1", "packaging_format": "CONTAINER"},
@@ -58,6 +64,17 @@
           "version_number": "1.32.7",
           "artifacts": [
             {"name": "kubernetes-cluster-autoscaler:1.32.7-11.1", "packaging_format": "CONTAINER"}
+          ]
+        }
+      ]
+    },
+    {
+      "branch_name": "1.36",
+      "versions": [
+        {
+          "version_number": "1.36.1",
+          "artifacts": [
+            {"name": "kubernetes-cluster-autoscaler:1.36.1-4.1", "packaging_format": "CONTAINER"}
           ]
         }
       ]

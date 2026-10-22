@@ -153,27 +153,35 @@ func selectMappings(metadata component, existing map[int]mapping) (map[int]mappi
 			continue
 		}
 
-		selected, ok := newestCompleteVersion(currentBranch.Versions)
-		if !ok {
-			warnings = append(warnings, fmt.Sprintf("Kubernetes stream %s has no version with both HELM_CHART and CONTAINER artifacts", currentBranch.BranchName))
-			continue
+		var artifacts []artifact
+		for _, version := range currentBranch.Versions {
+			artifacts = append(artifacts, version.Artifacts...)
 		}
 
-		chart, ok := newestArtifact(selected.Artifacts, "HELM_CHART")
-		if !ok {
-			warnings = append(warnings, fmt.Sprintf("Kubernetes stream %s version %s has no usable HELM_CHART artifact", currentBranch.BranchName, selected.VersionNumber))
-			continue
-		}
-		container, ok := newestArtifact(selected.Artifacts, "CONTAINER")
-		if !ok {
-			warnings = append(warnings, fmt.Sprintf("Kubernetes stream %s version %s has no usable CONTAINER artifact", currentBranch.BranchName, selected.VersionNumber))
-			continue
+		chart, hasChart := newestArtifact(artifacts, "HELM_CHART")
+		container, hasContainer := newestArtifact(artifacts, "CONTAINER")
+		if !hasChart || !hasContainer {
+			missing := make([]string, 0, 2)
+			if !hasChart {
+				missing = append(missing, "HELM_CHART")
+			}
+			if !hasContainer {
+				missing = append(missing, "CONTAINER")
+			}
+			warnings = append(warnings, fmt.Sprintf("Kubernetes stream %s has no usable %s artifact", currentBranch.BranchName, strings.Join(missing, " and ")))
 		}
 
-		result[minor] = mapping{
-			ImageTag:     containerValue(container),
-			ChartVersion: chart.Version,
+		selected := existing[minor]
+		if hasContainer {
+			selected.ImageTag = containerValue(container)
 		}
+		if hasChart {
+			selected.ChartVersion = chart.Version
+		}
+		if selected.ImageTag == "" || selected.ChartVersion == "" {
+			continue
+		}
+		result[minor] = selected
 	}
 
 	return result, warnings
@@ -188,41 +196,6 @@ func kubernetesMinor(branchName string) (int, bool) {
 		return 0, false
 	}
 	return minor, true
-}
-
-func newestCompleteVersion(versions []componentVersion) (componentVersion, bool) {
-	sortedVersions := append([]componentVersion(nil), versions...)
-	sort.SliceStable(sortedVersions, func(i, j int) bool {
-		left, leftErr := semver.NewVersion(sortedVersions[i].VersionNumber)
-		right, rightErr := semver.NewVersion(sortedVersions[j].VersionNumber)
-		if leftErr != nil && rightErr != nil {
-			return sortedVersions[i].VersionNumber > sortedVersions[j].VersionNumber
-		}
-		if leftErr != nil {
-			return false
-		}
-		if rightErr != nil {
-			return true
-		}
-		if left.Equal(right) {
-			return sortedVersions[i].VersionNumber > sortedVersions[j].VersionNumber
-		}
-		return left.GreaterThan(right)
-	})
-
-	for _, version := range sortedVersions {
-		if _, err := semver.NewVersion(version.VersionNumber); err != nil {
-			continue
-		}
-		if _, ok := newestArtifact(version.Artifacts, "HELM_CHART"); !ok {
-			continue
-		}
-		if _, ok := newestArtifact(version.Artifacts, "CONTAINER"); !ok {
-			continue
-		}
-		return version, true
-	}
-	return componentVersion{}, false
 }
 
 func newestArtifact(artifacts []artifact, format string) (artifact, bool) {

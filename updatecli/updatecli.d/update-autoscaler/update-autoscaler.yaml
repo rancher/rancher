@@ -40,7 +40,7 @@ conditions:
     scmid: 'default'
     disablesourceinput: true
     spec:
-      command: 'go run ./pkg/controllers/capr/autoscaler/cmd/generate-artifact-versions && git diff --exit-code -- pkg/controllers/capr/autoscaler/artifact_versions_zz_generated.go'
+      command: 'go run ./pkg/controllers/capr/autoscaler/generator && git diff --exit-code -- pkg/controllers/capr/autoscaler/artifact_versions_zz_generated.go'
       changedif:
         kind: 'exitcode'
         spec:
@@ -54,4 +54,4 @@ targets:
     scmid: 'default'
     disablesourceinput: true
     spec:
-      command: 'go run ./pkg/controllers/capr/autoscaler/cmd/generate-artifact-versions'
+      command: 'go run ./pkg/controllers/capr/autoscaler/generator'

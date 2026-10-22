@@ -6,27 +6,27 @@ package autoscaler
 // cluster-autoscaler image and chart versions.
 var k8sVersionToAutoscalerChartVersions = map[int]*k8sToAutoscalerVersion{
 	36: {
-		imageTag:     "1.36.1-3.1",
+		imageTag:     "1.36.2-6.1",
 		chartVersion: "9.59.0",
 	},
 	35: {
-		imageTag:     "1.35.2-11.1",
-		chartVersion: "9.56.0",
+		imageTag:     "1.35.3-14.1",
+		chartVersion: "9.59.0",
 	},
 	34: {
-		imageTag:     "1.34.5-15.1",
-		chartVersion: "9.50.1",
+		imageTag:     "1.34.5-18.1",
+		chartVersion: "9.53.0",
 	},
 	33: {
-		imageTag:     "1.33.4-15.1",
-		chartVersion: "9.50.1",
+		imageTag:     "1.33.4-18.1",
+		chartVersion: "9.51.0",
 	},
 	32: {
-		imageTag:     "1.32.3-1.5",
+		imageTag:     "1.32.7-16.1",
 		chartVersion: "9.50.1",
 	},
 }
 
 // This is a default value, so we never fall back to what is in the chart. This
 // ensures that we run a vetted image that exists in the Prime registry.
-var defaultChartVersionConfigs = k8sVersionToAutoscalerChartVersions[34]
+var defaultChartVersionConfigs = k8sVersionToAutoscalerChartVersions[35]
