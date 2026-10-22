@@ -241,9 +241,6 @@ spec:
 {{- end }}
 {{- if and .Values.customLogos.enabled (or (eq .Values.customLogos.volumeKind "persistentVolumeClaim") (and (eq .Values.customLogos.volumeKind "configMap") (.Values.customLogos.volumeName))) }}
         # Mount rancher custom-logos volume
-        - mountPath: /usr/share/rancher/ui/assets/images/logos
-          name: custom-logos
-          subPath: {{ .Values.customLogos.volumeSubpaths.emberUi | default "ember" | quote }}
         - mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
           name: custom-logos
           subPath: {{ .Values.customLogos.volumeSubpaths.vueUi | default "vue" | quote }}
