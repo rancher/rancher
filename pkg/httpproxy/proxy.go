@@ -52,6 +52,8 @@ var (
 		"content-length":          true,
 		"x-api-auth-header":       true,
 		"x-api-cattleauth-header": true,
+		"authorization":           true,
+		"cookie":                  true,
 		"cf-connecting-ip":        true,
 		"cf-ray":                  true,
 	}
@@ -213,6 +215,9 @@ func (p *proxy) proxy(req *http.Request) error {
 	req.URL = destURL
 	req.Header = headerCopy
 
+	// Runs before the branches below, some of which return early.
+	replaceCookies(req)
+
 	if auth != "" { // non-empty AuthHeader is noop
 		req.Header.Set(AuthHeader, auth)
 	} else if cAuth != "" {
@@ -224,8 +229,6 @@ func (p *proxy) proxy(req *http.Request) error {
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
-
-	replaceCookies(req)
 
 	return nil
 }
