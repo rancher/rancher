@@ -28,6 +28,8 @@ type BaseDriver struct {
 	DriverHash   string
 	DriverName   string
 	BinaryPrefix string
+
+	calculatedHash string
 }
 
 func (d *BaseDriver) Name() string {
@@ -38,8 +40,8 @@ func (d *BaseDriver) Hash() string {
 	return d.DriverHash
 }
 
-func (d *BaseDriver) Checksum() string {
-	return d.DriverName
+func (d *BaseDriver) CalculatedHash() string {
+	return d.calculatedHash
 }
 
 func (d *BaseDriver) FriendlyName() string {
@@ -334,14 +336,16 @@ func (d *BaseDriver) download(dest io.Writer) error {
 }
 
 func (d *BaseDriver) cacheFile() string {
-	key := sha256Bytes([]byte(d.URL + d.DriverHash))
-
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {
 		base = "./management-state"
 	}
 
-	return path.Join(base, "machine-drivers", key)
+	return path.Join(base, "machine-drivers", d.cacheKey())
+}
+
+func (d *BaseDriver) cacheKey() string {
+	return sha256Bytes([]byte(d.URL + d.DriverHash))
 }
 
 func isInstalled(file string) (string, error) {

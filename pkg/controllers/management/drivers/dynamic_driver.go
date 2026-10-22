@@ -57,6 +57,10 @@ func (d *DynamicDriver) Install() error {
 		return nil
 	}
 
+	if err := os.MkdirAll(filepath.Dir(d.assetPath()), 0755); err != nil {
+		return err
+	}
+
 	return d.copyTo(d.assetPath())
 }
 
@@ -64,28 +68,24 @@ func (d *DynamicDriver) assetPath() string {
 	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
 }
 
-// Valid returns whether the driver binary is correctly downloaded and matches the expected checksum
+// Valid returns whether the driver binary is correctly downloaded and ready to use
 func (d *DynamicDriver) Valid() bool {
 	if !d.Exists() {
 		return false
 	}
 
-	hasher := d.getHasher()
-	if hasher == nil {
+	if d.Builtin {
 		return true
 	}
 
-	f, err := os.Open(d.assetPath())
-	if err != nil {
-		return false
+	if os.Getenv("CATTLE_DEV_MODE") == "" {
+		info, err := os.Stat(d.assetPath())
+		if err != nil || !info.Mode().IsRegular() {
+			return false
+		}
 	}
-	defer f.Close()
 
-	if _, err := io.Copy(hasher, f); err != nil {
-		return false
-	}
-	_, matches := compare(hasher, d.DriverHash)
-	return matches
+	return d.Executable() == nil
 }
 
 func (d *BaseDriver) copyTo(dest string) error {
