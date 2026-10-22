@@ -14,21 +14,60 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+var manageNSRule = rbacv1.PolicyRule{
+	APIGroups:     []string{"management.cattle.io"},
+	Verbs:         []string{"manage-namespaces"},
+	Resources:     []string{"projects"},
+	ResourceNames: []string{"p-123xyz"},
+}
+
+func newManageNSRole(rules ...rbacv1.PolicyRule) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "p-123xyz-namespaces-manage",
+		},
+		Rules: rules,
+	}
+}
+
+func newProjectCRLister(ctrl *gomock.Controller, getErr error, existing []*rbacv1.ClusterRole) *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole] {
+	crLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+	crLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+		func(name string) (*rbacv1.ClusterRole, error) {
+			if getErr != nil {
+				return nil, getErr
+			}
+			for _, cr := range existing {
+				if cr.Name == name {
+					return cr, nil
+				}
+			}
+			return nil, apierror.NewNotFound(schema.GroupResource{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "ClusterRoles",
+			}, name)
+		},
+	).AnyTimes()
+	return crLister
+}
+
 func TestCreate(t *testing.T) {
 	const projectName = "p-123xyz"
 	ctrl := gomock.NewController(t)
 	tests := []struct {
-		name                     string
-		existingClusterRoleNames []string
-		getErr                   error
-		createErr                error
+		name                 string
+		existingClusterRoles []*rbacv1.ClusterRole
+		getErr               error
+		createErr            error
+		updateErr            error
 
-		wantErr   bool
-		wantRoles []rbacv1.ClusterRole
+		wantErr          bool
+		wantRoles        []*rbacv1.ClusterRole
+		wantUpdatedRoles []*rbacv1.ClusterRole
 	}{
 		{
 			name: "basic create",
-			wantRoles: []rbacv1.ClusterRole{
+			wantRoles: []*rbacv1.ClusterRole{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "p-123xyz-namespaces-readonly",
@@ -44,21 +83,14 @@ func TestCreate(t *testing.T) {
 							projectNSAnn: "p-123xyz-namespaces-edit",
 						},
 					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups:     []string{"management.cattle.io"},
-							Verbs:         []string{"manage-namespaces"},
-							Resources:     []string{"projects"},
-							ResourceNames: []string{"p-123xyz"},
-						},
-					},
 				},
+				newManageNSRole(manageNSRule),
 			},
 		},
 		{
 			name:    "get error",
 			getErr:  fmt.Errorf("unexpected error"),
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:      "create error",
@@ -66,13 +98,46 @@ func TestCreate(t *testing.T) {
 			wantErr:   true,
 		},
 		{
-			name:                     "roles already exist",
-			existingClusterRoleNames: []string{"p-123xyz-namespaces-readonly", "p-123xyz-namespaces-edit"},
-			wantErr:                  false,
+			name: "roles already exist",
+			existingClusterRoles: []*rbacv1.ClusterRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-readonly"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-edit"}},
+				newManageNSRole(manageNSRule),
+			},
+		},
+		{
+			name: "manage role is created if the other roles already exist",
+			existingClusterRoles: []*rbacv1.ClusterRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-readonly"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-edit"}},
+			},
+			wantRoles: []*rbacv1.ClusterRole{newManageNSRole(manageNSRule)},
+		},
+		{
+			name: "manage role with extra rules is updated",
+			existingClusterRoles: []*rbacv1.ClusterRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-readonly"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-edit"}},
+				newManageNSRole(manageNSRule, rbacv1.PolicyRule{
+					APIGroups: []string{""},
+					Verbs:     []string{"delete"},
+					Resources: []string{"namespaces"},
+				}),
+			},
+			wantUpdatedRoles: []*rbacv1.ClusterRole{newManageNSRole(manageNSRule)},
+		},
+		{
+			name: "manage role update error",
+			existingClusterRoles: []*rbacv1.ClusterRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-readonly"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-edit"}},
+				newManageNSRole(),
+			},
+			updateErr: fmt.Errorf("unexpected error"),
+			wantErr:   true,
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			project := &v3.Project{
@@ -80,28 +145,7 @@ func TestCreate(t *testing.T) {
 					Name: projectName,
 				},
 			}
-			var newCRs []*rbacv1.ClusterRole
-			crLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
-			crLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(name string) (*rbacv1.ClusterRole, error) {
-					if test.getErr != nil {
-						return nil, test.getErr
-					}
-					for _, clusterRoleName := range test.existingClusterRoleNames {
-						if clusterRoleName == name {
-							return &rbacv1.ClusterRole{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: clusterRoleName,
-								},
-							}, nil
-						}
-					}
-					return nil, apierror.NewNotFound(schema.GroupResource{
-						Group:    "rbac.authorization.k8s.io",
-						Resource: "ClusterRoles",
-					}, name)
-				},
-			).AnyTimes()
+			var newCRs, updatedCRs []*rbacv1.ClusterRole
 			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
@@ -112,9 +156,18 @@ func TestCreate(t *testing.T) {
 					return in, nil
 				},
 			).AnyTimes()
+			clusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+					updatedCRs = append(updatedCRs, in)
+					if test.updateErr != nil {
+						return nil, test.updateErr
+					}
+					return in, nil
+				},
+			).AnyTimes()
 			lifecycle := pLifecycle{
 				m: &manager{
-					crLister:     crLister,
+					crLister:     newProjectCRLister(ctrl, test.getErr, test.existingClusterRoles),
 					clusterRoles: clusterRoles,
 				},
 			}
@@ -123,10 +176,8 @@ func TestCreate(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, len(test.wantRoles), len(newCRs))
-				for _, desiredRole := range test.wantRoles {
-					assert.Contains(t, newCRs, &desiredRole)
-				}
+				assert.ElementsMatch(t, test.wantRoles, newCRs)
+				assert.ElementsMatch(t, test.wantUpdatedRoles, updatedCRs)
 			}
 		})
 	}
@@ -135,103 +186,69 @@ func TestCreate(t *testing.T) {
 func TestUpdated(t *testing.T) {
 	const projectName = "p-123xyz"
 	ctrl := gomock.NewController(t)
+	editNSRule := rbacv1.PolicyRule{
+		APIGroups:     []string{""},
+		Verbs:         []string{"*"},
+		Resources:     []string{"namespaces"},
+		ResourceNames: []string{"test-ns"},
+	}
+	newEditNSRole := func(rules ...rbacv1.PolicyRule) *rbacv1.ClusterRole {
+		return &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "p-123xyz-namespaces-edit",
+				Annotations: map[string]string{
+					projectNSAnn: "p-123xyz-namespaces-edit",
+				},
+			},
+			Rules: rules,
+		}
+	}
 	tests := []struct {
-		name               string
-		currentClusterRole *rbacv1.ClusterRole
-		getError           error
-		updError           error
-		createError        error
+		name                string
+		currentClusterRoles []*rbacv1.ClusterRole
+		getError            error
+		updError            error
+		createError         error
 
-		wantError       bool
-		wantClusterRole *rbacv1.ClusterRole
+		wantError        bool
+		wantClusterRoles []*rbacv1.ClusterRole
 	}{
 		{
-			name: "missing cluster role annotation",
-			currentClusterRole: &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
-					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
-					},
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{""},
-						Verbs:         []string{"*"},
-						Resources:     []string{"namespaces"},
-						ResourceNames: []string{"test-ns"},
-					},
-				},
-			},
-			wantError: false,
-			wantClusterRole: &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
-					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
-					},
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{""},
-						Verbs:         []string{"*"},
-						Resources:     []string{"namespaces"},
-						ResourceNames: []string{"test-ns"},
-					},
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						Verbs:         []string{"manage-namespaces"},
-						Resources:     []string{"projects"},
-						ResourceNames: []string{"p-123xyz"},
-					},
-				},
-			},
+			name:                "roles are up to date",
+			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule), newManageNSRole(manageNSRule)},
+			wantError:           false,
 		},
 		{
-			name: "annotation present",
-			currentClusterRole: &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
-					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
-					},
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{""},
-						Verbs:         []string{"*"},
-						Resources:     []string{"namespaces"},
-						ResourceNames: []string{"test-ns"},
-					},
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						Verbs:         []string{"manage-namespaces"},
-						Resources:     []string{"projects"},
-						ResourceNames: []string{"p-123xyz"},
-					},
-				},
+			name:                "manage-namespaces is removed from edit role",
+			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule, manageNSRule), newManageNSRole(manageNSRule)},
+			wantClusterRoles:    []*rbacv1.ClusterRole{newEditNSRole(editNSRule)},
+		},
+		{
+			name: "missing cluster roles",
+			wantClusterRoles: []*rbacv1.ClusterRole{
+				newManageNSRole(manageNSRule),
+				newEditNSRole(),
 			},
 			wantError: false,
 		},
 		{
-			name: "missing cluster role",
-			wantClusterRole: &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
-					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
-					},
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						Verbs:         []string{"manage-namespaces"},
-						Resources:     []string{"projects"},
-						ResourceNames: []string{"p-123xyz"},
-					},
-				},
+			name:                "missing manage cluster role",
+			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule, manageNSRule)},
+			wantClusterRoles:    []*rbacv1.ClusterRole{newManageNSRole(manageNSRule), newEditNSRole(editNSRule)},
+		},
+		{
+			name: "manage cluster role with extra rules",
+			currentClusterRoles: []*rbacv1.ClusterRole{
+				newEditNSRole(editNSRule, manageNSRule),
+				newManageNSRole(manageNSRule, editNSRule),
 			},
-			wantError: false,
+			wantClusterRoles: []*rbacv1.ClusterRole{newManageNSRole(manageNSRule), newEditNSRole(editNSRule)},
+		},
+		{
+			name:                "edit role update error",
+			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule, manageNSRule), newManageNSRole(manageNSRule)},
+			updError:            fmt.Errorf("unexpected error"),
+			wantError:           true,
 		},
 		{
 			name:      "get error",
@@ -244,26 +261,13 @@ func TestUpdated(t *testing.T) {
 			wantError:   true,
 		},
 		{
-			name: "update error",
-			currentClusterRole: &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{""},
-						Verbs:         []string{"*"},
-						Resources:     []string{"namespaces"},
-						ResourceNames: []string{"test-ns"},
-					},
-				},
-			},
-			updError:  fmt.Errorf("unexpected error"),
-			wantError: true,
+			name:                "update error",
+			currentClusterRoles: []*rbacv1.ClusterRole{newEditNSRole(editNSRule), newManageNSRole()},
+			updError:            fmt.Errorf("unexpected error"),
+			wantError:           true,
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			project := &v3.Project{
@@ -272,21 +276,7 @@ func TestUpdated(t *testing.T) {
 				},
 			}
 			var newCRs []*rbacv1.ClusterRole
-			crLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
-			crLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(name string) (*rbacv1.ClusterRole, error) {
-					if test.getError != nil {
-						return nil, test.getError
-					}
-					if test.currentClusterRole != nil && name == test.currentClusterRole.Name {
-						return test.currentClusterRole, nil
-					}
-					return nil, apierror.NewNotFound(schema.GroupResource{
-						Group:    "rbac.authorization.k8s.io",
-						Resource: "ClusterRoles",
-					}, name)
-				},
-			).AnyTimes()
+			crLister := newProjectCRLister(ctrl, test.getError, test.currentClusterRoles)
 			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
@@ -317,10 +307,7 @@ func TestUpdated(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				if test.wantClusterRole != nil {
-					assert.Len(t, newCRs, 1)
-					assert.Equal(t, test.wantClusterRole, newCRs[0])
-				}
+				assert.ElementsMatch(t, test.wantClusterRoles, newCRs)
 			}
 		})
 	}

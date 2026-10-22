@@ -2,8 +2,9 @@ package rbac
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
-	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
@@ -12,6 +13,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -92,7 +94,60 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		}
 	}
 
+	if err := m.removeStaleProjectNamespaceCRBs(binding, crbsToKeep); err != nil {
+		return nil, err
+	}
+
 	return crbsToKeep, nil
+}
+
+// removeStaleProjectNamespaceCRBs removes the binding's ownership from ClusterRoleBindings to project namespace roles
+// it no longer grants, such as namespaces-edit for a RoleTemplate that only allows creating namespaces. A
+// ClusterRoleBinding is deleted once no other binding owns it.
+func (m *manager) removeStaleProjectNamespaceCRBs(binding *v3.ProjectRoleTemplateBinding, crbsToKeep map[string]bool) error {
+	projectName := parseProjectName(binding.ProjectName)
+	if projectName == "" {
+		return nil
+	}
+	nsRoles := []string{"create-ns"}
+	for _, suffix := range append(slices.Collect(maps.Values(projectNSVerbToSuffix)), projectNSManageSuffix) {
+		nsRoles = append(nsRoles, fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, suffix))
+	}
+
+	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
+	crbs, err := m.crbLister.List(labels.Set{rtbNsAndName: owner}.AsSelector())
+	if err != nil {
+		return err
+	}
+	for _, crb := range crbs {
+		if crbsToKeep[crb.Name] || !slices.Contains(nsRoles, crb.RoleRef.Name) {
+			continue
+		}
+
+		crb = crb.DeepCopy()
+		delete(crb.Labels, rtbNsAndName)
+		// Bindings created before 2.5 also own the ClusterRoleBinding through a UID label.
+		if crb.Labels[string(binding.UID)] == owner {
+			delete(crb.Labels, string(binding.UID))
+		}
+
+		eligibleForDeletion, err := m.noRemainingOwnerLabels(crb)
+		if err != nil {
+			return err
+		}
+		if eligibleForDeletion {
+			logrus.Infof("Deleting clusterRoleBinding %v for project access to global resource role %v.", crb.Name, crb.RoleRef.Name)
+			if err := m.clusterRoleBindings.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			continue
+		}
+		crbsToKeep[crb.Name] = true
+		if _, err := m.clusterRoleBindings.Update(crb); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // EnsureGlobalResourcesRolesForPRTB ensures that all necessary roles exist and contain the rules needed to
@@ -104,37 +159,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		return nil, nil
 	}
 
-	var roleVerb, roleSuffix string
-	for _, r := range rts {
-		for _, rule := range r.Rules {
-			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
-			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
-			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-					roleVerb = "*"
-					roles.Insert("create-ns")
-					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
-						createNSRT, err := m.rtLister.Get("create-ns")
-						if err != nil {
-							return nil, err
-						}
-						if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
-							return nil, err
-						}
-					}
-					break
-				}
-			}
-
-		}
-	}
-	if roleVerb == "" {
-		roleVerb = "get"
-	}
-	roleSuffix = projectNSVerbToSuffix[roleVerb]
-	role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-	roles.Insert(role)
-
+	var allRules []rbacv1.PolicyRule
 	for _, rt := range rts {
 		// Get the rules of the RoleTemplate
 		var rules []rbacv1.PolicyRule
@@ -153,6 +178,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		} else {
 			rules = rt.Rules
 		}
+		allRules = append(allRules, rules...)
 
 		// Find any Promoted Rules
 		promotedRules := roletemplates.ExtractPromotedRules(rules)
@@ -168,6 +194,20 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			roles.Insert(roleName)
 		}
 	}
+
+	nsRoles := roletemplates.ProjectNamespaceRoles(projectName, allRules)
+	if slices.Contains(nsRoles, "create-ns") {
+		if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
+			createNSRT, err := m.rtLister.Get("create-ns")
+			if err != nil {
+				return nil, err
+			}
+			if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
+				return nil, err
+			}
+		}
+	}
+	roles.Insert(nsRoles...)
 
 	return sets.List(roles), nil
 }

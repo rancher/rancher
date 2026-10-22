@@ -583,6 +583,24 @@ var (
 			},
 		},
 	}
+	crbManage = rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "crb-fwst6p66lc",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner-test-prtb": "true"},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "p-xyz789-namespaces-manage",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
 )
 
 func TestPRTBHandlerBuildNamespaceBindings(t *testing.T) {
@@ -632,7 +650,71 @@ func TestPRTBHandlerBuildNamespaceBindings(t *testing.T) {
 					},
 				}, nil)
 			},
-			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy()},
+			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbReadOnly.DeepCopy(), crbManage.DeepCopy()},
+		},
+		{
+			name: "namespaces update cluster roles",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"namespaces"},
+							APIGroups: []string{""},
+							Verbs:     []string{"update"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbReadOnly.DeepCopy(), crbManage.DeepCopy()},
+		},
+		{
+			name: "namespaces patch cluster roles",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"namespaces"},
+							APIGroups: []string{""},
+							Verbs:     []string{"patch"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbReadOnly.DeepCopy(), crbManage.DeepCopy()},
+		},
+		{
+			name: "namespaces delete only gets read only cluster role",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"namespaces"},
+							APIGroups: []string{""},
+							Verbs:     []string{"delete"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbReadOnly.DeepCopy()},
+		},
+		{
+			name: "namespaces wildcard verb creates edit cluster roles",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"namespaces"},
+							APIGroups: []string{""},
+							Verbs:     []string{"*"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy(), crbManage.DeepCopy()},
 		},
 		{
 			name: "namespaces psa cluster role",
@@ -649,7 +731,7 @@ func TestPRTBHandlerBuildNamespaceBindings(t *testing.T) {
 				}, nil)
 				m.EXPECT().Create(gomock.All()).Return(&rbacv1.ClusterRole{}, nil)
 			},
-			want: []*rbacv1.ClusterRoleBinding{crbPSA.DeepCopy()},
+			want: []*rbacv1.ClusterRoleBinding{crbReadOnly.DeepCopy(), crbPSA.DeepCopy()},
 		},
 		{
 			name: "wildcards create edit cluster roles",
@@ -666,7 +748,7 @@ func TestPRTBHandlerBuildNamespaceBindings(t *testing.T) {
 				}, nil)
 				m.EXPECT().Create(gomock.All()).Return(&rbacv1.ClusterRole{}, nil)
 			},
-			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy(), crbPSA.DeepCopy()},
+			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy(), crbManage.DeepCopy(), crbPSA.DeepCopy()},
 		},
 	}
 	ctrl := gomock.NewController(t)
