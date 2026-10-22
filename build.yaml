@@ -1,7 +1,7 @@
 # Container tags
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
 defaultShellVersion: rancher/shell:v0.9.0-rc.1
-defaultSccOperatorImage: rancher/scc-operator:v0.5.3-rc.1
+defaultSccOperatorImage: rancher/scc-operator:v0.5.3-rc.2
 # Notes: ClusterRepo asset and branch versions
 defaultAssetsImage: rancher/rancher-assets:v2.16-20261020T2207Z-dev
 chartDefaultBranch: dev-v2.16
