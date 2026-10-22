@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -65,7 +66,7 @@ func reconcileResourceToNamespace(obj runtime.Object, controller string, nsName 
 				ObjectMeta: metav1.ObjectMeta{
 					Name: nsName,
 					Annotations: map[string]string{
-						"management.cattle.io/system-namespace": "true",
+						namespace.SystemNamespaceAnnotation: "true",
 					},
 				},
 			})

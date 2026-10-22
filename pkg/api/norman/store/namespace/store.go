@@ -12,6 +12,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/utils"
@@ -25,7 +26,7 @@ func New(store types.Store) types.Store {
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			anns, _ := data["annotations"].(map[string]interface{})
-			if anns["management.cattle.io/system-namespace"] == "true" {
+			if anns[namespaceutil.SystemNamespaceAnnotation] == "true" {
 				return nil, nil
 			}
 			return data, nil
