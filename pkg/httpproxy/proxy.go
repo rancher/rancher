@@ -129,14 +129,26 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
 	}
 
-	return &httputil.ReverseProxy{
-		Director: func(req *http.Request) {
-			if err := p.proxy(req); err != nil {
-				logrus.Infof("Failed to proxy: %v", err)
-			}
-		},
+	return newHandler(&p), nil
+}
+
+// newHandler rewrites the request and hands it to the reverse proxy, or responds
+// with 502 if the rewrite fails.
+func newHandler(p *proxy) http.Handler {
+	rp := &httputil.ReverseProxy{
+		Director:       func(*http.Request) {},
 		ModifyResponse: setModifiedHeaders,
-	}, nil
+	}
+
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if err := p.proxy(req); err != nil {
+			logrus.Infof("Failed to proxy: %v", err)
+			http.Error(rw, "Bad Gateway", http.StatusBadGateway)
+			return
+		}
+
+		rp.ServeHTTP(rw, req)
+	})
 }
 
 func setModifiedHeaders(res *http.Response) error {
