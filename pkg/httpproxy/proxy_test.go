@@ -1,12 +1,20 @@
 package httpproxy
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ReplaceSetCookies should rename set cookie header to api set cookie header
@@ -344,4 +352,185 @@ func TestProxyAPICookieWithSigner(t *testing.T) {
 	assert.NoError(t, p.proxy(req))
 	assert.Equal(t, []string{"mine=1"}, req.Header.Values(Cookie))
 	assert.Empty(t, req.Header.Values(APICookie))
+}
+
+type recordedRequest struct {
+	method string
+	path   string
+	cookie string
+}
+
+type upstreamRecorder struct {
+	mu       sync.Mutex
+	requests []recordedRequest
+}
+
+func (u *upstreamRecorder) record(req *http.Request) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	u.requests = append(u.requests, recordedRequest{
+		method: req.Method,
+		path:   req.URL.Path,
+		cookie: req.Header.Get(Cookie),
+	})
+}
+
+func (u *upstreamRecorder) all() []recordedRequest {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	return slices.Clone(u.requests)
+}
+
+// startUpstream starts the host the proxy is asked to reach.
+func startUpstream(t *testing.T, body string) (*upstreamRecorder, string) {
+	t.Helper()
+
+	recorder := &upstreamRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		recorder.record(req)
+		fmt.Fprint(rw, body)
+	}))
+	t.Cleanup(srv.Close)
+
+	return recorder, strings.TrimPrefix(srv.URL, "http://")
+}
+
+// startMetaProxy mounts the proxy at /meta/proxy/, matching how routes.go
+// registers it, and returns the address to send requests to.
+func startMetaProxy(t *testing.T, validHosts []string) string {
+	t.Helper()
+
+	handler := newHandler(&proxy{
+		prefix:             "/proxy/",
+		validHostsSupplier: func() []string { return validHosts },
+	})
+
+	mux := http.NewServeMux()
+	mux.Handle("/meta/proxy/", handler)
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	return strings.TrimPrefix(srv.URL, "http://")
+}
+
+// rawRequest writes requestLine verbatim so the test controls the request-target
+// form. An http.Client cannot do this: it only emits an absolute-form target when
+// it believes it is talking to a configured proxy.
+func rawRequest(t *testing.T, addr, requestLine string) *http.Response {
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	require.NoError(t, conn.SetDeadline(time.Now().Add(30*time.Second)))
+
+	_, err = fmt.Fprintf(conn,
+		"%s HTTP/1.1\r\nHost: rancher.example.com\r\nCookie: R_SESS=session-token\r\nConnection: close\r\n\r\n",
+		requestLine)
+	require.NoError(t, err)
+
+	res, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { res.Body.Close() })
+
+	return res
+}
+
+func TestProxyRequestTargetHandling(t *testing.T) {
+	t.Parallel()
+
+	const upstreamBody = "upstream-response"
+
+	tests := []struct {
+		name string
+		// validHosts is the allowlist. The upstream listens on 127.0.0.1, so
+		// "127.0.0.1" permits it and anything else rejects it.
+		validHosts   []string
+		requestLine  func(upstreamAddr, proxyAddr string) string
+		wantStatus   int
+		wantUpstream []recordedRequest
+	}{
+		{
+			name:       "allowed host",
+			validHosts: []string{"127.0.0.1"},
+			requestLine: func(upstreamAddr, _ string) string {
+				return fmt.Sprintf("GET /meta/proxy/http:/%s/data", upstreamAddr)
+			},
+			wantStatus:   http.StatusOK,
+			wantUpstream: []recordedRequest{{method: http.MethodGet, path: "/data"}},
+		},
+		{
+			name:       "allowed host, absolute-form request target",
+			validHosts: []string{"127.0.0.1"},
+			requestLine: func(upstreamAddr, proxyAddr string) string {
+				return fmt.Sprintf("GET http://%s/meta/proxy/http:/%s/data", proxyAddr, upstreamAddr)
+			},
+			wantStatus:   http.StatusOK,
+			wantUpstream: []recordedRequest{{method: http.MethodGet, path: "/data"}},
+		},
+		{
+			name:       "host not allowed",
+			validHosts: []string{"allowed.example.com"},
+			requestLine: func(upstreamAddr, _ string) string {
+				return fmt.Sprintf("GET /meta/proxy/http:/%s/data", upstreamAddr)
+			},
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "absolute-form request target",
+			validHosts: []string{"allowed.example.com"},
+			requestLine: func(upstreamAddr, _ string) string {
+				return fmt.Sprintf("GET http://%s/meta/proxy/", upstreamAddr)
+			},
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "absolute-form request target with encoded path",
+			validHosts: []string{"allowed.example.com"},
+			requestLine: func(upstreamAddr, _ string) string {
+				return fmt.Sprintf("PUT http://%s/meta/proxy/%%2e%%2e/%%2e%%2e/data", upstreamAddr)
+			},
+			wantStatus: http.StatusBadGateway,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			upstream, upstreamAddr := startUpstream(t, upstreamBody)
+			proxyAddr := startMetaProxy(t, test.validHosts)
+
+			res := rawRequest(t, proxyAddr, test.requestLine(upstreamAddr, proxyAddr))
+			assert.Equal(t, test.wantStatus, res.StatusCode)
+
+			body, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+
+			if test.wantStatus == http.StatusOK {
+				assert.Equal(t, upstreamBody, string(body))
+			} else {
+				assert.NotContains(t, string(body), upstreamBody)
+			}
+
+			assert.Equal(t, test.wantUpstream, upstream.all())
+		})
+	}
+}
+
+func TestProxyForwardedRequestCookie(t *testing.T) {
+	t.Parallel()
+
+	upstream, upstreamAddr := startUpstream(t, "upstream-response")
+	proxyAddr := startMetaProxy(t, []string{"127.0.0.1"})
+
+	res := rawRequest(t, proxyAddr, fmt.Sprintf("GET /meta/proxy/http:/%s/data", upstreamAddr))
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	requests := upstream.all()
+	require.Len(t, requests, 1)
+	assert.Empty(t, requests[0].cookie)
 }
