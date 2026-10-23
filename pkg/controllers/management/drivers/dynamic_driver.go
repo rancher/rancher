@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ var DockerMachineDriverPrefix = "docker-machine-driver-"
 
 const ExecutionTimeout = time.Second * 5
 
-func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
+func NewDynamicDriver(builtin bool, name, url, hash string) (*DynamicDriver, error) {
 	d := &DynamicDriver{
 		BaseDriver{
 			Builtin:      builtin,
@@ -37,7 +38,10 @@ func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
 	if !strings.HasPrefix(d.DriverName, DockerMachineDriverPrefix) {
 		d.DriverName = DockerMachineDriverPrefix + d.DriverName
 	}
-	return d
+	if len(hash) > 0 && d.getHasher() == nil {
+		return nil, fmt.Errorf("invalid hash format: %s", hash)
+	}
+	return d, nil
 }
 
 func (d *DynamicDriver) Install() error {
@@ -53,7 +57,35 @@ func (d *DynamicDriver) Install() error {
 		return nil
 	}
 
-	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIDashboardPath.Get(), d.DriverName))
+	if err := os.MkdirAll(filepath.Dir(d.assetPath()), 0755); err != nil {
+		return err
+	}
+
+	return d.copyTo(d.assetPath())
+}
+
+func (d *DynamicDriver) assetPath() string {
+	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
+}
+
+// Valid returns whether the driver binary is correctly downloaded and ready to use
+func (d *DynamicDriver) Valid() bool {
+	if !d.Exists() {
+		return false
+	}
+
+	if d.Builtin {
+		return true
+	}
+
+	if os.Getenv("CATTLE_DEV_MODE") == "" {
+		info, err := os.Stat(d.assetPath())
+		if err != nil || !info.Mode().IsRegular() {
+			return false
+		}
+	}
+
+	return d.Executable() == nil
 }
 
 func (d *BaseDriver) copyTo(dest string) error {

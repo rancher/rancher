@@ -28,6 +28,8 @@ type BaseDriver struct {
 	DriverHash   string
 	DriverName   string
 	BinaryPrefix string
+
+	calculatedHash string
 }
 
 func (d *BaseDriver) Name() string {
@@ -38,8 +40,8 @@ func (d *BaseDriver) Hash() string {
 	return d.DriverHash
 }
 
-func (d *BaseDriver) Checksum() string {
-	return d.DriverName
+func (d *BaseDriver) CalculatedHash() string {
+	return d.calculatedHash
 }
 
 func (d *BaseDriver) FriendlyName() string {
@@ -120,11 +122,10 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	hasher, err := d.getHasher()
-	if err != nil {
-		return err
+	hasher := d.getHasher()
+	if len(d.DriverHash) > 0 && hasher == nil {
+		return fmt.Errorf("invalid hash format: %s", d.DriverHash)
 	}
-
 	downloadDest := io.Writer(tempFile)
 	if hasher != nil {
 		downloadDest = io.MultiWriter(tempFile, hasher)
@@ -307,22 +308,19 @@ func compare(hash hash.Hash, value string) (string, bool) {
 	return got, got == expected
 }
 
-func (d *BaseDriver) getHasher() (hash.Hash, error) {
+func (d *BaseDriver) getHasher() hash.Hash {
 	switch len(d.DriverHash) {
-	case 0:
-		return nil, nil
 	case 32:
 		logrus.Warnf("[%s] md5 is unsupported and will be removed in a future version of Rancher", d.Name())
-		return md5.New(), nil
+		return md5.New()
 	case 40:
-		return sha1.New(), nil
+		return sha1.New()
 	case 64:
-		return sha256.New(), nil
+		return sha256.New()
 	case 128:
-		return sha512.New(), nil
+		return sha512.New()
 	}
-
-	return nil, fmt.Errorf("invalid hash format: %s", d.DriverHash)
+	return nil
 }
 
 func (d *BaseDriver) download(dest io.Writer) error {
@@ -338,14 +336,16 @@ func (d *BaseDriver) download(dest io.Writer) error {
 }
 
 func (d *BaseDriver) cacheFile() string {
-	key := sha256Bytes([]byte(d.URL + d.DriverHash))
-
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {
 		base = "./management-state"
 	}
 
-	return path.Join(base, "machine-drivers", key)
+	return path.Join(base, "machine-drivers", d.cacheKey())
+}
+
+func (d *BaseDriver) cacheKey() string {
+	return sha256Bytes([]byte(d.URL + d.DriverHash))
 }
 
 func isInstalled(file string) (string, error) {
