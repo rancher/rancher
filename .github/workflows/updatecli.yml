@@ -6,6 +6,10 @@ on:
     - cron: '0 12 * * *'
   workflow_dispatch:
     inputs:
+      tag:
+        description: 'Optional Rancher Machine tag; used only by the machine update.'
+        required: false
+        type: string
       target:
         description: 'Select which updatecli workflow to run or `all` to run all updates.'
         required: true
@@ -16,6 +20,7 @@ on:
           - 'k3s'
           - 'k8s'
           - 'harvester-docker-machine'
+          - 'machine'
           - 'wins-system-agent'
 
 permissions:
@@ -81,6 +86,7 @@ jobs:
         env:
           UPDATECLI_GITHUB_ACTOR: ${{ github.actor }}
           UPDATECLI_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          MACHINE_RELEASE_TAG: ${{ inputs.tag }}
         run: |
           # Never use '--debug' or 'manifest show' options, because they will
           # leak the GH token.
