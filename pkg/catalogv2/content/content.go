@@ -294,6 +294,10 @@ func (c *Manager) getRepo(namespace, name string) (repoDef, error) {
 		if err != nil {
 			return repoDef{}, err
 		}
+		// A disabled repository behaves as if it didn't exist
+		if cr.Spec.Enabled != nil && !*cr.Spec.Enabled {
+			return repoDef{}, fmt.Errorf("clusterrepo %s is disabled: %w", name, validation.NotFound)
+		}
 		return repoDef{
 			typedata: &cr.TypeMeta,
 			metadata: &cr.ObjectMeta,
