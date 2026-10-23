@@ -27,7 +27,7 @@ FROM registry.suse.com/bci/golang:1.27.3
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.6
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.7
 ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
