@@ -70,6 +70,27 @@ func Test_CheckoutState(t *testing.T) {
 	}
 }
 
+// Test_ForgetRepoAfterRemoval covers the order used when a ClusterRepo is deleted: the directory is
+// removed before the checkout state is dropped, and the state must go with it even though the
+// bundled directory it was recorded under no longer exists.
+func Test_ForgetRepoAfterRemoval(t *testing.T) {
+	setSystemCatalog(t, "bundled")
+	newFixture(t)
+
+	require.NoError(t, Ensure(nil, bundledNamespace, bundledName, bundledURL, "", false, nil))
+	require.True(t, IsCheckedOut(bundledName, bundledURL))
+
+	// IsCheckedOut can't be used to tell: once the bundled directory is gone it resolves to the state
+	// directory and reports false whatever is left behind, so look at the recorded key.
+	key := checkoutKey(RepoDir(bundledNamespace, bundledName, bundledURL))
+	parent := ParentRepoDir(bundledNamespace, bundledName)
+	require.NoError(t, os.RemoveAll(parent))
+	ForgetRepo(bundledName)
+
+	_, stale := checkedOut.Load(key)
+	assert.False(t, stale, "the checkout state of the removed directory should have been dropped")
+}
+
 // Test_WorktreePopulated covers telling a restored working tree from the states a repository can be
 // in when this process hasn't restored it itself.
 func Test_WorktreePopulated(t *testing.T) {
