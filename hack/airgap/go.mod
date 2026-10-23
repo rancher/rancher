@@ -2,7 +2,7 @@ module github.com/rancher/rancher/airgap
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 replace (
 	github.com/containerd/containerd/v2 => github.com/containerd/containerd/v2 v2.3.7 // CVE-2024-40635
