@@ -25,8 +25,10 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2"
@@ -185,7 +187,8 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 	// If the chart icon is not an HTTP URL and the repository has a commit status,
 	// attempt to get the icon from the git repository.
 	if !isHTTP(chart.Icon) && repo.status.Commit != "" {
-		return git.Icon(namespace, name, repo.status.URL, chart)
+		icon, suffix, err := git.Icon(namespace, name, repo.status.URL, chart)
+		return icon, suffix, notReady(err)
 	}
 
 	// Check if the repository from the chart is bundled and is at an airgapped environment
@@ -236,7 +239,8 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	// If the commit status of the repository is not an empty string
 	// Return the Chart through Git without checking the secret
 	if repo.status.Commit != "" {
-		return git.Chart(namespace, name, repo.status.URL, chart)
+		content, err := git.Chart(namespace, name, repo.status.URL, chart)
+		return content, notReady(err)
 	}
 
 	secret, err := catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
@@ -261,6 +265,27 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	default:
 		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 	}
+}
+
+// NotReadyRetryAfter is the delay clients are asked to wait, through Retry-After, before asking again
+// for content of a repository that is still being checked out.
+const NotReadyRetryAfter = 5 * time.Second
+
+// notReady turns git.ErrNotCheckedOut into a 503, as the repository is expected to be restored by
+// the ClusterRepo controller shortly, and leaves any other error as is. Use IsNotReady to tell this
+// 503 apart from any other one.
+func notReady(err error) error {
+	if errors.Is(err, git.ErrNotCheckedOut) {
+		return apierror.WrapAPIError(err, validation.ClusterUnavailable, err.Error())
+	}
+	return err
+}
+
+// IsNotReady returns true if err was caused by the repository not being checked out yet by this
+// replica. Unlike other 503s, retrying after NotReadyRetryAfter is expected to succeed.
+func IsNotReady(err error) bool {
+	var apiErr *apierror.APIError
+	return errors.As(err, &apiErr) && errors.Is(apiErr.Cause, git.ErrNotCheckedOut)
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.

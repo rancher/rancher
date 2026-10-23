@@ -9,11 +9,18 @@ import (
 )
 
 // Ensure the repository is checked out at the provided commit reference.
-// Cloning/fetching and cleaning a dirty state is performed if necessary
+// Cloning/fetching and cleaning a dirty state is performed if necessary.
+// If the working tree has not been restored yet, it is first restored to the local HEAD.
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return fmt.Errorf("ensure failure: %w", err)
+	}
+
+	// A repository shipped with its working tree is ready to be served as is, and has to be reported as
+	// such before anything else in here, which may take a while.
+	if !IsCheckedOut(name, gitURL) {
+		markIfPopulated(git.directory())
 	}
 
 	// If the repositories are rancher managed and if bundled is set
@@ -30,6 +37,15 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 
 	if err := git.clone(""); err != nil {
 		return fmt.Errorf("ensure failure: %w", err)
+	}
+
+	// A repository shipped without a working tree is first restored from the commit it already holds,
+	// which needs no network access. Reaching the requested commit may need to fetch it, and if that
+	// fails the content of the local commit remains available while the caller retries.
+	if !IsCheckedOut(name, gitURL) {
+		if err := git.reset("HEAD"); err != nil {
+			return fmt.Errorf("ensure failure: %w", err)
+		}
 	}
 
 	if err := git.reset(commit); err == nil {

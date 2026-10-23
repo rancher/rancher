@@ -285,6 +285,7 @@ func (g *gitGo) clone(branch string) error {
 		return nil
 	}
 
+	clearCheckedOut(g.Directory)
 	if err := os.RemoveAll(g.Directory); err != nil {
 		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
 	}
@@ -553,7 +554,12 @@ func (g *gitGo) reset(rev string) error {
 	}
 
 	// Update HEAD to point to the commit
-	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, hash))
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, hash)); err != nil {
+		return err
+	}
+
+	markCheckedOut(g.Directory)
+	return nil
 }
 
 // currentCommit returns the current HEAD commit SHA
