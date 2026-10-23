@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
@@ -681,4 +683,19 @@ func deleteDir(dir string) error {
 		return err
 	}
 	return nil
+}
+
+func TestNotReady(t *testing.T) {
+	other := fmt.Errorf("boom")
+
+	assert.NoError(t, notReady(nil))
+	assert.Same(t, other, notReady(other))
+	assert.False(t, IsNotReady(other))
+	assert.False(t, IsNotReady(apierror.NewAPIError(validation.ClusterUnavailable, "unrelated 503")))
+
+	err := notReady(fmt.Errorf("wrapped: %w", git.ErrNotCheckedOut))
+	var apiErr *apierror.APIError
+	assert.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 503, apiErr.Code.Status)
+	assert.True(t, IsNotReady(err))
 }

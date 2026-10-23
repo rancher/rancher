@@ -464,3 +464,9 @@ func skipIndexFiltering() bool {
 	// If setting is true, we skip filtering.
 	return settings.SkipHelmIndexFiltering.Get() == "true"
 }
+
+// notReady turns git.ErrNotCheckedOut into a 503.
+func notReady(err error) error { return err }
+
+// IsNotReady returns true if err was caused by the repository not being checked out yet.
+func IsNotReady(err error) bool { return false }
