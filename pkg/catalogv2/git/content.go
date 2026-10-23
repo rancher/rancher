@@ -19,6 +19,10 @@ func Icon(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.R
 		return nil, "", fmt.Errorf("failed to find chartName %s version %s: %w", chartVersion.Name, chartVersion.Version, validation.NotFound)
 	}
 
+	if !IsCheckedOut(name, gitURL) {
+		return nil, "", ErrNotCheckedOut
+	}
+
 	dir := RepoDir(namespace, name, gitURL)
 	icon := chartVersion.Icon
 
@@ -32,6 +36,10 @@ func Icon(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.R
 }
 
 func Chart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, error) {
+	if !IsCheckedOut(name, gitURL) {
+		return nil, ErrNotCheckedOut
+	}
+
 	dir := RepoDir(namespace, name, gitURL)
 
 	if len(chartVersion.URLs) == 0 {

@@ -114,6 +114,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 			logrus.Errorf("error while removing git repo %s: %v", path, err)
 			return nil, err
 		}
+		git.ForgetRepo(key)
 		return nil, nil
 	}
 	// Ignore OCI Based Helm Repositories
