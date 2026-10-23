@@ -3,8 +3,12 @@ package imported
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
+	"path"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -202,6 +206,34 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3(t *testing.T) {
 	runImportedRestoreModeTest(t, "rm-all-s3", rkev1.RestoreRKEConfigAll, snapshotbackpopulate.S3)
 }
 
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHA is the
+// kubernetesVersion/local case on an HA topology — three etcd+control-plane servers and one agent —
+// brought up the way clusters usually are outside of tests: the bootstrap server generates its own
+// token, which is then read off its disk and handed to the joining nodes, rather than every node
+// being pre-seeded with the same shared secret.
+//
+// This targets a failure seen in the field, where after such a restore the distro version is not
+// put back on every node, and any node that *is* on the restored version stays unavailable — the
+// signature of a split brain, with the restored server and the rest of the cluster no longer
+// agreeing on etcd membership. So beyond the usual matrix assertions, every server is checked
+// individually: each must be a voting member of one and the same etcd cluster, and each must see
+// the same set of nodes, all Ready on the restored version.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHA(t *testing.T) {
+	runImportedRestoreModeTestOn(t, "rm-kv-local-ha", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local,
+		[]cluster.ImportedNodePool{
+			{ETCD: true, ControlPlane: true, Quantity: 3},
+			{Worker: true, Quantity: 1},
+		},
+		cluster.ImportedClusterOptions{ExtractServerToken: true})
+}
+
+// defaultRestoreModePools is the split-role topology the matrix runs on: one node per role.
+var defaultRestoreModePools = []cluster.ImportedNodePool{
+	{ETCD: true, Quantity: 1},
+	{ControlPlane: true, Quantity: 1},
+	{Worker: true, Quantity: 1},
+}
+
 // The two configuration values every case in the matrix moves, so that each mode can be pinned by
 // what it does and does not put back.
 const (
@@ -216,6 +248,15 @@ const (
 func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage) {
 	t.Helper()
 
+	runImportedRestoreModeTestOn(t, displayName, mode, storage, defaultRestoreModePools, cluster.ImportedClusterOptions{})
+}
+
+// runImportedRestoreModeTestOn is runImportedRestoreModeTest on an explicit topology. When the
+// topology has more than one etcd node, it additionally asserts that those nodes agree with each
+// other both before the snapshot and after the restore — see assertImportedServersConverged.
+func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage, pools []cluster.ImportedNodePool, opts cluster.ImportedClusterOptions) {
+	t.Helper()
+
 	requireTwoVersions(t)
 
 	clients, err := clients.New()
@@ -224,10 +265,16 @@ func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage 
 	}
 	defer clients.Close()
 
-	fx := setUpImportedRestoreModeCluster(t, clients, displayName, storage)
+	fx := setUpImportedRestoreModeCluster(t, clients, displayName, storage, pools, opts)
+	servers := importedETCDPods(fx, pools)
 
 	// The cluster comes up on the older version, so that is what the snapshot captures.
 	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+	if len(servers) > 1 {
+		// Establish that the servers agree before anything happens, so that disagreement after the
+		// restore is attributable to the restore.
+		assertImportedServersConverged(t, clients, fx, servers, previousK8sVersion)
+	}
 	waitForImportedSnapshotMetadataReady(t, fx)
 
 	// Tolerations are a convenient probe for the agent customization: a plain list on the mgmt
@@ -302,6 +349,9 @@ func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage 
 
 	assertImportedNodesUnchanged(t, fx, nodesBefore, "the restore must not replace any node")
 	assertImportedClusterHealthy(t, clients, fx, expectedVersion)
+	if len(servers) > 1 {
+		assertImportedServersConverged(t, clients, fx, servers, expectedVersion)
+	}
 
 	// The reported version is the last thing to settle, so wait for it rather than sampling it, then
 	// assert the rest off the object that wait last read.
@@ -355,24 +405,19 @@ func waitForReportedGitVersion(t *testing.T, clients *clients.Clients, name, ver
 	return latest
 }
 
-// setUpImportedRestoreModeCluster brings up a single-node imported cluster on the older version,
-// configured to keep etcd snapshots wherever the case under test needs them.
+// setUpImportedRestoreModeCluster brings up an imported cluster with the given topology on the older
+// version, configured to keep etcd snapshots wherever the case under test needs them. opts is passed
+// through to the node pods, with the object store settings merged in for S3.
 //
 // For snapshotStorageLocal the cluster is left alone and snapshots stay on the node's disk, which is
 // durable enough here because an imported cluster upgrades in place and keeps its nodes. For
 // snapshotStorageS3 an object store is stood up and the distro is pointed at it; the snapshot is then
 // written locally *and* uploaded, and the test restores from the uploaded copy.
-func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayName string, storage snapshotbackpopulate.Storage) *importedClusterFixture {
+func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayName string, storage snapshotbackpopulate.Storage, pools []cluster.ImportedNodePool, opts cluster.ImportedClusterOptions) *importedClusterFixture {
 	t.Helper()
 
-	pools := []cluster.ImportedNodePool{
-		{ETCD: true, Quantity: 1},
-		{ControlPlane: true, Quantity: 1},
-		{Worker: true, Quantity: 1},
-	}
-
 	if storage == snapshotbackpopulate.Local {
-		return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion)
+		return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion, opts)
 	}
 
 	// The nodes are pods in this cluster, so a ClusterIP endpoint is reachable — unlike the CAPRKE2
@@ -388,8 +433,19 @@ func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayN
 	folder := displayName + "-" + strings.ToLower(name.Hex(time.Now().String(), 8))
 	t.Logf("etcd snapshots go to s3://%s/%s at %s", osInfo.Bucket, folder, osInfo.Endpoint)
 
-	return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion,
-		importedS3Options(previousK8sVersion, osInfo, folder))
+	s3 := importedS3Options(previousK8sVersion, osInfo, folder)
+	opts.ServerConfig = mergeStrings(opts.ServerConfig, s3.ServerConfig)
+	opts.ServerFiles = mergeStrings(opts.ServerFiles, s3.ServerFiles)
+
+	return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion, opts)
+}
+
+// mergeStrings returns a new map holding base overlaid with extra.
+func mergeStrings(base, extra map[string]string) map[string]string {
+	merged := make(map[string]string, len(base)+len(extra))
+	maps.Copy(merged, base)
+	maps.Copy(merged, extra)
+	return merged
 }
 
 // importedS3Options renders the object store as the etcd-s3* config keys RKE2/K3s read, plus the CA
@@ -643,4 +699,180 @@ func waitForAgentToleration(t *testing.T, clients *clients.Clients, c *mgmtv3.Cl
 		return agentToleration(obj.(*mgmtv3.Cluster)) == key, nil
 	})
 	handleError(t, clients, c.Name, err)
+}
+
+// importedETCDPods returns the fixture's etcd pods. It relies on the
+// ordering cluster.NewImportedClusterPods produces: the first etcd node is the init node at pods[0],
+// and the rest follow in pool order with the init node left out.
+func importedETCDPods(fx *importedClusterFixture, pools []cluster.ImportedNodePool) []*corev1.Pod {
+	type role struct{ etcd bool }
+
+	var (
+		roles   []role
+		initSet bool
+	)
+	for _, pool := range pools {
+		for i := 0; i < pool.Quantity; i++ {
+			r := role{etcd: pool.ETCD}
+			if !initSet && pool.ETCD {
+				roles = append([]role{r}, roles...)
+				initSet = true
+				continue
+			}
+			roles = append(roles, r)
+		}
+	}
+
+	var servers []*corev1.Pod
+	for i, r := range roles {
+		if r.etcd && i < len(fx.pods) {
+			servers = append(servers, fx.pods[i])
+		}
+	}
+	return servers
+}
+
+// etcdMemberList is the subset of the supervisor's /db/info response the split-brain check reads.
+// The handler answers with the local etcd's member list, JSON-encoded straight from the client's
+// protobuf types, so IDs are plain numbers and isLearner is omitted when false.
+//
+// The supervisor is used rather than etcd's own client port because K3s and RKE2 do not enable
+// etcd's gRPC gateway: over TLS, curl negotiates HTTP/2 and lands on the native gRPC server (415,
+// wrong content type), and over HTTP/1.1 nothing answers at all.
+type etcdMemberList struct {
+	Members []struct {
+		ID        uint64 `json:"ID"`
+		Name      string `json:"name"`
+		IsLearner bool   `json:"isLearner"`
+	} `json:"members"`
+}
+
+// serverView is what a single server reports about the cluster: the etcd members its local etcd
+// lists, plus the nodes its own API server returns.
+type serverView struct {
+	// members are "<name>/<id>", so a member that was removed and re-added under the same name — as
+	// happens when a server is reset into a new cluster — does not compare equal to the original.
+	members  []string
+	learners []string
+	nodes    string
+}
+
+func (v serverView) String() string {
+	return fmt.Sprintf("etcd members %v, learners %v, nodes [%s]",
+		v.members, v.learners, strings.ReplaceAll(strings.TrimSpace(v.nodes), "\n", "; "))
+}
+
+// readServerView asks one server — its local supervisor and API server, not the init node's — for
+// its view of the cluster. Going through each server's own endpoints is the whole point: a split
+// brain is precisely the case where the init node's answers are not representative.
+func readServerView(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, pod *corev1.Pod, dataDir string, supervisorPort int) (serverView, error) {
+	t.Helper()
+
+	// /db/info authenticates with the server token's password, i.e. everything after "::server:".
+	serverDir := path.Join(dataDir, "server")
+	out, err := cluster.ExecOnPod(cs, fx.ns.Name, pod.Name, "sh", "-c", fmt.Sprintf(
+		`pw=$(cut -d: -f4- %[1]s/token) && curl -sSf --cacert %[1]s/tls/server-ca.crt -u "server:$pw" https://127.0.0.1:%[2]d/db/info`,
+		serverDir, supervisorPort))
+	if err != nil {
+		return serverView{}, fmt.Errorf("listing etcd members: %w: %s", err, out)
+	}
+
+	var list etcdMemberList
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		return serverView{}, fmt.Errorf("decoding etcd member list %q: %w", out, err)
+	}
+
+	var view serverView
+	for _, m := range list.Members {
+		view.members = append(view.members, fmt.Sprintf("%s/%d", m.Name, m.ID))
+		if m.IsLearner {
+			view.learners = append(view.learners, m.Name)
+		}
+	}
+	slices.Sort(view.members)
+	slices.Sort(view.learners)
+
+	nodes, err := cluster.ExecOnPod(cs, fx.ns.Name, pod.Name, "sh", "-c", fmt.Sprintf("export %s && %s", fx.kubectlEnv,
+		"kubectl get nodes --sort-by=.metadata.name -o jsonpath='{range .items[*]}"+
+			"{.metadata.name}={.metadata.uid}={.status.nodeInfo.kubeletVersion}={range .status.conditions[?(@.type==\"Ready\")]}{.status}{end}{\"\\n\"}{end}'"))
+	if err != nil {
+		return serverView{}, fmt.Errorf("listing nodes: %w: %s", err, nodes)
+	}
+	view.nodes = nodes
+
+	return view, nil
+}
+
+// assertImportedServersConverged fails unless every etcd server in servers agrees on the shape of
+// the cluster: each one's local etcd reports the same full, learner-free membership — one voting member per server — and each one's local API server returns the same
+// nodes, all Ready and on version. Every server passed must run etcd and the API server.
+//
+// assertImportedClusterHealthy only asks the init node, which is exactly the wrong place to look for
+// a split brain: the init node is the one the restore resets, so it is guaranteed to be on the
+// restored side. A server that rejoined the wrong cluster, or was never brought back into the
+// restored one, only shows up when it is asked directly.
+func assertImportedServersConverged(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, servers []*corev1.Pod, version string) {
+	t.Helper()
+
+	logrus.Infof("waiting for all %d servers of cluster %s to agree on etcd membership and nodes at %s",
+		len(servers), fx.mgmtCluster.Name, version)
+
+	dataDir := fmt.Sprintf("/var/lib/rancher/%s", capr.GetRuntime(version))
+	supervisorPort := capr.GetRuntimeSupervisorPort(version)
+
+	var views map[string]string
+	err := utilwait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 15*time.Minute, true, func(context.Context) (bool, error) {
+		views = map[string]string{}
+
+		var reference *serverView
+		converged := true
+		for _, pod := range servers {
+			view, err := readServerView(t, cs, fx, pod, dataDir, supervisorPort)
+			if err != nil {
+				views[pod.Name] = err.Error()
+				converged = false
+				continue
+			}
+			views[pod.Name] = view.String()
+
+			if !serverViewHealthy(view, len(servers), version) {
+				converged = false
+			}
+			if reference == nil {
+				reference = &view
+				continue
+			}
+			if !slices.Equal(view.members, reference.members) || view.nodes != reference.nodes {
+				converged = false
+			}
+		}
+		return converged, nil
+	})
+	if err != nil {
+		var report strings.Builder
+		for _, pod := range servers {
+			fmt.Fprintf(&report, "\n  %s: %s", pod.Name, views[pod.Name])
+		}
+		t.Fatalf("servers of cluster %s do not agree on a single healthy cluster at %s (possible split brain):%s",
+			fx.mgmtCluster.Name, version, report.String())
+	}
+}
+
+// serverViewHealthy reports whether a single server's view is, on its own, what a converged cluster
+// looks like: every etcd server a voting member, and every node Ready on version.
+func serverViewHealthy(view serverView, etcdServers int, version string) bool {
+	if len(view.members) != etcdServers || len(view.learners) != 0 {
+		return false
+	}
+	lines := strings.Split(strings.TrimSpace(view.nodes), "\n")
+	if len(lines) == 0 || strings.TrimSpace(view.nodes) == "" {
+		return false
+	}
+	for _, line := range lines {
+		fields := strings.Split(strings.TrimSpace(line), "=")
+		if len(fields) != 4 || fields[2] != version || fields[3] != "True" {
+			return false
+		}
+	}
+	return true
 }

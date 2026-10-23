@@ -88,6 +88,11 @@ type ImportedClusterOptions struct {
 	// ServerFiles are written verbatim on every server node before the distro is installed, keyed by
 	// absolute path. For anything a config key has to point at, e.g. an S3 endpoint CA bundle.
 	ServerFiles map[string]string
+	// ExtractServerToken brings the init node up without a token, letting the distro generate its
+	// own, then reads the resulting full server token (K10<ca-hash>::server:<password>) back off the
+	// init node's disk and hands that to every joining node. This mirrors how a cluster is typically
+	// stood up by hand, as opposed to pre-seeding every node with the same shared secret.
+	ExtractServerToken bool
 }
 
 // NewImportedClusterPods creates systemd-node pods that independently bootstrap an RKE2/K3s cluster.
@@ -104,9 +109,13 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 	distro := capr.GetRuntime(k8sVersion)
 	supervisorPort := capr.GetRuntimeSupervisorPort(k8sVersion)
 
-	token, err := generateImportedToken()
-	if err != nil {
-		return nil, err
+	var token string
+	if !options.ExtractServerToken {
+		var err error
+		token, err = generateImportedToken()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	type nodeSpec struct {
@@ -152,6 +161,17 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 	})
 	if err != nil {
 		return nil, fmt.Errorf("init node pod did not become ready: %w", err)
+	}
+
+	if options.ExtractServerToken {
+		dataDir := initSpec.dataDir
+		if dataDir == "" {
+			dataDir = fmt.Sprintf("/var/lib/rancher/%s", distro)
+		}
+		token, err = waitForServerToken(clients, namespace, initPod.Name, dataDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	serverURL := fmt.Sprintf("https://%s:%d", initPod.Status.PodIP, supervisorPort)
@@ -846,6 +866,29 @@ func generateImportedToken() (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
+// waitForServerToken polls the init node until the distro has written its server token, and returns
+// it. The file only appears once the server has generated its CA and bootstrap data, which is after
+// the install script has run and the service has started, so it can take several minutes.
+func waitForServerToken(clients *clients.Clients, namespace, podName, dataDir string) (string, error) {
+	tokenPath := path.Join(dataDir, "server", "token")
+
+	var lastErr error
+	deadline := time.Now().Add(15 * time.Minute)
+	for time.Now().Before(deadline) {
+		out, err := ExecOnPod(clients, namespace, podName, "cat", tokenPath)
+		if token := strings.TrimSpace(out); err == nil && token != "" {
+			return token, nil
+		}
+		lastErr = err
+		select {
+		case <-clients.Ctx.Done():
+			return "", clients.Ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+	}
+	return "", fmt.Errorf("timed out waiting for server token at %s on %s/%s: %v", tokenPath, namespace, podName, lastErr)
+}
+
 func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, dataDir string, registryCACert []byte, options ImportedClusterOptions) string {
 	isServer := etcd || cp
 	rancherDir := fmt.Sprintf("/etc/rancher/%s", distro)
@@ -853,7 +896,9 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 
 	var configLines []string
 	configLines = append(configLines, "node-name: "+nodeName)
-	configLines = append(configLines, "token: "+token)
+	if token != "" {
+		configLines = append(configLines, "token: "+token)
+	}
 
 	if dataDir != "" {
 		configLines = append(configLines, "data-dir: "+dataDir)
