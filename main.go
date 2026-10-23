@@ -7,6 +7,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/ehazlett/simplelog"
@@ -193,6 +195,7 @@ func main() {
 				log.Println(http.ListenAndServe(profileAddress, nil))
 			}()
 		}
+		config.ACMEDomains = appendEnvACMEDomains(config.ACMEDomains, os.Getenv("ACME_DOMAIN"))
 		initLogs(cmd, config)
 		return run(cmd, config)
 	}
@@ -200,6 +203,17 @@ func main() {
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+// appendEnvACMEDomains restores the v1 behavior of combining ACME_DOMAIN with
+// --acme-domain, as cli v3 ignores the env source once the flag is given.
+func appendEnvACMEDomains(domains []string, env string) []string {
+	for _, domain := range strings.Split(env, ",") {
+		if domain = strings.TrimSpace(domain); domain != "" && !slices.Contains(domains, domain) {
+			domains = append(domains, domain)
+		}
+	}
+	return domains
 }
 
 func initLogs(c *cli.Command, cfg rancher.Options) {
