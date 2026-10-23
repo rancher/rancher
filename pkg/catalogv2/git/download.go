@@ -17,6 +17,12 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 		return fmt.Errorf("ensure failure: %w", err)
 	}
 
+	// A repository shipped with its working tree is ready to be served as is, and has to be reported as
+	// such before anything else in here, which may take a while.
+	if !IsCheckedOut(name, gitURL) {
+		markIfPopulated(git.directory())
+	}
+
 	// If the repositories are rancher managed and if bundled is set
 	// don't fetch anything from upstream.
 	if IsBundled(git.directory()) && settings.SystemCatalog.Get() == "bundled" {
