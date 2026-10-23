@@ -3,14 +3,14 @@ package clients
 import (
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
 // GroupCache is an in-memory cache of group principals.
-var GroupCache *lru.Cache
+var GroupCache *lru.Cache[string, v3.Principal]
 
 type userPrincipalsClient interface {
 	GetGroup(id string) (v3.Principal, error)
@@ -33,13 +33,8 @@ func UserGroupsToPrincipals(azureClient userPrincipalsClient, groupNames []strin
 		j := i
 		groupID := id
 
-		if principal, ok := GroupCache.Get(groupID); ok {
-			p, ok := principal.(v3.Principal)
-			if !ok {
-				logrus.Errorf("failed to convert a cached group to principal")
-				continue
-			}
-			groupPrincipals[j] = p
+		if groupPrincipal, ok := GroupCache.Get(groupID); ok {
+			groupPrincipals[j] = groupPrincipal
 			continue
 		}
 

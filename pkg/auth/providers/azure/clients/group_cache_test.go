@@ -3,7 +3,7 @@ package clients
 import (
 	"testing"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,7 +63,7 @@ func setupTestCache(t *testing.T) {
 	t.Cleanup(func() {
 		GroupCache = oldGroupCache
 	})
-	gc, err := lru.New(10)
+	gc, err := lru.New[string, v3.Principal](10)
 	require.NoError(t, err)
 	GroupCache = gc
 }
