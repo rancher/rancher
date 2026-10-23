@@ -95,7 +95,6 @@ jobs:
   approve:
     name: Approve Rancher Assets Release PRs
     permissions:
-      checks: read # Read CI conclusions before approval.
       id-token: write # Allow Vault action to authenticate with GitHub OIDC.
       pull-requests: read # Read PR restrictions and review state.
     runs-on: ubuntu-latest
