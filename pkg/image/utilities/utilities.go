@@ -613,6 +613,16 @@ docker_uses_containerd_snapshotter () {
     docker info 2>/dev/null | grep -qi "containerd.snapshotter"
 }
 
+# On SLES/SL Micro, 'docker' is commonly an alias/symlink to Podman. Podman's
+# default docker-archive format stores a SINGLE image: extra names are treated
+# as tags for that one image rather than as separate images, so
+# 'docker save a b c' silently produces an archive with just one image. Podman
+# needs --multi-image-archive (-m) to bundle all images; native Docker does not
+# have that flag.
+engine_is_podman () {
+    docker --version 2>/dev/null | grep -qi "podman"
+}
+
 helm_available () {
     command -v helm >/dev/null 2>&1
 }
@@ -719,7 +729,12 @@ done < "${list}"
 
 if [ -n "${pulled}" ]; then
     echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') images"
-    docker save $(echo ${pulled}) | gzip --stdout > ${images}
+    save_opts=()
+    if engine_is_podman; then
+        echo "Detected Podman: using --multi-image-archive to save all images."
+        save_opts+=(--multi-image-archive)
+    fi
+    docker save "${save_opts[@]}" $(echo ${pulled}) | gzip --stdout > ${images}
 else
     echo "No docker images pulled; skipping ${images}."
 fi
