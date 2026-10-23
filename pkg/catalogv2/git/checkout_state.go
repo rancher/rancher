@@ -131,11 +131,11 @@ func IsCheckedOut(name, gitURL string) bool {
 	return ok
 }
 
-// ForgetRepo drops the checkout state of every repository cloned for the ClusterRepo, to be used
-// once its directory has been removed.
-func ForgetRepo(name string) {
-	// ClusterRepos never use namespace cause they are cluster scoped so we pass ""
-	parent := checkoutKey(ParentRepoDir("", name)) + string(filepath.Separator)
+// ForgetRepo drops the checkout state of every repository cloned under parentDir, the directory
+// returned by ParentRepoDir for the ClusterRepo. It takes the directory rather than resolving it
+// again because ParentRepoDir falls back to the state directory once a bundled one is removed.
+func ForgetRepo(parentDir string) {
+	parent := checkoutKey(parentDir) + string(filepath.Separator)
 	checkedOut.Range(func(key, _ any) bool {
 		if strings.HasPrefix(key.(string), parent) {
 			checkedOut.Delete(key)

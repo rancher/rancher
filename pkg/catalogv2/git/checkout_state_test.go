@@ -64,7 +64,7 @@ func Test_CheckoutState(t *testing.T) {
 			require.NoError(t, tc.restore(t))
 			assertGate(t, false)
 
-			ForgetRepo(bundledName)
+			ForgetRepo(ParentRepoDir(bundledNamespace, bundledName))
 			assertGate(t, true)
 		})
 	}
@@ -85,7 +85,7 @@ func Test_ForgetRepoAfterRemoval(t *testing.T) {
 	key := checkoutKey(RepoDir(bundledNamespace, bundledName, bundledURL))
 	parent := ParentRepoDir(bundledNamespace, bundledName)
 	require.NoError(t, os.RemoveAll(parent))
-	ForgetRepo(bundledName)
+	ForgetRepo(parent)
 
 	_, stale := checkedOut.Load(key)
 	assert.False(t, stale, "the checkout state of the removed directory should have been dropped")
