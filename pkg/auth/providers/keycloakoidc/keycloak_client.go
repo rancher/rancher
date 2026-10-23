@@ -46,7 +46,10 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, conf
 	}
 	if principalType == "" || principalType == UserType {
 		var userAccounts []account
-		searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, UserType, searchTerm)
+		// The search term is user input and may contain characters that are not
+		// valid in a URL (e.g. non-ASCII characters or spaces), so it must be
+		// percent-encoded before being appended to the query string.
+		searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, UserType, url.QueryEscape(searchTerm))
 		search := URLEncoded(searchURL)
 
 		b, err := k.getFromKeyCloak(search)
@@ -80,7 +83,10 @@ func (k *KeyCloakClient) groupSearch(searchTerm string, sURL string) ([]account,
 	var groups []Group
 	var accounts []account
 
-	searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, GroupType, searchTerm)
+	// The search term is user input and may contain characters that are not
+	// valid in a URL (e.g. non-ASCII characters or spaces), so it must be
+	// percent-encoded before being appended to the query string.
+	searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, GroupType, url.QueryEscape(searchTerm))
 	search := URLEncoded(searchURL)
 
 	b, err := k.getFromKeyCloak(search)
