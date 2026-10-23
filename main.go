@@ -197,12 +197,6 @@ func main() {
 		return run(cmd, config)
 	}
 
-	app.ExitErrHandler = func(_ context.Context, _ *cli.Command, err error) {
-		logrus.Fatal(err)
-	}
-
-	// v3 only routes action and exit-coder errors through ExitErrHandler;
-	// usage errors are returned, so surface them instead of exiting 0.
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		logrus.Fatal(err)
 	}
