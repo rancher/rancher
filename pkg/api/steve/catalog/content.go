@@ -35,19 +35,19 @@ func (i *contentDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	switch apiContext.Link {
 	case "index":
 		if err := i.serveIndex(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	case "info":
 		if err := i.serveInfo(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	case "chart":
 		if err := i.serveChart(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	case "icon":
 		if err := i.serveIcon(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	}
 }
@@ -171,4 +171,8 @@ func nsAndName(apiContext *types.APIRequest) (string, string) {
 		return "", apiContext.Name
 	}
 	return apiContext.Namespace, apiContext.Name
+}
+
+func (i *contentDownload) writeError(apiContext *types.APIRequest, rw http.ResponseWriter, err error) {
+	apiContext.WriteError(err)
 }
