@@ -516,11 +516,12 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 }
 
 func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	// The principal is returned for the AuthConfig that issued it, which may
-	// not be the one that issued the token.
 	configName, principalType, externalID, err := common.SplitPrincipalID(principalID)
 	if err != nil {
 		return apiv3.Principal{}, fmt.Errorf("SAML: %w", err)
+	}
+	if _, err := common.ConfigNameForPrincipalLookup(principalID, token); err != nil {
+		return apiv3.Principal{}, err
 	}
 	if principalType != common.UserPrincipalType && principalType != common.GroupPrincipalType {
 		return apiv3.Principal{}, fmt.Errorf("SAML: Invalid principal type")

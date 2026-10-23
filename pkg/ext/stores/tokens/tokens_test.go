@@ -3423,48 +3423,52 @@ func (w *mockWatch) ResultChan() <-chan watch.Event {
 
 func (w *mockWatch) Stop() {}
 
-func TestSystemStoreListForProvider(t *testing.T) {
+func TestSystemStoreListForConfig(t *testing.T) {
 	t.Parallel()
 
-	otherPrincipal := ext.TokenPrincipal{
-		Name:     "other-user",
-		Provider: "otherprovider",
-	}
-	otherPrincipalBytes, _ := json.Marshal(otherPrincipal)
-
-	otherSecret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "token-other",
-			Labels: map[string]string{
-				UserIDLabel:     "otheruser",
-				SecretKindLabel: SecretKindLabelValue,
+	newSecret := func(name, principalID string) *corev1.Secret {
+		principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+			Name:     principalID,
+			Provider: "github",
+		})
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					UserIDLabel:     name + "-user",
+					SecretKindLabel: SecretKindLabelValue,
+				},
+				UID: types.UID(name + "-uid"),
 			},
-			UID: "other-uid",
-		},
-		Data: map[string][]byte{
-			FieldDescription:    []byte(""),
-			FieldEnabled:        []byte("true"),
-			FieldHash:           []byte("otherhash"),
-			FieldKind:           []byte(IsLogin),
-			FieldLastUpdateTime: []byte("14:00:00"),
-			FieldPrincipal:      otherPrincipalBytes,
-			FieldTTL:            []byte("5000"),
-			FieldUID:            []byte("other-kube-uid"),
-			FieldUserID:         []byte("otheruser"),
-		},
+			Data: map[string][]byte{
+				FieldDescription:    []byte(""),
+				FieldEnabled:        []byte("true"),
+				FieldHash:           []byte("somehash"),
+				FieldKind:           []byte(IsLogin),
+				FieldLastUpdateTime: []byte("14:00:00"),
+				FieldPrincipal:      principalBytes,
+				FieldTTL:            []byte("5000"),
+				FieldUID:            []byte(name + "-kube-uid"),
+				FieldUserID:         []byte(name + "-user"),
+			},
+		}
 	}
+
+	// Both configs have the provider type github.
+	githubSecret := newSecret("token-github", "github_user://1")
+	githubEUSecret := newSecret("token-github-eu", "github-eu_user://2")
 
 	tests := []struct {
 		name       string
-		provider   string
+		configName string
 		err        error
-		wantCount  int
+		wantTokens []string
 		storeSetup func(scache *fake.MockCacheInterface[*corev1.Secret])
 	}{
 		{
-			name:     "cache error propagates",
-			provider: "somebody",
-			err:      apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider somebody: %w", errSomeError)),
+			name:       "cache error propagates",
+			configName: "github",
+			err:        apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config github: %w", errSomeError)),
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -3472,9 +3476,8 @@ func TestSystemStoreListForProvider(t *testing.T) {
 			},
 		},
 		{
-			name:      "empty result",
-			provider:  "somebody",
-			wantCount: 0,
+			name:       "empty result",
+			configName: "github",
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -3482,33 +3485,44 @@ func TestSystemStoreListForProvider(t *testing.T) {
 			},
 		},
 		{
-			name:      "returns only matching provider",
-			provider:  "somebody",
-			wantCount: 1,
+			name:       "returns only the default config's tokens",
+			configName: "github",
+			wantTokens: []string{"token-github"},
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
-					Return([]*corev1.Secret{&properSecret, &otherSecret}, nil)
+					Return([]*corev1.Secret{githubSecret, githubEUSecret}, nil)
 			},
 		},
 		{
-			name:      "no match returns empty",
-			provider:  "nonexistent",
-			wantCount: 0,
+			name:       "returns only the named config's tokens",
+			configName: "github-eu",
+			wantTokens: []string{"token-github-eu"},
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
-					Return([]*corev1.Secret{&properSecret, &otherSecret}, nil)
+					Return([]*corev1.Secret{githubSecret, githubEUSecret}, nil)
 			},
 		},
 		{
-			name:      "skips broken secrets",
-			provider:  "somebody",
-			wantCount: 1,
+			name:       "does not match by provider type",
+			configName: "somebody",
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
-					Return([]*corev1.Secret{&properSecret, &badSecret}, nil)
+					// properSecret has the provider somebody but an
+					// unparseable principal ID.
+					Return([]*corev1.Secret{&properSecret, githubSecret}, nil)
+			},
+		},
+		{
+			name:       "skips broken secrets",
+			configName: "github",
+			wantTokens: []string{"token-github"},
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return([]*corev1.Secret{githubSecret, &badSecret}, nil)
 			},
 		},
 	}
@@ -3528,17 +3542,19 @@ func TestSystemStoreListForProvider(t *testing.T) {
 			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 			tt.storeSetup(scache)
 
-			toks, err := store.ListForProvider(tt.provider)
+			toks, err := store.ListForConfig(tt.configName)
 			if tt.err != nil {
 				assert.Equal(t, tt.err, err)
 				assert.Nil(t, toks)
-			} else {
-				require.NoError(t, err)
-				assert.Len(t, toks.Items, tt.wantCount)
-				for _, tok := range toks.Items {
-					assert.Equal(t, tt.provider, tok.Spec.UserPrincipal.Provider)
-				}
+				return
 			}
+
+			require.NoError(t, err)
+			var names []string
+			for _, tok := range toks.Items {
+				names = append(names, tok.Name)
+			}
+			assert.ElementsMatch(t, tt.wantTokens, names)
 		})
 	}
 }

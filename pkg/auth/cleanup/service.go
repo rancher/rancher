@@ -9,6 +9,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	ranchercontrollers "github.com/rancher/rancher/pkg/controllers"
@@ -20,7 +21,7 @@ import (
 )
 
 type extTokenStore interface {
-	ListForProvider(provider string) (*ext.TokenList, error)
+	ListForConfig(configName string) (*ext.TokenList, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 }
 
@@ -224,6 +225,9 @@ func (s *Service) deleteUsers(provider string) error {
 	return nil
 }
 
+// deleteTokens deletes the tokens issued by the named AuthConfig. Token.AuthProvider
+// holds the provider type, which several AuthConfigs can share, so tokens are
+// selected by the config name prefix of their user principal.
 func (s *Service) deleteTokens(provider string) error {
 	tokens, err := s.tokensCache.List(labels.Everything())
 	if err != nil {
@@ -231,11 +235,13 @@ func (s *Service) deleteTokens(provider string) error {
 	}
 
 	for _, t := range tokens {
-		if t.AuthProvider == provider {
-			err := s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				return fmt.Errorf("failed deleting token %s while disabling auth provider %s: %w", t.Name, provider, err)
-			}
+		configName, err := common.ConfigNameFromToken(t)
+		if err != nil || configName != provider {
+			continue
+		}
+		err = s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed deleting token %s while disabling auth provider %s: %w", t.Name, provider, err)
 		}
 	}
 
@@ -243,7 +249,7 @@ func (s *Service) deleteTokens(provider string) error {
 }
 
 func (s *Service) deleteExtTokens(provider string) error {
-	tokens, err := s.extTokenStore.ListForProvider(provider)
+	tokens, err := s.extTokenStore.ListForConfig(provider)
 	if err != nil {
 		return fmt.Errorf("failed to list ext tokens: %w", err)
 	}

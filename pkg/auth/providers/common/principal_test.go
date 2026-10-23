@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/norman/httperror"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -183,6 +184,71 @@ func TestConfigNameFromPrincipal(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.want, ConfigNameFromPrincipal(tt.principal))
+		})
+	}
+}
+
+func TestConfigNameForPrincipalLookup(t *testing.T) {
+	tests := []struct {
+		name           string
+		principalID    string
+		tokenPrincipal string
+		wantConfigName string
+		wantNotFound   bool
+		wantErr        bool
+	}{
+		{
+			name:           "principal from the token's config",
+			principalID:    "openldap-it_group://cn=admins,dc=example,dc=com",
+			tokenPrincipal: "openldap-it_user://cn=alice,dc=example,dc=com",
+			wantConfigName: "openldap-it",
+		},
+		{
+			name:           "principal from another config",
+			principalID:    "openldap-it_user://cn=bob,dc=example,dc=com",
+			tokenPrincipal: "openldap-corp_user://cn=alice,dc=example,dc=com",
+			wantNotFound:   true,
+		},
+		{
+			name:           "principal from the default config with a token from an additional config",
+			principalID:    "openldap_user://cn=bob,dc=example,dc=com",
+			tokenPrincipal: "openldap-corp_user://cn=alice,dc=example,dc=com",
+			wantNotFound:   true,
+		},
+		{
+			name:           "invalid principal ID",
+			principalID:    "openldap-corp",
+			tokenPrincipal: "openldap-corp_user://cn=alice,dc=example,dc=com",
+			wantErr:        true,
+		},
+		{
+			name:           "invalid token principal",
+			principalID:    "openldap-corp_user://cn=bob,dc=example,dc=com",
+			tokenPrincipal: "openldap-corp",
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: tt.tokenPrincipal},
+				},
+			}
+
+			gotConfigName, err := ConfigNameForPrincipalLookup(tt.principalID, token)
+			if tt.wantNotFound {
+				assert.True(t, httperror.IsNotFound(err), "expected NotFound, got %v", err)
+				return
+			}
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantConfigName, gotConfigName)
 		})
 	}
 }

@@ -174,7 +174,7 @@ func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, 
 }
 
 func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	var principal apiv3.Principal
 	if err != nil {
 		return principal, err
