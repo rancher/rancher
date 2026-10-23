@@ -18,6 +18,7 @@ import (
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -698,4 +699,40 @@ func TestNotReady(t *testing.T) {
 	assert.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, 503, apiErr.Code.Status)
 	assert.True(t, IsNotReady(err))
+}
+
+type fakeClusterRepoCache struct {
+	catalogcontrollers.ClusterRepoCache
+	repo *v1.ClusterRepo
+}
+
+func (f fakeClusterRepoCache) Get(string) (*v1.ClusterRepo, error) { return f.repo, nil }
+
+func TestGetRepoDisabled(t *testing.T) {
+	enabled, disabled := true, false
+
+	tests := []struct {
+		name        string
+		enabled     *bool
+		expectFound bool
+	}{
+		{name: "enabled unset", enabled: nil, expectFound: true},
+		{name: "enabled", enabled: &enabled, expectFound: true},
+		{name: "disabled", enabled: &disabled, expectFound: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewManager(nil, nil, nil, fakeClusterRepoCache{repo: &v1.ClusterRepo{
+				Spec: v1.RepoSpec{Enabled: tt.enabled},
+			}})
+
+			_, err := m.getRepo("", "repo")
+
+			if tt.expectFound {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, validation.NotFound)
+			}
+		})
+	}
 }
