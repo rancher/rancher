@@ -1,8 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.26.0
-
-toolchain go1.26.10
+go 1.26.10
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -125,7 +123,7 @@ require (
 	github.com/rancher/norman v0.7.4
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.0
-	github.com/rancher/remotedialer-proxy v0.6.4
+	github.com/rancher/remotedialer-proxy v0.6.5-rc.1
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260804210501-8350c1d7eb94
 	github.com/rancher/steve v0.7.47
