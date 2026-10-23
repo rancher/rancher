@@ -61,3 +61,9 @@ func ForgetRepo(name string) {
 		return true
 	})
 }
+
+// markIfPopulated marks the repository in dir as checked out when its working tree is already there.
+func markIfPopulated(dir string) bool { return false }
+
+// worktreePopulated returns true if the working tree of the repository in dir is the one HEAD refers to.
+func worktreePopulated(dir string) bool { return false }

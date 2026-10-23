@@ -2,6 +2,8 @@ package git
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,4 +68,91 @@ func Test_CheckoutState(t *testing.T) {
 			assertGate(t, true)
 		})
 	}
+}
+
+// Test_WorktreePopulated covers telling a restored working tree from the states a repository can be
+// in when this process hasn't restored it itself.
+func Test_WorktreePopulated(t *testing.T) {
+	testCases := []struct {
+		test     string
+		prepare  func(t *testing.T, f *fixture)
+		expected bool
+	}{
+		{
+			test:     "#1 TestCase: Cloned Without Checkout",
+			prepare:  func(t *testing.T, f *fixture) {},
+			expected: false,
+		},
+		{
+			test: "#2 TestCase: Shipped With Its Files",
+			prepare: func(t *testing.T, f *fixture) {
+				require.NoError(t, gitCmd("-C", f.dir, "checkout", "HEAD"))
+			},
+			expected: true,
+		},
+		{
+			test: "#3 TestCase: Index Written But A File Is Missing (Interrupted Reset)",
+			prepare: func(t *testing.T, f *fixture) {
+				require.NoError(t, gitCmd("-C", f.dir, "checkout", "HEAD"))
+				require.NoError(t, os.Remove(filepath.Join(f.dir, "chart.yaml")))
+			},
+			expected: false,
+		},
+		{
+			test: "#4 TestCase: A File Has A Different Size",
+			prepare: func(t *testing.T, f *fixture) {
+				require.NoError(t, gitCmd("-C", f.dir, "checkout", "HEAD"))
+				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "chart.yaml"), []byte("truncated?"), 0o644))
+			},
+			expected: false,
+		},
+		{
+			test: "#5 TestCase: Index Is At A Different Commit Than HEAD",
+			prepare: func(t *testing.T, f *fixture) {
+				require.NoError(t, gitCmd("-C", f.dir, "checkout", "HEAD"))
+				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "chart.yaml"), []byte("v2, longer"), 0o644))
+				require.NoError(t, gitCmd("-C", f.dir, "-c", "user.name=rancher", "-c", "user.email=rancher@suse.com",
+					"-c", "commit.gpgsign=false", "commit", "-am", "v2"))
+				// HEAD goes back to v1 while the index and the files stay at v2
+				require.NoError(t, gitCmd("-C", f.dir, "reset", "--soft", "HEAD~1"))
+			},
+			expected: false,
+		},
+		{
+			test: "#6 TestCase: Files Present But No Index",
+			prepare: func(t *testing.T, f *fixture) {
+				require.NoError(t, gitCmd("-C", f.dir, "checkout", "HEAD"))
+				require.NoError(t, os.Remove(filepath.Join(f.dir, ".git", "index")))
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.test, func(t *testing.T) {
+			f := newFixture(t)
+			tc.prepare(t, f)
+
+			assert.Equal(t, tc.expected, worktreePopulated(f.dir))
+			assert.Equal(t, tc.expected, markIfPopulated(f.dir))
+			assert.Equal(t, tc.expected, IsCheckedOut(bundledName, bundledURL))
+		})
+	}
+	t.Run("#7 TestCase: Directory Is Not A Repository", func(t *testing.T) {
+		assert.False(t, worktreePopulated(t.TempDir()))
+	})
+}
+
+// Test_Ensure_ShippedWithFiles checks a repository shipped with its files is reported ready by Ensure
+// even when what it goes on to do can't succeed, as there is no upstream to fetch from.
+func Test_Ensure_ShippedWithFiles(t *testing.T) {
+	setSystemCatalog(t, "external")
+	f := newFixture(t)
+	require.NoError(t, gitCmd("-C", f.dir, "checkout", "HEAD"))
+	require.False(t, IsCheckedOut(bundledName, bundledURL))
+
+	err := Ensure(nil, bundledNamespace, bundledName, bundledURL, "missing-commit", false, nil)
+
+	require.ErrorContains(t, err, "ensure failure")
+	assert.True(t, IsCheckedOut(bundledName, bundledURL))
 }
