@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -146,7 +148,6 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	token := &apiv3.Token{
-		AuthProvider: config.GetName(),
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "github_user://9253000",
@@ -423,5 +424,21 @@ func TestSearchPrincipalsExt(t *testing.T) {
 
 	if found[0].LoginName != "developer" {
 		t.Errorf("Unexpected principal %s", found[0].LoginName)
+	}
+}
+
+func TestGetPrincipalRejectsOtherConfig(t *testing.T) {
+	// The provider has no clients configured, so this fails if the principal
+	// is looked up.
+	provider := &Provider{}
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "github-corp_user://1"},
+		},
+	}
+
+	for _, principalID := range []string{"github-it_user://2", "github-it_group://3", "github_user://2"} {
+		_, err := provider.GetPrincipal(principalID, token)
+		assert.True(t, httperror.IsNotFound(err), "expected NotFound for %s, got %v", principalID, err)
 	}
 }

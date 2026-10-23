@@ -268,11 +268,13 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 
 	// Tokens are grouped by the AuthConfig they were issued for rather than
 	// by provider, so tokens from different configs of the same provider are
-	// handled independently.
+	// handled independently. Tokens whose AuthConfig can't be determined
+	// belong to no config, so they are skipped.
 	assign := func(token accessor.TokenAccessor) {
-		provider, err := common.ConfigNameFromToken(token)
+		provider, err := common.ConfigNameOrLocalFromToken(token)
 		if err != nil {
-			provider = token.GetAuthProvider()
+			logrus.Warnf("Skipping token %s of user %s: %v", token.GetName(), user.Name, err)
+			return
 		}
 		if token.GetIsDerived() {
 			derivedTokens[provider] = append(derivedTokens[provider], token)
@@ -393,7 +395,8 @@ func (r *refresher) refreshProvider(
 		} else {
 			token = derivedTokens[configName][0]
 		}
-		userPrincipal, err := providers.GetPrincipal(principalID, token)
+		// The token was issued by this config, so its provider is already known.
+		userPrincipal, err := providers.GetPrincipalFromProvider(providerName, principalID, token)
 		if err != nil {
 			return false, false, err
 		}
@@ -531,17 +534,14 @@ func (r *refresher) cleanupDeletedConfigs(
 }
 
 func (r *refresher) configuredProviders() ([]configuredProvider, error) {
-	authConfigs, err := r.authConfigLister.List("", labels.Everything())
+	refs, err := common.ConfigRefs(r.authConfigLister)
 	if err != nil {
-		return nil, fmt.Errorf("error listing auth configs: %w", err)
+		return nil, err
 	}
 
-	configured := make([]configuredProvider, 0, len(authConfigs))
-	for _, authConfig := range authConfigs {
-		configured = append(configured, configuredProvider{
-			configName:   authConfig.Name,
-			providerName: providers.NameFromType(authConfig.Type),
-		})
+	configured := make([]configuredProvider, len(refs))
+	for i, ref := range refs {
+		configured[i] = configuredProvider{configName: ref.ConfigName, providerName: ref.ProviderName}
 	}
 	return configured, nil
 }

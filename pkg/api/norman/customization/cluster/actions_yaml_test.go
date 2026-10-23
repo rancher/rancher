@@ -175,8 +175,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "fake-legacy",
 				},
-				UserID:       testUser,
-				AuthProvider: "local",
+				UserID: testUser,
 				UserPrincipal: apimgmtv3.Principal{
 					Provider: "local",
 					ObjectMeta: metav1.ObjectMeta{
@@ -376,8 +375,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "fake-legacy",
 				},
-				UserID:       testUser, // session owner, distinct from impersonated target
-				AuthProvider: "local",
+				UserID: testUser, // session owner, distinct from impersonated target
 				UserPrincipal: apimgmtv3.Principal{
 					Provider: "local",
 					ObjectMeta: metav1.ObjectMeta{

@@ -39,8 +39,8 @@ users:
 {{- end }}
 {{- with .ExecUser }}
         - --user-id={{.ID}}
-{{- if .AuthProvider }}
-        - --auth-provider={{.AuthProvider}}
+{{- if .ConfigName }}
+        - --auth-provider={{.ConfigName}}
 {{- end }}
 {{- end }}
       command: rancher
@@ -104,8 +104,8 @@ users:
 {{- end }}
 {{- with $.ExecUser }}
         - --user-id={{.ID}}
-{{- if .AuthProvider }}
-        - --auth-provider={{.AuthProvider}}
+{{- if .ConfigName }}
+        - --auth-provider={{.ConfigName}}
 {{- end }}
 {{- end }}
       command: rancher

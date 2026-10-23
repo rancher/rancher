@@ -73,6 +73,7 @@ type tokenManager interface {
 
 type ldapProvider struct {
 	authConfigs           mgmtv3.AuthConfigInterface
+	authConfigLister      mgmtv3.AuthConfigLister
 	secrets               wcorev1.SecretController
 	userMGR               userManager
 	tokenMGR              tokenManager
@@ -83,6 +84,7 @@ type ldapProvider struct {
 func Configure(mgmtCtx *config.ScaledContext, userMGR userManager, tokenMGR tokenManager, providerName string) common.AuthProvider {
 	return &ldapProvider{
 		authConfigs:           mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister:      mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
 		secrets:               mgmtCtx.Wrangler.Core.Secret(),
 		userMGR:               userMGR,
 		tokenMGR:              tokenMGR,
@@ -161,7 +163,12 @@ func (p *ldapProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, 
 		return v3.Principal{}, nil, "", err
 	}
 
-	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), login.ConfigName)
+	configName, err := common.LoginConfigName(p.authConfigLister, login.ConfigName, p.providerName)
+	if err != nil {
+		return v3.Principal{}, nil, "", err
+	}
+
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), configName)
 	if err != nil {
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
@@ -225,9 +232,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, token a
 }
 
 func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	// The principal is looked up using the AuthConfig that issued it, which
-	// may not be the one that issued the token.
-	configName, _, _, err := common.SplitPrincipalID(principalID)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return v3.Principal{}, err
 	}

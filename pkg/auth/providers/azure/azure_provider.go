@@ -48,11 +48,12 @@ type unstructuredGetter interface {
 }
 
 type Provider struct {
-	authConfigs v3.AuthConfigInterface
-	Retriever   unstructuredGetter
-	secrets     wcorev1.SecretController
-	userMGR     user.Manager
-	tokenMGR    *tokens.Manager
+	authConfigs      v3.AuthConfigInterface
+	authConfigLister v3.AuthConfigLister
+	Retriever        unstructuredGetter
+	secrets          wcorev1.SecretController
+	userMGR          user.Manager
+	tokenMGR         *tokens.Manager
 	// getConfig is used to retrieve the AzureAD configuration; injectable for testing.
 	getConfig func(string) (*apiv3.AzureADConfig, error)
 }
@@ -66,11 +67,12 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	}
 
 	p := &Provider{
-		Retriever:   mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
-		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		secrets:     mgmtCtx.Wrangler.Core.Secret(),
-		userMGR:     userMGR,
-		tokenMGR:    tokenMGR,
+		Retriever:        mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
 	}
 	p.getConfig = p.GetAzureConfigK8s
 	return p
@@ -155,7 +157,10 @@ func (ap *Provider) AuthenticateUser(w http.ResponseWriter, r *http.Request, inp
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	configName := login.ConfigName
+	configName, err := common.LoginConfigName(ap.authConfigLister, login.ConfigName, ProviderName)
+	if err != nil {
+		return apiv3.Principal{}, nil, "", err
+	}
 	logrus.Debugf("Loading Azure config %s", configName)
 	cfg, err := ap.getConfig(configName)
 	if err != nil {
@@ -260,7 +265,7 @@ func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.
 
 func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	var principal apiv3.Principal
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return principal, err
 	}

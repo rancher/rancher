@@ -353,10 +353,6 @@ func validateToken(authToken, token accessor.TokenAccessor, now time.Time) error
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("users don't match"))
 	}
 
-	if authToken.GetAuthProvider() != token.GetAuthProvider() {
-		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("auth providers don't match"))
-	}
-
 	if authToken.GetUserPrincipal().Name != token.GetUserPrincipal().Name {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("user principals don't match"))
 	}
