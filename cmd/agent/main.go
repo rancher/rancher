@@ -301,7 +301,9 @@ func run(ctx context.Context) error {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	for {
+	// Resolved before every attempt: the agent registers on its first
+	// connection and uses the plain path for each reconnect after that.
+	wsURLFor := func() string {
 		safeHost := serverURL.Host
 		if utils.IsPlainIPV6(safeHost) {
 			safeHost = fmt.Sprintf("[%s]", safeHost)
@@ -310,21 +312,41 @@ func run(ctx context.Context) error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
-
-		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
-		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
-			switch proto {
-			case "tcp":
-				return true
-			case "unix":
-				return address == "/var/run/docker.sock"
-			case "npipe":
-				return address == "//./pipe/docker_engine"
-			}
-			return false
-		}, onConnect)
-		time.Sleep(5 * time.Second)
+		return wsURL
 	}
+
+	logrus.Infof("Connecting to %s with token starting with %s", wsURLFor(), token[:len(token)/2])
+	// Reconnects internally, so it only returns once the context is cancelled.
+	return remotedialer.ClientConnectWithOpts(ctx, "", headers, nil, func(proto, address string) bool {
+		switch proto {
+		case "tcp":
+			return true
+		case "unix":
+			return address == "/var/run/docker.sock"
+		case "npipe":
+			return address == "//./pipe/docker_engine"
+		}
+		return false
+	}, onConnect, &remotedialer.ConnectOpts{
+		URL: wsURLFor,
+		Backoff: remotedialer.Backoff{
+			Min: retryDurationFromEnv("CATTLE_CONNECT_RETRY_MIN", 10*time.Second),
+			Max: retryDurationFromEnv("CATTLE_CONNECT_RETRY_MAX", 0),
+		},
+	})
+}
+
+// retryDurationFromEnv parses a duration; unset or invalid values yield def.
+func retryDurationFromEnv(key string, def time.Duration) time.Duration {
+	v := os.Getenv(key)
+	d, err := time.ParseDuration(v)
+	if v != "" && err != nil {
+		logrus.Warnf("Ignoring %s=%q, want a duration like 30s or 5m", key, v)
+	}
+	if d <= 0 {
+		return def
+	}
+	return d
 }
 
 func exitCertWriter(ctx context.Context) {
