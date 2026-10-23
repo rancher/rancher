@@ -568,13 +568,13 @@ func setIDTokenCookie(req *http.Request, w http.ResponseWriter, token string) {
 	if len(token) > maxSafeCookieSize {
 		logrus.Warnf("[AZURE_PROVIDER] ID token is %d bytes, may exceed browser cookie limit; SSO logout will fall back to client_id only", len(token))
 	}
-	isSecure := req.URL.Scheme == "https"
 	http.SetCookie(w, &http.Cookie{
 		Name:     IDTokenCookie,
 		Value:    token,
-		Secure:   isSecure,
+		Secure:   true,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
