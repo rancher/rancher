@@ -25,6 +25,9 @@ repos:
   system_agent:
     owner: 'rancher'
     repo: 'system-agent'
+  system_upgrade_controller:
+    owner: 'rancher'
+    repo: 'system-upgrade-controller'
   wins:
     owner: 'rancher'
     repo: 'wins'
@@ -49,3 +52,10 @@ wins_system_agent:
   commitmessage:
     type: 'deps'
     scope: 'wins and system-agent'
+
+system_upgrade_controller:
+  manifest: 'Update system-upgrade-controller pkg/apis module version'
+  pipelineid: 'update-system-upgrade-controller-version'
+  commitmessage:
+    type: 'deps'
+    scope: 'system-upgrade-controller'

@@ -1,0 +1,84 @@
+name: '{{ .system_upgrade_controller.manifest }}'
+pipelineid: '{{ .system_upgrade_controller.pipelineid }}'
+
+scms:
+  default:
+    kind: github
+    spec:
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repo }}'
+      branch: '{{ .scm.branch }}'
+      user: '{{ .scm.user }}'
+      email: '{{ .scm.email }}'
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      commitusingapi: {{ .scm.commitusingapi }}
+      commitmessage:
+        squash: {{ .scm.commitmessage.squash }}
+        type: '{{ .system_upgrade_controller.commitmessage.type }}'
+        scope: '{{ .system_upgrade_controller.commitmessage.scope }}'
+        title: 'Bump system-upgrade-controller to {{ source "suc-release" }}'
+        body: 'Bumps `github.com/rancher/system-upgrade-controller/pkg/apis` to `{{ source "suc-release" }}`.'
+
+actions:
+  rancher-pr:
+    kind: github/pullrequest
+    scmid: 'default'
+    spec:
+      labels:
+        - 'dependencies'
+      reviewers:
+        - 'rancher/rancher-team-2-hostbusters-dev'
+      mergemethod: '{{ .scm.mergemethod }}'
+      title: '[{{ .scm.branch }}] Bump system-upgrade-controller to {{ source "suc-release" }}'
+      description: 'Bumps `github.com/rancher/system-upgrade-controller/pkg/apis` to `{{ source "suc-release" }}` and refreshes go.sum via scripts/go-tidy.'
+
+sources:
+  suc-current-version:
+    name: 'Get current system-upgrade-controller pkg/apis version from go.mod'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'go.mod'
+      matchpattern: 'github\.com/rancher/system-upgrade-controller/pkg/apis v\S+'
+    transformers:
+      - find: 'v\S+'
+
+  suc-release:
+    name: 'Get latest upstream system-upgrade-controller pkg/apis version'
+    kind: shell
+    spec:
+      command: |
+        set -eu
+        output=$(GOTOOLCHAIN=auto go mod download -json "github.com/{{ .repos.system_upgrade_controller.owner }}/{{ .repos.system_upgrade_controller.repo }}/pkg/apis@master")
+        version=$(printf '%s\n' "$output" | grep '"Version":' | sed -E 's/.*"Version": "([^"]+)".*/\1/')
+        case "$version" in
+          v[0-9]*)
+            printf '%s\n' "$version"
+            ;;
+          *)
+            echo "Error: invalid or empty version '$version' retrieved for system-upgrade-controller pkg/apis" >&2
+            exit 1
+            ;;
+        esac
+
+targets:
+  update-go-mod:
+    name: 'Update github.com/rancher/system-upgrade-controller/pkg/apis in go.mod'
+    kind: file
+    scmid: 'default'
+    sourceid: 'suc-release'
+    spec:
+      file: 'go.mod'
+      matchpattern: 'github\.com/rancher/system-upgrade-controller/pkg/apis v\S+'
+      replacepattern: 'github.com/rancher/system-upgrade-controller/pkg/apis {{ source "suc-release" }}'
+
+  tidy-modules:
+    name: 'Run scripts/go-tidy to refresh go.sum'
+    kind: shell
+    scmid: 'default'
+    dependson:
+      - 'update-go-mod'
+    disablesourceinput: true
+    spec:
+      command: './scripts/go-tidy'
