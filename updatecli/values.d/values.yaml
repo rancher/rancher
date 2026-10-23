@@ -19,6 +19,9 @@ repos:
   harvester_docker_machine:
     owner: 'harvester'
     repo: 'docker-machine-driver-harvester'
+  machine:
+    owner: 'rancher'
+    repo: 'machine'
   k3s:
     owner: 'k3s-io'
     repo: 'k3s'
@@ -38,6 +41,13 @@ harvester_docker_machine:
   commitmessage:
     type: 'deps'
     scope: 'harvester-docker-machine'
+
+machine:
+  manifest: 'Update Rancher Machine version'
+  pipelineid: 'update-machine-version'
+  commitmessage:
+    type: 'deps'
+    scope: 'machine'
 
 k8s:
   manifest: 'Update K8s patch versions'
