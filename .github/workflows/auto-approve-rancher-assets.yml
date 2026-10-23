@@ -26,9 +26,8 @@ jobs:
   ci-check-trigger:
     name: Check/Re-trigger Rancher Assets Release GHAs PRs
     permissions:
-      actions: read # Read run status/attempts.
+      actions: write # Re-run failed checks.
       checks: read # Find which checks failed.
-      id-token: write # Allow Vault action to authenticate with GitHub OIDC.
       pull-requests: read # List open bump PRs and read their checks.
     runs-on: ubuntu-latest
     steps:
@@ -68,30 +67,10 @@ jobs:
 
           printf 'failed_runs=%s\n' "${failed_runs[*]}" >> "$GITHUB_OUTPUT"
 
-      - name: Read App Secrets
-        if: steps.find-failures.outputs.failed_runs != ''
-        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/rancher-assets-auto-approve/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/rancher-assets-auto-approve/app-credentials privateKey | PRIVATE_KEY
-
-      - name: Create App Token
-        if: steps.find-failures.outputs.failed_runs != ''
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: |
-            ${{ github.event.repository.name }}
-          permission-actions: write
-
       - name: Re-trigger failed runs
         if: steps.find-failures.outputs.failed_runs != ''
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_IDS: ${{ steps.find-failures.outputs.failed_runs }}
           MAX_RETRIES: 5
@@ -116,7 +95,6 @@ jobs:
   approve:
     name: Approve Rancher Assets Release PRs
     permissions:
-      checks: read # Read CI conclusions before approval.
       id-token: write # Allow Vault action to authenticate with GitHub OIDC.
       pull-requests: read # Read PR restrictions and review state.
     runs-on: ubuntu-latest
@@ -144,30 +122,17 @@ jobs:
 
           printf 'eligible_prs=%s\n' "$(echo "$eligible_prs" | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
 
-      - name: Read App Secrets
+      - name: Read Vault Token
         if: steps.eligibility.outputs.eligible_prs != ''
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/rancher-assets-auto-approve/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/rancher-assets-auto-approve/app-credentials privateKey | PRIVATE_KEY
-
-      - name: Create App Token
-        if: steps.eligibility.outputs.eligible_prs != ''
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: |
-            ${{ github.event.repository.name }}
-          permission-pull-requests: write
+            github/token/rancher--rancher--auto-approve--pull_requests--write token | APPROVE_TOKEN
 
       - name: Approve PR
         if: steps.eligibility.outputs.eligible_prs != ''
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ env.APPROVE_TOKEN }}
           PR_NUMBERS: ${{ steps.eligibility.outputs.eligible_prs }}
           REPO: ${{ github.repository }}
         run: |
