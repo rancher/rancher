@@ -481,3 +481,44 @@ func storeOperations(store map[string]v3.Setting) (get, set, list) {
 type get func(name string, opts metav1.GetOptions) (*v3.Setting, error)
 type set func(setting *v3.Setting) (*v3.Setting, error)
 type list func(opts metav1.ListOptions) (*v3.SettingList, error)
+
+func TestSetAllStaleEnvSettingRejectedByWebhook(t *testing.T) {
+	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+	provider := settingsProvider{
+		settings: client,
+	}
+	store := map[string]v3.Setting{
+		"some-setting": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "some-setting",
+			},
+			Value:   "stale-env-value",
+			Default: "old-default",
+			Source:  "env",
+		},
+	}
+	get, set, list := storeOperations(store)
+
+	client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+	client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+	// Mimic older versions of rancher-webhook, which reject changing the source of a setting away from "env".
+	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(setting *v3.Setting) (*v3.Setting, error) {
+		if store[setting.Name].Source == "env" && setting.Source != "env" {
+			return nil, apierrors.NewBadRequest("setting with source \"\" cannot update setting with source \"env\"")
+		}
+		return set(setting)
+	}).Times(2)
+
+	values := map[string]settings.Setting{
+		"some-setting": settings.NewSetting("some-setting", "new-default"),
+	}
+	err := provider.SetAll(values)
+	require.NoError(t, err)
+
+	s, err := get("some-setting", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "env", s.Source)
+	assert.Equal(t, "stale-env-value", s.Value)
+	assert.Equal(t, "new-default", s.Default)
+	assert.Equal(t, "stale-env-value", provider.fallback["some-setting"])
+}
