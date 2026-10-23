@@ -46,15 +46,26 @@ type Provider struct {
 	// authConfigLister is used to find the provider for the principals of
 	// external users. If nil, the AuthConfig name is used as the provider.
 	authConfigLister v3.AuthConfigLister
+	// users finds the users of principals for GetKnownPrincipal.
+	users userByPrincipalGetter
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, _ user.Manager) common.AuthProvider {
+// userByPrincipalGetter finds the user who has a principal, returning nil if
+// there is none.
+type userByPrincipalGetter interface {
+	GetUserByPrincipalID(principalID string) (*apiv3.User, error)
+}
+
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager) common.AuthProvider {
 	provider := NewProvider(
 		mgmtCtx.Management.Users("").Controller().Informer(),
 		mgmtCtx.Management.Users("").Controller().Lister(),
 		pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
 	)
 	provider.authConfigLister = mgmtCtx.Management.AuthConfigs("").Controller().Lister()
+	if userMGR != nil {
+		provider.users = userMGR
+	}
 
 	return provider
 }
@@ -265,13 +276,13 @@ func (l *Provider) providerNameForConfig(configName string) string {
 		return configName
 	}
 
-	authConfig, err := l.authConfigLister.Get("", configName)
+	providerName, err := common.LookupProviderNameForConfig(l.authConfigLister, configName)
 	if err != nil {
-		logrus.Debugf("SearchPrincipals local getting AuthConfig %s: %v", configName, err)
+		logrus.Debugf("SearchPrincipals local: %v", err)
 		return configName
 	}
 
-	return common.ProviderNameFromType(authConfig.Type)
+	return providerName
 }
 
 func (l *Provider) searchUserResources(searchKey string, queryKey string) ([]*apiv3.User, error) {
@@ -316,6 +327,33 @@ func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	princID := getLocalPrincipalID(user)
 	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, token, Name)
 	return princ, nil
+}
+
+// GetKnownPrincipal returns the principal with the given ID of a user Rancher
+// knows, built from the User object. The principal's identity provider is
+// never queried. It returns a NotFound error if no user has the principal,
+// which is always the case for group principals.
+//
+// It resolves the principals of other AuthConfigs when MultiAuthProviderCross
+// is enabled, the same principals that SearchPrincipals returns then.
+func (l *Provider) GetKnownPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	configName, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return apiv3.Principal{}, err
+	}
+	if l.users == nil {
+		return apiv3.Principal{}, fmt.Errorf("can't look up the user of principal %s", principalID)
+	}
+
+	user, err := l.users.GetUserByPrincipalID(principalID)
+	if err != nil {
+		return apiv3.Principal{}, fmt.Errorf("looking up the user of principal %s: %w", principalID, err)
+	}
+	if user == nil {
+		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("principal %s not found", principalID))
+	}
+
+	return l.toPrincipal("user", user.DisplayName, user.Username, principalID, token, l.providerNameForConfig(configName)), nil
 }
 
 func (l *Provider) listAllUsers(searchKey string) ([]*apiv3.User, error) {

@@ -235,15 +235,17 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 			LoginName:     "developer",
 			PrincipalType: "user",
 		},
-		AuthProvider: fakeAuthProvider,
-		Token:        fakeTokenValue,
-		UserID:       fakeUser,
-		Enabled:      new(true),
+		Token:   fakeTokenValue,
+		UserID:  fakeUser,
+		Enabled: new(true),
 	})
 	assert.NoError(s.T(), err)
 
 	// mock auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
+	// Without an AuthConfig lister, the provider for the token's config is
+	// found by provider name.
+	mockProvider.EXPECT().GetName().Return(fakeAuthProvider).AnyTimes()
 	mockProvider.EXPECT().IsDisabledProvider(fakeAuthProvider).Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]providercommon.AuthProvider{fakeAuthProvider: mockProvider})
 

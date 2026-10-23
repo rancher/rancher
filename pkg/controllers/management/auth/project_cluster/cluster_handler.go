@@ -392,7 +392,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			}
 
 			if principalName := cluster.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
-				if !strings.HasPrefix(principalName, "local") {
+				if !strings.HasPrefix(principalName, "local://") {
 					// Setting UserPrincipalName only makes sense for non-local users.
 					crtb.UserPrincipalName = principalName
 					crtb.UserName = ""

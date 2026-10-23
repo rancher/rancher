@@ -184,6 +184,8 @@ func (t *Token) ObjClusterName() string {
 	return ""
 }
 
+// Deprecated: GetAuthProvider is deprecated in favour of parsing the
+// AuthConfig name from the Principal's ID and using that AuthConfig's type.
 func (t *Token) GetAuthProvider() string {
 	return t.Spec.UserPrincipal.Provider
 }

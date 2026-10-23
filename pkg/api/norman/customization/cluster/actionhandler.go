@@ -104,23 +104,26 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
-		AuthProvider:  authToken.GetAuthProvider(),
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
 		UserPrincipal: authToken.GetUserPrincipal(),
 	}, nil
 }
 
-// execUser returns the requesting user and their auth provider for the exec entry of a kubeconfig without a token.
+// execUser returns the requesting user and the AuthConfig that issued their
+// token for the exec entry of a kubeconfig without a token.
 func (a ActionHandler) execUser(apiContext *types.APIContext) (*kubeconfig.ExecUser, error) {
 	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
 	if err != nil {
 		return nil, err
 	}
 
+	// Tokens that belong to no AuthConfig leave the CLI to ask for one.
+	configName, _ := common.ConfigNameFromToken(authToken)
+
 	return &kubeconfig.ExecUser{
-		ID:           a.UserMgr.GetUser(apiContext.Request),
-		AuthProvider: authToken.GetAuthProvider(),
+		ID:         a.UserMgr.GetUser(apiContext.Request),
+		ConfigName: configName,
 	}, nil
 }
 

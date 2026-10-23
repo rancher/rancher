@@ -202,7 +202,7 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 
 	// token already exists - so just return the token string.
 	if t != nil {
-		if t.AuthProvider == "local" && t.UserPrincipal.Name == "" {
+		if autoscalerTokenNeedsPrincipal(t) {
 			t = t.DeepCopy()
 			t.UserPrincipal = autoscalerUserPrincipal(t.UserID)
 			t, err = h.tokenClient.Update(t)

@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/clientcmd"
@@ -68,19 +69,19 @@ func TestKubeconfigDownload(t *testing.T) {
 	)
 
 	tests := []struct {
-		name          string
-		execGetToken  string
-		authProvider  string
-		tokenFetchErr error
+		name            string
+		execGetToken    string
+		userPrincipalID string
+		tokenFetchErr   error
 
 		wantErr  bool
 		wantArgs []string
 	}{
 		{
-			name:         "token command with setting off",
-			execGetToken: "false",
-			authProvider: "github",
-			wantArgs:     []string{"token", "--server=" + fakeHost, "--user=" + testClusterID},
+			name:            "token command with setting off",
+			execGetToken:    "false",
+			userPrincipalID: "github_user://12345",
+			wantArgs:        []string{"token", "--server=" + fakeHost, "--user=" + testClusterID},
 		},
 		{
 			name:          "token command with setting off ignores token fetch error",
@@ -89,10 +90,16 @@ func TestKubeconfigDownload(t *testing.T) {
 			wantArgs:      []string{"token", "--server=" + fakeHost, "--user=" + testClusterID},
 		},
 		{
-			name:         "get-token command",
-			execGetToken: "true",
-			authProvider: "github",
-			wantArgs:     []string{"auth", "get-token", "--server=" + fakeHost, "--user-id=" + testUserID, "--auth-provider=github"},
+			name:            "get-token command",
+			execGetToken:    "true",
+			userPrincipalID: "github_user://12345",
+			wantArgs:        []string{"auth", "get-token", "--server=" + fakeHost, "--user-id=" + testUserID, "--auth-provider=github"},
+		},
+		{
+			name:            "get-token command with token from a non-default auth config",
+			execGetToken:    "true",
+			userPrincipalID: "github-eu_user://12345",
+			wantArgs:        []string{"auth", "get-token", "--server=" + fakeHost, "--user-id=" + testUserID, "--auth-provider=github-eu"},
 		},
 		{
 			name:         "get-token command without auth provider",
@@ -136,8 +143,11 @@ func TestKubeconfigDownload(t *testing.T) {
 
 			handler := kubeconfigDownload{
 				authToken: &fakeAuthToken{
-					token: apimgmtv3.Token{UserID: "u-tokenuser", AuthProvider: test.authProvider}, // The user id must come from the request user, not the token.
-					err:   test.tokenFetchErr,
+					token: apimgmtv3.Token{
+						UserID:        "u-tokenuser", // The user id must come from the request user, not the token.
+						UserPrincipal: apimgmtv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: test.userPrincipalID}},
+					},
+					err: test.tokenFetchErr,
 				},
 			}
 			handler.ServeHTTP(httptest.NewRecorder(), apiRequest.Request)
