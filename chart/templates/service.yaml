@@ -26,6 +26,9 @@ spec:
     targetPort: 443
     protocol: TCP
     name: https
+    {{- if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
   selector:
 {{ include "rancher.selectorLabels" . | indent 4 }}
 
