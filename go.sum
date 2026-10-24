@@ -639,8 +639,8 @@ github.com/rancher/dynamiclistener v0.9.3 h1:hhiwFy51FqH+1zc9pmq9WQqDGIVoIL6aMoc
 github.com/rancher/dynamiclistener v0.9.3/go.mod h1:8vf06Xo75ioz6zIUAKIdrIGK2bsg/8sblbf6A9n5x3s=
 github.com/rancher/eks-operator v1.15.3 h1:XP93Reyia2TqqJ+ubM5Bnpt4V0hNcx+hvZdNf3As93w=
 github.com/rancher/eks-operator v1.15.3/go.mod h1:XZR4QMzXZHsnTAcdGQ52WVgGQmHyscK7F3QGFFlrH7s=
-github.com/rancher/fleet/pkg/apis v0.16.3-rc.2 h1:401kFZBmuYu2iHxUz/tCdRg/yzZ8Sibl3z+aV/zGRPU=
-github.com/rancher/fleet/pkg/apis v0.16.3-rc.2/go.mod h1:z2NvV37tKikwmcg23+/Wc6eXDMzxhsv8/40Trn49W14=
+github.com/rancher/fleet/pkg/apis v0.16.3 h1:fMD1V8qy17eV7vDwTf+nz9yfbes18WlojvQovmLpPOI=
+github.com/rancher/fleet/pkg/apis v0.16.3/go.mod h1:z2NvV37tKikwmcg23+/Wc6eXDMzxhsv8/40Trn49W14=
 github.com/rancher/gke-operator v1.15.4 h1:E6GBHjjlkXear9lFcsvarv6Zw0RIioR8EMNvGzWMVM4=
 github.com/rancher/gke-operator v1.15.4/go.mod h1:fWSo2cMlsE8mrFHQdCQhCBwoVVTpZQwXbrQAqge8f1o=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXIAwGYNwSFoRYJadVnOrD8kx2qrZyN8=
@@ -649,8 +649,8 @@ github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae7577
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379/go.mod h1:IfqyXrTiCAg8rTJodbGApTiORgujJnBH+QyHHJlFSII=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=
 github.com/rancher/lasso v0.2.9/go.mod h1:PMtxoVahRQvhEAi1HVOfyLDe1CrtGwTqOtkPVjSSkns=
-github.com/rancher/machine v0.15.0-rancher145.3-rc.1 h1:UamnXPRvD4XcrB2ZUr0yRLM9aXYnNstdgYN+vol3eNc=
-github.com/rancher/machine v0.15.0-rancher145.3-rc.1/go.mod h1:xN4A4f1caAYGK7Fa1WSJtV/iU0fROtadj0WmSqkoj/Y=
+github.com/rancher/machine v0.15.0-rancher145.3-rc.2 h1:m3XfC0txM846jOoO75sjT7ZX8h3f/bfepItyQBr7Fyk=
+github.com/rancher/machine v0.15.0-rancher145.3-rc.2/go.mod h1:rOGXfI8YhV1dLVLhccmzKaR5wzY/jEkSKCErfpxoGZQ=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/muchang v0.1.1 h1:2UJ7FPn+DZKspmqioWQpGb/DvotKFJZdFrV961ZPHdU=
@@ -659,8 +659,8 @@ github.com/rancher/norman v0.9.11 h1:Yc06fyPIMZuO8iW469YfJKEgaV85AUge+BVkt+5iJVQ
 github.com/rancher/norman v0.9.11/go.mod h1:4qkaDOXCsSpbsHAb+w9NPJuhjHsjpYivYXDtdAeqb2M=
 github.com/rancher/remotedialer v0.6.1 h1:smq2sHKJn+NxxIeQ8To9CGGkz8l6Ir7EPzfAdjUTt2s=
 github.com/rancher/remotedialer v0.6.1/go.mod h1:0+dmsw9TPjcqNUPrgAVFZpvbxy1r/fRaGPpVa84OMjU=
-github.com/rancher/remotedialer-proxy v0.8.2 h1:q2kh6iE4INPS9kwN5lvkDNl+w6ZgJFzUvt5TArYD3TM=
-github.com/rancher/remotedialer-proxy v0.8.2/go.mod h1:5COqTa9QtMbBdk0YtrTWKemXVoTqBhSBMK/9PQvwniM=
+github.com/rancher/remotedialer-proxy v0.8.3-rc.1 h1:bg4LErOHrppCllPQ2WXSCfehF10tC1l8r8l60V45pk0=
+github.com/rancher/remotedialer-proxy v0.8.3-rc.1/go.mod h1:xcmpmGBbkHqimD+ZMHkaJmhyDgn+Pkus5sX2/LkuKNg=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a h1://lhZJ7E6znLttBO9b2+V/Xl51iw3bDspjiH8W5MxMk=
