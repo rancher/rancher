@@ -1,8 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.26.0
-
-toolchain go1.26.10
+go 1.26.10
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -122,7 +120,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.7.7
 	github.com/rancher/eks-operator v1.12.14
-	github.com/rancher/fleet/pkg/apis v0.13.17-rc.2
+	github.com/rancher/fleet/pkg/apis v0.13.17
 	github.com/rancher/gke-operator v1.12.15
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
@@ -391,7 +389,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/time v0.14.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.51.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
