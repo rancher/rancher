@@ -21,14 +21,25 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	setID  = "rke2-machine-config-cleanup"
+	prefix = "rke2-machineconfig-cleanup"
+
+	// legacyNamespace is where Rancher v2.13.x and earlier created the namespaced cleanup objects.
+	legacyNamespace = fleet.ClustersDefaultNamespace
 )
 
 type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	secretCache               corecontrollers.SecretCache
 	apply                     apply.Apply
+	k8s                       kubernetes.Interface
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
@@ -41,6 +52,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 			clients.Core.ConfigMap()),
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		secretCache:               clients.Core.Secret().Cache(),
+		k8s:                       clients.K8s,
 	}
 
 	clients.Mgmt.ClusterRegistrationToken().OnChange(ctx, "cluster-registration-token", h.onChange)
@@ -72,13 +84,61 @@ func (h *handler) onChange(_ string, obj *v3apis.ClusterRegistrationToken) (_ *v
 	}
 
 	if err := h.apply.
-		WithSetID("rke2-machine-config-cleanup").
+		WithSetID(setID).
 		WithDynamicLookup().
 		WithNoDelete().ApplyObjects(cleanupObjects(token)...); err != nil {
 		return nil, err
 	}
 
+	if err := h.removeLegacyObjects(context.TODO()); err != nil {
+		return nil, err
+	}
+
 	return obj, nil
+}
+
+// removeLegacyObjects deletes the cronjob, config map, and service account that Rancher v2.13.x and earlier created in
+// the fleet-default namespace.
+func (h *handler) removeLegacyObjects(ctx context.Context) error {
+	cronJobs := h.k8s.BatchV1().CronJobs(legacyNamespace)
+	cronJob, err := cronJobs.Get(ctx, prefix+"-cronjob", metav1.GetOptions{})
+	if err := deleteIfOwned(ctx, cronJob, err, cronJobs.Delete); err != nil {
+		return err
+	}
+
+	configMaps := h.k8s.CoreV1().ConfigMaps(legacyNamespace)
+	configMap, err := configMaps.Get(ctx, prefix+"-script", metav1.GetOptions{})
+	if err := deleteIfOwned(ctx, configMap, err, configMaps.Delete); err != nil {
+		return err
+	}
+
+	serviceAccounts := h.k8s.CoreV1().ServiceAccounts(legacyNamespace)
+	serviceAccount, err := serviceAccounts.Get(ctx, prefix+"-sa", metav1.GetOptions{})
+	return deleteIfOwned(ctx, serviceAccount, err, serviceAccounts.Delete)
+}
+
+// deleteIfOwned deletes obj if it was created by this handler's apply. getErr is the error returned when fetching obj.
+func deleteIfOwned(ctx context.Context, obj metav1.Object, getErr error, deleteFunc func(context.Context, string, metav1.DeleteOptions) error) error {
+	if apierrors.IsNotFound(getErr) {
+		return nil
+	} else if getErr != nil {
+		return getErr
+	}
+
+	if obj.GetAnnotations()[apply.LabelID] != setID {
+		return nil
+	}
+
+	uid, resourceVersion := obj.GetUID(), obj.GetResourceVersion()
+	propagation := metav1.DeletePropagationBackground
+	err := deleteFunc(ctx, obj.GetName(), metav1.DeleteOptions{
+		Preconditions:     &metav1.Preconditions{UID: &uid, ResourceVersion: &resourceVersion},
+		PropagationPolicy: &propagation,
+	})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("deleting legacy %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+	}
+	return nil
 }
 
 // cleanupObjects returns the service account, cluster role+binding, config map, and cronjob required for periodically
@@ -100,7 +160,6 @@ func cleanupObjects(token string) []runtime.Object {
 
 	// Use fleet-local namespace as it's guaranteed to exist.
 	namespace := fleet.ClustersLocalNamespace
-	prefix := "rke2-machineconfig-cleanup"
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
