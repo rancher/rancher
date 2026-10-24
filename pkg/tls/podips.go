@@ -123,29 +123,9 @@ func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodContro
 	return newPodIPTracker(ctx, namespace.System, rancherPodSelector(), pods, handlerName)
 }
 
-// rancherPodSelector returns the label selector used to find the Rancher
-// server pods whose IPs are allowed on the dynamiclistener-managed cert.
-//
-// All replicas must resolve this to the SAME value: each pod runs its own
-// tracker over a shared cert secret, so a selector mismatch makes replicas
-// disagree on the valid IP set and fight over the secret, causing perpetual
-// cert churn.
-//
-// The source of truth is IMPERATIVE_API_APP_SELECTOR, which the chart
-// templates from the release fullname specifically as the pod "app" label
-// value (see chart/templates/deployment.yaml) and which pkg/ext already
-// treats as the canonical selector. When unset -- unit tests and non-Helm
-// installs where pods carry the plain label -- we fall back to the literal
-// "app=rancher".
-//
-// We deliberately do NOT fall back to the peer-service setting
-// (settings.PeerServices / CATTLE_PEER_SERVICE): despite today coinciding
-// with the fullname, it holds a comma-separated, order-insensitive set of
-// *Service names* -- not pod "app" label values -- so inferring a single
-// "app=<name>" selector from it is unsound (a Service may select pods on any
-// labels, and "first entry" has no defined meaning). Nor do we honor the RDP
-// "api-extension" override: that selector targets the imperative-api-extension
-// Service, not the Rancher server pods this filter is scoped to.
+// rancherPodSelector returns the label selector for the Rancher server pods.
+// The chart sets IMPERATIVE_API_APP_SELECTOR to rancher.fullname, the same
+// value used for the pods' "app" label; fall back to "app=rancher" when unset.
 func rancherPodSelector() string {
 	if v := os.Getenv(imperativeAPIAppSelectorEnvVar); v != "" {
 		return "app=" + v
