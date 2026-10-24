@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -115,7 +116,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		IsDerived:     true,
 		TTLMillis:     tokenTTL,
 		UserID:        token.GetUserID(),
-		AuthProvider:  token.GetAuthProvider(),
+		AuthProvider:  authProviderForPrincipal(token.GetUserPrincipal()),
 		ProviderInfo:  token.GetProviderInfo(),
 		Description:   jsonInput.Description,
 		ClusterName:   jsonInput.ClusterID,
@@ -679,7 +680,7 @@ func (m *Manager) EnsureClusterToken(clusterName string, input user.TokenInput) 
 		TTLMillis:     0,
 		Description:   input.Description,
 		UserID:        input.UserName,
-		AuthProvider:  input.AuthProvider,
+		AuthProvider:  authProviderForPrincipal(input.UserPrincipal),
 		UserPrincipal: input.UserPrincipal,
 		IsDerived:     true,
 		Token:         key,
@@ -718,6 +719,14 @@ func (m *Manager) EnsureClusterToken(clusterName string, input user.TokenInput) 
 	return token.Name + ":" + key, token, nil
 }
 
+// authProviderForPrincipal returns the value of the deprecated
+// Token.AuthProvider for a token issued for the principal: the principal's
+// provider, or local for the tokens Rancher issues for its own controllers,
+// which have no principal.
+func authProviderForPrincipal(principal apiv3.Principal) string {
+	return cmp.Or(principal.Provider, "local")
+}
+
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *Manager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (string, error) {
 	tokenTTL, err := GetKubeconfigDefaultTokenTTLInMilliSeconds()
@@ -730,7 +739,6 @@ func (m *Manager) newTokenForKubeconfig(clusterName, tokenName, description, kin
 		Description:   description,
 		Kind:          kind,
 		UserName:      userName,
-		AuthProvider:  userPrincipal.Provider,
 		TTL:           tokenTTL,
 		Randomize:     true,
 		UserPrincipal: userPrincipal,

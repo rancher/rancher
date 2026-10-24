@@ -322,14 +322,13 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token is disabled")
 	}
 
-	authProvider := rancherToken.GetAuthProvider()
-	if authProvider != "" {
+	if common.TokenHasAuthConfig(rancherToken) {
 		configName, err := common.ConfigNameFromToken(rancherToken)
 		if err != nil {
 			return TokenResponse{}, oidcerror.Newf(oidcerror.AccessDenied, "parsing auth provider: %v", err)
 		}
 
-		disabled, err := providers.IsDisabledProvider(authProvider, configName)
+		disabled, err := providers.IsConfigDisabled(configName)
 		if err != nil {
 			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError,
 				"can't check if auth provider is disabled: %v", err)
@@ -346,19 +345,18 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 	if user.Enabled != nil && !*user.Enabled {
 		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "user is disabled")
 	}
+	if !canLogInToOIDCClients(rancherToken, user) {
+		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "token can't be used to log in to OIDC clients")
+	}
 	attribs, err := h.userAttributeLister.Get(userID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "can't get user attributes: %v", err)
 	}
-	var groups []string
-	if attribs != nil {
-		for _, gps := range attribs.GroupPrincipals {
-			for _, principal := range gps.Items {
-				name := strings.TrimPrefix(principal.Name, "local://")
-				groups = append(groups, name)
-			}
-		}
+	configName, err := common.ConfigNameOrLocalFromToken(rancherToken)
+	if err != nil {
+		return TokenResponse{}, oidcerror.Newf(oidcerror.AccessDenied, "parsing auth config: %v", err)
 	}
+	groups := groupsForConfig(attribs, configName)
 
 	key, kid, err := h.jwks.GetSigningKey()
 	if err != nil {
@@ -399,9 +397,6 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 			"rancher_token_hash": rancherTokenHash,
 			"scope":              scopes,
 		}
-		if authProvider != "" {
-			refreshClaims["auth_provider"] = authProvider
-		}
 		refreshToken := jwt.NewWithClaims(jwt.SigningMethodRS256, refreshClaims)
 		refreshToken.Header["kid"] = kid
 		refreshTokenString, err := refreshToken.SignedString(key)
@@ -439,7 +434,13 @@ func createIDToken(oidcClient *v3.OIDCClient, rancherToken accessor.TokenAccesso
 	if slices.Contains(scopes, "groups") && groups != nil {
 		idClaims["groups"] = groups
 	}
-	authProvider := rancherToken.GetAuthProvider()
+	if configName, err := common.ConfigNameOrLocalFromToken(rancherToken); err == nil {
+		idClaims[configNameClaim] = configName
+	}
+	// Deprecated: auth_provider holds the provider type, which several
+	// AuthConfigs can share. Clients should use config_name instead. It is
+	// kept in id_tokens for existing clients and will be removed.
+	authProvider := authProviderClaim(rancherToken)
 	if authProvider != "" {
 		idClaims["auth_provider"] = authProvider
 	}
@@ -462,14 +463,24 @@ func CreateAccessToken(oidcClient *v3.OIDCClient, rancherToken accessor.TokenAcc
 		"token":      rancherToken.GetName(),
 		"token_kind": rancherToken.GetKind(),
 	}
-	authProvider := rancherToken.GetAuthProvider()
-	if authProvider != "" {
-		accessClaims["auth_provider"] = authProvider
+	if configName, err := common.ConfigNameOrLocalFromToken(rancherToken); err == nil {
+		accessClaims[configNameClaim] = configName
 	}
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodRS256, accessClaims)
 	accessToken.Header["kid"] = kid
 
 	return accessToken
+}
+
+// authProviderClaim returns the auth_provider claim for the token: the
+// provider of the AuthConfig that issued it, or empty if it can't be resolved.
+func authProviderClaim(rancherToken accessor.TokenAccessor) string {
+	providerName, err := providers.ProviderNameForToken(rancherToken)
+	if err != nil {
+		return ""
+	}
+
+	return providerName
 }
 
 func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient, clientSecretID string) error {

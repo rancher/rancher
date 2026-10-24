@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -395,8 +396,7 @@ func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
 			})
 
 			token := &apiv3.Token{
-				UserID:       "test-user",
-				AuthProvider: ProviderName,
+				UserID: "test-user",
 				UserPrincipal: apiv3.Principal{
 					ObjectMeta: metav1.ObjectMeta{Name: "keycloakoidc-eu_user://test-user"},
 				},
@@ -430,13 +430,12 @@ func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
 	}
 }
 
-func TestKeyCloakOIDCProviderGetPrincipalFromOtherConfig(t *testing.T) {
+func TestKeyCloakOIDCProviderGetPrincipalRejectsOtherConfig(t *testing.T) {
 	// GetConfig isn't set, so this fails if Keycloak is queried.
 	provider := &keyCloakOIDCProvider{
 		OpenIDCProvider: oidc.OpenIDCProvider{Name: ProviderName},
 	}
 	token := &v3.Token{
-		AuthProvider: ProviderName,
 		UserPrincipal: v3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: "keycloakoidc_user://alice"},
 			LoginName:     "alice",
@@ -445,14 +444,6 @@ func TestKeyCloakOIDCProviderGetPrincipalFromOtherConfig(t *testing.T) {
 		},
 	}
 
-	got, err := provider.GetPrincipal("keycloak-eu_user://bob", token)
-	require.NoError(t, err)
-
-	assert.Equal(t, apiv3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: "keycloak-eu_user://bob"},
-		DisplayName:   "bob",
-		LoginName:     "bob",
-		PrincipalType: UserType,
-		Provider:      ProviderName,
-	}, got)
+	_, err := provider.GetPrincipal("keycloak-eu_user://bob", token)
+	assert.True(t, httperror.IsNotFound(err), "expected NotFound, got %v", err)
 }

@@ -211,14 +211,13 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 		_ = subtle.ConstantTimeCompare([]byte(fakeToken), []byte(fakeToken))
 		return nil, fmt.Errorf("invalid token")
 	}
-	// If the auth provider is specified make sure it exists and enabled.
-	authProvider := token.GetAuthProvider()
-	if authProvider != "" {
+	// If the token was issued by an AuthConfig make sure it exists and is enabled.
+	if common.TokenHasAuthConfig(token) {
 		configName, err := common.ConfigNameFromToken(token)
 		if err != nil {
 			return nil, err
 		}
-		disabled, err := providers.IsDisabledProvider(authProvider, configName)
+		disabled, err := providers.IsConfigDisabled(configName)
 		if err != nil {
 			return nil, fmt.Errorf("can't check if auth provider is disabled: %w", err)
 		}
@@ -238,8 +237,23 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 	if authUser.Enabled != nil && !*authUser.Enabled {
 		return nil, fmt.Errorf("user is disabled")
 	}
+	if !canLogInToOIDCClients(token, authUser) {
+		return nil, fmt.Errorf("token can't be used to log in to OIDC clients")
+	}
 
 	return token, nil
+}
+
+// canLogInToOIDCClients reports whether the token can be used to log in to
+// OIDC clients. Only login tokens of users who logged in through an AuthConfig
+// can. Derived tokens, e.g. API keys, kubeconfig tokens and the tokens Rancher
+// issues for its own controllers, can't. Some controller tokens, e.g. the
+// autoscaler's, have a user principal, so the principal alone doesn't tell
+// them apart from a user's. The tokens of system users can't be used either.
+func canLogInToOIDCClients(token accessor.TokenAccessor, user *v3.User) bool {
+	return !token.GetIsDerived() &&
+		common.TokenHasAuthConfig(token) &&
+		!user.IsSystem()
 }
 
 func verifyToken(token accessor.TokenAccessor, tokenName, tokenKey string) (int, error) {

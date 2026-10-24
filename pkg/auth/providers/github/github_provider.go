@@ -39,12 +39,13 @@ type tokensManager interface {
 }
 
 type Provider struct {
-	authConfigs  v3.AuthConfigInterface
-	secrets      wcorev1.SecretController
-	getConfig    func(string) (*apiv3.GithubConfig, error)
-	githubClient *GClient
-	userMGR      user.Manager
-	tokenMGR     tokensManager
+	authConfigs      v3.AuthConfigInterface
+	authConfigLister v3.AuthConfigLister
+	secrets          wcorev1.SecretController
+	getConfig        func(string) (*apiv3.GithubConfig, error)
+	githubClient     *GClient
+	userMGR          user.Manager
+	tokenMGR         tokensManager
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -53,11 +54,12 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	}
 
 	provider := &Provider{
-		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
-		secrets:      mgmtCtx.Wrangler.Core.Secret(),
-		githubClient: githubClient,
-		userMGR:      userMGR,
-		tokenMGR:     tokenMGR,
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		githubClient:     githubClient,
+		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
 	}
 	provider.getConfig = provider.getGithubConfigCR
 
@@ -187,6 +189,10 @@ func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, c
 		configName = cmp.Or(configName, config.Name)
 	}
 	if config == nil {
+		configName, err = common.LoginConfigName(g.authConfigLister, configName, ProviderName)
+		if err != nil {
+			return apiv3.Principal{}, nil, "", err
+		}
 		logrus.Debugf("Loading Github config %s", configName)
 		config, err = g.getConfig(configName)
 		if err != nil {
@@ -342,7 +348,7 @@ const (
 )
 
 func (g *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return apiv3.Principal{}, err
 	}

@@ -94,16 +94,18 @@ func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Reques
 			oidcerror.WriteError(oidcerror.ServerError, fmt.Sprintf("can't get user attributes: %v", err), http.StatusInternalServerError, w)
 			return
 		}
-		var groups []string
-		if attribs != nil {
-			for _, gps := range attribs.GroupPrincipals {
-				for _, principal := range gps.Items {
-					name := strings.TrimPrefix(principal.Name, "local://")
-					groups = append(groups, name)
-				}
-			}
+		// Access tokens issued before the config_name claim was added have
+		// the deprecated auth_provider claim instead. In released versions
+		// each AuthConfig was named after its provider, so the provider name
+		// is the AuthConfig name. Access tokens are short-lived and refreshed
+		// ones have config_name, so this fallback can be removed once no
+		// tokens without config_name can still be valid. Tokens with neither
+		// claim get no groups rather than the groups of every AuthConfig.
+		configName, _ := claims[configNameClaim].(string)
+		if configName == "" {
+			configName, _ = claims["auth_provider"].(string)
 		}
-
+		groups := groupsForConfig(attribs, configName)
 		if groups != nil {
 			response.Groups = groups
 		}

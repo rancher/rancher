@@ -443,6 +443,14 @@ func (s *Store) Create(
 	dryRun := options != nil && len(options.DryRun) > 0
 	generateToken := s.shouldGenerateToken()
 
+	// Tokens are created from the request token's principal. Reject a
+	// principal without name or provider before anything is written.
+	if generateToken {
+		if p := authToken.GetUserPrincipal(); p.Name == "" || p.Provider == "" {
+			return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("request token %s has no user principal", authTokenID))
+		}
+	}
+
 	kubeconfigToStore := kubeconfig.DeepCopy()
 	kubeconfigToStore.Name = ""         // We generate the kubeconfig's name automatically.
 	kubeconfigToStore.GenerateName = "" // We generate the kubeconfig's name automatically.
@@ -503,9 +511,11 @@ func (s *Store) Create(
 
 	if s.shouldExecGetToken() {
 		// User entries without a token, including those of a dry run, run "rancher auth get-token".
+		// Tokens that belong to no AuthConfig leave the CLI to ask for one.
+		configName, _ := common.ConfigNameFromToken(authToken)
 		data.ExecUser = &kconfig.ExecUser{
-			ID:           userInfo.GetName(),
-			AuthProvider: authToken.GetAuthProvider(),
+			ID:         userInfo.GetName(),
+			ConfigName: configName,
 		}
 	}
 

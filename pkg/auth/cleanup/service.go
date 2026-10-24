@@ -9,18 +9,21 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	ranchercontrollers "github.com/rancher/rancher/pkg/controllers"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type extTokenStore interface {
-	ListForProvider(provider string) (*ext.TokenList, error)
+	ListForConfig(configName string) (*ext.TokenList, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 }
 
@@ -81,30 +84,30 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 		return fmt.Errorf("cannot clean up resources: auth config is nil")
 	}
 
-	provider := config.Name
+	authConfigName := config.Name
 	var errs []error
 
 	if err := secrets.CleanupClientSecrets(s.secretsInterface, config); err != nil {
 		errs = append(errs, fmt.Errorf("client secrets: %w", err))
 	}
 
-	if err := s.deleteGlobalRoleBindings(provider); err != nil {
+	if err := s.deleteGlobalRoleBindings(authConfigName); err != nil {
 		errs = append(errs, fmt.Errorf("global role bindings: %w", err))
 	}
 
-	if err := s.deleteClusterRoleTemplateBindings(provider); err != nil {
+	if err := s.deleteClusterRoleTemplateBindings(authConfigName); err != nil {
 		errs = append(errs, fmt.Errorf("cluster role template bindings: %w", err))
 	}
 
-	if err := s.deleteProjectRoleTemplateBindings(provider); err != nil {
+	if err := s.deleteProjectRoleTemplateBindings(authConfigName); err != nil {
 		errs = append(errs, fmt.Errorf("project role template bindings: %w", err))
 	}
 
-	if err := s.deleteUsersAndTokens(provider); err != nil {
+	if err := s.deleteUsersAndTokens(authConfigName); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := scim.Cleanup(s.secretsInterface, s.groupClient, provider); err != nil {
+	if err := scim.Cleanup(s.secretsInterface, s.groupClient, authConfigName); err != nil {
 		errs = append(errs, fmt.Errorf("SCIM secrets: %w", err))
 	}
 
@@ -115,32 +118,37 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 // user lifecycle controller's Remove handler needs tokens to exist to discover which clusters
 // have ClusterUserAttributes to clean up. If user deletion fails, token deletion is skipped
 // to preserve them for the next retry.
-func (s *Service) deleteUsersAndTokens(provider string) error {
-	if err := s.deleteUsers(provider); err != nil {
+func (s *Service) deleteUsersAndTokens(authConfigName string) error {
+	if err := s.deleteUsers(authConfigName); err != nil {
 		return fmt.Errorf("users: %w", err)
 	}
 
 	var errs []error
 
-	if err := s.deleteTokens(provider); err != nil {
+	if err := s.deleteTokens(authConfigName); err != nil {
 		errs = append(errs, fmt.Errorf("tokens: %w", err))
 	}
 
-	if err := s.deleteExtTokens(provider); err != nil {
+	if err := s.deleteExtTokens(authConfigName); err != nil {
 		errs = append(errs, fmt.Errorf("ext tokens: %w", err))
 	}
 
 	return errors.Join(errs...)
 }
 
-func (s *Service) deleteClusterRoleTemplateBindings(provider string) error {
+func (s *Service) deleteClusterRoleTemplateBindings(authConfigName string) error {
 	list, err := s.clusterRoleTemplateBindingsCache.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("failed to list cluster role template bindings: %w", err)
 	}
 
 	for _, b := range list {
-		if getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName) == provider {
+		configName, err := configNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
+		if err != nil {
+			logrus.Warnf("[auth cleanup] skipping cluster role template binding %s: %v", b.Namespace+"/"+b.Name, err)
+			continue
+		}
+		if configName == authConfigName {
 			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -151,14 +159,19 @@ func (s *Service) deleteClusterRoleTemplateBindings(provider string) error {
 	return nil
 }
 
-func (s *Service) deleteGlobalRoleBindings(provider string) error {
+func (s *Service) deleteGlobalRoleBindings(authConfigName string) error {
 	list, err := s.globalRoleBindingsCache.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("failed to list global role bindings: %w", err)
 	}
 
 	for _, b := range list {
-		if getProviderNameFromPrincipalNames(b.GroupPrincipalName) == provider {
+		configName, err := configNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
+		if err != nil {
+			logrus.Warnf("[auth cleanup] skipping global role binding %s: %v", b.Name, err)
+			continue
+		}
+		if configName == authConfigName {
 			err := s.globalRoleBindingsClient.Delete(b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -169,14 +182,19 @@ func (s *Service) deleteGlobalRoleBindings(provider string) error {
 	return nil
 }
 
-func (s *Service) deleteProjectRoleTemplateBindings(provider string) error {
+func (s *Service) deleteProjectRoleTemplateBindings(authConfigName string) error {
 	prtbs, err := s.projectRoleTemplateBindingsCache.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("failed to list project role template bindings: %w", err)
 	}
 
 	for _, b := range prtbs {
-		if getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName) == provider {
+		configName, err := configNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
+		if err != nil {
+			logrus.Warnf("[auth cleanup] skipping project role template binding %s: %v", b.Namespace+"/"+b.Name, err)
+			continue
+		}
+		if configName == authConfigName {
 			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -187,36 +205,50 @@ func (s *Service) deleteProjectRoleTemplateBindings(provider string) error {
 	return nil
 }
 
-// deleteUsers deletes all external users for the given provider,
-// who never were local users. It does not delete external users who were local before the provider had been set up.
-// The method only removes the external principal IDs from those users.
-// External users are those who have multiple principal IDs associated with them.
-// A local admin (not necessarily the default admin) who had set up the provider will have two principal IDs,
-// but will also have a password.
-// This is how Rancher distinguishes fully external users from those who are external, too, but were once local.
-func (s *Service) deleteUsers(provider string) error {
+// deleteUsers removes the principals of the named AuthConfig from every user.
+// A user is deleted if nothing they can log in with is left, i.e. they have
+// no principals of other AuthConfigs and no local password. A user who has a
+// local password, e.g. a local admin who set up the AuthConfig, or principals
+// of other AuthConfigs is kept with their remaining principals.
+func (s *Service) deleteUsers(configName string) error {
+	// Local principals are never removed, so local users are never deleted.
+	if configName == local.Name {
+		return nil
+	}
+
 	users, err := s.userClient.List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list users: %w", err)
 	}
 
 	for _, u := range users.Items {
-		if getProviderNameFromPrincipalNames(u.PrincipalIDs...) != provider {
+		remaining, otherConfigs, err := principalsWithoutConfig(u.PrincipalIDs, configName)
+		if err != nil {
+			logrus.Warnf("[auth cleanup] skipping user %s: %v", u.Name, err)
 			continue
 		}
+		if len(remaining) == len(u.PrincipalIDs) {
+			continue
+		}
+
 		// A fully external user (who was never local) has no password.
-		_, err := s.secretsCache.Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
+		_, err = s.secretsCache.Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get user secret: %w", err)
 		}
-		if u.Password == "" && apierrors.IsNotFound(err) {
+		hasPassword := u.Password != "" || err == nil
+
+		switch {
+		case !hasPassword && !otherConfigs:
 			err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
-		} else {
-			if err := s.resetLocalUser(&u); err != nil {
-				return fmt.Errorf("failed to reset local user: %w", err)
+		case len(remaining) == 0:
+			logrus.Warnf("[auth cleanup] not removing the last principal of user %s, who has a local password", u.Name)
+		default:
+			if err := s.updateUserPrincipals(&u, remaining); err != nil {
+				return fmt.Errorf("failed to update user principals: %w", err)
 			}
 		}
 	}
@@ -224,26 +256,31 @@ func (s *Service) deleteUsers(provider string) error {
 	return nil
 }
 
-func (s *Service) deleteTokens(provider string) error {
+// deleteTokens deletes the tokens issued by the named AuthConfig. Token.AuthProvider
+// holds the provider type, which several AuthConfigs can share, so tokens are
+// selected by the config name prefix of their user principal.
+func (s *Service) deleteTokens(authConfigName string) error {
 	tokens, err := s.tokensCache.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("failed to list tokens: %w", err)
 	}
 
 	for _, t := range tokens {
-		if t.AuthProvider == provider {
-			err := s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				return fmt.Errorf("failed deleting token %s while disabling auth provider %s: %w", t.Name, provider, err)
-			}
+		configName, err := common.ConfigNameFromToken(t)
+		if err != nil || configName != authConfigName {
+			continue
+		}
+		err = s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed deleting token %s while disabling auth config %s: %w", t.Name, authConfigName, err)
 		}
 	}
 
 	return nil
 }
 
-func (s *Service) deleteExtTokens(provider string) error {
-	tokens, err := s.extTokenStore.ListForProvider(provider)
+func (s *Service) deleteExtTokens(authConfigName string) error {
+	tokens, err := s.extTokenStore.ListForConfig(authConfigName)
 	if err != nil {
 		return fmt.Errorf("failed to list ext tokens: %w", err)
 	}
@@ -253,37 +290,20 @@ func (s *Service) deleteExtTokens(provider string) error {
 			if apierrors.IsNotFound(err) {
 				continue
 			}
-			return fmt.Errorf("failed deleting ext token %s while disabling auth provider %s: %w",
-				tokens.Items[i].Name, provider, err)
+			return fmt.Errorf("failed deleting ext token %s while disabling auth config %s: %w",
+				tokens.Items[i].Name, authConfigName, err)
 		}
 	}
 
 	return nil
 }
 
-// resetLocalUser takes a user and removes all its principal IDs except that of the local user.
-// It updates the user so that it is effectively as it was before any auth provider had been enabled.
-func (s *Service) resetLocalUser(user *v3.User) error {
-	if user == nil || len(user.PrincipalIDs) < 2 {
-		return nil
-	}
-
-	var localID string
-	for _, id := range user.PrincipalIDs {
-		if strings.HasPrefix(id, "local") {
-			localID = id
-			break
-		}
-	}
-
-	if localID == "" {
-		return nil
-	}
-
-	user.PrincipalIDs = []string{localID}
+// updateUserPrincipals sets the user's principal IDs.
+func (s *Service) updateUserPrincipals(user *v3.User, principalIDs []string) error {
+	user.PrincipalIDs = principalIDs
 	impClient, err := s.userClient.WithImpersonation(ranchercontrollers.WebhookImpersonation())
 	if err != nil {
-		return fmt.Errorf("impersonating webhook to reset user principals: %w", err)
+		return fmt.Errorf("impersonating webhook to update user principals: %w", err)
 	}
 	_, err = impClient.Update(user)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -292,14 +312,52 @@ func (s *Service) resetLocalUser(user *v3.User) error {
 	return nil
 }
 
-// getProviderNameFromPrincipalNames tries to extract the provider name from any one string that represents
-// a user principal or group principal.
-func getProviderNameFromPrincipalNames(names ...string) string {
+// principalsWithoutConfig returns the principal IDs that weren't issued by the
+// named AuthConfig, and whether any of them were issued by another AuthConfig.
+// Local and system principals belong to no AuthConfig. It returns an error if
+// a principal can't be parsed.
+func principalsWithoutConfig(principalIDs []string, configName string) ([]string, bool, error) {
+	var remaining []string
+	var otherConfigs bool
+	for _, id := range principalIDs {
+		if strings.HasPrefix(id, "system://") {
+			remaining = append(remaining, id)
+			continue
+		}
+		idConfigName, _, _, err := common.SplitPrincipalID(id)
+		if err != nil {
+			return nil, false, err
+		}
+		if idConfigName == configName {
+			continue
+		}
+		if idConfigName != local.Name {
+			otherConfigs = true
+		}
+		remaining = append(remaining, id)
+	}
+
+	return remaining, otherConfigs, nil
+}
+
+// configNameFromPrincipalNames returns the name of the AuthConfig that issued
+// the first principal in names that was issued by one. Empty names, local
+// principals and system principals, which belong to no AuthConfig, are
+// skipped. It returns "" if no principal was issued by an AuthConfig, and an
+// error if a principal can't be parsed.
+func configNameFromPrincipalNames(names ...string) (string, error) {
 	for _, name := range names {
-		parts := strings.Split(name, "_")
-		if len(parts) > 0 && parts[0] != "" && !strings.HasPrefix(parts[0], "local") {
-			return parts[0]
+		if name == "" || strings.HasPrefix(name, "system://") {
+			continue
+		}
+		configName, _, _, err := common.SplitPrincipalID(name)
+		if err != nil {
+			return "", err
+		}
+		if configName != local.Name {
+			return configName, nil
 		}
 	}
-	return ""
+
+	return "", nil
 }

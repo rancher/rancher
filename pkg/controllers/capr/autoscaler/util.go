@@ -20,6 +20,10 @@ import (
 const (
 	autoscalerHelmSecretResourceName   = "autoscaler-helm-secret"
 	autoscalerChartImagePullSecretName = "autoscaler-chart-image-pull-secret"
+
+	// autoscalerTokenKind is the value of the tokens.TokenKindLabel label on
+	// tokens created for the cluster autoscaler.
+	autoscalerTokenKind = "autoscaler"
 )
 
 func helmOpSecretName(clusterName string) string {
@@ -117,6 +121,14 @@ func generateKubeconfig(token string) ([]byte, error) {
 	return data, nil
 }
 
+// autoscalerTokenNeedsPrincipal reports whether t is an autoscaler token
+// created before autoscaler tokens were issued with a UserPrincipal.
+// Such tokens are identified by the autoscaler token kind label, which
+// generateToken has always set, and an empty UserPrincipal.Name.
+func autoscalerTokenNeedsPrincipal(t *v3.Token) bool {
+	return t.Labels[tokens.TokenKindLabel] == autoscalerTokenKind && t.UserPrincipal.Name == ""
+}
+
 // generateToken generates a v3.Token for a user in a specified cluster with given ownership references.
 func generateToken(username, clusterName string, owner []metav1.OwnerReference) (*v3.Token, error) {
 	// Generate new token value
@@ -130,7 +142,7 @@ func generateToken(username, clusterName string, owner []metav1.OwnerReference) 
 			Name: username,
 			Labels: map[string]string{
 				tokens.UserIDLabel:    username,
-				tokens.TokenKindLabel: "autoscaler",
+				tokens.TokenKindLabel: autoscalerTokenKind,
 				capi.ClusterNameLabel: clusterName,
 			},
 			Annotations:     map[string]string{},

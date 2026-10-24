@@ -32,18 +32,29 @@ func TestUserInfoEndpoint(t *testing.T) {
 		fakeSigningKey = "signing-key"
 		fakeUserName   = "user-name"
 		fakeUserID     = "user-id"
-		fakeGroupName  = "group-name"
+		fakeGroupName  = "github-eu_team://10"
+		fakeConfigName = "github-eu"
 	)
 	fakeUser := v3.User{
 		DisplayName: fakeUserName,
 	}
 	fakeUserAttributes := v3.UserAttribute{
 		GroupPrincipals: map[string]v3.Principals{
-			"group": {
+			fakeConfigName: {
 				Items: []v3.Principal{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeGroupName,
+						},
+					},
+				},
+			},
+			// Groups from another AuthConfig must not be returned.
+			"github": {
+				Items: []v3.Principal{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "github_team://other-group",
 						},
 					},
 				},
@@ -56,7 +67,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 		"iss":           settings.ServerURL.Get() + "/oidc",
 		"iat":           float64(time.Now().Unix()),
 		"sub":           fakeUserID,
-		"auth_provider": "auth-provider",
+		configNameClaim: fakeConfigName,
 		"scope":         []string{"openid", "profile", "groups"},
 	})
 	fakeAccessToken.Header["kid"] = fakeSigningKey
@@ -69,7 +80,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 		"iss":           settings.ServerURL.Get() + "/oidc",
 		"iat":           float64(time.Now().Unix()),
 		"sub":           fakeUserID,
-		"auth_provider": "auth-provider",
+		configNameClaim: fakeConfigName,
 		"scope":         []string{"openid", "groups"},
 	})
 	fakeAccessTokenNoProfile.Header["kid"] = fakeSigningKey
@@ -87,11 +98,52 @@ func TestUserInfoEndpoint(t *testing.T) {
 	fakeAccessTokenNoGroups.Header["kid"] = fakeSigningKey
 	fakeAccessTokenNoGroupsString, _ := fakeAccessTokenNoGroups.SignedString(privateKey)
 
+	// Access tokens issued while both claims were written. auth_provider holds
+	// the provider type, which matches the config "github" that the user didn't
+	// log in through.
+	fakeAccessTokenBothClaims := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"aud":           []interface{}{"client-id"},
+		"exp":           float64(time.Now().Add(10 * time.Hour).Unix()),
+		"iss":           settings.ServerURL.Get() + "/oidc",
+		"iat":           float64(time.Now().Unix()),
+		"sub":           fakeUserID,
+		"auth_provider": "github",
+		configNameClaim: fakeConfigName,
+		"scope":         []string{"openid", "profile", "groups"},
+	})
+	fakeAccessTokenBothClaims.Header["kid"] = fakeSigningKey
+	fakeAccessTokenBothClaimsString, _ := fakeAccessTokenBothClaims.SignedString(privateKey)
+
+	// Access tokens issued before the config_name claim was added.
+	fakeAccessTokenNoConfigName := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"aud":           []interface{}{"client-id"},
+		"exp":           float64(time.Now().Add(10 * time.Hour).Unix()),
+		"iss":           settings.ServerURL.Get() + "/oidc",
+		"iat":           float64(time.Now().Unix()),
+		"sub":           fakeUserID,
+		"auth_provider": "github",
+		"scope":         []string{"openid", "profile", "groups"},
+	})
+	fakeAccessTokenNoConfigName.Header["kid"] = fakeSigningKey
+	fakeAccessTokenNoConfigNameString, _ := fakeAccessTokenNoConfigName.SignedString(privateKey)
+
+	fakeAccessTokenNoConfigNameOrProvider := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"aud":   []interface{}{"client-id"},
+		"exp":   float64(time.Now().Add(10 * time.Hour).Unix()),
+		"iss":   settings.ServerURL.Get() + "/oidc",
+		"iat":   float64(time.Now().Unix()),
+		"sub":   fakeUserID,
+		"scope": []string{"openid", "profile", "groups"},
+	})
+	fakeAccessTokenNoConfigNameOrProvider.Header["kid"] = fakeSigningKey
+	fakeAccessTokenNoConfigNameOrProviderString, _ := fakeAccessTokenNoConfigNameOrProvider.SignedString(privateKey)
+
 	tests := map[string]struct {
 		req          func() *http.Request
 		mockSetup    func(mockParams)
 		wantResponse *UserInfoResponse
 		wantError    string
+		wantStatus   int
 		wantHeaders  map[string]string
 	}{
 		"success response": {
@@ -140,7 +192,61 @@ func TestUserInfoEndpoint(t *testing.T) {
 				mockParams.userCache.EXPECT().Get(fakeUserID).Return(&fakeUser, nil)
 			},
 			wantResponse: &UserInfoResponse{
-				Sub: fakeUserID,
+				Sub:      fakeUserID,
+				UserName: fakeUserName,
+			},
+		},
+		"access token with config name and auth provider gets the groups of the config name": {
+			req: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenBothClaimsString))
+
+				return req
+			},
+			mockSetup: func(mockParams mockParams) {
+				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				mockParams.userCache.EXPECT().Get(fakeUserID).Return(&fakeUser, nil)
+				mockParams.useAttributeLister.EXPECT().Get(fakeUserID).Return(&fakeUserAttributes, nil)
+			},
+			wantResponse: &UserInfoResponse{
+				Sub:      fakeUserID,
+				UserName: fakeUserName,
+				Groups:   []string{fakeGroupName},
+			},
+		},
+		"access token without config name gets the groups of the config named after its auth provider": {
+			req: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenNoConfigNameString))
+
+				return req
+			},
+			mockSetup: func(mockParams mockParams) {
+				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				mockParams.userCache.EXPECT().Get(fakeUserID).Return(&fakeUser, nil)
+				mockParams.useAttributeLister.EXPECT().Get(fakeUserID).Return(&fakeUserAttributes, nil)
+			},
+			wantResponse: &UserInfoResponse{
+				Sub:      fakeUserID,
+				UserName: fakeUserName,
+				Groups:   []string{"github_team://other-group"},
+			},
+		},
+		"access token without config name or auth provider gets no groups": {
+			req: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenNoConfigNameOrProviderString))
+
+				return req
+			},
+			mockSetup: func(mockParams mockParams) {
+				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				mockParams.userCache.EXPECT().Get(fakeUserID).Return(&fakeUser, nil)
+				mockParams.useAttributeLister.EXPECT().Get(fakeUserID).Return(&fakeUserAttributes, nil)
+			},
+			wantResponse: &UserInfoResponse{
+				Sub:      fakeUserID,
+				UserName: fakeUserName,
 			},
 		},
 		"invalid signature": {
@@ -154,7 +260,8 @@ func TestUserInfoEndpoint(t *testing.T) {
 			mockSetup: func(mockParams mockParams) {
 				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
-			wantError: `{"error":"invalid_request","error_description":"invalid access_token: token signature is invalid: crypto/rsa: verification error"}`,
+			wantError:  `{"error":"invalid_request","error_description":"invalid access_token: token signature is invalid: crypto/rsa: verification error"}`,
+			wantStatus: http.StatusBadRequest,
 		},
 		"invalid access token": {
 			req: func() *http.Request {
@@ -175,14 +282,16 @@ func TestUserInfoEndpoint(t *testing.T) {
 			mockSetup: func(mockParams mockParams) {
 				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
-			wantError: `{"error":"invalid_request","error_description":"invalid access_token: it doesn't have scope"}`,
+			wantError:  `{"error":"invalid_request","error_description":"invalid access_token: it doesn't have scope"}`,
+			wantStatus: http.StatusBadRequest,
 		},
 		"no access token": {
 			req: func() *http.Request {
 				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
 				return req
 			},
-			wantError: `{"error":"invalid_request","error_description":"failed to get token from header: authorization header is missing"}`,
+			wantError:  `{"error":"invalid_request","error_description":"failed to get token from header: authorization header is missing"}`,
+			wantStatus: http.StatusBadRequest,
 		},
 		"userinfo endpoint sets cache-control headers": {
 			req: func() *http.Request {
@@ -199,7 +308,11 @@ func TestUserInfoEndpoint(t *testing.T) {
 				"Cache-Control": "no-store",
 				"Pragma":        "no-cache",
 			},
-			wantResponse: &UserInfoResponse{},
+			wantResponse: &UserInfoResponse{
+				Sub:      fakeUserID,
+				UserName: fakeUserName,
+				Groups:   []string{fakeGroupName},
+			},
 		},
 	}
 
@@ -226,11 +339,13 @@ func TestUserInfoEndpoint(t *testing.T) {
 				assert.Equal(t, v, rec.Header().Get(k), "response header %s", k)
 			}
 			if test.wantError != "" {
+				assert.Equal(t, test.wantStatus, rec.Code, "unexpected status code")
 				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			} else {
 				var response UserInfoResponse
 				err := json.Unmarshal(rec.Body.Bytes(), &response)
 				assert.NoError(t, err)
+				assert.Equal(t, test.wantResponse, &response)
 			}
 		})
 	}
