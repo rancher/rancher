@@ -1,8 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.26.0
-
-toolchain go1.26.10
+go 1.26.10
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
@@ -133,7 +131,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.5
 	github.com/rancher/eks-operator v1.11.15
-	github.com/rancher/fleet/pkg/apis v0.12.21-rc.2
+	github.com/rancher/fleet/pkg/apis v0.12.21
 	github.com/rancher/gke-operator v1.11.16
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.4
