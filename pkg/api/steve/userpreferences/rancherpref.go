@@ -3,6 +3,7 @@ package userpreferences
 import (
 	"github.com/rancher/apiserver/pkg/store/empty"
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/steve/pkg/attributes"
 	steveclient "github.com/rancher/steve/pkg/client"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
@@ -92,6 +93,9 @@ func (e *rancherPrefStore) createNamespace(apiOp *types.APIRequest, ns string) e
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"name": ns,
+				"annotations": map[string]interface{}{
+					namespace.SystemNamespaceAnnotation: "true",
+				},
 			},
 		},
 	}, metav1.CreateOptions{})

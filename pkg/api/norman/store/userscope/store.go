@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -67,7 +68,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		s.nsClient.Create(&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					"management.cattle.io/system-namespace": "true",
+					namespace.SystemNamespaceAnnotation: "true",
 				},
 				Name: ns,
 			},
