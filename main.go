@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/ehazlett/simplelog"
@@ -18,7 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -45,161 +48,175 @@ func main() {
 
 	var config rancher.Options
 
-	app := cli.NewApp()
-	app.Version = version.FriendlyVersion()
-	app.Usage = "Complete container management platform"
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:        "kubeconfig",
-			Usage:       "Kube config for accessing k8s cluster",
-			EnvVar:      "KUBECONFIG",
-			Destination: &kubeConfig,
-		},
-		cli.BoolFlag{
-			Name:        "debug",
-			Usage:       "Enable debug logs",
-			Destination: &config.Debug,
-		},
-		cli.BoolFlag{
-			Name:        "trace",
-			Usage:       "Enable trace logs",
-			Destination: &config.Trace,
-		},
-		cli.StringFlag{
-			Name:        "add-local",
-			Usage:       "Add local cluster (true, false)",
-			Value:       "true",
-			Destination: &config.AddLocal,
-			Hidden:      true,
-		},
-		cli.IntFlag{
-			Name:        "http-listen-port",
-			Usage:       "HTTP listen port",
-			Value:       8080,
-			Destination: &config.HTTPListenPort,
-		},
-		cli.IntFlag{
-			Name:        "https-listen-port",
-			Usage:       "HTTPS listen port",
-			Value:       8443,
-			Destination: &config.HTTPSListenPort,
-		},
-		cli.StringFlag{
-			Name:        "k8s-mode",
-			Usage:       "Mode to run or access k8s API server for management API (embedded, external, auto)",
-			Value:       "auto",
-			Destination: &config.K8sMode,
-		},
-		cli.StringFlag{
-			Name:  "log-format",
-			Usage: "Log formatter used (json, text, simple)",
-			Value: "simple",
-		},
-		cli.StringSliceFlag{
-			Name:   "acme-domain",
-			EnvVar: "ACME_DOMAIN",
-			Usage:  "Domain to register with LetsEncrypt",
-			Value:  &config.ACMEDomains,
-		},
-		cli.BoolFlag{
-			Name:        "no-cacerts",
-			Usage:       "Skip CA certs population in settings when set to true",
-			Destination: &config.NoCACerts,
-		},
-		cli.StringFlag{
-			Name:        "audit-log-path",
-			EnvVar:      "AUDIT_LOG_PATH",
-			Value:       "/var/log/auditlog/rancher-api-audit.log",
-			Usage:       "Log path for Rancher Server API. Default path is /var/log/auditlog/rancher-api-audit.log",
-			Destination: &config.AuditLogPath,
-		},
-		cli.IntFlag{
-			Name:        "audit-log-maxage",
-			Value:       10,
-			EnvVar:      "AUDIT_LOG_MAXAGE",
-			Usage:       "Defined the maximum number of days to retain old audit log files",
-			Destination: &config.AuditLogMaxage,
-		},
-		cli.IntFlag{
-			Name:        "audit-log-maxbackup",
-			Value:       10,
-			EnvVar:      "AUDIT_LOG_MAXBACKUP",
-			Usage:       "Defines the maximum number of audit log files to retain",
-			Destination: &config.AuditLogMaxbackup,
-		},
-		cli.IntFlag{
-			Name:        "audit-log-maxsize",
-			Value:       100,
-			EnvVar:      "AUDIT_LOG_MAXSIZE",
-			Usage:       "Defines the maximum size in megabytes of the audit log file before it gets rotated, default size is 100M",
-			Destination: &config.AuditLogMaxsize,
-		},
-		cli.IntFlag{
-			Name:        "audit-level",
-			Value:       0,
-			EnvVar:      "AUDIT_LEVEL",
-			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body",
-			Destination: &config.AuditLogLevel,
-		},
-		cli.BoolFlag{
-			Name:        "enable-audit-log",
-			Usage:       "enable the rancher audit log system",
-			EnvVar:      "AUDIT_LOG_ENABLED",
-			Destination: &config.AuditLogEnabled,
-		},
-		cli.BoolFlag{
-			Name:        "audit-exclude-groups",
-			Usage:       "Indicates that user groups should not be logged in the auditing, this can reduce the bandwidth",
-			EnvVar:      "AUDIT_EXCLUDE_GROUPS",
-			Destination: &config.AuditLogExcludeGroups,
-		},
-		cli.StringFlag{
-			Name:        "profile-listen-address",
-			Value:       "127.0.0.1:6060",
-			Usage:       "Address to listen on for profiling",
-			Destination: &profileAddress,
-		},
-		cli.StringFlag{
-			Name:        "features",
-			EnvVar:      "CATTLE_FEATURES",
-			Value:       "",
-			Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
-			Destination: &config.Features,
-		},
-		cli.DurationFlag{
-			Name:        "aggregation-registration-timeout",
-			EnvVar:      "AGGREGATION_REGISTRATION_TIMEOUT",
-			Value:       time.Minute * 5,
-			Usage:       "Declare a different timeout duration when waiting to registration requests from the aggregation layer",
-			Destination: &config.AggregationRegistrationTimeout,
-		},
-		cli.StringFlag{
-			Name:        "rancher-namespaces",
-			EnvVar:      "RANCHER_NAMESPACES_OPTIONS",
-			Usage:       "Configuration for rancher namespace labels and annotations",
-			Destination: &config.RancherNamespaceOptions,
+	app := &cli.Command{
+		Version: version.FriendlyVersion(),
+		Usage:   "Complete container management platform",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "kubeconfig",
+				Usage:       "Kube config for accessing k8s cluster",
+				Sources:     cli.EnvVars("KUBECONFIG"),
+				Destination: &kubeConfig,
+			},
+			&cli.BoolFlag{
+				Name:        "debug",
+				Usage:       "Enable debug logs",
+				Destination: &config.Debug,
+			},
+			&cli.BoolFlag{
+				Name:        "trace",
+				Usage:       "Enable trace logs",
+				Destination: &config.Trace,
+			},
+			&cli.StringFlag{
+				Name:        "add-local",
+				Usage:       "Add local cluster (true, false)",
+				Value:       "true",
+				Destination: &config.AddLocal,
+				Hidden:      true,
+			},
+			&cli.IntFlag{
+				Name:        "http-listen-port",
+				Usage:       "HTTP listen port",
+				Value:       8080,
+				Destination: &config.HTTPListenPort,
+			},
+			&cli.IntFlag{
+				Name:        "https-listen-port",
+				Usage:       "HTTPS listen port",
+				Value:       8443,
+				Destination: &config.HTTPSListenPort,
+			},
+			&cli.StringFlag{
+				Name:        "k8s-mode",
+				Usage:       "Mode to run or access k8s API server for management API (embedded, external, auto)",
+				Value:       "auto",
+				Destination: &config.K8sMode,
+			},
+			&cli.StringFlag{
+				Name:  "log-format",
+				Usage: "Log formatter used (json, text, simple)",
+				Value: "simple",
+			},
+			&cli.StringSliceFlag{
+				Name:    "acme-domain",
+				Sources: cli.EnvVars("ACME_DOMAIN"),
+				Usage:   "Domain to register with LetsEncrypt",
+				// v3 disables trimming for string slices by default; v1
+				// trimmed the space around comma-separated values.
+				Config:      cli.StringConfig{TrimSpace: true},
+				Destination: &config.ACMEDomains,
+			},
+			&cli.BoolFlag{
+				Name:        "no-cacerts",
+				Usage:       "Skip CA certs population in settings when set to true",
+				Destination: &config.NoCACerts,
+			},
+			&cli.StringFlag{
+				Name:        "audit-log-path",
+				Sources:     cli.EnvVars("AUDIT_LOG_PATH"),
+				Value:       "/var/log/auditlog/rancher-api-audit.log",
+				Usage:       "Log path for Rancher Server API. Default path is /var/log/auditlog/rancher-api-audit.log",
+				Destination: &config.AuditLogPath,
+			},
+			&cli.IntFlag{
+				Name:        "audit-log-maxage",
+				Value:       10,
+				Sources:     cli.EnvVars("AUDIT_LOG_MAXAGE"),
+				Usage:       "Defined the maximum number of days to retain old audit log files",
+				Destination: &config.AuditLogMaxage,
+			},
+			&cli.IntFlag{
+				Name:        "audit-log-maxbackup",
+				Value:       10,
+				Sources:     cli.EnvVars("AUDIT_LOG_MAXBACKUP"),
+				Usage:       "Defines the maximum number of audit log files to retain",
+				Destination: &config.AuditLogMaxbackup,
+			},
+			&cli.IntFlag{
+				Name:        "audit-log-maxsize",
+				Value:       100,
+				Sources:     cli.EnvVars("AUDIT_LOG_MAXSIZE"),
+				Usage:       "Defines the maximum size in megabytes of the audit log file before it gets rotated, default size is 100M",
+				Destination: &config.AuditLogMaxsize,
+			},
+			&cli.IntFlag{
+				Name:        "audit-level",
+				Value:       0,
+				Sources:     cli.EnvVars("AUDIT_LEVEL"),
+				Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body",
+				Destination: &config.AuditLogLevel,
+			},
+			&cli.BoolFlag{
+				Name:        "enable-audit-log",
+				Usage:       "enable the rancher audit log system",
+				Sources:     cli.EnvVars("AUDIT_LOG_ENABLED"),
+				Destination: &config.AuditLogEnabled,
+			},
+			&cli.BoolFlag{
+				Name:        "audit-exclude-groups",
+				Usage:       "Indicates that user groups should not be logged in the auditing, this can reduce the bandwidth",
+				Sources:     cli.EnvVars("AUDIT_EXCLUDE_GROUPS"),
+				Destination: &config.AuditLogExcludeGroups,
+			},
+			&cli.StringFlag{
+				Name:        "profile-listen-address",
+				Value:       "127.0.0.1:6060",
+				Usage:       "Address to listen on for profiling",
+				Destination: &profileAddress,
+			},
+			&cli.StringFlag{
+				Name:        "features",
+				Sources:     cli.EnvVars("CATTLE_FEATURES"),
+				Value:       "",
+				Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
+				Destination: &config.Features,
+			},
+			&cli.DurationFlag{
+				Name:        "aggregation-registration-timeout",
+				Sources:     cli.EnvVars("AGGREGATION_REGISTRATION_TIMEOUT"),
+				Value:       time.Minute * 5,
+				Usage:       "Declare a different timeout duration when waiting to registration requests from the aggregation layer",
+				Destination: &config.AggregationRegistrationTimeout,
+			},
+			&cli.StringFlag{
+				Name:        "rancher-namespaces",
+				Sources:     cli.EnvVars("RANCHER_NAMESPACES_OPTIONS"),
+				Usage:       "Configuration for rancher namespace labels and annotations",
+				Destination: &config.RancherNamespaceOptions,
+			},
 		},
 	}
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(_ context.Context, cmd *cli.Command) error {
 		// enable profiler
 		if profileAddress != "" {
 			go func() {
 				log.Println(http.ListenAndServe(profileAddress, nil))
 			}()
 		}
-		initLogs(c, config)
-		return run(c, config)
+		config.ACMEDomains = appendEnvACMEDomains(config.ACMEDomains, os.Getenv("ACME_DOMAIN"))
+		initLogs(cmd, config)
+		return run(cmd, config)
 	}
 
-	app.ExitErrHandler = func(c *cli.Context, err error) {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		logrus.Fatal(err)
 	}
-
-	app.Run(os.Args)
 }
 
-func initLogs(c *cli.Context, cfg rancher.Options) {
+// appendEnvACMEDomains restores the v1 behavior of combining ACME_DOMAIN with
+// --acme-domain, as cli v3 ignores the env source once the flag is given.
+func appendEnvACMEDomains(domains []string, env string) []string {
+	for _, domain := range strings.Split(env, ",") {
+		if domain = strings.TrimSpace(domain); domain != "" && !slices.Contains(domains, domain) {
+			domains = append(domains, domain)
+		}
+	}
+	return domains
+}
+
+func initLogs(c *cli.Command, cfg rancher.Options) {
 	switch c.String("log-format") {
 	case "simple":
 		logrus.SetFormatter(&simplelog.StandardFormatter{})
@@ -221,7 +238,7 @@ func initLogs(c *cli.Context, cfg rancher.Options) {
 	logserver.StartServerWithDefaults()
 }
 
-func run(cli *cli.Context, cfg rancher.Options) error {
+func run(_ *cli.Command, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	ctx := signals.SetupSignalContext()
 
