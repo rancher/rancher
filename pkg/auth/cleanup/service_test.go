@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type fakeExtTokenStore struct {
@@ -109,6 +110,12 @@ func TestRunCleanup(t *testing.T) {
 				Name:   "boss",
 				Labels: map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}},
 			PrincipalIDs: []string{"local://boss", "azuread_user://authprincipal"},
+		},
+		// migrating has principals from both azuread (being disabled) and genericoidc,
+		// so it must be preserved even though azuread appears first in the list.
+		"migrating": {
+			ObjectMeta:   metav1.ObjectMeta{Name: "migrating"},
+			PrincipalIDs: []string{"azuread_user://migrating", "local://migrating", "genericoidc_user://migrating"},
 		},
 	}
 
@@ -203,17 +210,73 @@ func TestRunCleanup(t *testing.T) {
 	assert.Len(t, globalRoleBindingStore, 1)
 	assert.Len(t, clusterRoleTemplateBindingStore, 1)
 	assert.Len(t, projectRoleTemplateBindingStore, 1)
-	assert.Len(t, userStore, 2)
+	assert.Len(t, userStore, 3)
 	assert.Len(t, secretStore, 1)
 	assert.Len(t, tokenStore, 2)
 	assert.Empty(t, tokenStore["azure-123"])
 	assert.Len(t, extTokens, 1)
 	assert.NotNil(t, extTokens["ext-local-1"])
 
+	// Users that were reset (former local admins) must have only their local principal left.
 	for _, user := range userStore {
-		require.Lenf(t, user.PrincipalIDs, 1, "every user after cleanup must have only one principal ID, got %d", len(user.PrincipalIDs))
+		if user.Name == "migrating" {
+			continue
+		}
+		require.Lenf(t, user.PrincipalIDs, 1, "every reset user after cleanup must have only one principal ID, got %d", len(user.PrincipalIDs))
 		principalID := user.PrincipalIDs[0]
 		assert.Truef(t, strings.HasPrefix(principalID, "local"), "the only principal ID has 'local' as a prefix, got %s", principalID)
+	}
+	// The migrating user has principals from both azuread (disabled) and genericoidc (active),
+	// so it must be kept with only the azuread principal removed.
+	migrating, exists := userStore["migrating"]
+	require.True(t, exists, "multi-provider user must not be deleted during single-provider cleanup")
+	assert.Equal(t, []string{"local://migrating", "genericoidc_user://migrating"}, migrating.PrincipalIDs)
+}
+
+func TestRunCleanupMultiProviderUser(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		principalIDs []string
+	}{
+		{
+			name:         "disabled provider listed first",
+			principalIDs: []string{"azuread_user://u", "local://u", "genericoidc_user://u"},
+		},
+		{
+			name:         "disabled provider listed last",
+			principalIDs: []string{"genericoidc_user://u", "local://u", "azuread_user://u"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			userStore := map[string]*v3.User{
+				"u": {ObjectMeta: metav1.ObjectMeta{Name: "u"}, PrincipalIDs: tt.principalIDs},
+			}
+			svc := newMockCleanupService(t,
+				map[string]*v3.GlobalRoleBinding{},
+				map[string]*v3.ProjectRoleTemplateBinding{},
+				map[string]*v3.ClusterRoleTemplateBinding{},
+				map[string]*v3.Token{},
+				userStore,
+				map[string]*v1.Secret{},
+				&fakeExtTokenStore{tokens: map[string]*ext.Token{}},
+			)
+
+			err := svc.Run(&v3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: "azuread"}, Type: client.AzureADConfigType})
+			require.NoError(t, err)
+			require.Contains(t, userStore, "u", "a user with a genericoidc principal must survive disabling azuread")
+			assert.ElementsMatch(t, []string{"local://u", "genericoidc_user://u"}, userStore["u"].PrincipalIDs)
+
+			// Once the last external provider is disabled as well, the user is cleaned up like any other.
+			err = svc.Run(&v3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: "genericoidc"}, Type: client.GenericOIDCConfigType})
+			require.NoError(t, err)
+			assert.NotContains(t, userStore, "u")
+		})
 	}
 }
 
@@ -488,6 +551,55 @@ func TestDeleteExtTokens(t *testing.T) {
 			for _, name := range tt.wantLeft {
 				assert.Contains(t, store.tokens, name)
 			}
+		})
+	}
+}
+
+func TestGetProvidersFromPrincipalNames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected sets.Set[string]
+	}{
+		{
+			name:     "empty input",
+			input:    []string{},
+			expected: sets.New[string](),
+		},
+		{
+			name:     "local principal only",
+			input:    []string{"local://u-abc"},
+			expected: sets.New[string](),
+		},
+		{
+			name:     "single external provider",
+			input:    []string{"azuread_user://alice", "local://u-abc"},
+			expected: sets.New("azuread"),
+		},
+		{
+			name:     "multiple principals same provider",
+			input:    []string{"openldap_user://alice", "openldap_group://engineers"},
+			expected: sets.New("openldap"),
+		},
+		{
+			name:     "multiple providers",
+			input:    []string{"openldap_user://alice", "local://u-abc", "genericoidc_user://alice"},
+			expected: sets.New("openldap", "genericoidc"),
+		},
+		{
+			name:     "group principal",
+			input:    []string{"azuread_group://mygroup"},
+			expected: sets.New("azuread"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := getProvidersFromPrincipalNames(tt.input...)
+			assert.True(t, got.Equal(tt.expected), "got %v, want %v", got, tt.expected)
 		})
 	}
 }
