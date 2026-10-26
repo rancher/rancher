@@ -745,6 +745,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		if err != nil {
 			return nil, err
 		}
+		// Users don't care about the hashed value.
+		token.Status.Hash = ""
 		return token, nil
 	}
 

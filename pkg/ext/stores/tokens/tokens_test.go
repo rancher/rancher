@@ -3820,7 +3820,7 @@ func TestSystemStoreUpdateSessionTTL(t *testing.T) {
 	}
 }
 
-func TestSystemStoreCreateDryRunTTL(t *testing.T) {
+func TestSystemStoreCreateDryRun(t *testing.T) {
 	const (
 		hour = int64(time.Hour / time.Millisecond)
 		day  = 24 * hour
@@ -3897,6 +3897,7 @@ func TestSystemStoreCreateDryRunTTL(t *testing.T) {
 			created, err := store.Create(t.Context(), GVR.GroupResource(), token, opts, &mockUser{name: "world"})
 			require.NoError(t, err)
 			assert.Equal(t, test.want, created.Spec.TTL)
+			assert.Empty(t, created.Status.Hash)
 		})
 	}
 }
