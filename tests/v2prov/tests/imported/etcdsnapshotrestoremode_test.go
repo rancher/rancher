@@ -99,8 +99,8 @@ func setDesiredVersion(t *testing.T, clients *clients.Clients, name, version str
 	require.NoError(t, err, "setting desired version to %s", version)
 }
 
-// waitForReportedVersion waits until the cluster reports version, i.e. the nodes have actually
-// converged on it rather than the desired field merely having been written.
+// waitForReportedVersion waits until the cluster reports version and is not upgrading, i.e. the
+// nodes have actually converged on it rather than the desired field merely having been written.
 func waitForReportedVersion(t *testing.T, clients *clients.Clients, c *mgmtv3.Cluster, version string) {
 	t.Helper()
 
@@ -111,11 +111,111 @@ func waitForReportedVersion(t *testing.T, clients *clients.Clients, c *mgmtv3.Cl
 		if current.Status.Version == nil {
 			return false, nil
 		}
-		// Upgraded has to be true as well: mid-rollout the reported version flips to the new value
-		// as soon as the first node comes back, well before the rest have followed.
-		return current.Status.Version.GitVersion == version, nil
+		// The cluster must not be mid-rollout either: the reported version flips to the new value as
+		// soon as the first node comes back, well before the rest have followed. The upgrader marks a
+		// rollout by setting Upgraded to Unknown; a freshly imported cluster that has never been
+		// upgraded has no Upgraded condition at all, which counts as not upgrading.
+		upgrading := mgmtv3.ClusterConditionUpgraded.IsUnknown(current) || mgmtv3.ClusterConditionUpgraded.IsFalse(current)
+		return current.Status.Version.GitVersion == version && !upgrading, nil
 	})
 	handleError(t, clients, c.Name, err)
+}
+
+// waitForImportedNodesOnVersion waits until every node of the cluster runs version, is Ready, and is
+// schedulable — the node-level picture of a finished rollout — as seen from both sides:
+//
+//   - downstream, through the API server, where the kubelet reports its own version; and
+//   - upstream, on the management.cattle.io Node objects Rancher syncs from them, which is what the
+//     k3s-based upgrader's nodesNeedUpgrade reads to decide whether a rollout is still needed.
+//
+// Both have to account for every node the fixture created, so a node that has dropped out of the
+// cluster — or never made it back after a restart — is a failure rather than silently not checked.
+//
+// The mgmt cluster's own view is not enough on its own. Its reported version comes from the API
+// server and its Upgraded condition from the upgrader's reading of the system-upgrade-controller
+// plans, and neither says anything direct about the kubelets. The upgrader cordons each node while it
+// swaps the binary, so a node left unschedulable means its plan never finished.
+func waitForImportedNodesOnVersion(t *testing.T, clients *clients.Clients, fx *importedClusterFixture, version string) {
+	t.Helper()
+
+	want := len(fx.pods)
+	logrus.Infof("waiting for all %d nodes of cluster %s to be Ready and schedulable on %s", want, fx.mgmtCluster.Name, version)
+
+	var downstreamReason, upstreamReason string
+	err := utilwait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 15*time.Minute, true, func(context.Context) (bool, error) {
+		downstreamOK := downstreamNodesOnVersion(t, fx, want, version, &downstreamReason)
+		upstreamOK := mgmtNodesOnVersion(clients, fx.mgmtCluster.Name, want, version, &upstreamReason)
+		return downstreamOK && upstreamOK, nil
+	})
+	if err != nil {
+		t.Fatalf("not all %d nodes of cluster %s are Ready and schedulable on %s:\n  downstream: %s\n  management: %s",
+			want, fx.mgmtCluster.Name, version, downstreamReason, upstreamReason)
+	}
+}
+
+// downstreamNodesOnVersion reports whether the downstream API server lists exactly want nodes, all
+// Ready, schedulable and with kubelet version. reason is set to what was last read.
+func downstreamNodesOnVersion(t *testing.T, fx *importedClusterFixture, want int, version string, reason *string) bool {
+	t.Helper()
+
+	out, err := fx.execKubectl(t, "kubectl get nodes -o jsonpath='{range .items[*]}"+
+		"{.metadata.name}={.status.nodeInfo.kubeletVersion}={range .status.conditions[?(@.type==\"Ready\")]}{.status}{end}={.spec.unschedulable}{\"\\n\"}{end}'")
+	if err != nil {
+		*reason = fmt.Sprintf("%v: %s", err, out)
+		return false
+	}
+	*reason = fmt.Sprintf("(name=version=ready=unschedulable) %q", out)
+
+	var lines []string
+	if trimmed := strings.TrimSpace(out); trimmed != "" {
+		lines = strings.Split(trimmed, "\n")
+	}
+	if len(lines) != want {
+		*reason = fmt.Sprintf("%d nodes, want %d: %s", len(lines), want, *reason)
+		return false
+	}
+	for _, line := range lines {
+		fields := strings.Split(strings.TrimSpace(line), "=")
+		if len(fields) != 4 || fields[1] != version || fields[2] != "True" || fields[3] == "true" {
+			return false
+		}
+	}
+	return true
+}
+
+// mgmtNodesOnVersion reports whether the cluster's management.cattle.io Nodes number exactly want,
+// and each records kubelet version, Ready, and schedulable. These are synced from the downstream
+// cluster by the node syncer, so they lag it; the caller polls. reason is set to what was last read.
+func mgmtNodesOnVersion(clients *clients.Clients, clusterName string, want int, version string, reason *string) bool {
+	nodes, err := clients.Mgmt.Node().List(clusterName, metav1.ListOptions{})
+	if err != nil {
+		*reason = fmt.Sprintf("list: %v", err)
+		return false
+	}
+
+	ok := len(nodes.Items) == want
+	var seen []string
+	for _, node := range nodes.Items {
+		kubelet := node.Status.InternalNodeStatus.NodeInfo.KubeletVersion
+		ready := mgmtNodeReady(node.Status.InternalNodeStatus.Conditions)
+		unschedulable := node.Spec.InternalNodeSpec.Unschedulable
+		seen = append(seen, fmt.Sprintf("%s=%s=%t=%t", node.Status.NodeName, kubelet, ready, unschedulable))
+		if kubelet != version || !ready || unschedulable {
+			ok = false
+		}
+	}
+	slices.Sort(seen)
+	*reason = fmt.Sprintf("%d nodes, want %d (name=version=ready=unschedulable) %v", len(nodes.Items), want, seen)
+	return ok
+}
+
+func mgmtNodeReady(conditions []corev1.NodeCondition) bool {
+	for _, c := range conditions {
+		if c.Type == corev1.NodeReady {
+			return c.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 // waitForDesiredVersion waits until the mgmt cluster's desired version is version. A restore writes
@@ -218,13 +318,21 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3(t *testing.T) {
 // agreeing on etcd membership. So beyond the usual matrix assertions, every server is checked
 // individually: each must be a voting member of one and the same etcd cluster, and each must see
 // the same set of nodes, all Ready on the restored version.
+//
+// The restore deliberately runs from a snapshot taken on a joining server rather than the init node.
+// For a local snapshot the controller resets etcd on the node that holds the file, so this makes a
+// non-init server the restore leader: the init node — whose config has no `server:` and which
+// bootstrapped the cluster — then has to rejoin through the temporary drop-in like everyone else.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHA(t *testing.T) {
 	runImportedRestoreModeTestOn(t, "rm-kv-local-ha", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local,
 		[]cluster.ImportedNodePool{
 			{ETCD: true, ControlPlane: true, Quantity: 3},
 			{Worker: true, Quantity: 1},
 		},
-		cluster.ImportedClusterOptions{ExtractServerToken: true})
+		cluster.ImportedClusterOptions{ExtractServerToken: true},
+		// cluster.NewImportedClusterPods names joining nodes imported-node-<n>; node 1 is the first
+		// server to join the init node.
+		"imported-node-1")
 }
 
 // defaultRestoreModePools is the split-role topology the matrix runs on: one node per role.
@@ -248,16 +356,24 @@ const (
 func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage) {
 	t.Helper()
 
-	runImportedRestoreModeTestOn(t, displayName, mode, storage, defaultRestoreModePools, cluster.ImportedClusterOptions{})
+	runImportedRestoreModeTestOn(t, displayName, mode, storage, defaultRestoreModePools, cluster.ImportedClusterOptions{}, "")
 }
 
 // runImportedRestoreModeTestOn is runImportedRestoreModeTest on an explicit topology. When the
 // topology has more than one etcd node, it additionally asserts that those nodes agree with each
 // other both before the snapshot and after the restore — see assertImportedServersConverged.
-func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage, pools []cluster.ImportedNodePool, opts cluster.ImportedClusterOptions) {
+//
+// restoreNode, when set, is the downstream node name to restore from: the restore uses that node's
+// local snapshot, which makes it the node etcd is reset on, and the test asserts afterwards that the
+// reset really ran there. Empty restores from whichever snapshot is newest. It only applies to local
+// storage — an S3 snapshot is not tied to a node.
+func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage, pools []cluster.ImportedNodePool, opts cluster.ImportedClusterOptions, restoreNode string) {
 	t.Helper()
 
 	requireTwoVersions(t)
+	if restoreNode != "" && storage != snapshotbackpopulate.Local {
+		t.Fatalf("restoreNode %q requires local snapshot storage, got %s", restoreNode, storage)
+	}
 
 	clients, err := clients.New()
 	if err != nil {
@@ -270,6 +386,7 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 
 	// The cluster comes up on the older version, so that is what the snapshot captures.
 	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+	waitForImportedNodesOnVersion(t, clients, fx, previousK8sVersion)
 	if len(servers) > 1 {
 		// Establish that the servers agree before anything happens, so that disagreement after the
 		// restore is attributable to the restore.
@@ -288,7 +405,12 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 
 	before := time.Now()
 	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
-	snapshot := waitForBackpopulatedSnapshotForStorage(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, storage, before)
+	var snapshot *rkev1.ETCDSnapshot
+	if restoreNode != "" {
+		snapshot = waitForBackpopulatedLocalSnapshotOnNode(t, clients, fx.mgmtCluster.Name, restoreNode, before)
+	} else {
+		snapshot = waitForBackpopulatedSnapshotForStorage(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, storage, before)
+	}
 	assertSnapshotOffersMode(t, snapshot, mode)
 	if mode != rkev1.RestoreRKEConfigNone {
 		// `none` declares no selector, so there is nothing to resolve; for the other two, check the
@@ -303,6 +425,10 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 		fx.mgmtCluster.Name, previousK8sVersion, defaults.SomeK8sVersion)
 	setDesiredVersion(t, clients, fx.mgmtCluster.Name, defaults.SomeK8sVersion)
 	waitForReportedVersion(t, clients, fx.mgmtCluster, defaults.SomeK8sVersion)
+	// Every node has to have finished upgrading before the restore starts. Otherwise the restore
+	// begins on a cluster that is part-way through a rollout, which is a different scenario from the
+	// one this test is about, and fails for different reasons.
+	waitForImportedNodesOnVersion(t, clients, fx, defaults.SomeK8sVersion)
 
 	// An imported cluster upgrades in place — the system-upgrade-controller drains a node, swaps the
 	// distro binary and brings it back — so unlike the CAPRKE2 case the nodes are expected to be the
@@ -323,6 +449,9 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	require.NotNil(t, op)
 
 	proof.assertRestored(t, fx)
+	if restoreNode != "" {
+		assertETCDResetRanOnlyOn(t, clients, fx, restoreNode)
+	}
 
 	// What each mode is expected to have put back. Waiting is only appropriate where a change is
 	// expected: for the values a mode must *not* restore there is nothing to wait for, and they are
@@ -613,7 +742,8 @@ func mapsEqual(a, b map[string]string) bool {
 }
 
 // assertImportedClusterHealthy is the "the cluster came out of this intact" check: the mgmt v3
-// Cluster is Ready, and every downstream node is Ready and running the expected version. Ready on the
+// Cluster is Ready, and every node is Ready, schedulable and running the expected version, both
+// downstream and on the management Node objects (see waitForImportedNodesOnVersion). Ready on the
 // mgmt cluster covers the parts of the downstream cluster Rancher itself watches — the agent is
 // connected and the cluster's components are responding.
 func assertImportedClusterHealthy(t *testing.T, clients *clients.Clients, fx *importedClusterFixture, version string) {
@@ -626,34 +756,7 @@ func assertImportedClusterHealthy(t *testing.T, clients *clients.Clients, fx *im
 	})
 	handleError(t, clients, fx.mgmtCluster.Name, err)
 
-	var lastOut string
-	pollErr := utilwait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 15*time.Minute, true, func(context.Context) (bool, error) {
-		out, err := fx.execKubectl(t, "kubectl get nodes -o jsonpath='{range .items[*]}"+
-			"{.metadata.name}={.status.nodeInfo.kubeletVersion}={range .status.conditions[?(@.type==\"Ready\")]}{.status}{end}{\"\\n\"}{end}'")
-		if err != nil {
-			lastOut = fmt.Sprintf("%v: %s", err, out)
-			return false, nil
-		}
-		lastOut = out
-
-		lines := strings.Split(strings.TrimSpace(out), "\n")
-		if len(lines) == 0 || strings.TrimSpace(out) == "" {
-			return false, nil
-		}
-		for _, line := range lines {
-			fields := strings.Split(strings.TrimSpace(line), "=")
-			if len(fields) != 3 {
-				return false, nil
-			}
-			if fields[1] != version || fields[2] != "True" {
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	if pollErr != nil {
-		t.Fatalf("downstream nodes are not all Ready on version %s (last read %q)", version, lastOut)
-	}
+	waitForImportedNodesOnVersion(t, clients, fx, version)
 }
 
 // agentToleration returns the marker key of the cluster agent's first appended toleration, or "".
@@ -875,4 +978,83 @@ func serverViewHealthy(view serverView, etcdServers int, version string) bool {
 		}
 	}
 	return true
+}
+
+// waitForBackpopulatedLocalSnapshotOnNode is waitForBackpopulatedSnapshotForStorage narrowed to the
+// local snapshot taken on nodeName: an on-demand save snapshots every etcd node, and the newest of
+// those is whichever node happened to finish last.
+func waitForBackpopulatedLocalSnapshotOnNode(t *testing.T, clients *clients.Clients, clusterName, nodeName string, createdAfter time.Time) *rkev1.ETCDSnapshot {
+	t.Helper()
+
+	var (
+		picked *rkev1.ETCDSnapshot
+		seen   []string
+	)
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 10*time.Minute, true, func(context.Context) (bool, error) {
+		list, err := clients.RKE.ETCDSnapshot().List(clusterName, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, clusterName),
+		})
+		if err != nil {
+			return false, err
+		}
+		seen = seen[:0]
+		for i := range list.Items {
+			s := &list.Items[i]
+			if s.SnapshotFile.Name == "" || s.SnapshotFile.S3 != nil {
+				continue
+			}
+			if s.SnapshotFile.CreatedAt == nil || !s.SnapshotFile.CreatedAt.Time.After(createdAfter) {
+				continue
+			}
+			seen = append(seen, s.SnapshotFile.NodeName)
+			if s.SnapshotFile.NodeName != nodeName {
+				continue
+			}
+			if picked == nil || s.SnapshotFile.CreatedAt.After(picked.SnapshotFile.CreatedAt.Time) {
+				picked = s
+			}
+		}
+		return picked != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for a back-populated local ETCDSnapshot from node %s in %s (found snapshots from %v): %v",
+			nodeName, clusterName, seen, err)
+	}
+	t.Logf("using local snapshot %s/%s from node %s (file=%s)", picked.Namespace, picked.Name, nodeName, picked.SnapshotFile.Name)
+	return picked
+}
+
+// assertETCDResetRanOnlyOn fails unless the restore's `--cluster-reset` ran on nodeName and on no
+// other etcd node.
+//
+// The evidence is the reset's idempotency marker: the restore step runs through the idempotent
+// action script, which records each attempt under <provisioning dir>/idempotence/<key>/, and the
+// Shutdown step clears that tracking on every node at the start of the operation. So after a single
+// restore, exactly the node that performed the reset has an entry under the restore key.
+func assertETCDResetRanOnlyOn(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, nodeName string) {
+	t.Helper()
+
+	const markerDir = "/var/lib/rancher/capr/idempotence/etcd-restore/restore"
+	configFile := fmt.Sprintf("/etc/rancher/%s/config.yaml.d/50-test.yaml", capr.GetRuntime(previousK8sVersion))
+
+	ranOn := map[string]bool{}
+	for _, pod := range fx.pods {
+		out, err := cluster.ExecOnPod(cs, fx.ns.Name, pod.Name, "sh", "-c", fmt.Sprintf(
+			"sed -n 's/^node-name: //p' %s; if [ -n \"$(ls -A %s 2>/dev/null)\" ]; then echo reset; fi",
+			configFile, markerDir))
+		require.NoError(t, err, "inspecting %s for the etcd reset marker: %s", pod.Name, out)
+
+		lines := strings.Fields(out)
+		require.NotEmpty(t, lines, "pod %s has no node-name in %s", pod.Name, configFile)
+		ranOn[lines[0]] = slices.Contains(lines[1:], "reset")
+	}
+
+	require.Contains(t, ranOn, nodeName, "no node named %s in the fixture (nodes %v)", nodeName, ranOn)
+	for node, reset := range ranOn {
+		if node == nodeName {
+			assert.True(t, reset, "etcd was not reset on %s, the node holding the snapshot", node)
+		} else {
+			assert.False(t, reset, "etcd was reset on %s, but the restore was supposed to run on %s", node, nodeName)
+		}
+	}
 }

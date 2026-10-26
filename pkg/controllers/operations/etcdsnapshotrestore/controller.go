@@ -1754,6 +1754,10 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 		)
 	}
 
+	if install, ok := s.adapter.InstallInstruction(secret, dataDir); ok {
+		instructions = append(instructions, install)
+	}
+
 	return &plan.Plan{
 		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
 		OneTimeInstructions: instructions,
