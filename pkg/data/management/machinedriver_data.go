@@ -75,9 +75,6 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip", "", "1757e2b807b0fea4a38eade4e961bcc609853986a44a99a4e86a37ccea1f7679", []string{"objects-east.cloud.ca"}, false, false, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/releases/download/v1.2.0/docker-machine-driver-cloudscale_v1.2.0_linux_amd64.tar.gz", "", "e33fbd6c2f87b1c470bcb653cc8aa50baf914a9d641a2f18f86a07c398cfb544", []string{"objects.rma.cloudscale.ch"}, false, false, false, nil, management); err != nil {
-		return err
-	}
 	if err := addMachineDriver(DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, false, nil, management); err != nil {
 		return err
 	}
@@ -143,6 +140,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 
 	deleteMachineDriver("pinganyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
 	deleteMachineDriver("aliyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
+	deleteMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/", management.Management.NodeDrivers(""))
 
 	return nil
 }
