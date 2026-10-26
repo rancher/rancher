@@ -328,12 +328,25 @@ func run(ctx context.Context) error {
 		}
 		return false
 	}, onConnect, &remotedialer.ConnectOpts{
-		URL: wsURLFor,
-		Backoff: remotedialer.Backoff{
-			Min: retryDurationFromEnv("CATTLE_CONNECT_RETRY_MIN", 10*time.Second),
-			Max: retryDurationFromEnv("CATTLE_CONNECT_RETRY_MAX", 0),
-		},
+		URL:     wsURLFor,
+		Backoff: connectBackoff(),
 	})
+}
+
+// connectBackoff reads the reconnect backoff from the environment. A maximum
+// below the minimum would otherwise be ignored, holding every delay at the
+// larger minimum, so it is clamped to keep the configured ceiling.
+func connectBackoff() remotedialer.Backoff {
+	retryMin := retryDurationFromEnv("CATTLE_CONNECT_RETRY_MIN", 10*time.Second)
+	retryMax := retryDurationFromEnv("CATTLE_CONNECT_RETRY_MAX", 0)
+
+	if retryMax > 0 && retryMax < retryMin {
+		logrus.Warnf("CATTLE_CONNECT_RETRY_MAX (%s) is below CATTLE_CONNECT_RETRY_MIN (%s), using %s for both",
+			retryMax, retryMin, retryMax)
+		retryMin = retryMax
+	}
+
+	return remotedialer.Backoff{Min: retryMin, Max: retryMax}
 }
 
 // retryDurationFromEnv parses a duration; unset or invalid values yield def.
