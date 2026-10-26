@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"path"
 	"reflect"
 	"slices"
@@ -1438,7 +1439,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		}
 
 		nodePlan.Files = append(nodePlan.Files, plan.File{
-			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", s.adapter.GetServerURL(etcdSecret), s.adapter.GetSupervisorPort(etcdSecret)))),
+			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: %q\n", supervisorURL(s.adapter.GetServerURL(etcdSecret), s.adapter.GetSupervisorPort(etcdSecret))))),
 			Path:    path.Join(s.adapter.ConfigDirectory(controlPlaneSecret), "zz_etcd-snapshot-restore.yaml"),
 		})
 	}
@@ -1809,7 +1810,7 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	}
 
 	if initialPass && secret.UID != initSecret.UID {
-		arg := fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret))
+		arg := fmt.Sprintf("server: %q\n", supervisorURL(serverURL, s.adapter.GetSupervisorPort(secret)))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
 			arg = fmt.Sprintf("%stoken-file: \"%s\"\n", arg, path.Join(dataDir, "server/token"))
 		}
@@ -1828,6 +1829,12 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	}
 
 	return nodePlan, nil
+}
+
+// supervisorURL returns the URL of the supervisor at host and port, as a node's `server:` setting.
+// host comes from the adapter's GetServerURL and may be an IPv6 address, which a URL needs bracketed.
+func supervisorURL(host, port string) string {
+	return "https://" + net.JoinHostPort(host, port)
 }
 
 // buildRestorePlan builds the plan that resets etcd from the snapshot on the elected leader:

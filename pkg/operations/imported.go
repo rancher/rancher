@@ -257,6 +257,9 @@ func (a *ImportedAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return fmt.Sprintf("/etc/rancher/%s/config.yaml.d", a.RuntimeCommand())
 }
 
+// GetServerURL returns the address of the node behind the machine-plan secret that other nodes should
+// join through — see primaryNodeAddress. It is a bare host, which may be an IPv6 address; callers
+// building a URL from it must bracket it, e.g. with net.JoinHostPort.
 func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 	if secret == nil {
 		return ""
@@ -282,17 +285,29 @@ func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 		return ""
 	}
 
-	var address string
+	return primaryNodeAddress(machine.Status.InternalNodeStatus.Addresses)
+}
 
-	for _, addr := range machine.Status.InternalNodeStatus.Addresses {
-		if addr.Type == corev1.NodeExternalIP && address == "" {
-			address = addr.Address
-		} else if addr.Type == corev1.NodeInternalIP {
-			address = addr.Address
+// primaryNodeAddress returns the address other nodes should use to reach a node: its first
+// InternalIP, or failing that its first ExternalIP.
+//
+// The first InternalIP is the node's primary address. The kubelet lists a node's addresses in its
+// node-ip order, so on a dual-stack node the first InternalIP is in the family the node — and its
+// etcd, which advertises peers on it — actually runs on. Taking any other one would point rejoining
+// nodes at the cluster's secondary family.
+func primaryNodeAddress(addresses []corev1.NodeAddress) string {
+	var external string
+	for _, addr := range addresses {
+		switch addr.Type {
+		case corev1.NodeInternalIP:
+			return addr.Address
+		case corev1.NodeExternalIP:
+			if external == "" {
+				external = addr.Address
+			}
 		}
 	}
-
-	return address
+	return external
 }
 
 func (a *ImportedAdapter) GetSupervisorPort(_ *corev1.Secret) string {

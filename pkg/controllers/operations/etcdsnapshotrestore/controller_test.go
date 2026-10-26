@@ -1799,6 +1799,25 @@ func TestBuildRestartPlan(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("an IPv6 leader address is bracketed in the server drop-in", func(t *testing.T) {
+		t.Parallel()
+
+		s := newTestScope(defaultAdapter(), types.UID("uid-1"))
+
+		// Unbracketed, the port would read as part of the address and the URL would not parse.
+		nodePlan, err := buildRestartPlan(s, otherEtcd, initSecret, "fd00::1", initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		content, err := base64.StdEncoding.DecodeString(nodePlan.Files[1].Content)
+		if err != nil {
+			t.Fatalf("decoding drop-in: %v", err)
+		}
+		if want := "server: \"https://[fd00::1]:9345\"\ntoken-file: \"/var/lib/rancher/rke2/server/token\"\n"; string(content) != want {
+			t.Errorf("drop-in = %q, want %q", string(content), want)
+		}
+	})
 }
 
 // restartInstructionArgs returns the arguments of the plan's restart instruction. It is wrapped by
