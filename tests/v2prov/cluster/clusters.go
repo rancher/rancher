@@ -7,12 +7,14 @@ import (
 	"encoding/base64"
 	"fmt"
 	"maps"
+	"net"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -93,6 +95,116 @@ type ImportedClusterOptions struct {
 	// init node's disk and hands that to every joining node. This mirrors how a cluster is typically
 	// stood up by hand, as opposed to pre-seeding every node with the same shared secret.
 	ExtractServerToken bool
+	// Network, when set, selects the addresses the nodes use to reach each other. Nil keeps the
+	// distro defaults: a single-stack IPv4 cluster on the pod's primary address.
+	Network *ImportedNetwork
+	// BeforeJoin, when set, is called with the running init node pod — after its server token has
+	// been extracted, with ExtractServerToken — and before any joining node is created. Joining
+	// nodes are only created once it returns nil. It lets a test observe the init node before anything
+	// has connected to it.
+	BeforeJoin func(initPod *corev1.Pod) error
+}
+
+// Labels NewImportedClusterPods puts on every node pod, so tests can map a pod to the downstream node
+// it runs without reconstructing the pool ordering.
+const (
+	// ImportedNodeNameLabel is the downstream node name (the node-name in the node's config).
+	ImportedNodeNameLabel = "v2prov.cattle.io/imported-node-name"
+	// ImportedNodeETCDLabel is "true" on nodes that run etcd.
+	ImportedNodeETCDLabel = "v2prov.cattle.io/imported-node-etcd"
+)
+
+// ImportedNetwork selects which of a node pod's subnets — and through which interface — the
+// downstream cluster runs on. Every field is optional; zero values fall back to the defaults below.
+//
+// The node pods get their addresses from the cluster the test runs against, so a family can only be
+// used if that cluster hands pods an address in it: IPv6 needs a dual-stack host cluster (see
+// dev-scripts/k3d-dual-stack).
+type ImportedNetwork struct {
+	// IPFamilies are the address families the downstream cluster runs, primary first. The primary
+	// family is what nodes join over and what etcd advertises its peer URLs on. Defaults to IPv4.
+	IPFamilies []corev1.IPFamily
+	// Interface is the in-pod interface each node takes its node-ip from, one address per family.
+	// When set it is also passed to flannel as flannel-iface. Defaults to eth0, without flannel-iface.
+	Interface string
+	// ClusterCIDRs and ServiceCIDRs are the downstream pod and service CIDRs, one per entry of
+	// IPFamilies and in the same order. They default per family to subnets that do not collide with
+	// the host cluster's (see defaultImportedCIDRs).
+	ClusterCIDRs []string
+	ServiceCIDRs []string
+	// JoinFamily is the family joining nodes use to reach the init node. Defaults to the primary
+	// family. A server's certificate only covers its node-ip addresses, so setting this to a family
+	// outside IPFamilies makes nodes join through an address the init node's certificate does not
+	// list — which fails, and is only useful for exercising that failure.
+	JoinFamily corev1.IPFamily
+}
+
+// defaultImportedCIDRs are the downstream cluster and service CIDRs per family. The IPv4 pair is what
+// imported nodes have always used; the IPv6 pair sits next to the host cluster's fd00:42::/56 and
+// fd00:43::/112 from dev-scripts/k3d-dual-stack without overlapping them.
+var defaultImportedCIDRs = map[corev1.IPFamily][2]string{
+	corev1.IPv4Protocol: {"10.44.0.0/16", "10.45.0.0/16"},
+	corev1.IPv6Protocol: {"fd00:44::/56", "fd00:45::/112"},
+}
+
+// resolve returns a copy of n with every default filled in, or an error if n is inconsistent.
+func (n ImportedNetwork) resolve() (ImportedNetwork, error) {
+	if len(n.IPFamilies) == 0 {
+		n.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+	}
+	if len(n.IPFamilies) > 2 || (len(n.IPFamilies) == 2 && n.IPFamilies[0] == n.IPFamilies[1]) {
+		return n, fmt.Errorf("IPFamilies must be one family, or one of each: got %v", n.IPFamilies)
+	}
+	for _, family := range n.IPFamilies {
+		if _, ok := defaultImportedCIDRs[family]; !ok {
+			return n, fmt.Errorf("unsupported IP family %q", family)
+		}
+	}
+
+	if n.JoinFamily == "" {
+		n.JoinFamily = n.IPFamilies[0]
+	} else if _, ok := defaultImportedCIDRs[n.JoinFamily]; !ok {
+		return n, fmt.Errorf("unsupported join IP family %q", n.JoinFamily)
+	}
+
+	if len(n.ClusterCIDRs) == 0 {
+		for _, family := range n.IPFamilies {
+			n.ClusterCIDRs = append(n.ClusterCIDRs, defaultImportedCIDRs[family][0])
+		}
+	}
+	if len(n.ServiceCIDRs) == 0 {
+		for _, family := range n.IPFamilies {
+			n.ServiceCIDRs = append(n.ServiceCIDRs, defaultImportedCIDRs[family][1])
+		}
+	}
+	if len(n.ClusterCIDRs) != len(n.IPFamilies) || len(n.ServiceCIDRs) != len(n.IPFamilies) {
+		return n, fmt.Errorf("need one cluster and one service CIDR per IP family %v: got %v and %v",
+			n.IPFamilies, n.ClusterCIDRs, n.ServiceCIDRs)
+	}
+
+	return n, nil
+}
+
+// interfaceName is the interface node IPs are taken from.
+func (n ImportedNetwork) interfaceName() string {
+	if n.Interface == "" {
+		return "eth0"
+	}
+	return n.Interface
+}
+
+// PodIPForFamily returns pod's address in family, or "" if it has none.
+func PodIPForFamily(pod *corev1.Pod, family corev1.IPFamily) string {
+	for _, podIP := range pod.Status.PodIPs {
+		ip := net.ParseIP(podIP.IP)
+		if ip == nil {
+			continue
+		}
+		if (ip.To4() != nil) == (family == corev1.IPv4Protocol) {
+			return podIP.IP
+		}
+	}
+	return ""
 }
 
 // NewImportedClusterPods creates systemd-node pods that independently bootstrap an RKE2/K3s cluster.
@@ -108,6 +220,15 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	distro := capr.GetRuntime(k8sVersion)
 	supervisorPort := capr.GetRuntimeSupervisorPort(k8sVersion)
+
+	var network *ImportedNetwork
+	if options.Network != nil {
+		resolved, err := options.Network.resolve()
+		if err != nil {
+			return nil, fmt.Errorf("invalid imported network: %w", err)
+		}
+		network = &resolved
+	}
 
 	var token string
 	if !options.ExtractServerToken {
@@ -148,8 +269,8 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	var pods []*corev1.Pod
 
-	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, initSpec.dataDir, registryCACert, options)
-	initPod, err := systemdnode.New(clients, namespace, initScript, labels, nil)
+	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, initSpec.dataDir, registryCACert, options, network)
+	initPod, err := systemdnode.New(clients, namespace, initScript, importedNodeLabels(labels, "imported-init-0", initSpec.etcd), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create init node: %w", err)
 	}
@@ -163,6 +284,19 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 		return nil, fmt.Errorf("init node pod did not become ready: %w", err)
 	}
 
+	// Joining nodes reach the init node over the network's join family, by default its primary one;
+	// without a network that is simply the pod's primary address.
+	joinAddress := initPod.Status.PodIP
+	if network != nil {
+		for _, family := range append(slices.Clone(network.IPFamilies), network.JoinFamily) {
+			if PodIPForFamily(initPod, family) == "" {
+				return nil, fmt.Errorf("init node pod %s/%s has no %s address (pod IPs %v); the cluster under test must give pods an address in every family the imported network uses",
+					initPod.Namespace, initPod.Name, family, initPod.Status.PodIPs)
+			}
+		}
+		joinAddress = PodIPForFamily(initPod, network.JoinFamily)
+	}
+
 	if options.ExtractServerToken {
 		dataDir := initSpec.dataDir
 		if dataDir == "" {
@@ -174,12 +308,18 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 		}
 	}
 
-	serverURL := fmt.Sprintf("https://%s:%d", initPod.Status.PodIP, supervisorPort)
+	if options.BeforeJoin != nil && len(joinSpecs) > 0 {
+		if err := options.BeforeJoin(initPod); err != nil {
+			return pods, fmt.Errorf("before joining nodes to %s/%s: %w", initPod.Namespace, initPod.Name, err)
+		}
+	}
+
+	serverURL := "https://" + net.JoinHostPort(joinAddress, strconv.Itoa(supervisorPort))
 
 	for i, spec := range joinSpecs {
 		nodeName := fmt.Sprintf("imported-node-%d", i+1)
-		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, spec.dataDir, registryCACert, options)
-		pod, err := systemdnode.New(clients, namespace, script, labels, nil)
+		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, spec.dataDir, registryCACert, options, network)
+		pod, err := systemdnode.New(clients, namespace, script, importedNodeLabels(labels, nodeName, spec.etcd), nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node %s: %w", nodeName, err)
 		}
@@ -889,7 +1029,52 @@ func waitForServerToken(clients *clients.Clients, namespace, podName, dataDir st
 	return "", fmt.Errorf("timed out waiting for server token at %s on %s/%s: %v", tokenPath, namespace, podName, lastErr)
 }
 
-func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, dataDir string, registryCACert []byte, options ImportedClusterOptions) string {
+// importedNodeLabels returns labels plus the node identity labels, without modifying labels.
+func importedNodeLabels(labels map[string]string, nodeName string, etcd bool) map[string]string {
+	merged := maps.Clone(labels)
+	if merged == nil {
+		merged = map[string]string{}
+	}
+	merged[ImportedNodeNameLabel] = nodeName
+	merged[ImportedNodeETCDLabel] = strconv.FormatBool(etcd)
+	return merged
+}
+
+// importedNodeIPScript renders the shell that appends node-ip to configFile: one address per family
+// in network.IPFamilies order, read off the network's interface when the node boots. The address is
+// only known once the pod is running, so it cannot be baked into the config ahead of time. Tentative
+// IPv6 addresses are skipped, since a service binding one fails until duplicate address detection
+// completes.
+func importedNodeIPScript(network *ImportedNetwork, configFile string) string {
+	var families []string
+	for _, family := range network.IPFamilies {
+		if family == corev1.IPv6Protocol {
+			families = append(families, "6")
+		} else {
+			families = append(families, "4")
+		}
+	}
+
+	return fmt.Sprintf(`iface=%[1]s
+node_ips=""
+for fam in %[2]s; do
+  addr=""
+  for i in $(seq 1 60); do
+    addr=$(ip -o -$fam addr show dev "$iface" scope global -tentative | awk '{print $4}' | cut -d/ -f1 | head -n1)
+    [ -n "$addr" ] && break
+    sleep 1
+  done
+  if [ -z "$addr" ]; then
+    echo "no IPv$fam address on $iface" >&2
+    exit 1
+  fi
+  node_ips="${node_ips:+$node_ips,}$addr"
+done
+echo "node-ip: $node_ips" >> %[3]s
+`, network.interfaceName(), strings.Join(families, " "), configFile)
+}
+
+func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, dataDir string, registryCACert []byte, options ImportedClusterOptions, network *ImportedNetwork) string {
 	isServer := etcd || cp
 	rancherDir := fmt.Sprintf("/etc/rancher/%s", distro)
 	configDir := rancherDir + "/config.yaml.d"
@@ -912,9 +1097,29 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 		configLines = append(configLines, "server: "+serverURL)
 	}
 
+	if network != nil && network.Interface != "" {
+		configLines = append(configLines, "flannel-iface: "+network.Interface)
+	}
+
 	if isServer {
-		configLines = append(configLines, "service-cidr: 10.45.0.0/16")
-		configLines = append(configLines, "cluster-cidr: 10.44.0.0/16")
+		serviceCIDR, clusterCIDR := "10.45.0.0/16", "10.44.0.0/16"
+		if network != nil {
+			serviceCIDR, clusterCIDR = strings.Join(network.ServiceCIDRs, ","), strings.Join(network.ClusterCIDRs, ",")
+		}
+		configLines = append(configLines, "service-cidr: "+serviceCIDR)
+		configLines = append(configLines, "cluster-cidr: "+clusterCIDR)
+
+		// flannel masquerades IPv4 pod traffic leaving the cluster CIDR, but IPv6 only when asked.
+		// Without it, a pod reaching another node's address — such as the cluster agent reaching an
+		// API server on another node through the kubernetes service — goes out unencapsulated with
+		// its pod address as source while the reply returns through the VXLAN tunnel, and conntrack
+		// marks the reply INVALID, which the network policy controller drops: TCP connects, then
+		// the TLS handshake hangs. The setting is server-side and applies to agents too.
+		if network != nil && distro == capr.RuntimeK3S && slices.Contains(network.IPFamilies, corev1.IPv6Protocol) {
+			if _, set := options.ServerConfig["flannel-ipv6-masq"]; !set {
+				configLines = append(configLines, "flannel-ipv6-masq: true")
+			}
+		}
 
 		if !etcd {
 			configLines = append(configLines, "disable-etcd: true")
@@ -939,6 +1144,11 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 	}
 
 	configContent := strings.Join(configLines, "\n")
+
+	var nodeIPBlock string
+	if network != nil {
+		nodeIPBlock = importedNodeIPScript(network, configDir+"/50-test.yaml")
+	}
 
 	var installCmd, serviceName string
 	if isServer {
@@ -968,8 +1178,8 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 			rancherDir, registryHost, registryHost, caPath, caPath, string(registryCACert))
 	}
 
-	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
-		configDir, configDir, configContent, extraFiles, registryBlock, installCmd, serviceName, serviceName)
+	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
+		configDir, configDir, configContent, nodeIPBlock, extraFiles, registryBlock, installCmd, serviceName, serviceName)
 }
 
 func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {

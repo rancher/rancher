@@ -6,10 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net"
+	"net/url"
 	"os"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +22,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
+	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/restoremode"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
@@ -335,6 +340,34 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalH
 		"imported-node-1")
 }
 
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHAIPv6 is the HA case on
+// a dual-stack downstream cluster whose nodes reach each other over IPv6: IPv6 is the primary family,
+// so it is what nodes join over and what etcd advertises its peers on, with IPv4 alongside it.
+//
+// A restore has to keep the cluster on that network. It rebuilds etcd membership from scratch — one
+// node resets, every other node is pointed at it through a temporary `server:` drop-in — so the
+// address it chooses for the leader decides which family the cluster comes back on. Pointing the
+// others at the leader's IPv4 address would rejoin them over the secondary family, and etcd would
+// re-advertise its peers there. So on top of the HA assertions, the test checks that every drop-in
+// the restore writes names the leader's IPv6 address, and that afterwards the nodes and etcd members
+// are all still on IPv6.
+//
+// Needs a dual-stack host cluster, and skips without one: see dev-scripts/k3d-dual-stack.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHAIPv6(t *testing.T) {
+	runImportedRestoreModeTestOn(t, "rm-kv-local-ha-v6", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local,
+		[]cluster.ImportedNodePool{
+			{ETCD: true, ControlPlane: true, Quantity: 3},
+			{Worker: true, Quantity: 1},
+		},
+		cluster.ImportedClusterOptions{
+			ExtractServerToken: true,
+			Network: &cluster.ImportedNetwork{
+				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol},
+			},
+		},
+		"imported-node-1")
+}
+
 // defaultRestoreModePools is the split-role topology the matrix runs on: one node per role.
 var defaultRestoreModePools = []cluster.ImportedNodePool{
 	{ETCD: true, Quantity: 1},
@@ -367,6 +400,14 @@ func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage 
 // local snapshot, which makes it the node etcd is reset on, and the test asserts afterwards that the
 // reset really ran there. Empty restores from whichever snapshot is newest. It only applies to local
 // storage — an S3 snapshot is not tied to a node.
+//
+// In every case the test also checks that each server URL the restore hands a node is one the node can
+// actually connect to with certificate verification — see assertRestoreServerArgsTrusted.
+//
+// When opts.Network is set, the test skips unless the host cluster can give pods an address in every
+// family it names, and asserts that the cluster runs on its primary family before the snapshot, that
+// the restore points rejoining nodes at the leader over that family, and that the cluster is still on
+// it afterwards — see assertImportedClusterOnFamily and watchRestoreServerArgs.
 func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage, pools []cluster.ImportedNodePool, opts cluster.ImportedClusterOptions, restoreNode string) {
 	t.Helper()
 
@@ -381,8 +422,17 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	}
 	defer clients.Close()
 
+	// The family the cluster is expected to run on, or "" to leave the network unchecked.
+	var primaryFamily corev1.IPFamily
+	if opts.Network != nil {
+		requireHostIPFamilies(t, clients, opts.Network.IPFamilies)
+		if len(opts.Network.IPFamilies) > 0 {
+			primaryFamily = opts.Network.IPFamilies[0]
+		}
+	}
+
 	fx := setUpImportedRestoreModeCluster(t, clients, displayName, storage, pools, opts)
-	servers := importedETCDPods(fx, pools)
+	servers := importedETCDPods(t, clients, fx)
 
 	// The cluster comes up on the older version, so that is what the snapshot captures.
 	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
@@ -391,6 +441,11 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 		// Establish that the servers agree before anything happens, so that disagreement after the
 		// restore is attributable to the restore.
 		assertImportedServersConverged(t, clients, fx, servers, previousK8sVersion)
+	}
+	if primaryFamily != "" {
+		// Without this the post-restore network assertion could pass on a cluster that was never on
+		// the family to begin with.
+		assertImportedClusterOnFamily(t, clients, fx, primaryFamily)
 	}
 	waitForImportedSnapshotMetadataReady(t, fx)
 
@@ -443,10 +498,21 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	// change — which is the only thing a `none` restore leaves behind as evidence.
 	proof.delete(t, fx)
 
+	// Record what the restore tells each node to rejoin through; stopping is idempotent, so the defer
+	// only matters if the restore fails before the explicit stop below.
+	stopWatchingServerArgs := watchRestoreServerArgs(t, clients, fx.mgmtCluster.Name)
+	defer stopWatchingServerArgs()
+
 	op := RunETCDSnapshotRestoreOperationTest(t, clients, fx.mgmtCluster.Name, snapshot.Name, fx.clusterRef,
 		WithRestoreMode(mode),
 		WithRestoreTTL(-1))
 	require.NotNil(t, op)
+
+	restoreServerArgs := stopWatchingServerArgs()
+	assertRestoreServerArgsTrusted(t, clients, fx, restoreServerArgs)
+	if primaryFamily != "" {
+		assertRestoreServerArgsOnFamily(t, clients, fx, restoreServerArgs, primaryFamily, restoreNode)
+	}
 
 	proof.assertRestored(t, fx)
 	if restoreNode != "" {
@@ -480,6 +546,9 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	assertImportedClusterHealthy(t, clients, fx, expectedVersion)
 	if len(servers) > 1 {
 		assertImportedServersConverged(t, clients, fx, servers, expectedVersion)
+	}
+	if primaryFamily != "" {
+		assertImportedClusterOnFamily(t, clients, fx, primaryFamily)
 	}
 
 	// The reported version is the last thing to settle, so wait for it rather than sampling it, then
@@ -804,32 +873,51 @@ func waitForAgentToleration(t *testing.T, clients *clients.Clients, c *mgmtv3.Cl
 	handleError(t, clients, c.Name, err)
 }
 
-// importedETCDPods returns the fixture's etcd pods. It relies on the
-// ordering cluster.NewImportedClusterPods produces: the first etcd node is the init node at pods[0],
-// and the rest follow in pool order with the init node left out.
-func importedETCDPods(fx *importedClusterFixture, pools []cluster.ImportedNodePool) []*corev1.Pod {
-	type role struct{ etcd bool }
+// importedNode is one of the fixture's node pods, read back from the API server, together with the
+// downstream node it runs.
+type importedNode struct {
+	pod *corev1.Pod
+	// name is the downstream node name.
+	name string
+	etcd bool
+}
 
-	var (
-		roles   []role
-		initSet bool
-	)
-	for _, pool := range pools {
-		for i := 0; i < pool.Quantity; i++ {
-			r := role{etcd: pool.ETCD}
-			if !initSet && pool.ETCD {
-				roles = append([]role{r}, roles...)
-				initSet = true
-				continue
-			}
-			roles = append(roles, r)
-		}
+// ip returns the node's address in family, or "". The downstream node takes its node-ip from the
+// pod's interface, so this is also the address the node registers with.
+func (n importedNode) ip(family corev1.IPFamily) string {
+	return cluster.PodIPForFamily(n.pod, family)
+}
+
+// importedNodes returns every node of the fixture, freshly read so that pod IPs are populated — the
+// fixture's own pods are snapshots from creation time, and joining pods are created without waiting
+// for an address. Nodes are identified by the labels cluster.NewImportedClusterPods puts on each pod.
+func importedNodes(t *testing.T, cs *clients.Clients, fx *importedClusterFixture) []importedNode {
+	t.Helper()
+
+	var nodes []importedNode
+	for _, p := range fx.pods {
+		pod, err := cs.Core.Pod().Get(p.Namespace, p.Name, metav1.GetOptions{})
+		require.NoError(t, err, "reading node pod %s/%s", p.Namespace, p.Name)
+
+		name := pod.Labels[cluster.ImportedNodeNameLabel]
+		require.NotEmpty(t, name, "node pod %s/%s has no %s label", pod.Namespace, pod.Name, cluster.ImportedNodeNameLabel)
+		nodes = append(nodes, importedNode{
+			pod:  pod,
+			name: name,
+			etcd: pod.Labels[cluster.ImportedNodeETCDLabel] == "true",
+		})
 	}
+	return nodes
+}
 
-	var servers []*corev1.Pod
-	for i, r := range roles {
-		if r.etcd && i < len(fx.pods) {
-			servers = append(servers, fx.pods[i])
+// importedETCDPods returns the fixture's etcd nodes, init node first.
+func importedETCDPods(t *testing.T, cs *clients.Clients, fx *importedClusterFixture) []importedNode {
+	t.Helper()
+
+	var servers []importedNode
+	for _, node := range importedNodes(t, cs, fx) {
+		if node.etcd {
+			servers = append(servers, node)
 		}
 	}
 	return servers
@@ -843,11 +931,34 @@ func importedETCDPods(fx *importedClusterFixture, pools []cluster.ImportedNodePo
 // etcd's gRPC gateway: over TLS, curl negotiates HTTP/2 and lands on the native gRPC server (415,
 // wrong content type), and over HTTP/1.1 nothing answers at all.
 type etcdMemberList struct {
-	Members []struct {
-		ID        uint64 `json:"ID"`
-		Name      string `json:"name"`
-		IsLearner bool   `json:"isLearner"`
-	} `json:"members"`
+	Members []etcdMember `json:"members"`
+}
+
+type etcdMember struct {
+	ID        uint64   `json:"ID"`
+	Name      string   `json:"name"`
+	PeerURLs  []string `json:"peerURLs"`
+	IsLearner bool     `json:"isLearner"`
+}
+
+// readETCDMembers returns the member list of pod's local etcd, through its supervisor.
+func readETCDMembers(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, pod *corev1.Pod, dataDir string, supervisorPort int) ([]etcdMember, error) {
+	t.Helper()
+
+	// /db/info authenticates with the server token's password, i.e. everything after "::server:".
+	serverDir := path.Join(dataDir, "server")
+	out, err := cluster.ExecOnPod(cs, fx.ns.Name, pod.Name, "sh", "-c", fmt.Sprintf(
+		`pw=$(cut -d: -f4- %[1]s/token) && curl -sSf --cacert %[1]s/tls/server-ca.crt -u "server:$pw" https://127.0.0.1:%[2]d/db/info`,
+		serverDir, supervisorPort))
+	if err != nil {
+		return nil, fmt.Errorf("listing etcd members: %w: %s", err, out)
+	}
+
+	var list etcdMemberList
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		return nil, fmt.Errorf("decoding etcd member list %q: %w", out, err)
+	}
+	return list.Members, nil
 }
 
 // serverView is what a single server reports about the cluster: the etcd members its local etcd
@@ -871,22 +982,13 @@ func (v serverView) String() string {
 func readServerView(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, pod *corev1.Pod, dataDir string, supervisorPort int) (serverView, error) {
 	t.Helper()
 
-	// /db/info authenticates with the server token's password, i.e. everything after "::server:".
-	serverDir := path.Join(dataDir, "server")
-	out, err := cluster.ExecOnPod(cs, fx.ns.Name, pod.Name, "sh", "-c", fmt.Sprintf(
-		`pw=$(cut -d: -f4- %[1]s/token) && curl -sSf --cacert %[1]s/tls/server-ca.crt -u "server:$pw" https://127.0.0.1:%[2]d/db/info`,
-		serverDir, supervisorPort))
+	members, err := readETCDMembers(t, cs, fx, pod, dataDir, supervisorPort)
 	if err != nil {
-		return serverView{}, fmt.Errorf("listing etcd members: %w: %s", err, out)
-	}
-
-	var list etcdMemberList
-	if err := json.Unmarshal([]byte(out), &list); err != nil {
-		return serverView{}, fmt.Errorf("decoding etcd member list %q: %w", out, err)
+		return serverView{}, err
 	}
 
 	var view serverView
-	for _, m := range list.Members {
+	for _, m := range members {
 		view.members = append(view.members, fmt.Sprintf("%s/%d", m.Name, m.ID))
 		if m.IsLearner {
 			view.learners = append(view.learners, m.Name)
@@ -914,7 +1016,7 @@ func readServerView(t *testing.T, cs *clients.Clients, fx *importedClusterFixtur
 // a split brain: the init node is the one the restore resets, so it is guaranteed to be on the
 // restored side. A server that rejoined the wrong cluster, or was never brought back into the
 // restored one, only shows up when it is asked directly.
-func assertImportedServersConverged(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, servers []*corev1.Pod, version string) {
+func assertImportedServersConverged(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, servers []importedNode, version string) {
 	t.Helper()
 
 	logrus.Infof("waiting for all %d servers of cluster %s to agree on etcd membership and nodes at %s",
@@ -929,14 +1031,14 @@ func assertImportedServersConverged(t *testing.T, cs *clients.Clients, fx *impor
 
 		var reference *serverView
 		converged := true
-		for _, pod := range servers {
-			view, err := readServerView(t, cs, fx, pod, dataDir, supervisorPort)
+		for _, server := range servers {
+			view, err := readServerView(t, cs, fx, server.pod, dataDir, supervisorPort)
 			if err != nil {
-				views[pod.Name] = err.Error()
+				views[server.name] = err.Error()
 				converged = false
 				continue
 			}
-			views[pod.Name] = view.String()
+			views[server.name] = view.String()
 
 			if !serverViewHealthy(view, len(servers), version) {
 				converged = false
@@ -953,8 +1055,8 @@ func assertImportedServersConverged(t *testing.T, cs *clients.Clients, fx *impor
 	})
 	if err != nil {
 		var report strings.Builder
-		for _, pod := range servers {
-			fmt.Fprintf(&report, "\n  %s: %s", pod.Name, views[pod.Name])
+		for _, server := range servers {
+			fmt.Fprintf(&report, "\n  %s: %s", server.name, views[server.name])
 		}
 		t.Fatalf("servers of cluster %s do not agree on a single healthy cluster at %s (possible split brain):%s",
 			fx.mgmtCluster.Name, version, report.String())
@@ -1056,5 +1158,333 @@ func assertETCDResetRanOnlyOn(t *testing.T, cs *clients.Clients, fx *importedClu
 		} else {
 			assert.False(t, reset, "etcd was reset on %s, but the restore was supposed to run on %s", node, nodeName)
 		}
+	}
+}
+
+// requireHostIPFamilies skips unless the cluster the tests run against can give pods an address in
+// every family in families, judged by its nodes' pod CIDRs. The node pods are ordinary pods there,
+// so a family the host cluster does not hand out is one the downstream cluster cannot run on.
+func requireHostIPFamilies(t *testing.T, cs *clients.Clients, families []corev1.IPFamily) {
+	t.Helper()
+
+	nodes, err := cs.Core.Node().List(metav1.ListOptions{})
+	require.NoError(t, err, "listing host cluster nodes")
+
+	var cidrs []string
+	for _, node := range nodes.Items {
+		cidrs = append(cidrs, node.Spec.PodCIDRs...)
+	}
+	for _, family := range families {
+		found := slices.ContainsFunc(cidrs, func(cidr string) bool {
+			ip, _, err := net.ParseCIDR(cidr)
+			return err == nil && (ip.To4() != nil) == (family == corev1.IPv4Protocol)
+		})
+		if !found {
+			t.Skipf("host cluster has no %s pod CIDR (pod CIDRs %v); create one with dev-scripts/k3d-dual-stack", family, cidrs)
+		}
+	}
+}
+
+// ipInFamily reports whether s is an IP address of family.
+func ipInFamily(s string, family corev1.IPFamily) bool {
+	ip := net.ParseIP(s)
+	return ip != nil && (ip.To4() != nil) == (family == corev1.IPv4Protocol)
+}
+
+// assertImportedClusterOnFamily fails unless the downstream cluster runs on family: every node's
+// first InternalIP is its own address in that family, and every etcd member advertises its peer URL
+// on its node's address in that family.
+//
+// The first InternalIP is the one that counts because it is the node's primary address — the kubelet
+// orders them by node-ip — and the etcd peer URLs are what members actually dial each other on, so
+// together they say which network the cluster is really using rather than merely which addresses it
+// has. Both are polled: after a restore the nodes re-register and etcd membership is rebuilt.
+func assertImportedClusterOnFamily(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, family corev1.IPFamily) {
+	t.Helper()
+
+	logrus.Infof("checking that cluster %s runs on %s", fx.mgmtCluster.Name, family)
+
+	nodes := importedNodes(t, cs, fx)
+	wantIP := map[string]string{}
+	etcdNodes := 0
+	for _, node := range nodes {
+		ip := node.ip(family)
+		require.NotEmpty(t, ip, "node %s (pod %s) has no %s address: %v", node.name, node.pod.Name, family, node.pod.Status.PodIPs)
+		wantIP[node.name] = ip
+		if node.etcd {
+			etcdNodes++
+		}
+	}
+
+	dataDir := fmt.Sprintf("/var/lib/rancher/%s", capr.GetRuntime(previousK8sVersion))
+	supervisorPort := capr.GetRuntimeSupervisorPort(previousK8sVersion)
+
+	var reason string
+	err := utilwait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 10*time.Minute, true, func(context.Context) (bool, error) {
+		out, err := fx.execKubectl(t, "kubectl get nodes -o jsonpath='{range .items[*]}"+
+			"{.metadata.name}={range .status.addresses[?(@.type==\"InternalIP\")]}{.address},{end}{\"\\n\"}{end}'")
+		if err != nil {
+			reason = fmt.Sprintf("listing nodes: %v: %s", err, out)
+			return false, nil
+		}
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if strings.TrimSpace(out) == "" || len(lines) != len(wantIP) {
+			reason = fmt.Sprintf("downstream lists %d nodes, want %d: %q", len(lines), len(wantIP), out)
+			return false, nil
+		}
+		for _, line := range lines {
+			name, addrs, _ := strings.Cut(strings.TrimSpace(line), "=")
+			primary, _, _ := strings.Cut(addrs, ",")
+			if _, known := wantIP[name]; !known || primary != wantIP[name] {
+				reason = fmt.Sprintf("node %s has primary InternalIP %q, want its %s address %s (InternalIPs %s)",
+					name, primary, family, wantIP[name], strings.TrimSuffix(addrs, ","))
+				return false, nil
+			}
+		}
+
+		members, err := readETCDMembers(t, cs, fx, fx.pods[0], dataDir, supervisorPort)
+		if err != nil {
+			reason = err.Error()
+			return false, nil
+		}
+		if len(members) != etcdNodes {
+			reason = fmt.Sprintf("etcd lists %d members, want %d: %+v", len(members), etcdNodes, members)
+			return false, nil
+		}
+		for _, m := range members {
+			nodeName := etcdMemberNodeName(m.Name, wantIP)
+			if nodeName == "" || len(m.PeerURLs) == 0 {
+				reason = fmt.Sprintf("etcd member %s matches no node, or advertises no peer URLs: %+v", m.Name, m)
+				return false, nil
+			}
+			for _, peer := range m.PeerURLs {
+				u, err := url.Parse(peer)
+				if err != nil || u.Hostname() != wantIP[nodeName] {
+					reason = fmt.Sprintf("etcd member %s advertises peer URL %q, want its node's %s address %s",
+						m.Name, peer, family, wantIP[nodeName])
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("cluster %s is not running on %s: %s", fx.mgmtCluster.Name, family, reason)
+	}
+}
+
+// etcdMemberNodeName maps an etcd member name, which the distro forms as "<node name>-<suffix>", back
+// to the node in nodes it belongs to, or "" if none matches.
+func etcdMemberNodeName(member string, nodes map[string]string) string {
+	for name := range nodes {
+		if strings.HasPrefix(member, name+"-") {
+			return name
+		}
+	}
+	return ""
+}
+
+// watchRestoreServerArgs starts recording what the restore tells each node to join through, and
+// returns a function that stops recording and returns, per downstream node name, every distinct
+// `server:` value written to the node's zz_etcd-snapshot-restore.yaml drop-in, in the order seen.
+//
+// The drop-in only exists while the restore runs — the final restart removes it — so it cannot be read
+// off the nodes afterwards. Instead this watches the machine-plan secrets the restore writes, which
+// carry every file the plan lays down. The restore leader's own drop-in is `server: ""`, blanking the
+// server its config would otherwise join; every other node's points at the leader.
+func watchRestoreServerArgs(t *testing.T, cs *clients.Clients, clusterNamespace string) func() map[string][]string {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(cs.Ctx)
+	var (
+		mu   sync.Mutex
+		seen = map[string][]string{}
+		done = make(chan struct{})
+	)
+
+	record := func(secret *corev1.Secret) {
+		var nodePlan plan.Plan
+		if err := json.Unmarshal(secret.Data["plan"], &nodePlan); err != nil {
+			return
+		}
+		for _, f := range nodePlan.Files {
+			if path.Base(f.Path) != "zz_etcd-snapshot-restore.yaml" {
+				continue
+			}
+			content, err := base64.StdEncoding.DecodeString(f.Content)
+			if err != nil {
+				continue
+			}
+			for _, line := range strings.Split(string(content), "\n") {
+				value, ok := strings.CutPrefix(strings.TrimSpace(line), "server:")
+				if !ok {
+					continue
+				}
+				value = strings.Trim(strings.TrimSpace(value), `"`)
+				node := secret.Labels[capr.NodeNameLabel]
+				mu.Lock()
+				if !slices.Contains(seen[node], value) {
+					seen[node] = append(seen[node], value)
+				}
+				mu.Unlock()
+			}
+		}
+	}
+
+	go func() {
+		defer close(done)
+		opts := metav1.ListOptions{FieldSelector: fmt.Sprintf("type=%s", capr.SecretTypeMachinePlan)}
+		// Re-establish the watch until stopped: a watch can be closed by the server at any time, and
+		// missing the window in which the drop-ins are assigned would make the assertion vacuous.
+		for ctx.Err() == nil {
+			w, err := cs.Core.Secret().Watch(clusterNamespace, opts)
+			if err != nil {
+				select {
+				case <-ctx.Done():
+				case <-time.After(time.Second):
+				}
+				continue
+			}
+			func() {
+				defer w.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case event, ok := <-w.ResultChan():
+						if !ok {
+							return
+						}
+						if secret, ok := event.Object.(*corev1.Secret); ok {
+							record(secret)
+						}
+					}
+				}
+			}()
+		}
+	}()
+
+	return func() map[string][]string {
+		cancel()
+		<-done
+		mu.Lock()
+		defer mu.Unlock()
+		return maps.Clone(seen)
+	}
+}
+
+// assertRestoreServerArgsOnFamily fails unless the restore pointed every rejoining node at the
+// restore leader's family address and supervisor port, and at nothing else.
+//
+// The leader is the node whose drop-in blanked its server. When restoreNode is set it must be that
+// node, which also cross-checks the snapshot-to-leader correlation.
+func assertRestoreServerArgsOnFamily(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, seen map[string][]string, family corev1.IPFamily, restoreNode string) {
+	t.Helper()
+
+	t.Logf("restore server drop-ins by node: %v", seen)
+
+	var leaders []string
+	for node, values := range seen {
+		if slices.Contains(values, "") {
+			leaders = append(leaders, node)
+		}
+	}
+	require.Len(t, leaders, 1, "expected exactly one node to have its server blanked by the restore, got %v (drop-ins %v)", leaders, seen)
+	leader := leaders[0]
+	if restoreNode != "" {
+		require.Equal(t, restoreNode, leader, "the restore reset etcd on %s, want %s", leader, restoreNode)
+	}
+
+	nodes := importedNodes(t, cs, fx)
+	var leaderIP string
+	for _, node := range nodes {
+		if node.name == leader {
+			leaderIP = node.ip(family)
+		}
+	}
+	require.NotEmpty(t, leaderIP, "restore leader %s has no %s address", leader, family)
+	want := "https://" + net.JoinHostPort(leaderIP, strconv.Itoa(capr.GetRuntimeSupervisorPort(previousK8sVersion)))
+
+	for _, node := range nodes {
+		if node.name == leader {
+			continue
+		}
+		values := seen[node.name]
+		if !assert.NotEmpty(t, values, "the restore never pointed %s at the leader", node.name) {
+			continue
+		}
+		for _, value := range values {
+			u, err := url.Parse(value)
+			if !assert.NoError(t, err, "the restore pointed %s at %q, which is not a valid URL (an IPv6 address must be bracketed)", node.name, value) {
+				continue
+			}
+			assert.True(t, ipInFamily(u.Hostname(), family), "the restore pointed %s at %q, which is not a %s address", node.name, value, family)
+			assert.Equal(t, want, value, "the restore pointed %s at %q, want the leader %s at %q", node.name, value, leader, want)
+		}
+	}
+}
+
+// distroCACandidates are the paths, relative to the distro data directory, where a node keeps the
+// cluster's server CA: servers under server/tls, agents under agent.
+var distroCACandidates = []string{"server/tls/server-ca.crt", "agent/server-ca.crt"}
+
+// probeServerTLS connects from pod to serverURL's /cacerts endpoint verifying the server's
+// certificate against the cluster CA found on pod, and returns an error carrying curl's output if
+// the connection is not trusted.
+//
+// This is the check RKE2/K3s itself makes before joining: the first thing a node does with its
+// `server:` URL is fetch /cacerts and validate it, with ordinary TLS verification including the
+// certificate's subject alternative names. An address the server's certificate does not list fails
+// here exactly as it fails the join, but immediately and with the reason spelled out.
+func probeServerTLS(cs *clients.Clients, namespace, pod, dataDir, serverURL string) error {
+	var cas []string
+	for _, rel := range distroCACandidates {
+		cas = append(cas, path.Join(dataDir, rel))
+	}
+	out, err := cluster.ExecOnPod(cs, namespace, pod, "sh", "-c", fmt.Sprintf(
+		`ca=""; for f in %s; do if [ -f "$f" ]; then ca=$f; break; fi; done
+if [ -z "$ca" ]; then echo "no server CA found" >&2; exit 2; fi
+curl -sS --globoff --cacert "$ca" -o /dev/null %q`,
+		strings.Join(cas, " "), strings.TrimSuffix(serverURL, "/")+"/cacerts"))
+	if err != nil {
+		return fmt.Errorf("TLS probe of %s from %s failed: %w: %s", serverURL, pod, err, out)
+	}
+	return nil
+}
+
+// assertRestoreServerArgsTrusted fails unless every server URL the restore handed a node is trusted
+// from that node: a verified TLS connection to it succeeds (see probeServerTLS). A URL that points at
+// an address outside the leader's certificate leaves that node unable to rejoin, which otherwise
+// surfaces only as a restart that times out.
+//
+// It is probed after the operation, from the node the URL was given to. The leader keeps its
+// certificate across the restore, so what is trusted now is what was trusted when the node rejoined.
+// The probe is retried for a while, since the leader's supervisor may still be restarting.
+func assertRestoreServerArgsTrusted(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, seen map[string][]string) {
+	t.Helper()
+
+	nodes := importedNodes(t, cs, fx)
+	dataDir := fmt.Sprintf("/var/lib/rancher/%s", capr.GetRuntime(previousK8sVersion))
+
+	probed := 0
+	for _, node := range nodes {
+		for _, serverURL := range seen[node.name] {
+			if serverURL == "" {
+				// The leader's own drop-in blanks its server rather than pointing anywhere.
+				continue
+			}
+			probed++
+
+			var lastErr error
+			err := utilwait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 3*time.Minute, true, func(context.Context) (bool, error) {
+				lastErr = probeServerTLS(cs, fx.ns.Name, node.pod.Name, dataDir, serverURL)
+				return lastErr == nil, nil
+			})
+			assert.NoError(t, err, "the restore told %s to rejoin through %s, which it cannot connect to with certificate verification: %v",
+				node.name, serverURL, lastErr)
+		}
+	}
+	if len(nodes) > 1 {
+		require.NotZero(t, probed, "the restore handed no node a server URL to probe (drop-ins %v)", seen)
 	}
 }
