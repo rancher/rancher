@@ -7,7 +7,7 @@ const (
 	ClusterAutoscalerChartVersion = "9.50.1"
 	CspAdapterMinVersion          = "108.0.0+up8.0.0"
 	DefaultSccOperatorImage       = "rancher/scc-operator:v0.5.3-rc.2"
-	DefaultShellVersion           = "rancher/shell:v0.6.5"
+	DefaultShellVersion           = "rancher/shell:v0.6.6"
 	FleetVersion                  = "108.0.12+up0.14.12"
 	ProvisioningCAPIVersion       = "108.0.0+up0.9.0"
 	RemoteDialerProxyVersion      = "108.0.5+up0.6.5-rc.1"
