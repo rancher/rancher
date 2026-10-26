@@ -661,6 +661,12 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
+	// A token without principal name and provider can't be read back, reject
+	// it before anything is written.
+	if rtPrincipal.Name == "" || rtPrincipal.Provider == "" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("authentication token %s has no user principal", authTokenID))
+	}
 	token.Spec.UserPrincipal = ext.TokenPrincipal{
 		Name:           rtPrincipal.ObjectMeta.Name,
 		DisplayName:    rtPrincipal.DisplayName,
@@ -891,14 +897,17 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
-// ListForProvider returns all ext tokens associated with the named auth
-// provider. It is an internal call invoked by other parts of Rancher.
-func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
+// ListForConfig returns all ext tokens issued by the named AuthConfig. It is an
+// internal call invoked by other parts of Rancher.
+//
+// Several AuthConfigs can share a provider type, so tokens are selected by the
+// config name prefix of their user principal, not by the principal's provider.
+func (t *SystemStore) ListForConfig(configName string) (*ext.TokenList, error) {
 	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
 		SecretKindLabel: SecretKindLabelValue,
 	}).AsSelector())
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider %s: %w", provider, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config %s: %w", configName, err))
 	}
 
 	var tokens []ext.Token
@@ -907,7 +916,13 @@ func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
 		if err != nil {
 			continue
 		}
-		if token.Spec.UserPrincipal.Provider == provider {
+		tokenConfigName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			logrus.Debugf("tokens: failed to parse configName from token %s: %s", secret.Name, err)
+			continue
+		}
+
+		if tokenConfigName == configName {
 			tokens = append(tokens, *token)
 		}
 	}

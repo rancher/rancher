@@ -38,13 +38,14 @@ type keyCloakOIDCProvider struct {
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	p := &keyCloakOIDCProvider{
 		oidc.OpenIDCProvider{
-			Name:        ProviderName,
-			Type:        client.KeyCloakOIDCConfigType,
-			CTX:         ctx,
-			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-			Secrets:     mgmtCtx.Wrangler.Core.Secret(),
-			UserMGR:     userMGR,
-			TokenMgr:    tokenMGR,
+			Name:             ProviderName,
+			Type:             client.KeyCloakOIDCConfigType,
+			CTX:              ctx,
+			AuthConfigs:      mgmtCtx.Management.AuthConfigs(""),
+			AuthConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+			Secrets:          mgmtCtx.Wrangler.Core.Secret(),
+			UserMGR:          userMGR,
+			TokenMgr:         tokenMGR,
 		},
 	}
 
@@ -162,20 +163,13 @@ func (k *keyCloakOIDCProvider) toPrincipal(configName, principalType string, acc
 }
 
 func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return apiv3.Principal{}, err
 	}
-	principalConfigName, principalType, externalID, err := common.SplitPrincipalID(principalID)
+	_, principalType, externalID, err := common.SplitPrincipalID(principalID)
 	if err != nil {
 		return apiv3.Principal{}, err
-	}
-
-	// Keycloak is queried with the token's credentials, which can only be used
-	// with the realm of the AuthConfig that issued the token. Principals from
-	// other AuthConfigs are built from their IDs instead.
-	if principalConfigName != configName {
-		return k.OpenIDCProvider.GetPrincipal(principalID, token)
 	}
 
 	config, err := k.GetOIDCConfig(configName)
@@ -192,7 +186,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 	if err != nil {
 		return apiv3.Principal{}, err
 	}
-	princ := k.toPrincipal(principalConfigName, principalType, acct, token)
+	princ := k.toPrincipal(configName, principalType, acct, token)
 
 	return princ, err
 }

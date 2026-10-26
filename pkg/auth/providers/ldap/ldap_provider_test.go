@@ -6,27 +6,37 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"reflect"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -433,4 +443,103 @@ func TestGetDNAndScopeFromPrincipalID(t *testing.T) {
 			assert.Equal(t, tt.wantScope, gotScope)
 		})
 	}
+}
+
+func TestLdapProviderGetPrincipalUsesTokenConfig(t *testing.T) {
+	tests := map[string]struct {
+		providerName string
+		principalID  string
+		tokenConfig  string
+		wantFetched  []string
+		wantErr      string
+	}{
+		"principal from the token's config": {
+			providerName: OpenLdapName,
+			principalID:  "openldap-corp_user://cn=bob,dc=corp,dc=example,dc=com",
+			tokenConfig:  "openldap-corp",
+			wantFetched:  []string{"openldap-corp"},
+		},
+		"principal from another config": {
+			providerName: OpenLdapName,
+			principalID:  "openldap-it_user://cn=bob,dc=it,dc=example,dc=com",
+			tokenConfig:  "openldap-corp",
+			wantErr:      "not issued by",
+		},
+		"group principal from another config": {
+			providerName: OpenLdapName,
+			principalID:  "openldap-it_group://cn=admins,dc=it,dc=example,dc=com",
+			tokenConfig:  "openldap-corp",
+			wantErr:      "not issued by",
+		},
+		"SAML search principal from another config": {
+			providerName: OKTAName,
+			principalID:  "okta-it_user://bob",
+			tokenConfig:  "okta-corp",
+			wantErr:      "not issued by",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			var fetched []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				configName := path.Base(r.URL.Path)
+				fetched = append(fetched, configName)
+
+				// No servers are configured, so any LDAP lookup fails after
+				// the config has been loaded.
+				w.Header().Set("Content-Type", "application/json")
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"apiVersion": "management.cattle.io/v3",
+					"kind":       "AuthConfig",
+					"metadata":   map[string]any{"name": configName},
+					"enabled":    true,
+				}))
+			}))
+			t.Cleanup(srv.Close)
+
+			objectClient := newTestAuthConfigObjectClient(t, srv.URL)
+			p := &ldapProvider{
+				providerName: tt.providerName,
+				authConfigs: &fakes.AuthConfigInterfaceMock{
+					ObjectClientFunc: func() *objectclient.ObjectClient { return objectClient },
+				},
+			}
+			token := &v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: tt.tokenConfig + "_user://alice"},
+				},
+			}
+
+			_, err := p.GetPrincipal(tt.principalID, token)
+			// Lookups for the token's config fail because no LDAP server is
+			// configured.
+			require.Error(t, err)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+			assert.Equal(t, tt.wantFetched, fetched)
+		})
+	}
+}
+
+func newTestAuthConfigObjectClient(t *testing.T, host string) *objectclient.ObjectClient {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, v3.AddToScheme(scheme))
+	gv := mgmtv3.AuthConfigGroupVersionKind.GroupVersion()
+	restClient, err := rest.RESTClientFor(&rest.Config{
+		Host:    host,
+		APIPath: "/apis",
+		ContentConfig: rest.ContentConfig{
+			GroupVersion:         &gv,
+			NegotiatedSerializer: serializer.NewCodecFactory(scheme).WithoutConversion(),
+		},
+	})
+	require.NoError(t, err)
+
+	gvr := gv.WithResource(mgmtv3.AuthConfigResource.Name)
+	return objectclient.NewObjectClient("", client.NewClient(gvr, mgmtv3.AuthConfigGroupVersionKind.Kind, false, restClient, time.Minute),
+		&mgmtv3.AuthConfigResource, mgmtv3.AuthConfigGroupVersionKind, &objectclient.UnstructuredObjectFactory{})
 }

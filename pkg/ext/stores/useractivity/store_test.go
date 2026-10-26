@@ -78,7 +78,6 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tokenID,
 		},
-		AuthProvider:  "oidc",
 		UserPrincipal: apiv3.Principal{},
 	}
 )
@@ -118,7 +117,6 @@ func TestStoreUpdate(t *testing.T) {
 			UID:               uid,
 			ResourceVersion:   resourceVersion,
 		},
-		AuthProvider:  "oidc",
 		TTLMillis:     defaultTokenTTL,
 		UserPrincipal: apiv3.Principal{},
 	}
@@ -342,12 +340,12 @@ func TestStoreUpdate(t *testing.T) {
 			wantErr: "user user-xyz is not a Rancher user",
 		},
 		{
-			desc:    "auth providers don't match",
+			desc:    "user principals don't match",
 			ctx:     ctxAdmin,
 			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
 			setupMocks: func() {
 				sessionToken := sessionToken.DeepCopy()
-				sessionToken.AuthProvider = "local"
+				sessionToken.UserPrincipal.Name = "local://u-other"
 
 				gomock.InOrder(
 					userCache.EXPECT().Get(user.Name).Return(user, nil),
@@ -355,7 +353,7 @@ func TestStoreUpdate(t *testing.T) {
 					tokenCache.EXPECT().Get(tokenID).Return(sessionToken, nil),
 				)
 			},
-			wantErr: "auth providers don't match",
+			wantErr: "user principals don't match",
 		},
 		{
 			desc:    "token is disabled",

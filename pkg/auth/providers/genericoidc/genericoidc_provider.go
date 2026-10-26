@@ -30,14 +30,15 @@ const (
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	p := &GenOIDCProvider{
 		baseoidc.OpenIDCProvider{
-			Name:         ProviderName,
-			Type:         client.GenericOIDCConfigType,
-			CTX:          ctx,
-			AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
-			Secrets:      mgmtCtx.Wrangler.Core.Secret(),
-			UserMGR:      userMGR,
-			TokenMgr:     tokenMGR,
-			UserSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
+			Name:             ProviderName,
+			Type:             client.GenericOIDCConfigType,
+			CTX:              ctx,
+			AuthConfigs:      mgmtCtx.Management.AuthConfigs(""),
+			AuthConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+			Secrets:          mgmtCtx.Wrangler.Core.Secret(),
+			UserMGR:          userMGR,
+			TokenMgr:         tokenMGR,
+			UserSearcher:     common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 		},
 	}
 	p.GetConfig = p.GetOIDCConfig
@@ -89,6 +90,9 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	var p apiv3.Principal
 	principalConfigName, principalType, externalID, err := common.SplitPrincipalID(principalID)
 	if err != nil {
+		return p, err
+	}
+	if _, err := common.ConfigNameForPrincipalLookup(principalID, token); err != nil {
 		return p, err
 	}
 	if externalID == "" && principalType == "" {

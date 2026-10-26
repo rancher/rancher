@@ -55,15 +55,16 @@ type tokenManager interface {
 }
 
 type OpenIDCProvider struct {
-	Name         string
-	Type         string
-	CTX          context.Context
-	AuthConfigs  v3.AuthConfigInterface
-	Secrets      wcorev1.SecretController
-	UserMGR      user.Manager
-	TokenMgr     tokenManager
-	UserSearcher *common.UserSearcher
-	GetConfig    func(string) (*apiv3.OIDCConfig, error)
+	Name             string
+	Type             string
+	CTX              context.Context
+	AuthConfigs      v3.AuthConfigInterface
+	AuthConfigLister v3.AuthConfigLister
+	Secrets          wcorev1.SecretController
+	UserMGR          user.Manager
+	TokenMgr         tokenManager
+	UserSearcher     *common.UserSearcher
+	GetConfig        func(string) (*apiv3.OIDCConfig, error)
 }
 
 type ClaimInfo struct {
@@ -201,14 +202,15 @@ func coerceToStringSlice(v any) []string {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, TokenMgr *tokens.Manager) common.AuthProvider {
 	p := &OpenIDCProvider{
-		Name:         ProviderName,
-		Type:         client.OIDCConfigType,
-		CTX:          ctx,
-		AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
-		Secrets:      mgmtCtx.Wrangler.Core.Secret(),
-		UserMGR:      userMGR,
-		TokenMgr:     TokenMgr,
-		UserSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
+		Name:             ProviderName,
+		Type:             client.OIDCConfigType,
+		CTX:              ctx,
+		AuthConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		AuthConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		Secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		UserMGR:          userMGR,
+		TokenMgr:         TokenMgr,
+		UserSearcher:     common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 	}
 
 	p.GetConfig = p.GetOIDCConfig
@@ -243,6 +245,12 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 	if config != nil {
 		configName = cmp.Or(configName, config.Name)
 	} else {
+		// Embedding providers (keycloakoidc, genericoidc, cognito) set Name
+		// to their own provider name.
+		configName, err = common.LoginConfigName(o.AuthConfigLister, configName, o.Name)
+		if err != nil {
+			return userPrincipal, nil, "", userClaimInfo, err
+		}
 		logrus.Debugf("Loading OIDC config %s", configName)
 		config, err = o.GetConfig(configName)
 		if err != nil {
@@ -313,6 +321,9 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	var p apiv3.Principal
 	configName, principalType, externalID, err := common.SplitPrincipalID(principalID)
 	if err != nil {
+		return p, err
+	}
+	if _, err := common.ConfigNameForPrincipalLookup(principalID, token); err != nil {
 		return p, err
 	}
 
@@ -547,9 +558,7 @@ func (o *OpenIDCProvider) saveOIDCSecrets(config *apiv3.OIDCConfig) error {
 	}
 	config.ClientSecret = name
 
-	logrus.Debugf("OpenIDCProvider: saveOIDCConfig: updating config")
-	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	return err
+	return nil
 }
 
 func (o *OpenIDCProvider) GetOIDCConfig(configName string) (*apiv3.OIDCConfig, error) {
@@ -979,7 +988,7 @@ func (o *OpenIDCProvider) LogoutAll(w http.ResponseWriter, r *http.Request, toke
 	if err != nil {
 		return err
 	}
-	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
+	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by auth config %s", configName)
 
 	oidcConfig, err := o.GetConfig(configName)
 	if err != nil {

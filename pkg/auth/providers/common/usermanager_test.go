@@ -846,18 +846,17 @@ func TestGetGroupsForTokenAuthProviderUsesConfigName(t *testing.T) {
 	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributeCache.EXPECT().Get("u-abcdef").Return(&v3.UserAttribute{
 		GroupPrincipals: map[string]v3.Principals{
-			"github":    {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}}}},
-			"github-eu": {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}}}},
+			"github":    {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}, Provider: "github"}}},
+			"github-eu": {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}}},
 		},
 	}, nil)
 
 	manager := userManager{userAttributeCache: userAttributeCache}
 
-	// The token records the provider name, but the groups must come from the
+	// The principal records the provider type, but the groups must come from the
 	// config that issued it.
 	token := &v3.Token{
-		UserID:       "u-abcdef",
-		AuthProvider: "github",
+		UserID: "u-abcdef",
 		UserPrincipal: v3.Principal{
 			ObjectMeta: v1.ObjectMeta{Name: "github-eu_user://42"},
 			Provider:   "github",
@@ -866,5 +865,194 @@ func TestGetGroupsForTokenAuthProviderUsesConfigName(t *testing.T) {
 
 	groups := manager.GetGroupsForTokenAuthProvider(token)
 
-	assert.Equal(t, []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}}}, groups)
+	assert.Equal(t, []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}}, groups)
+}
+
+// Groups used by the IsMemberOf and GetGroupsForTokenAuthProvider tests.
+var (
+	groupGitHub   = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}, Provider: "github"}
+	groupGitHubEU = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}
+	groupLocal    = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "local://g-local"}, Provider: "local"}
+	groupLegacy   = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "legacy_org://3"}, Provider: "legacy"}
+)
+
+// newGroupsTestToken returns a token with the given user principal ID and
+// AuthProvider, carrying groupLegacy as its legacy group principals.
+func newGroupsTestToken(principalID, authProvider string) *v3.Token {
+	return &v3.Token{
+		UserID:       "u-abcdef",
+		AuthProvider: authProvider,
+		UserPrincipal: v3.Principal{
+			ObjectMeta: v1.ObjectMeta{Name: principalID},
+			Provider:   authProvider,
+		},
+		GroupPrincipals: []v3.Principal{groupLegacy},
+	}
+}
+
+// The UserAttribute is looked up at most once: tokens with an unparseable
+// principal are refused before it is.
+func newGroupsTestUserManager(t *testing.T, groupPrincipals map[string]v3.Principals) *userManager {
+	ctrl := gomock.NewController(t)
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	if groupPrincipals == nil {
+		userAttributeCache.EXPECT().Get("u-abcdef").
+			Return(nil, apierrors.NewNotFound(v3.Resource("userattributes"), "u-abcdef")).MaxTimes(1)
+	} else {
+		userAttributeCache.EXPECT().Get("u-abcdef").Return(&v3.UserAttribute{
+			ObjectMeta:      v1.ObjectMeta{Name: "u-abcdef"},
+			GroupPrincipals: groupPrincipals,
+		}, nil).MaxTimes(1)
+	}
+
+	return &userManager{userAttributeCache: userAttributeCache}
+}
+
+func TestIsMemberOf(t *testing.T) {
+	tests := []struct {
+		name            string
+		token           *v3.Token
+		groupPrincipals map[string]v3.Principals // nil means the UserAttribute is not found
+		wantMember      []v3.Principal
+		wantNotMember   []v3.Principal
+	}{
+		{
+			// The AuthProvider records the provider type, which differs from the
+			// config name; the legacy fallback must be decided by the config name.
+			name:  "token from a named config uses its config's groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github-eu": {Items: []v3.Principal{groupGitHubEU}},
+				"local":     {Items: []v3.Principal{groupLocal}},
+			},
+			wantMember:    []v3.Principal{groupGitHubEU, groupLocal},
+			wantNotMember: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token from a named config with no groups for its config falls back to legacy groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			wantMember: []v3.Principal{groupGitHub, groupLegacy},
+		},
+		{
+			name:  "token with an empty principal uses local groups",
+			token: newGroupsTestToken("", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+				"local":  {Items: []v3.Principal{groupLocal}},
+			},
+			wantMember:    []v3.Principal{groupGitHub, groupLocal},
+			wantNotMember: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token with an unparseable principal is not a member of any group",
+			token: newGroupsTestToken("not-a-principal", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+				"local":  {Items: []v3.Principal{groupLocal}},
+			},
+			wantNotMember: []v3.Principal{groupGitHub, groupLocal, groupLegacy},
+		},
+		{
+			name:  "token with an empty principal and no local groups falls back to legacy groups",
+			token: newGroupsTestToken("", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			wantMember: []v3.Principal{groupGitHub, groupLegacy},
+		},
+		{
+			name:          "user attribute not found falls back to legacy groups",
+			token:         newGroupsTestToken("github-eu_user://1", "github"),
+			wantMember:    []v3.Principal{groupLegacy},
+			wantNotMember: []v3.Principal{groupGitHubEU, groupLocal},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, group := range tt.wantMember {
+				manager := newGroupsTestUserManager(t, tt.groupPrincipals)
+				assert.True(t, manager.IsMemberOf(tt.token, group), "expected to be a member of %s", group.Name)
+			}
+			for _, group := range tt.wantNotMember {
+				manager := newGroupsTestUserManager(t, tt.groupPrincipals)
+				assert.False(t, manager.IsMemberOf(tt.token, group), "expected not to be a member of %s", group.Name)
+			}
+		})
+	}
+}
+
+func TestGetGroupsForTokenAuthProvider(t *testing.T) {
+	allGroups := map[string]v3.Principals{
+		"github":    {Items: []v3.Principal{groupGitHub}},
+		"github-eu": {Items: []v3.Principal{groupGitHubEU}},
+		"local":     {Items: []v3.Principal{groupLocal}},
+	}
+
+	tests := []struct {
+		name            string
+		token           *v3.Token
+		groupPrincipals map[string]v3.Principals // nil means the UserAttribute is not found
+		want            []v3.Principal
+	}{
+		{
+			name:            "token from a named config gets its config's groups",
+			token:           newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: allGroups,
+			want:            []v3.Principal{groupGitHubEU},
+		},
+		{
+			name:            "token with an empty principal gets local groups",
+			token:           newGroupsTestToken("", ""),
+			groupPrincipals: allGroups,
+			want:            []v3.Principal{groupLocal},
+		},
+		{
+			name:            "token with an unparseable principal gets no groups",
+			token:           newGroupsTestToken("not-a-principal", "github"),
+			groupPrincipals: allGroups,
+			want:            nil,
+		},
+		{
+			name:  "token whose config has no entry falls back to legacy groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			want: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token with an empty principal and no local entry falls back to legacy groups",
+			token: newGroupsTestToken("", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			want: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token whose config has an empty entry gets no groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github":    {Items: []v3.Principal{groupGitHub}},
+				"github-eu": {},
+			},
+			want: nil,
+		},
+		{
+			name:  "user attribute not found falls back to legacy groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			want:  []v3.Principal{groupLegacy},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := newGroupsTestUserManager(t, tt.groupPrincipals)
+
+			assert.Equal(t, tt.want, manager.GetGroupsForTokenAuthProvider(tt.token))
+		})
+	}
 }

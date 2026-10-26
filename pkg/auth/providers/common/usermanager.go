@@ -499,6 +499,13 @@ func groupPrincipalsChanged(stored, groupPrincipals []v3.Principal) bool {
 }
 
 func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
+	configName, err := ConfigNameOrLocalFromToken(token)
+	if err != nil {
+		logrus.Warnf("Problem determining group membership for %v in %v (%v): %v",
+			token.GetUserID(), group.Name, group.DisplayName, err)
+		return false
+	}
+
 	attribs, err := m.userAttributeCache.Get(token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v",
@@ -518,7 +525,7 @@ func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principa
 	}
 
 	// fallback to legacy token groupPrincipals
-	if _, ok := hitProviders[token.GetAuthProvider()]; !ok {
+	if _, ok := hitProviders[configName]; !ok {
 		for _, principal := range token.GetGroupPrincipals() {
 			groups[principal.Name] = true
 		}
@@ -530,6 +537,12 @@ func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principa
 func (m *userManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
 	var groups []v3.Principal
 
+	tokenProvider, err := ConfigNameOrLocalFromToken(token)
+	if err != nil {
+		logrus.Warnf("Problem getting groups for %v: %v", token.GetUserID(), err)
+		return nil
+	}
+
 	attribs, err := m.userAttributeCache.Get(token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.GetUserID(), err)
@@ -538,10 +551,6 @@ func (m *userManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor
 
 	hitProvider := false
 	if attribs != nil {
-		tokenProvider, err := ConfigNameFromToken(token)
-		if err != nil {
-			tokenProvider = token.GetAuthProvider()
-		}
 		for provider, y := range attribs.GroupPrincipals {
 			if provider == tokenProvider {
 				hitProvider = true
