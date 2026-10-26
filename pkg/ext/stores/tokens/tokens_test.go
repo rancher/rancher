@@ -3819,3 +3819,84 @@ func TestSystemStoreUpdateSessionTTL(t *testing.T) {
 		})
 	}
 }
+
+func TestSystemStoreCreateDryRunTTL(t *testing.T) {
+	const (
+		hour = int64(time.Hour / time.Millisecond)
+		day  = 24 * hour
+	)
+
+	tests := []struct {
+		name string
+		kind string
+		ttl  int64
+		want int64
+	}{
+		{
+			name: "default",
+			want: 90 * day,
+		},
+		{
+			name: "longer than the max",
+			ttl:  100 * day,
+			want: 90 * day,
+		},
+		{
+			name: "session, default",
+			kind: IsLogin,
+			want: 16 * hour,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTTLSettings(t, "129600", "129600", "960")
+
+			ctrl := gomock.NewController(t)
+
+			// No secret is created on a dry run.
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().Get(TokenNamespace, gomock.Any()).
+				Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "token"))
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					Provider:   "local",
+				},
+			}, nil)
+
+			auth := NewMockauthHandler(ctrl)
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+
+			hasher := NewMockhashHandler(ctrl)
+			hasher.EXPECT().MakeAndHashSecret().Return("secretval", "hashval", nil)
+
+			timer := NewMocktimeHandler(ctrl)
+			timer.EXPECT().Now().Return("fake-now")
+
+			store := NewSystem(nil, nil, secrets, users, tcache, nil, timer, hasher, auth)
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   test.kind,
+					TTL:    test.ttl,
+				},
+			}
+
+			opts := &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+			created, err := store.Create(t.Context(), GVR.GroupResource(), token, opts, &mockUser{name: "world"})
+			require.NoError(t, err)
+			assert.Equal(t, test.want, created.Spec.TTL)
+		})
+	}
+}

@@ -730,6 +730,13 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rest.FillObjectMetaSystemFields(token)
 
+	// Converting resolves the TTL, so a dry run returns the TTL that would be stored.
+	secret, err := toSecret(token)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
+			token.Name, err))
+	}
+
 	// Return early as the user does not wish to actually change anything.
 	if dryRun {
 		// enforce our choice of name
@@ -739,12 +746,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			return nil, err
 		}
 		return token, nil
-	}
-
-	secret, err := toSecret(token)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
-			token.Name, err))
 	}
 
 	// enforce our choice of name, without racing create
