@@ -234,8 +234,19 @@ func (a *ImportedAdapter) kubernetesVersion() string {
 	return ""
 }
 
+// LoopbackAddress returns "localhost" rather than a literal loopback address, so that it works
+// whichever address family the node runs on.
+//
+// RKE2/K3s bind node-local endpoints (the controller-manager, scheduler and kubelet health
+// endpoints, and etcd's client and metrics listeners) to the loopback of the node's primary family:
+// 127.0.0.1 on an IPv4-primary node, but only ::1 on an IPv6-primary one. An imported cluster has no
+// stack preference Rancher could read that from — unlike CAPR's, see capr.GetLoopbackAddress — and
+// the management Node may be stale or, on a restore from nothing, missing. localhost resolves to both
+// loopbacks, and the node's own resolver and Go's dialer fall through to whichever is listening when
+// the probe or command runs. The distro's serving certificates all list localhost, so certificate
+// verification against it holds.
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
-	return "127.0.0.1"
+	return "localhost"
 }
 
 func (a *ImportedAdapter) ConfigFile(_ *corev1.Secret) string {
@@ -791,8 +802,7 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		return nil, err
 	}
 
-	// only support ipv4, need to implement per-node extraction mechanism
-	loopbackAddress := "127.0.0.1"
+	loopbackAddress := a.LoopbackAddress(secret)
 
 	// render this probe separately because it has a specific format
 	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {

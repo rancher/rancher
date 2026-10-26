@@ -979,12 +979,21 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 	assert.NotContains(t, probes, CalicoProbeName)
 
 	kcm := probes[KubeControllerManagerProbeName]
-	assert.Equal(t, "https://127.0.0.1:10261/healthz", kcm.HTTPGetAction.URL)
+	assert.Equal(t, "https://localhost:10261/healthz", kcm.HTTPGetAction.URL)
 	assert.Equal(t, "/custom/kcm.crt", kcm.HTTPGetAction.CACert)
 
 	scheduler := probes[KubeSchedulerProbeName]
-	assert.Equal(t, "https://127.0.0.1:10262/healthz", scheduler.HTTPGetAction.URL)
+	assert.Equal(t, "https://localhost:10262/healthz", scheduler.HTTPGetAction.URL)
 	assert.Equal(t, "/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt", scheduler.HTTPGetAction.CACert)
+}
+
+// TestImportedAdapter_LoopbackAddress pins the imported adapter to localhost: the node-local
+// endpoints it probes and points etcd at listen on the loopback of the node's primary address
+// family, which Rancher cannot know for an imported cluster, and localhost resolves to both.
+func TestImportedAdapter_LoopbackAddress(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "localhost", (&ImportedAdapter{}).LoopbackAddress(nil))
 }
 
 // calicoTestSecret builds a machine-plan secret with lifecycle labels pointing at machineName,
