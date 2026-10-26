@@ -7,7 +7,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -195,7 +194,7 @@ func main() {
 				log.Println(http.ListenAndServe(profileAddress, nil))
 			}()
 		}
-		config.ACMEDomains = appendEnvACMEDomains(config.ACMEDomains, os.Getenv("ACME_DOMAIN"))
+		config.ACMEDomains = mergeEnvACMEDomains(config.ACMEDomains, os.Getenv("ACME_DOMAIN"))
 		initLogs(cmd, config)
 		return run(cmd, config)
 	}
@@ -205,14 +204,32 @@ func main() {
 	}
 }
 
-// appendEnvACMEDomains restores the v1 behavior of combining ACME_DOMAIN with
-// --acme-domain, as cli v3 ignores the env source once the flag is given.
-func appendEnvACMEDomains(domains []string, env string) []string {
-	for _, domain := range strings.Split(env, ",") {
-		if domain = strings.TrimSpace(domain); domain != "" && !slices.Contains(domains, domain) {
-			domains = append(domains, domain)
+// mergeEnvACMEDomains restores the v1 behavior of combining ACME_DOMAIN with
+// --acme-domain, as cli v3 ignores the env source once the flag is given. The
+// environment domains come first, matching the order v1 produced.
+func mergeEnvACMEDomains(flagValues []string, env string) []string {
+	domains := make([]string, 0, len(flagValues)+1)
+	seen := make(map[string]struct{}, len(flagValues)+1)
+
+	add := func(domain string) {
+		domain = strings.TrimSpace(domain)
+		if domain == "" {
+			return
 		}
+		if _, ok := seen[domain]; ok {
+			return
+		}
+		seen[domain] = struct{}{}
+		domains = append(domains, domain)
 	}
+
+	for _, domain := range strings.Split(env, ",") {
+		add(domain)
+	}
+	for _, domain := range flagValues {
+		add(domain)
+	}
+
 	return domains
 }
 
