@@ -833,6 +833,12 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		return status, nil
 	}
 
+	// The cluster stays paused until the operation reaches a terminal phase (see handleSucceeded,
+	// handleFailed and handleCanceled), not just until etcd is back. A restore that rolls back
+	// configuration — the Kubernetes version in particular — leaves the control plane out of date, so
+	// an unpaused CAPI control plane provider starts replacing machines straight away: new nodes join
+	// the restored etcd before Rancher has a machine-plan secret for them, and old ones, the restore
+	// leader included, are removed while the restart and postflight steps still act on them.
 	if err = s.adapter.PauseCluster(true); err != nil {
 		return status, err
 	}
@@ -1563,10 +1569,6 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		value = value + "/initial"
 	} else {
 		value = value + "/final"
-	}
-
-	if err = s.adapter.PauseCluster(false); err != nil {
-		return status, err
 	}
 
 	// The restart is built around the node etcd was reset on; see restoreLeader for why it is never
@@ -2477,9 +2479,17 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 		return status, nil
 	}
 
+	// Only the owner unpauses: it paused the cluster in Preflight, and a non-owner may be running
+	// while another operation holds it paused.
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+	if owning {
+		if err := s.adapter.PauseCluster(false); err != nil {
+			return status, err
+		}
+	}
 	// Owner and mid-chain delegates both go through ReleaseBeacon: it clears the beacon fully
 	// for the owner, or removes the delegate slot from the chain otherwise.
-	if plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
 		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
@@ -2503,9 +2513,17 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 		return status, nil
 	}
 
+	// Only the owner unpauses: it paused the cluster in Preflight, and a non-owner may be running
+	// while another operation holds it paused.
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+	if owning {
+		if err := s.adapter.PauseCluster(false); err != nil {
+			return status, err
+		}
+	}
 	// Owner performs full teardown via ReleaseBeacon; a mid-chain delegate is removed from the
 	// chain by the same call. Non-participants are no-op.
-	if plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
 		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
@@ -2530,9 +2548,16 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 		return status, nil
 	}
 
+	// Only the owner unpauses: it paused the cluster in Preflight, and a non-owner may be running
+	// while another operation holds it paused.
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+	if owning {
+		if err := s.adapter.PauseCluster(false); err != nil {
+			return status, err
+		}
+	}
 	// Owner does the full teardown + enqueues the cluster; a mid-chain delegate just removes
 	// itself. Only owner cleanup implies downstream reconciliation, so only owner enqueues.
-	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
 	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
 		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err

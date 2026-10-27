@@ -336,6 +336,46 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 	return pods, nil
 }
 
+// NewImportedJoinNodePod creates one more node for a running imported cluster, set up the way
+// NewImportedClusterPods sets up its joining nodes: it joins through serverURL with token, and runs
+// the roles of pool, whose Quantity is ignored. opts should be the options the cluster was created
+// with, so the new node is configured like the rest — a server that does not get the cluster's
+// etcd-s3 settings, for instance, would not see its S3 snapshots. The pod is returned as soon as it
+// is created; it is up to the caller to wait for the node to join.
+//
+// token is the full server token (K10<ca-hash>::server:<password>), as read from a running server
+// with ImportedServerToken.
+func NewImportedJoinNodePod(clients *clients.Clients, namespace, k8sVersion, nodeName, serverURL, token string, pool ImportedNodePool, labels map[string]string, registryCACert []byte, opts ...ImportedClusterOptions) (*corev1.Pod, error) {
+	var options ImportedClusterOptions
+	if len(opts) > 1 {
+		return nil, fmt.Errorf("at most one ImportedClusterOptions may be supplied, got %d", len(opts))
+	} else if len(opts) == 1 {
+		options = opts[0]
+	}
+
+	var network *ImportedNetwork
+	if options.Network != nil {
+		resolved, err := options.Network.resolve()
+		if err != nil {
+			return nil, fmt.Errorf("invalid imported network: %w", err)
+		}
+		network = &resolved
+	}
+
+	script := importedNodeUserData(capr.GetRuntime(k8sVersion), k8sVersion, token, nodeName, serverURL, false, pool.ControlPlane, pool.ETCD, pool.Worker, pool.DistroDataDir, registryCACert, options, network)
+	pod, err := systemdnode.New(clients, namespace, script, importedNodeLabels(labels, nodeName, pool.ETCD), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create node %s: %w", nodeName, err)
+	}
+	return pod, nil
+}
+
+// ImportedServerToken reads the full server token off a running server node of an imported cluster,
+// waiting for the distro to have written it. dataDir is the node's distro data directory.
+func ImportedServerToken(clients *clients.Clients, namespace, podName, dataDir string) (string, error) {
+	return waitForServerToken(clients, namespace, podName, dataDir)
+}
+
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	cluster = cluster.DeepCopy()
 	if cluster.Namespace == "" {

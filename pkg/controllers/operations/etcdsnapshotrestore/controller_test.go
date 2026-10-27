@@ -21,7 +21,11 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/restoremode"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +63,8 @@ type stubAdapter struct {
 	kubeconfigPath    string
 	serverUnit        string
 	waitForRegisterOK bool
+	// pauseCalls records every PauseCluster call, in order.
+	pauseCalls []bool
 
 	// restoreTargets are the objects RestoreTarget serves, keyed by resource key. A key that is
 	// absent yields (nil, nil), i.e. this cluster type has no counterpart for it.
@@ -100,8 +106,11 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 
 func (a *stubAdapter) BeaconRef() (string, string)    { return "test-namespace", "test-cluster" }
 func (a *stubAdapter) WaitForRegister() (bool, error) { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(_ bool) error      { return nil }
-func (a *stubAdapter) RuntimeCommand() string         { return a.runtimeCommand }
+func (a *stubAdapter) PauseCluster(paused bool) error {
+	a.pauseCalls = append(a.pauseCalls, paused)
+	return nil
+}
+func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 	return a.dataDir, a.dataDirErr
 }
@@ -2109,4 +2118,86 @@ func restartInstructionArgs(t *testing.T, nodePlan *planapi.Plan) []string {
 	}
 	t.Fatalf("plan has no restart instruction: %v", nodePlan.OneTimeInstructions)
 	return nil
+}
+
+type fakeBeaconClient struct {
+	plancontrollers.BeaconClient
+
+	statusUpdates []*planv1alpha1.Beacon
+}
+
+func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
+	f.statusUpdates = append(f.statusUpdates, beacon.DeepCopy())
+	return beacon, nil
+}
+
+func terminalScope(ownerKey string, adapter *stubAdapter) *scope {
+	return &scope{
+		ownerKey: ownerKey,
+		op:       newOp(),
+		beacon: &planv1alpha1.Beacon{
+			Status: planv1alpha1.BeaconStatus{Active: true, Owner: ownerKey},
+		},
+		adapter: adapter,
+	}
+}
+
+// The cluster is paused from the end of Preflight until the operation is terminal, so a CAPI
+// control plane provider cannot replace machines mid-restore. The owner is the one that unpauses it.
+// Succeeded is not covered here because its owner path also enqueues through a concrete
+// dynamic.Controller.
+func TestTerminalHandler_OwningOperationUnpausesAndReleasesBeacon(t *testing.T) {
+	t.Parallel()
+
+	for _, terminal := range []struct {
+		name    string
+		handler func(*handler, *scope, opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error)
+	}{
+		{"canceled", (*handler).handleCanceled},
+		{"failed", (*handler).handleFailed},
+	} {
+		t.Run(terminal.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter := &stubAdapter{}
+			beacons := &fakeBeaconClient{}
+			h := &handler{beacons: beacons}
+			s := terminalScope("etcd-snapshot-restore/test-namespace/test-restore", adapter)
+
+			_, err := terminal.handler(h, s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+			require.NoError(t, err)
+			assert.Equal(t, []bool{false}, adapter.pauseCalls)
+			require.Len(t, beacons.statusUpdates, 1)
+			assert.Empty(t, beacons.statusUpdates[0].Status.Owner)
+			assert.False(t, beacons.statusUpdates[0].Status.Active)
+		})
+	}
+}
+
+func TestTerminalHandler_NonOwnerDoesNotUnpauseOrReleaseBeacon(t *testing.T) {
+	t.Parallel()
+
+	for _, terminal := range []struct {
+		name    string
+		handler func(*handler, *scope, opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error)
+	}{
+		{"canceled", (*handler).handleCanceled},
+		{"failed", (*handler).handleFailed},
+		{"succeeded", (*handler).handleSucceeded},
+	} {
+		t.Run(terminal.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter := &stubAdapter{}
+			beacons := &fakeBeaconClient{}
+			h := &handler{beacons: beacons}
+			s := terminalScope("etcd-snapshot-restore/test-namespace/test-restore", adapter)
+			s.beacon.Status.Owner = "etcd-snapshot-restore/test-namespace/newer-restore"
+
+			_, err := terminal.handler(h, s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+			require.NoError(t, err)
+			assert.Empty(t, adapter.pauseCalls)
+			assert.Empty(t, beacons.statusUpdates)
+		})
+	}
 }
