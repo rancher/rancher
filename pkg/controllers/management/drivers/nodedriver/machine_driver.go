@@ -93,6 +93,11 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		v32.NodeDriverConditionDownloaded.Unknown(obj)
 		v32.NodeDriverConditionInstalled.Unknown(obj)
 		return obj, fmt.Errorf("node driver binary is not ready")
+	} else if err := driver.Executable(); err != nil {
+		v32.NodeDriverConditionDownloaded.True(obj)
+		v32.NodeDriverConditionInstalled.False(obj)
+		v32.NodeDriverConditionInstalled.Reason(obj, err.Error())
+		return obj, err
 	}
 
 	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
