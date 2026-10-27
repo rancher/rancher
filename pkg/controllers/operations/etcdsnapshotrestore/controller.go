@@ -56,7 +56,7 @@ const (
 	RestoreClusterConfigStepHookLabelPrefix = "restore-cluster-config.step.hook.operation.cattle.io/"
 
 	// ShutdownStepHookLabelPrefix gates the Shutdown step, before the controller assigns the
-	// killall + tombstone-touch + tls/cred-directory cleanup plan to every non-Windows secret.
+	// killall + tombstone-touch + tls/cred-directory cleanup + install plan to every non-Windows secret.
 	ShutdownStepHookLabelPrefix = "shutdown.step.hook.operation.cattle.io/"
 
 	// RestoreStepHookLabelPrefix gates the Restore step, before the controller assigns the
@@ -2048,9 +2048,9 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 }
 
 // buildShutdownPlan assembles the plan which stops the distro on a node ahead of the restore: it
-// clears any idempotency tracking left by a previous attempt, installs the distro version the
-// cluster is now configured for, runs the distro's killall script, and on etcd and control-plane
-// nodes lays down the etcd tombstone and removes the TLS directory.
+// clears any idempotency tracking left by a previous attempt, runs the distro's killall script, on etcd
+// and control-plane nodes lays down the etcd tombstone and removes the TLS directory, and finally
+// installs the distro version the cluster is now configured for.
 //
 // # Why the install lives here
 //
@@ -2070,11 +2070,13 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 // rkev1.ETCDSnapshotPhaseInitialRestartCluster runs a full reconcile, each desired plan carrying its
 // own install. Doing it once here covers both, and no node installs twice.
 //
-// The installer is invoked with the distro's start suppressed (see installInstruction's
-// INSTALL_<RUNTIME>_SKIP_START), so it lays down binaries and leaves the service alone: the
-// system-agent installer image exits before its `systemctl restart` when that is set. It is also
-// ordered ahead of the killall rather than after it, so that anything the installer did bring up is
-// taken down again by the shutdown that follows.
+// The install is the last instruction, so it runs once the distro has been stopped and its etcd and
+// TLS state cleared: the binaries are replaced while nothing is running them. Because nothing in the
+// plan follows it, the node staying down until the restart steps rests entirely on the installer
+// being invoked with the distro's start suppressed (see installInstruction's
+// INSTALL_<RUNTIME>_SKIP_START): the system-agent installer image exits before its `systemctl restart`
+// when that is set, so it lays down binaries and leaves the service alone. Were it to start the
+// service anyway, nothing in this step would stop it again.
 func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	dataDir, err := s.adapter.DistroDataDirectory(secret)
@@ -2136,7 +2138,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 // etcd was reset on.
 //
 // The node is already carrying the right distro version — the Shutdown step installed it on every
-// node before anything was torn down (see buildShutdownPlan) — so this only has to start what is
+// node while the cluster was down (see buildShutdownPlan) — so this only has to start what is
 // there. That is also why the restart is a plain `systemctl restart` rather than an install with a
 // restart stamp, the way the legacy planner's full reconcile does it.
 //

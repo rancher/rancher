@@ -526,14 +526,14 @@ func TestBuildShutdownPlan(t *testing.T) {
 		for _, instr := range plan.OneTimeInstructions {
 			names = append(names, instr.Name)
 		}
-		// The install is ordered ahead of the killall, so anything it starts is torn down again.
-		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory"}
+		// The install comes last, once the distro is stopped and its etcd and TLS state cleared.
+		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory", "install"}
 		if strings.Join(names, ",") != strings.Join(want, ",") {
 			t.Errorf("instructions = %v, want %v", names, want)
 		}
 
-		// The killall script reads the data directory out of the environment.
-		// The install now sits between the tracking cleanup and the killall, so the shutdown is third.
+		// The killall script reads the data directory out of the environment. It directly follows the
+		// tracking cleanup.
 		shutdown := plan.OneTimeInstructions[1]
 		dataDir, err := adapter.DistroDataDirectory(secret)
 		if err != nil {
@@ -559,14 +559,56 @@ func TestBuildShutdownPlan(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// No etcd data or TLS material to clear on a worker, but it is still installed and stopped:
+		// No etcd data or TLS material to clear on a worker, but it is still stopped and installed:
 		// it has to come back on the same version as the control plane it rejoins.
-		if len(plan.OneTimeInstructions) != 2 {
-			t.Fatalf("expected 2 instructions, got %d", len(plan.OneTimeInstructions))
-		}
+		var names []string
 		for _, instr := range plan.OneTimeInstructions {
-			if instr.Name == "create-etcd-tombstone" || instr.Name == "remove-tls-directory" {
-				t.Errorf("unexpected instruction %q for a worker node", instr.Name)
+			names = append(names, instr.Name)
+		}
+		want := []string{"remove idempotency tracking", "shutdown", "install"}
+		if strings.Join(names, ",") != strings.Join(want, ",") {
+			t.Errorf("instructions = %v, want %v", names, want)
+		}
+	})
+
+	t.Run("the install lays down the configured version without starting it", func(t *testing.T) {
+		// This is the operation's only install: it runs here, on every node, while nothing is
+		// running. The reset in the Restore step and the restarts afterwards both depend on it, so it
+		// has to carry the version being restored to. Nothing follows it in the plan, so it must also
+		// leave the service alone: were it to start the distro, the node would stay up into the reset.
+		secret := makePlanSecret("init", "node-init", map[string]string{capr.EtcdRoleLabel: "true"})
+
+		plan, err := buildShutdownPlan(s, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		install := plan.OneTimeInstructions[len(plan.OneTimeInstructions)-1]
+
+		if install.Name != "install" {
+			t.Fatalf("last instruction = %q, want the install", install.Name)
+		}
+		if !strings.HasSuffix(install.Image, ":v1.33.0-rke2r1") {
+			t.Errorf("image = %q, want it tagged with the configured version", install.Image)
+		}
+		if !slices.Contains(install.Env, "INSTALL_RKE2_SKIP_START=true") {
+			t.Errorf("env = %v, want the distro start suppressed", install.Env)
+		}
+	})
+
+	t.Run("a cluster type that does not manage its version shuts down without installing", func(t *testing.T) {
+		// An imported cluster whose version Rancher does not choose: there is no version to lay down,
+		// so the plan is the shutdown alone.
+		noVersion := newTestScope(defaultAdapter(), "restore-uid")
+		secret := makePlanSecret("init", "node-init", map[string]string{capr.EtcdRoleLabel: "true"})
+
+		plan, err := buildShutdownPlan(noVersion, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, instr := range plan.OneTimeInstructions {
+			if instr.Name == "install" {
+				t.Error("expected no install instruction when the cluster has no configured version")
 			}
 		}
 	})
