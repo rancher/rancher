@@ -1,4 +1,4 @@
-webhookVersion: 109.0.8+up0.10.13-rc.3
+webhookVersion: 109.0.8+up0.10.13
 remoteDialerProxyVersion: 109.0.7+up0.7.7
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 109.0.8+up0.26.8
