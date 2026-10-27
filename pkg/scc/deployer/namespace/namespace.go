@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/deployer/types"
 	"github.com/rancher/rancher/pkg/scc/util/generic"
@@ -81,21 +82,28 @@ func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 
 		// Check if namespace is actually gone after removing finalizers
 		var getErr error
-		retryErr := backoff.Retry(
-			func() error {
-				var ns *corev1.Namespace
-				ns, getErr = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
-				if getErr != nil && !errors.IsNotFound(getErr) {
-					return nil
+		_, retryErr := backoff.Retry(ctx,
+			func() (*struct{}, error) {
+				_, getErr = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
+				if errors.IsNotFound(getErr) {
+					// Namespace is gone, stop retrying
+					return nil, nil
+				}
+				if getErr != nil {
+					// Unexpected error, bail out without retrying
+					return nil, backoff.Permanent(fmt.Errorf("error getting namespace %s: %w", consts.DefaultSCCNamespace, getErr))
 				}
 
-				if ns != nil {
-					return fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
-				}
-
-				return nil
+				return nil, fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
 			},
-			backoff.WithMaxRetries(backoff.NewConstantBackOff(3), 3),
+			// Initial attempt plus three retries, matching the previous
+			// WithMaxRetries(..., 3) behavior. v7 additionally enables a 15
+			// minute elapsed-time limit by default, which could cut the loop
+			// short while a slow Get is still failing; disable it so only the
+			// attempt count bounds the retries.
+			backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+			backoff.WithMaxTries(4),
+			backoff.WithMaxElapsedTime(0),
 		)
 		if retryErr != nil {
 			return fmt.Errorf("encountered error while waiting for namespace to clean up: %w", retryErr)
