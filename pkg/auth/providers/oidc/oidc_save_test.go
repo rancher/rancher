@@ -118,6 +118,87 @@ func TestSaveOIDCConfigUpdatesConfigWithSecretReferences(t *testing.T) {
 	}
 }
 
+func TestSaveOIDCConfigRetriesOnConflict(t *testing.T) {
+	var updated map[string]any
+	updates := 0
+	resourceVersion := 1
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPut, r.Method)
+		updates++
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		var obj map[string]any
+		require.NoError(t, json.Unmarshal(body, &obj))
+
+		w.Header().Set("Content-Type", "application/json")
+		metadata := obj["metadata"].(map[string]any)
+		if metadata["resourceVersion"] != strconv.Itoa(resourceVersion) {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(metav1.Status{
+				TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+				Status:   metav1.StatusFailure,
+				Reason:   metav1.StatusReasonConflict,
+				Code:     http.StatusConflict,
+				Message:  "the object has been modified",
+			})
+			return
+		}
+		resourceVersion++
+		metadata["resourceVersion"] = strconv.Itoa(resourceVersion)
+		updated = obj
+		_ = json.NewEncoder(w).Encode(obj)
+	}))
+	t.Cleanup(srv.Close)
+
+	ctrl := gomock.NewController(t)
+	secretCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, apierrors.NewNotFound(corev1.Resource("secrets"), "")).AnyTimes()
+	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secrets.EXPECT().Cache().Return(secretCache).AnyTimes()
+	var secretValues []string
+	secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+		for _, v := range s.StringData {
+			secretValues = append(secretValues, v)
+		}
+		return s, nil
+	}).Times(2)
+
+	objectClient := newTestAuthConfigObjectClient(t, srv.URL)
+	gets := 0
+	o := OpenIDCProvider{
+		Name:    "genericoidc",
+		Type:    "genericOIDCConfig",
+		Secrets: secrets,
+		AuthConfigs: &fakes.AuthConfigInterfaceMock{
+			ObjectClientFunc: func() *objectclient.ObjectClient { return objectClient },
+		},
+		GetConfig: func(configName string) (*apiv3.OIDCConfig, error) {
+			config := &apiv3.OIDCConfig{
+				AuthConfig: apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: configName, ResourceVersion: strconv.Itoa(resourceVersion)}},
+			}
+			gets++
+			if gets == 1 {
+				// Something else writes the AuthConfig after it was read.
+				resourceVersion++
+			}
+			return config, nil
+		},
+	}
+
+	config := &apiv3.OIDCConfig{
+		AuthConfig:   apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: "genericoidc"}},
+		PrivateKey:   "test-key",
+		ClientSecret: "test-secret",
+	}
+	require.NoError(t, o.saveOIDCConfig(config))
+
+	assert.Equal(t, 2, updates, "the conflicting update should be retried")
+	assert.ElementsMatch(t, []string{"test-key", "test-secret"}, secretValues, "the Secrets should hold the secret values")
+	require.NotNil(t, updated, "the AuthConfig should be updated")
+	assert.Equal(t, common.SecretsNamespace+":genericoidcconfig-privatekey", updated["privateKey"])
+	assert.Equal(t, common.SecretsNamespace+":genericoidcconfig-clientsecret", updated["clientSecret"])
+}
+
 func newTestAuthConfigObjectClient(t *testing.T, host string) *objectclient.ObjectClient {
 	t.Helper()
 
