@@ -215,6 +215,7 @@ scopes:
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ETCDSnapshotRestoreStaleAddressOutsideLeaderCertificate|ETCDSnapshotRestoreModeKubernetesVersionLocalHA|ETCDSnapshotRestoreModeKubernetesVersionLocalHAIPv6|ETCDSnapshotRestoreModeAllS3)$', cpus: 8 }
 
   prebootstrap:
     package-paths:
