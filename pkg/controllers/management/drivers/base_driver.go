@@ -34,14 +34,6 @@ func (d *BaseDriver) Name() string {
 	return d.DriverName
 }
 
-func (d *BaseDriver) Hash() string {
-	return d.DriverHash
-}
-
-func (d *BaseDriver) Checksum() string {
-	return d.DriverName
-}
-
 func (d *BaseDriver) FriendlyName() string {
 	return strings.TrimPrefix(d.DriverName, d.BinaryPrefix)
 }
