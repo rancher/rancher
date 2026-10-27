@@ -138,6 +138,14 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 		return err
 	}
 
+	binHash, err := sha256sum(d.srcBinName())
+	if err != nil {
+		return fmt.Errorf("failed to hash driver binary: %w", err)
+	}
+	if err := os.WriteFile(d.srcBinHashFile(), []byte(binHash), 0644); err != nil {
+		return fmt.Errorf("failed to write hash file: %w", err)
+	}
+
 	d.DriverName = driverName
 	return nil
 }
@@ -277,6 +285,11 @@ func (d *BaseDriver) binName() string {
 // in account the version of the binary
 func (d *BaseDriver) srcBinName() string {
 	return d.cacheFile() + "-" + d.DriverName
+}
+
+// srcBinHashFile contains the sha256 hash of the cached/hashed binary executable (srcBinName)
+func (d *BaseDriver) srcBinHashFile() string {
+	return d.cacheFile() + "-" + d.DriverName + ".hash"
 }
 
 func binDir() string {
