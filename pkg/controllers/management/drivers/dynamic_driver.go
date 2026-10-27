@@ -2,6 +2,8 @@ package drivers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
@@ -171,4 +174,47 @@ func (d *BaseDriver) Executable() error {
 	}
 
 	return nil
+}
+
+// GetDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
+// If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
+func GetDriverDownloadURL(nd *v3.NodeDriver) (string, string, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	driverName := nd.Spec.DisplayName
+	if driverName == "" {
+		driverName = nd.Name
+	}
+	if !strings.HasPrefix(driverName, DockerMachineDriverPrefix) {
+		driverName = DockerMachineDriverPrefix + driverName
+	}
+
+	path := filepath.Join(settings.UIDashboardPath.Get(), "assets", driverName)
+	if _, err := os.Stat(path); err != nil {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	hash, err := sha256sum(path)
+	if err != nil {
+		return "", "", err
+	}
+
+	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName), hash, nil
+}
+
+func sha256sum(path string) (string, error) {
+	hasher := sha256.New()
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
