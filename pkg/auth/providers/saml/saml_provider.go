@@ -400,7 +400,26 @@ func (s *Provider) getSamlConfigFromUnstructured(configName string) (*apiv3.Saml
 func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	var configType string
 
-	storedSamlConfig, err := s.getSamlConfig(config.Name)
+	// Copy the annotations.
+	annotations := config.Annotations
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedSamlConfig, err := s.getSamlConfig(config.Name)
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		meta := storedSamlConfig.ObjectMeta
+
+		// Ensure the passed in config's annotations are applied to the object to be persisted.
+		if meta.Annotations == nil {
+			meta.Annotations = map[string]string{}
+		}
+		for k, v := range annotations {
+			meta.Annotations[k] = v
+		}
+		return meta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
@@ -423,8 +442,7 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = configType
-	storedSamlConfig.Annotations = config.Annotations
-	config.ObjectMeta = storedSamlConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	var field string
 	// This assumes the provider needs to create only one secret. If there are new entries
@@ -450,15 +468,22 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 		if err != nil {
 			return err
 		}
-		_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, combinedConfig)
-		if err != nil {
+		// The combined config has a copy of the metadata of config.
+		accessor, ok := combinedConfig.(metav1.ObjectMetaAccessor)
+		if !ok {
+			return fmt.Errorf("unable to update authconfig: unexpected type %T", combinedConfig)
+		}
+		meta, ok := accessor.GetObjectMeta().(*metav1.ObjectMeta)
+		if !ok {
+			return fmt.Errorf("unable to update authconfig: unexpected metadata type %T", accessor.GetObjectMeta())
+		}
+		if err := common.UpdateAuthConfig(s.authConfigs, combinedConfig, meta, getStoredMeta); err != nil {
 			return fmt.Errorf("unable to update authconfig: %w", err)
 		}
 		return nil
 	}
 
-	_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	return err
+	return common.UpdateAuthConfig(s.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 func (s *Provider) toPrincipal(principalType string, princ apiv3.Principal, token accessor.TokenAccessor) apiv3.Principal {

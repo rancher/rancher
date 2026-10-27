@@ -440,22 +440,31 @@ func (ap *Provider) newAzureClient(cfg *apiv3.AzureADConfig) (clients.AzureClien
 func (ap *Provider) saveAzureConfigK8s(config *apiv3.AzureADConfig) error {
 	// Copy the annotations.
 	annotations := config.Annotations
-	storedAzureConfig, err := ap.GetAzureConfigK8s(config.GetName())
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedAzureConfig, err := ap.GetAzureConfigK8s(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		meta := storedAzureConfig.ObjectMeta
+
+		// Ensure the passed in config's annotations are applied to the object to be persisted.
+		if meta.Annotations == nil {
+			meta.Annotations = map[string]string{}
+		}
+		for k, v := range annotations {
+			meta.Annotations[k] = v
+		}
+		return meta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.AzureADConfigType
-	config.ObjectMeta = storedAzureConfig.ObjectMeta
-
-	// Ensure the passed in config's annotations are applied to the object to be persisted.
-	if config.Annotations == nil {
-		config.Annotations = map[string]string{}
-	}
-	for k, v := range annotations {
-		config.Annotations[k] = v
-	}
+	config.ObjectMeta = storedMeta
 
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
 	name, err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, common.SecretNamePrefix(config.Name, config.Type))
@@ -466,11 +475,7 @@ func (ap *Provider) saveAzureConfigK8s(config *apiv3.AzureADConfig) error {
 	config.ApplicationSecret = name
 
 	logrus.Debugf("updating AzureADConfig")
-	_, err = ap.authConfigs.ObjectClient().Update(config.Name, config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return common.UpdateAuthConfig(ap.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 func (ap *Provider) GetAzureConfigK8s(configName string) (*apiv3.AzureADConfig, error) {

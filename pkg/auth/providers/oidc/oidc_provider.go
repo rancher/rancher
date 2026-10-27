@@ -34,7 +34,6 @@ import (
 	"golang.org/x/oauth2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -521,29 +520,29 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ apiv3
 }
 
 func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedOidcConfig, err := o.GetConfig(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, fmt.Errorf("getting OIDC Config %s: %w", config.GetName(), err)
+		}
+		return storedOidcConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
+	if err != nil {
+		return err
+	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = o.Type
+	config.ObjectMeta = storedMeta
 
-	// This replaces the secret values in the config with references to the
-	// Secrets, so it must not be repeated when the update is retried.
 	if err := o.saveOIDCSecrets(config); err != nil {
 		return err
 	}
 
-	// The AuthConfig can be written by controllers while the config is being
-	// tested, so retry with the latest metadata on conflict.
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		storedOidcConfig, err := o.GetConfig(config.GetName())
-		if err != nil {
-			return fmt.Errorf("getting OIDC Config %s: %w", config.GetName(), err)
-		}
-		config.ObjectMeta = storedOidcConfig.ObjectMeta
-
-		logrus.Debugf("OpenIDCProvider: saveOIDCConfig: updating config")
-		_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-		return err
-	})
+	logrus.Debugf("OpenIDCProvider: saveOIDCConfig: updating config")
+	return common.UpdateAuthConfig(o.AuthConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 // saveOIDCSecrets stores the private key and client secret from the config in
