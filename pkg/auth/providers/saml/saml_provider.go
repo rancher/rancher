@@ -1,7 +1,6 @@
 package saml
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,18 +43,19 @@ const (
 )
 
 type Provider struct {
-	authConfigs     v3.AuthConfigInterface
-	secrets         wcorev1.SecretController
-	samlTokens      v3.SamlTokenInterface
-	userMGR         user.Manager
-	tokenMGR        *tokens.Manager
-	serviceProvider *saml.ServiceProvider
-	name            string
-	clientState     ClientState
-	ldapProvider    common.AuthProvider
-	userSearcher    *common.UserSearcher
-	sloEnabled      bool
-	sloForced       bool
+	authConfigs      v3.AuthConfigInterface
+	authConfigLister v3.AuthConfigLister
+	secrets          wcorev1.SecretController
+	samlTokens       v3.SamlTokenInterface
+	userMGR          user.Manager
+	tokenMGR         *tokens.Manager
+	serviceProvider  *saml.ServiceProvider
+	name             string
+	clientState      ClientState
+	ldapProvider     common.AuthProvider
+	userSearcher     *common.UserSearcher
+	sloEnabled       bool
+	sloForced        bool
 
 	getSamlConfig  func(string) (*apiv3.SamlConfig, error)
 	assertionStore assertionStore
@@ -128,13 +128,14 @@ func (s *Provider) forConfig() *Provider {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
-		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
-		secrets:      mgmtCtx.Wrangler.Core.Secret(),
-		samlTokens:   mgmtCtx.Management.SamlTokens(""),
-		userMGR:      userMGR,
-		tokenMGR:     tokenMGR,
-		name:         name,
-		userSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		samlTokens:       mgmtCtx.Management.SamlTokens(""),
+		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
+		name:             name,
+		userSearcher:     common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 	}
 	provider.getSamlConfig = provider.getSamlConfigFromUnstructured
 	if provider.hasLdapGroupSearch() {
@@ -191,9 +192,11 @@ func (s *Provider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (ap
 // Logout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
 func (s *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	// SamlProviders is keyed by the name of the AuthConfig.
-	providerName, err := common.ConfigNameFromToken(token)
+	providerName, err := common.ConfigNameOrLocalFromToken(token)
 	if err != nil {
-		providerName = token.GetAuthProvider()
+		// There is no AuthConfig to force SLO.
+		logrus.Debugf("SAML [logout]: %v, allowing regular logout", err)
+		return nil
 	}
 
 	logrus.Debugf("SAML [logout]: triggered by provider %s", providerName)
@@ -214,9 +217,9 @@ func (s *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor
 
 func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	// SamlProviders is keyed by the name of the AuthConfig.
-	providerName, err := common.ConfigNameFromToken(token)
+	providerName, err := common.ConfigNameOrLocalFromToken(token)
 	if err != nil {
-		providerName = token.GetAuthProvider()
+		return fmt.Errorf("SAML [logout-all]: %w", err)
 	}
 
 	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)
@@ -281,18 +284,41 @@ func newInvalidURLError(msg string) error {
 	return httperror.NewAPIError(httperror.ErrorCode{Code: "Invalid redirect URL", Status: http.StatusBadRequest}, msg)
 }
 
+// defaultLoginConfigName returns the name of the AuthConfig a SAML login is
+// for when the login doesn't name one. Released CLIs send no configName, and
+// SAML logins without one used to go to the AuthConfig named after the
+// provider, e.g. "okta". They still do if that AuthConfig is enabled and of
+// this provider, even when other AuthConfigs of the provider are enabled too.
+// Otherwise the login is resolved as for other providers.
+func (s *Provider) defaultLoginConfigName(configName string) string {
+	if configName != "" {
+		return configName
+	}
+
+	authConfig, err := s.authConfigLister.Get("", s.name)
+	if err == nil && authConfig.Enabled && common.ProviderNameFromType(authConfig.Type) == s.name {
+		return s.name
+	}
+
+	return ""
+}
+
 func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input any, commonProvider common.AuthProvider) error {
 	// input will contain the FINAL redirect URL
 	login, ok := input.(*apiv3.SamlLoginInput)
 	if !ok {
 		return errors.New("unexpected input type")
 	}
-	if _, ok := commonProvider.(*Provider); !ok {
+	p, ok := commonProvider.(*Provider)
+	if !ok {
 		return errors.New("unexpected provider type")
 	}
 
 	// SamlProviders is keyed by the name of the AuthConfig.
-	configName := cmp.Or(login.ConfigName, name)
+	configName, err := common.LoginConfigName(p.authConfigLister, p.defaultLoginConfigName(login.ConfigName), name)
+	if err != nil {
+		return err
+	}
 	logrus.Debugf("SAML [PerformSamlLogin]: Id Provider            (%v)", configName)
 
 	provider, ok := getSamlProvider(configName)
@@ -516,11 +542,12 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 }
 
 func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	// The principal is returned for the AuthConfig that issued it, which may
-	// not be the one that issued the token.
 	configName, principalType, externalID, err := common.SplitPrincipalID(principalID)
 	if err != nil {
 		return apiv3.Principal{}, fmt.Errorf("SAML: %w", err)
+	}
+	if _, err := common.ConfigNameForPrincipalLookup(principalID, token); err != nil {
+		return apiv3.Principal{}, err
 	}
 	if principalType != common.UserPrincipalType && principalType != common.GroupPrincipalType {
 		return apiv3.Principal{}, fmt.Errorf("SAML: Invalid principal type")

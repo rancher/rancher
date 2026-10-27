@@ -253,7 +253,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object, nsName
 			}
 
 			if principalName := project.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
-				if !strings.HasPrefix(principalName, "local") {
+				if !strings.HasPrefix(principalName, "local://") {
 					// Setting UserPrincipalName only makes sense for non-local users.
 					prtb.UserPrincipalName = principalName
 					prtb.UserName = ""

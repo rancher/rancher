@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -20,18 +22,25 @@ type UserInfoResponse struct {
 	Groups   []string `json:"groups,omitempty"`
 }
 
+// rancherTokenFetcher fetches a v3 or ext Rancher token by name.
+type rancherTokenFetcher interface {
+	Fetch(name string) (accessor.TokenAccessor, error)
+}
+
 type userInfoHandler struct {
 	userCache           wrangmgmtv3.UserCache
 	userAttributeLister wrangmgmtv3.UserAttributeCache
 	jwks                signingKeyGetter
+	tokenFetcher        rancherTokenFetcher
 }
 
-func newUserInfoHandler(userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, jwks signingKeyGetter) *userInfoHandler {
+func newUserInfoHandler(userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, jwks signingKeyGetter, tokenFetcher rancherTokenFetcher) *userInfoHandler {
 
 	return &userInfoHandler{
 		userCache:           userLister,
 		userAttributeLister: userAttributeLister,
 		jwks:                jwks,
+		tokenFetcher:        tokenFetcher,
 	}
 }
 
@@ -94,16 +103,15 @@ func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Reques
 			oidcerror.WriteError(oidcerror.ServerError, fmt.Sprintf("can't get user attributes: %v", err), http.StatusInternalServerError, w)
 			return
 		}
-		var groups []string
-		if attribs != nil {
-			for _, gps := range attribs.GroupPrincipals {
-				for _, principal := range gps.Items {
-					name := strings.TrimPrefix(principal.Name, "local://")
-					groups = append(groups, name)
-				}
+		configName, _ := claims[configNameClaim].(string)
+		if configName == "" {
+			configName, err = h.configNameFromRancherToken(claims, userId)
+			if err != nil {
+				oidcerror.WriteError(oidcerror.ServerError, fmt.Sprintf("can't get rancher token: %v", err), http.StatusInternalServerError, w)
+				return
 			}
 		}
-
+		groups := groupsForConfig(attribs, configName)
 		if groups != nil {
 			response.Groups = groups
 		}
@@ -116,6 +124,39 @@ func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "failed to encode user info response", http.StatusInternalServerError)
 	}
 
+}
+
+// configNameFromRancherToken returns the name of the AuthConfig that issued
+// the Rancher token named in the token claim, for access tokens issued before
+// the config_name claim was added. Their deprecated auth_provider claim holds
+// the provider type, which several AuthConfigs can share, so it can't be used.
+//
+// It returns "" if the JWT names no Rancher token, e.g. a refresh token, or if
+// the Rancher token no longer exists or belongs to another user, so that these
+// get no groups rather than the groups of the wrong AuthConfig.
+func (h *userInfoHandler) configNameFromRancherToken(claims jwt.MapClaims, userID string) (string, error) {
+	tokenName, _ := claims["token"].(string)
+	if tokenName == "" {
+		return "", nil
+	}
+
+	token, err := h.tokenFetcher.Fetch(tokenName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if token.GetUserID() != userID {
+		return "", nil
+	}
+
+	configName, err := common.ConfigNameOrLocalFromToken(token)
+	if err != nil {
+		return "", nil
+	}
+
+	return configName, nil
 }
 
 func getTokenFromHeader(r *http.Request) (string, error) {

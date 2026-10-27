@@ -64,22 +64,22 @@ func isValidScope(config *v3.ActiveDirectoryConfig, scope string) bool {
 }
 
 type adProvider struct {
-	authConfigs mgmtv3.AuthConfigInterface
-	configMaps  wcorev1.ConfigMapCache
-	secrets     wcorev1.SecretController
-	userMGR     user.Manager
-	certs       string
-	caPool      *x509.CertPool
-	tokenMGR    *tokens.Manager
+	authConfigs      mgmtv3.AuthConfigInterface
+	authConfigLister mgmtv3.AuthConfigLister
+	configMaps       wcorev1.ConfigMapCache
+	secrets          wcorev1.SecretController
+	userMGR          user.Manager
+	tokenMGR         *tokens.Manager
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &adProvider{
-		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		configMaps:  mgmtCtx.Wrangler.Core.ConfigMap().Cache(),
-		secrets:     mgmtCtx.Wrangler.Core.Secret(),
-		userMGR:     userMGR,
-		tokenMGR:    tokenMGR,
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		configMaps:       mgmtCtx.Wrangler.Core.ConfigMap().Cache(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
 	}
 }
 
@@ -115,7 +115,10 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	configName := login.ConfigName
+	configName, err := common.LoginConfigName(p.authConfigLister, login.ConfigName, ProviderName)
+	if err != nil {
+		return v3.Principal{}, nil, "", err
+	}
 	logrus.Debugf("Loading ActiveDirectory config %s", configName)
 	config, caPool, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
@@ -176,9 +179,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, token acc
 }
 
 func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	// The principal is looked up using the AuthConfig that issued it, which
-	// may not be the one that issued the token.
-	configName, _, _, err := common.SplitPrincipalID(principalID)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return v3.Principal{}, err
 	}
@@ -222,13 +223,11 @@ func (p *adProvider) getActiveDirectoryConfig(configName string) (*v3.ActiveDire
 		return nil, nil, fmt.Errorf("unable to decode Active Directory Config: %w", err)
 	}
 
-	if p.certs != storedADConfig.Certificate || p.caPool == nil {
-		pool, err := newCAPool(storedADConfig.Certificate)
-		if err != nil {
-			return nil, nil, err
-		}
-		p.certs = storedADConfig.Certificate
-		p.caPool = pool
+	// The pool is built per call, as AuthConfigs can have different
+	// certificates and the provider is shared by all of them.
+	caPool, err := newCAPool(storedADConfig.Certificate)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if storedADConfig.ServiceAccountPassword != "" {
@@ -240,7 +239,7 @@ func (p *adProvider) getActiveDirectoryConfig(configName string) (*v3.ActiveDire
 		storedADConfig.ServiceAccountPassword = value
 	}
 
-	return storedADConfig, p.caPool, nil
+	return storedADConfig, caPool, nil
 }
 
 func newCAPool(cert string) (*x509.CertPool, error) {

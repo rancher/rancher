@@ -57,10 +57,9 @@ func TestGetTokenByIDLegacy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: authToken,
 		},
-		AuthProvider: "testing",
-		Token:        tokenKey,
-		TTLMillis:    0,
-		UserID:       "u-mo12345",
+		Token:     tokenKey,
+		TTLMillis: 0,
+		UserID:    "u-mo12345",
 	}
 
 	// token to actually get, legacy, always
@@ -73,10 +72,9 @@ func TestGetTokenByIDLegacy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tokenName,
 		},
-		AuthProvider: "testing",
-		Token:        mustGenerateRandomToken(t),
-		TTLMillis:    0,
-		UserID:       "u-mo12345",
+		Token:     mustGenerateRandomToken(t),
+		TTLMillis: 0,
+		UserID:    "u-mo12345",
 	}
 	di := &dummyIndexer{
 		Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
@@ -146,10 +144,9 @@ func TestGetTokenByIDExt(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tokenName,
 		},
-		AuthProvider: "testing",
-		Token:        mustGenerateRandomToken(t),
-		TTLMillis:    0,
-		UserID:       "u-mo12345",
+		Token:     mustGenerateRandomToken(t),
+		TTLMillis: 0,
+		UserID:    "u-mo12345",
 	}
 	di := &dummyIndexer{
 		Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
@@ -247,10 +244,9 @@ func TestGetTokenLegacy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tokenName,
 		},
-		AuthProvider: "testing",
-		Token:        tokenKey,
-		TTLMillis:    0,
-		UserID:       "u-mo12345",
+		Token:     tokenKey,
+		TTLMillis: 0,
+		UserID:    "u-mo12345",
 	}
 	di := &dummyIndexer{
 		Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
@@ -355,6 +351,8 @@ func TestListTokens(t *testing.T) {
 		tokens: &fakeTokenClient{
 			// Two tokens one matches the token and is current
 			// the other token does not match the token and is not current.
+			// AuthProvider is set to check the deprecated field is still
+			// exposed to API consumers.
 			list: []apiv3.Token{
 				{
 					TypeMeta: metav1.TypeMeta{

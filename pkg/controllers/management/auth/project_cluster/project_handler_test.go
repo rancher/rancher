@@ -56,6 +56,43 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 }
 
 func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
+	tests := map[string]struct {
+		principalName     string
+		wantUserName      string
+		wantPrincipalName string
+	}{
+		"a provider principal is bound by principal": {
+			principalName:     "keycloak_user@12345",
+			wantPrincipalName: "keycloak_user@12345",
+		},
+		"a principal of a config named like local is bound by principal": {
+			principalName:     "localsaml_user://12345",
+			wantPrincipalName: "localsaml_user://12345",
+		},
+		"a local principal is bound by user name": {
+			principalName: "local://u-abcdef",
+			wantUserName:  "u-abcdef",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			prtbs := reconcileProjectCreatorRTB(t, tt.principalName)
+
+			require.Len(t, prtbs, 1)
+			assert.Equal(t, "creator-project-owner", prtbs[0].Name)
+			assert.Equal(t, clusterID, prtbs[0].Namespace)
+			assert.Equal(t, clusterID+":p-abcdef", prtbs[0].ProjectName)
+			assert.Equal(t, tt.wantUserName, prtbs[0].UserName)
+			assert.Equal(t, tt.wantPrincipalName, prtbs[0].UserPrincipalName)
+		})
+	}
+}
+
+// reconcileProjectCreatorRTB reconciles the creator bindings of a project
+// created by u-abcdef with the given principal and returns the created PRTBs.
+func reconcileProjectCreatorRTB(t *testing.T, userPrincipalName string) []*v3.ProjectRoleTemplateBinding {
+	t.Helper()
 	var prtbs []*v3.ProjectRoleTemplateBinding
 
 	ctrl := gomock.NewController(t)
@@ -80,8 +117,6 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 		projects:   projects,
 	}
 
-	userPrincipalName := "keycloak_user@12345"
-
 	project := &v3.Project{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "p-abcdef",
@@ -98,12 +133,7 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, obj)
 
-	require.Len(t, prtbs, 1)
-	assert.Equal(t, "creator-project-owner", prtbs[0].Name)
-	assert.Equal(t, clusterID, prtbs[0].Namespace)
-	assert.Equal(t, clusterID+":p-abcdef", prtbs[0].ProjectName)
-	assert.Equal(t, "", prtbs[0].UserName)
-	assert.Equal(t, userPrincipalName, prtbs[0].UserPrincipalName)
+	return prtbs
 }
 
 func TestReconcileProjectCreatorRTBNoCreatorRBAC(t *testing.T) {

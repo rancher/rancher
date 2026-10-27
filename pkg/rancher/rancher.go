@@ -69,7 +69,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/k8scheck"
 	"github.com/rancher/wrangler/v3/pkg/unstructured"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"gopkg.in/natefinch/lumberjack.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -92,7 +91,7 @@ const (
 )
 
 type Options struct {
-	ACMEDomains                    cli.StringSlice
+	ACMEDomains                    []string
 	AddLocal                       string
 	Embedded                       bool
 	BindHost                       string

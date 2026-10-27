@@ -1,8 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.27.2
-
-toolchain go1.27.3
+go 1.27.3
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -76,7 +74,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/config v1.33.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
-	github.com/aws/aws-sdk-go-v2/service/eks v1.104.1
+	github.com/aws/aws-sdk-go-v2/service/eks v1.104.2
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
@@ -104,7 +102,7 @@ require (
 	github.com/k3s-io/api v0.2.1
 	github.com/mattn/go-colorable v0.1.16
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
-	github.com/microsoft/kiota-abstractions-go v1.11.1
+	github.com/microsoft/kiota-abstractions-go v1.11.3
 	github.com/microsoftgraph/msgraph-sdk-go v1.104.0
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.4.1
 	github.com/mitchellh/mapstructure v1.5.0
@@ -139,7 +137,7 @@ require (
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
-	github.com/rancher/remotedialer v0.6.1
+	github.com/rancher/remotedialer v0.6.2-rc.2
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20261021194219-25800d4c8ac6
 	github.com/rancher/steve v0.10.9
@@ -150,7 +148,7 @@ require (
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
-	github.com/urfave/cli v1.22.17
+	github.com/urfave/cli/v3 v3.14.0
 	github.com/vmware/govmomi v0.56.0
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v2 v2.4.4
@@ -167,7 +165,7 @@ require (
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	helm.sh/helm/v4 v4.3.0
+	helm.sh/helm/v4 v4.3.1
 	k8s.io/api v0.37.1
 	k8s.io/apiextensions-apiserver v0.37.1
 	k8s.io/apimachinery v0.37.1
@@ -179,7 +177,7 @@ require (
 	k8s.io/kubectl v0.37.1
 	k8s.io/kubernetes v1.37.1
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	oras.land/oras-go/v2 v2.6.3
+	oras.land/oras-go/v2 v2.6.4
 	sigs.k8s.io/aws-iam-authenticator v0.7.21
 	sigs.k8s.io/cluster-api v1.14.3
 	sigs.k8s.io/cluster-api/api v1.14.3
@@ -251,7 +249,6 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
 	github.com/coreos/ignition/v2 v2.27.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
@@ -431,6 +428,6 @@ require (
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
+	sigs.k8s.io/kustomize/kyaml v0.21.2 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )

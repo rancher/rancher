@@ -20,8 +20,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
@@ -1206,7 +1208,6 @@ func TestLogout(t *testing.T) {
 	for name, tt := range logoutTests {
 		t.Run(name, func(t *testing.T) {
 			testToken := &apiv3.Token{
-				AuthProvider: tt.config.GetName(),
 				UserPrincipal: apiv3.Principal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "keycloak_user://9253000",
@@ -1244,7 +1245,7 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 		s.LogoutAllEnabled = false
 	})
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+	testToken := &apiv3.Token{UserID: userId,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "keycloak_user://9253000",
@@ -1277,7 +1278,7 @@ func TestLogoutAll(t *testing.T) {
 	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+	testToken := &apiv3.Token{UserID: userId,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "genericoidc_user://9253000",
@@ -1319,7 +1320,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	)
 
 	oidcConfig := newOIDCConfig("8090")
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+	testToken := &apiv3.Token{UserID: userId,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "genericoidc_user://9253000",
@@ -1353,7 +1354,7 @@ func TestLogoutWithIDToken(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
 
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+	testToken := &apiv3.Token{UserID: userId,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "genericoidc_user://9253000",
@@ -1395,7 +1396,7 @@ func TestLogoutAllNoIDToken(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
 
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+	testToken := &apiv3.Token{UserID: userId,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "genericoidc_user://9253000",
@@ -1974,10 +1975,13 @@ func TestLoginUserPrincipalsUseConfigName(t *testing.T) {
 			tokenManager := mocks.NewMocktokenManager(ctrl)
 
 			config := newOIDCConfig(port)
+			authConfigs, authConfigLister := authconfigtest.New(t, authConfig(testConfigName, client.KeyCloakOIDCConfigType, true))
 			o := OpenIDCProvider{
-				Name:     "keycloakoidc",
-				TokenMgr: tokenManager,
-				UserMGR:  userManager,
+				Name:             "keycloakoidc",
+				AuthConfigs:      authConfigs,
+				AuthConfigLister: authConfigLister,
+				TokenMgr:         tokenManager,
+				UserMGR:          userManager,
 				GetConfig: func(name string) (*apiv3.OIDCConfig, error) {
 					assert.Equal(t, testConfigName, name)
 					return config, nil
@@ -2007,26 +2011,33 @@ func TestLoginUserPrincipalsUseConfigName(t *testing.T) {
 func TestGetPrincipal(t *testing.T) {
 	t.Parallel()
 
-	provider := &OpenIDCProvider{Name: ProviderName}
-	token := &apiv3.Token{
-		UserPrincipal: apiv3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_user://sub-0001"},
-			LoginName:     "sub-0001",
-			DisplayName:   "Developer",
-			PrincipalType: UserType,
-		},
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(false).AnyTimes()
+	provider := &OpenIDCProvider{Name: ProviderName, UserMGR: userManager}
+	newToken := func(principalID string) *apiv3.Token {
+		return &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+				LoginName:     "sub-0001",
+				DisplayName:   "Developer",
+				PrincipalType: UserType,
+			},
+		}
 	}
+	token := newToken("test-eu-oidc_user://sub-0001")
 
 	tests := []struct {
 		name        string
 		principalID string
 		token       accessor.TokenAccessor
 		want        apiv3.Principal
-		wantErr     bool
+		wantErr     string
 	}{
 		{
 			name:        "user principal for the default config",
 			principalID: "oidc_user://sub-0002",
+			token:       newToken("oidc_user://sub-0001"),
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0002"},
 				DisplayName:   "sub-0002",
@@ -2038,6 +2049,7 @@ func TestGetPrincipal(t *testing.T) {
 		{
 			name:        "user principal for an additional config",
 			principalID: "test-eu-oidc_user://sub-0002",
+			token:       token,
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_user://sub-0002"},
 				DisplayName:   "sub-0002",
@@ -2062,6 +2074,7 @@ func TestGetPrincipal(t *testing.T) {
 		{
 			name:        "group principal for an additional config",
 			principalID: "test-eu-oidc_group://admins",
+			token:       token,
 			want: apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_group://admins"},
 				DisplayName:   "admins",
@@ -2070,17 +2083,36 @@ func TestGetPrincipal(t *testing.T) {
 			},
 		},
 		{
+			name:        "user principal for another config than the token",
+			principalID: "test-us-oidc_user://sub-0002",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "group principal for another config than the token",
+			principalID: "test-us-oidc_group://admins",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "default config principal with a token from an additional config",
+			principalID: "oidc_user://sub-0002",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
 			name:        "invalid principal type",
 			principalID: "test-eu-oidc_other://admins",
-			wantErr:     true,
+			token:       token,
+			wantErr:     "invalid principal type",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := provider.GetPrincipal(tt.principalID, tt.token)
-			if tt.wantErr {
-				require.Error(t, err)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
 				return
 			}
 
