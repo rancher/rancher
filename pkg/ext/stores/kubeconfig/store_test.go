@@ -405,8 +405,9 @@ func TestStoreCreate(t *testing.T) {
 			switch tokenID {
 			case authTokenID:
 				return &v3.Token{
-					ObjectMeta: metav1.ObjectMeta{Name: tokenID},
-					UserID:     userID,
+					ObjectMeta:    metav1.ObjectMeta{Name: tokenID},
+					UserID:        userID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + userID}, Provider: "local"},
 				}, nil
 			default:
 				return nil, apierrors.NewNotFound(gvr.GroupResource(), tokenID)
@@ -936,9 +937,25 @@ func TestStoreCreate(t *testing.T) {
 			}
 		}
 		githubToken := newTokenStore(&v3.Token{
-			ObjectMeta:   metav1.ObjectMeta{Name: authTokenID},
-			UserID:       "u-tokenuser", // The user id must come from the request user, not the token.
-			AuthProvider: "github",
+			ObjectMeta:    metav1.ObjectMeta{Name: authTokenID},
+			UserID:        "u-tokenuser", // The user id must come from the request user, not the token.
+			UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "github_user://12345"}, Provider: "github"},
+		})
+		githubEUToken := newTokenStore(&v3.Token{
+			ObjectMeta:    metav1.ObjectMeta{Name: authTokenID},
+			UserID:        "u-tokenuser",
+			UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "github-eu_user://12345"}, Provider: "github"},
+		})
+		noPrincipalToken := newTokenStore(&v3.Token{
+			ObjectMeta: metav1.ObjectMeta{Name: authTokenID},
+			UserID:     "u-tokenuser",
+		})
+		openldapEUExtToken := newTokenStore(&ext.Token{
+			ObjectMeta: metav1.ObjectMeta{Name: authTokenID},
+			Spec: ext.TokenSpec{
+				UserID:        "u-tokenuser",
+				UserPrincipal: ext.TokenPrincipal{Name: "openldap-eu_user://cn=user", Provider: "openldap"},
+			},
 		})
 		openldapExtToken := newTokenStore(&ext.Token{
 			ObjectMeta: metav1.ObjectMeta{Name: authTokenID},
@@ -994,9 +1011,23 @@ func TestStoreCreate(t *testing.T) {
 				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=openldap"),
 			},
 			{
+				name:            "get-token command with token from a non-default auth config",
+				execGetToken:    true,
+				tokenStore:      githubEUToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github-eu"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github-eu"),
+			},
+			{
+				name:            "get-token command with ext request token from a non-default auth config",
+				execGetToken:    true,
+				tokenStore:      openldapEUExtToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=openldap-eu"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=openldap-eu"),
+			},
+			{
 				name:            "get-token command without auth provider",
 				execGetToken:    true,
-				tokenStore:      tokenStore,
+				tokenStore:      noPrincipalToken,
 				wantRancherArgs: getToken("--user-id=" + userID),
 				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID),
 			},
@@ -1388,6 +1419,49 @@ func TestStoreCreate(t *testing.T) {
 		assert.True(t, apierrors.IsForbidden(err))
 		assert.Contains(t, err.Error(), "\"non-existent\" not found")
 	})
+	// Tokens are created from the request token's principal, which needs
+	// both a name and a provider.
+	for name, principal := range map[string]v3.Principal{
+		"empty":         {},
+		"name only":     {ObjectMeta: metav1.ObjectMeta{Name: "github_user://1"}},
+		"provider only": {Provider: "github"},
+	} {
+		t.Run("request token without user principal: "+name, func(t *testing.T) {
+			noPrincipalToken := &fakeTokenStore{
+				fetchFunc: func(tokenID string) (accessor.TokenAccessor, error) {
+					return &v3.Token{
+						ObjectMeta:    metav1.ObjectMeta{Name: tokenID},
+						UserID:        userID,
+						UserPrincipal: principal,
+					}, nil
+				},
+			}
+			// Nothing is expected to be written.
+			configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+			tokenManager := &fakeTokenManager{
+				createTokenFunc: func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+					require.Fail(t, "unexpected token creation")
+					return nil, nil
+				},
+			}
+
+			store := newStore(configMapClient, noPrincipalToken, tokenManager)
+
+			ctx := userContext(userID, authTokenID)
+			kubeconfig := &ext.Kubeconfig{
+				Spec: ext.KubeconfigSpec{
+					Clusters:       []string{downstream1, downstream2},
+					CurrentContext: downstream1,
+				},
+			}
+
+			obj, err := store.Create(ctx, kubeconfig, nil, options)
+			require.Error(t, err)
+			assert.Nil(t, obj)
+			assert.True(t, apierrors.IsForbidden(err))
+			assert.Contains(t, err.Error(), "request token "+authTokenID+" has no user principal")
+		})
+	}
 	t.Run("default TTL fetch error returns structured error", func(t *testing.T) {
 		store := &Store{
 			authorizer: commonAuthorizer,

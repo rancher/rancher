@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
@@ -35,21 +36,30 @@ func (i *contentDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	switch apiContext.Link {
 	case "index":
 		if err := i.serveIndex(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	case "info":
 		if err := i.serveInfo(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	case "chart":
 		if err := i.serveChart(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	case "icon":
 		if err := i.serveIcon(apiContext, rw, req); err != nil {
-			apiContext.WriteError(err)
+			i.writeError(apiContext, rw, err)
 		}
 	}
+}
+
+// writeError writes err as the response. When the content is unavailable only because the repository
+// is still being checked out, Retry-After is set so clients can tell this 503 apart from any other.
+func (i *contentDownload) writeError(apiContext *types.APIRequest, rw http.ResponseWriter, err error) {
+	if content.IsNotReady(err) {
+		rw.Header().Set("Retry-After", strconv.Itoa(int(content.NotReadyRetryAfter.Seconds())))
+	}
+	apiContext.WriteError(err)
 }
 
 // serveIndex retrieves the index file from the Helm repository, translates the URLs based on the current domain name,

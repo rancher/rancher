@@ -186,8 +186,8 @@ spec:
             value: cattle-credentials-5ec1f7e700
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: "mcc-testing-namesapce-opotions-managed-system-94546d"
-          - name: RANCHER_NAMESPACE_OPTIONS
-            value: '{"enabled":true,"annotations":{"foo":"bar"},"labels":{}}'
+          - name: RANCHER_NAMESPACES_OPTIONS
+            value: '{"enabled":true,"strict":false,"annotations":{"foo":"bar"},"labels":{}}'
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID

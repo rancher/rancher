@@ -99,9 +99,8 @@ func TestRefreshAttributes(t *testing.T) {
 	}
 
 	loginTokenLocal := apiv3.Token{
-		UserID:       "user-abcde",
-		IsDerived:    false,
-		AuthProvider: local.Name,
+		UserID:    "user-abcde",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "local://user-abcde",
@@ -119,9 +118,8 @@ func TestRefreshAttributes(t *testing.T) {
 	derivedTokenLocal.IsDerived = true
 
 	derivedTokenShibboleth := apiv3.Token{
-		UserID:       "user-abcde",
-		IsDerived:    true,
-		AuthProvider: saml.ShibbolethName,
+		UserID:    "user-abcde",
+		IsDerived: true,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "shibboleth_user://user1",
@@ -837,9 +835,8 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-abcde",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-abcde",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://some-guid"},
 			Provider:   providerName,
@@ -1076,9 +1073,8 @@ func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-ghapp",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-ghapp",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
 			Provider:   providerName,
@@ -1244,7 +1240,7 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 		})
 		assert.Nil(t, got)
-		assert.ErrorContains(t, err, "error listing auth configs")
+		assert.ErrorContains(t, err, "listing auth configs: auth config list failed")
 		assert.ErrorIs(t, err, listErr)
 	})
 
@@ -1371,9 +1367,8 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		})
 
 		derivedToken := &apiv3.Token{
-			UserID:       "user-secret",
-			IsDerived:    true,
-			AuthProvider: providerName,
+			UserID:    "user-secret",
+			IsDerived: true,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
 				Provider:   providerName,
@@ -1442,9 +1437,8 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		})
 
 		loginToken := &apiv3.Token{
-			UserID:       "user-secret",
-			IsDerived:    false,
-			AuthProvider: providerName,
+			UserID:    "user-secret",
+			IsDerived: false,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
 				Provider:   providerName,
@@ -1497,9 +1491,8 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-refetch",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-refetch",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
 			Provider:   providerName,
@@ -1590,9 +1583,8 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 		})
 
 		derivedToken := &apiv3.Token{
-			UserID:       "user-refetch",
-			IsDerived:    true,
-			AuthProvider: providerName,
+			UserID:    "user-refetch",
+			IsDerived: true,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
 				Provider:   providerName,
@@ -1656,9 +1648,8 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-err",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-err",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
 			Provider:   providerName,
@@ -2190,8 +2181,7 @@ func TestRefreshAttributesWithSCIM(t *testing.T) {
 			}
 			attribsBefore := attribs.DeepCopy()
 			loginToken := &apiv3.Token{
-				UserID:       "user-alice",
-				AuthProvider: providerName,
+				UserID: "user-alice",
 				UserPrincipal: apiv3.Principal{
 					ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://alice"},
 					Provider:   providerName,
@@ -2302,9 +2292,8 @@ func TestRefreshAttributesMultipleConfigsForProvider(t *testing.T) {
 	// which config they were issued for.
 	newLoginToken := func(name, principalID string) *apiv3.Token {
 		return &apiv3.Token{
-			ObjectMeta:   metav1.ObjectMeta{Name: name},
-			UserID:       userName,
-			AuthProvider: providerName,
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			UserID:     userName,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: principalID},
 				Provider:   providerName,
@@ -2430,9 +2419,8 @@ func TestRefreshAttributesCleansUpDeletedConfigs(t *testing.T) {
 		PrincipalIDs: []string{"local://" + userName, "github-eu_user://2"},
 	}
 	staleToken := &apiv3.Token{
-		ObjectMeta:   metav1.ObjectMeta{Name: "token-github-eu"},
-		UserID:       userName,
-		AuthProvider: "github",
+		ObjectMeta: metav1.ObjectMeta{Name: "token-github-eu"},
+		UserID:     userName,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: "github-eu_user://2"},
 			Provider:   "github",
@@ -2511,4 +2499,166 @@ func TestRefreshAttributesCleansUpDeletedConfigs(t *testing.T) {
 		assert.Contains(t, got.GroupPrincipals, "github-eu")
 		assert.Contains(t, got.ExtraByProvider, "github-eu")
 	})
+}
+
+// Tokens with no user principal, e.g. the tokens Rancher issues for its own
+// controllers, are refreshed with the local AuthConfig. Tokens whose user
+// principal can't be parsed belong to no AuthConfig, so they are skipped.
+func TestRefreshAttributesUnparseablePrincipal(t *testing.T) {
+	localExtras := map[string]map[string][]string{
+		local.Name: {
+			common.UserAttributePrincipalID: {"local://user-abcde"},
+			common.UserAttributeUserName:    {"admin"},
+		},
+	}
+	tests := []struct {
+		name        string
+		principalID string
+		isDerived   bool
+		wantExtras  map[string]map[string][]string
+	}{
+		{name: "login token with an empty principal", principalID: "", wantExtras: localExtras},
+		{name: "derived token with an empty principal", principalID: "", isDerived: true, wantExtras: localExtras},
+		{name: "login token with an unparseable principal", principalID: "not-a-principal", wantExtras: map[string]map[string][]string{}},
+		{name: "derived token with an unparseable principal", principalID: "not-a-principal", isDerived: true, wantExtras: map[string]map[string][]string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			providers.SetProviders(map[string]common.AuthProvider{
+				local.Name: &mockLocalProvider{canAccess: true},
+			})
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil)
+
+			token := &apiv3.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: "token-abcde"},
+				UserID:     "user-abcde",
+				IsDerived:  tt.isDerived,
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: tt.principalID},
+					ExtraInfo: map[string]string{
+						common.UserAttributePrincipalID: "local://user-abcde",
+						common.UserAttributeUserName:    "admin",
+					},
+				},
+			}
+
+			r := &refresher{
+				authConfigLister: newFakeAuthConfigs(local.Name),
+				tokenLister: &fakes.TokenListerMock{
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+						return []*apiv3.Token{token}, nil
+					},
+				},
+				userLister: &fakes.UserListerMock{
+					GetFunc: func(_, _ string) (*apiv3.User, error) {
+						return &apiv3.User{
+							ObjectMeta:   metav1.ObjectMeta{Name: "user-abcde"},
+							Username:     "admin",
+							PrincipalIDs: []string{"local://user-abcde"},
+						}, nil
+					},
+				},
+				tokens: &fakes.TokenInterfaceMock{
+					DeleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+						t.Errorf("unexpected delete of token %s", name)
+						return nil
+					},
+				},
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{"local": false}),
+			}
+
+			got, err := r.refreshAttributes(&apiv3.UserAttribute{
+				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]apiv3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			})
+			require.NoError(t, err)
+
+			// The extra attributes are only refreshed from a token in the
+			// config's bucket, so they show whether the token was bucketed as
+			// local.
+			assert.Equal(t, tt.wantExtras, got.ExtraByProvider)
+		})
+	}
+}
+
+// A login token with no principal is bucketed as local, so it is deleted when
+// the user can no longer log in with the local AuthConfig. A login token with
+// an unparseable principal is skipped, so it is not.
+func TestRefreshAttributesUnparseablePrincipalDeletedWithLocal(t *testing.T) {
+	for principalID, wantDeleted := range map[string][]string{
+		"":                {"token-abcde"},
+		"not-a-principal": nil,
+	} {
+		t.Run("principal "+strconv.Quote(principalID), func(t *testing.T) {
+			providers.SetProviders(map[string]common.AuthProvider{
+				local.Name: &mockLocalProvider{canAccess: false},
+			})
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil)
+
+			token := &apiv3.Token{
+				ObjectMeta:    metav1.ObjectMeta{Name: "token-abcde"},
+				UserID:        "user-abcde",
+				UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}},
+			}
+
+			var deleted []string
+			r := &refresher{
+				authConfigLister: newFakeAuthConfigs(local.Name),
+				tokenLister: &fakes.TokenListerMock{
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+						return []*apiv3.Token{token}, nil
+					},
+				},
+				userLister: &fakes.UserListerMock{
+					GetFunc: func(_, _ string) (*apiv3.User, error) {
+						return &apiv3.User{
+							ObjectMeta:   metav1.ObjectMeta{Name: "user-abcde"},
+							Username:     "admin",
+							PrincipalIDs: []string{"local://user-abcde"},
+						}, nil
+					},
+				},
+				tokens: &fakes.TokenInterfaceMock{
+					DeleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+						deleted = append(deleted, name)
+						return nil
+					},
+				},
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{"local": false}),
+			}
+
+			_, err := r.refreshAttributes(&apiv3.UserAttribute{
+				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]apiv3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, wantDeleted, deleted)
+		})
+	}
 }

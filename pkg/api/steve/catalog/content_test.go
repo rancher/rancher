@@ -1,9 +1,14 @@
 package catalog
 
 import (
+	"errors"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rancher/apiserver/pkg/apierror"
+	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/catalogv2/git"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,6 +43,34 @@ func TestSetIconHeaders(t *testing.T) {
 			} else {
 				assert.Nil(t, resp.Header["Content-Type"])
 			}
+		})
+	}
+}
+
+func TestWriteErrorRetryAfter(t *testing.T) {
+	notReady := apierror.WrapAPIError(git.ErrNotCheckedOut, validation.ClusterUnavailable, git.ErrNotCheckedOut.Error())
+
+	tests := []struct {
+		name               string
+		err                error
+		expectedRetryAfter string
+	}{
+		{name: "repository not checked out yet", err: notReady, expectedRetryAfter: "5"},
+		{name: "other 503", err: apierror.NewAPIError(validation.ClusterUnavailable, "unrelated 503")},
+		{name: "other error", err: errors.New("boom")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rw := httptest.NewRecorder()
+			var written error
+			apiContext := &types.APIRequest{
+				ErrorHandler: func(_ *types.APIRequest, err error) { written = err },
+			}
+
+			(&contentDownload{}).writeError(apiContext, rw, tt.err)
+
+			assert.Equal(t, tt.err, written, "the error should still be written")
+			assert.Equal(t, tt.expectedRetryAfter, rw.Header().Get("Retry-After"))
 		})
 	}
 }

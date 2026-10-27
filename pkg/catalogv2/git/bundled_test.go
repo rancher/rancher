@@ -57,6 +57,11 @@ func Test_Ensure_Bundled_NotCheckedOut(t *testing.T) {
 
 			if tc.expectedError != "" {
 				require.ErrorContains(t, err, tc.expectedError)
+				// The commit can't be reached, yet the local one must have been restored for serving
+				assert.True(t, IsCheckedOut(bundledName, bundledURL), "the local commit should have been restored")
+				chart, err := os.ReadFile(filepath.Join(f.dir, "chart.yaml"))
+				require.NoError(t, err)
+				assert.Equal(t, "v1", string(chart), "the working tree should hold the local commit")
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, f.commits["v1"], f.headCommit(t, f.dir), "should be at bundled HEAD commit")

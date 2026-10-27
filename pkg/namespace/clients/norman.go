@@ -1,4 +1,4 @@
-package namespace
+package clients
 
 import (
 	normancorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -26,6 +26,6 @@ type wrapperNormanNamespace struct {
 }
 
 func (nn *wrapperNormanNamespace) Create(ns *corev1.Namespace) (*corev1.Namespace, error) {
-	ApplyLabelsAndAnnotations(ns)
+	handler(ns)
 	return nn.NamespaceInterface.Create(ns)
 }

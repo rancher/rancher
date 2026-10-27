@@ -14,7 +14,6 @@ type TokenInput struct {
 	Description   string
 	Kind          string
 	UserName      string
-	AuthProvider  string
 	TTL           *int64
 	Randomize     bool
 	UserPrincipal v3.Principal

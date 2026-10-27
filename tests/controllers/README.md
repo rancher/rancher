@@ -29,7 +29,7 @@ export KUBEBUILDER_ASSETS=$(setup-envtest use -p path)
 
 Note: You can add a k8s version to the export command if you want to test a specific version. Otherwise it will use the latest version installed.
 
-ex. `export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.30)`
+ex. `export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.37)`
 
 After setting the environment variable, running the tests is the same as any other go test and can be run with `go test`.
 

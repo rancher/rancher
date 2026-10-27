@@ -15,9 +15,11 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
@@ -63,6 +65,11 @@ type AuthenticatorResponse struct {
 	UserPrincipal string
 	Groups        []string
 	Extras        map[string][]string
+
+	// Identity is the authoritative identity of the user for this session (username,
+	// provider and principal), shown in the audit log. It is optional and deliberately
+	// not part of Extras, which are forwarded as impersonation headers.
+	Identity audit.Identity
 }
 
 // ClusterRouter returns the cluster ID based on the request URL's path.
@@ -102,12 +109,13 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 		if err != nil {
 			return nil, false, err
 		}
-		return &user.DefaultInfo{
+		info := &user.DefaultInfo{
 			Name:   authResp.User,
 			UID:    authResp.User,
 			Groups: authResp.Groups,
 			Extra:  authResp.Extras,
-		}, authResp.IsAuthed, err
+		}
+		return audit.WithIdentity(info, authResp.Identity), authResp.IsAuthed, err
 	}
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
@@ -181,20 +189,33 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	// System tokens are not tied to an auth provider configuration. Their
 	// system:// principals cannot be used to determine a provider config name.
-	if token.GetAuthProvider() != "" && !authUser.IsSystem() {
-		configName, err := common.ConfigNameFromToken(token)
+	// Neither are most of the tokens Rancher issues for its own controllers,
+	// e.g. the compose and agent tokens, which have no user principal. These
+	// are treated as local tokens. The autoscaler's tokens have the local
+	// principal of the autoscaler user, so they are local tokens anyway.
+	configName, providerName := local.Name, local.Name
+	tokenHasAuthConfig := common.TokenHasAuthConfig(token) && !authUser.IsSystem()
+	if tokenHasAuthConfig {
+		configName, err = common.ConfigNameFromToken(token)
 		if err != nil {
 			return nil, err
 		}
-		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider(), configName)
+		providerName, err = providers.ProviderNameForConfig(configName)
 		if err != nil {
 			return nil, errors.Wrapf(ErrMustAuthenticate,
-				"error checking if provider %s is disabled: %v",
-				token.GetAuthProvider(), err)
+				"error checking if auth config %s is disabled: %v",
+				configName, err)
+		}
+		var disabled bool
+		disabled, err = providers.IsDisabledProvider(providerName, configName)
+		if err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"error checking if auth config %s is disabled: %v",
+				configName, err)
 		}
 		if disabled {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled",
-				token.GetAuthProvider())
+			return nil, errors.Wrapf(ErrMustAuthenticate, "auth config %s is disabled",
+				configName)
 		}
 	}
 
@@ -209,15 +230,11 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	var groups []string
-	hitProvider := false
-	if attribs != nil {
-		authp := token.GetAuthProvider()
-		for provider, gps := range attribs.GroupPrincipals {
-			if provider != authp {
-				continue
-			}
-			hitProvider = true
-			for _, principal := range gps.Items {
+	hitConfig := false
+	if attribs != nil && tokenHasAuthConfig {
+		if principals, ok := attribs.GroupPrincipals[configName]; ok {
+			hitConfig = true
+			for _, principal := range principals.Items {
 				name := strings.TrimPrefix(principal.Name, "local://")
 				groups = append(groups, name)
 			}
@@ -225,7 +242,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	// fallback to legacy token.GroupPrincipals
-	if !hitProvider {
+	if !hitConfig {
 		for _, principal := range token.GetGroupPrincipals() {
 			// TODO This is a short cut for now. Will actually need to lookup groups in future
 			name := strings.TrimPrefix(principal.Name, "local://")
@@ -242,7 +259,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		common.ExtraRequestTokenID: {token.GetName()},
 		common.ExtraRequestHost:    {req.Host},
 	}
-	for key, value := range getUserExtraInfo(token, authUser, attribs) {
+	for key, value := range getUserExtraInfo(token, authUser, attribs, configName, providerName) {
 		extras[key] = value
 	}
 
@@ -252,6 +269,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		UserPrincipal: token.GetUserPrincipal().Name,
 		Groups:        groups,
 		Extras:        extras,
+		Identity:      sessionIdentity(token, authUser),
 	}
 
 	logrus.Debugf("Extras returned %v", authResp.Extras)
@@ -298,16 +316,36 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	return authResp, nil
 }
 
-func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *apiv3.UserAttribute) map[string][]string {
+// sessionIdentity returns the identity of the user for the session of the token, which the audit log
+// shows. It comes from the principal the token was issued for, so it is the provider's own answer for
+// this session. Unlike the stored user attributes it cannot be replaced by a provider refresh, and for
+// a user linked to several providers it is the one for this session instead of one of many. A token
+// without a login name falls back to the username of a local user.
+func sessionIdentity(token accessor.TokenAccessor, user *apiv3.User) audit.Identity {
+	principal := token.GetUserPrincipal()
+	identity := audit.Identity{
+		Username:    principal.LoginName,
+		Provider:    common.ConfigNameFromPrincipal(principal),
+		PrincipalID: principal.Name,
+	}
+	if identity.Provider == "" || identity.Provider == "local" {
+		identity.Provider = "local"
+		if identity.Username == "" {
+			identity.Username = user.Username
+		}
+	}
+	return identity
+}
+
+func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *apiv3.UserAttribute, configName, providerName string) map[string][]string {
 	extraInfo := make(map[string][]string)
 
-	ap := token.GetAuthProvider()
 	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
 		// Only principalid and username (common.IsValidUserExtraAttribute)
 		// are sent as request extras. The downstream impersonator role allows
 		// only those keys, so any other stored attribute would make
 		// downstream requests fail impersonation.
-		if ap == "local" || ap == "" {
+		if configName == local.Name || configName == "" {
 			// Gather all extraInfo for all external auth providers present in the userAttributes.
 			for _, extra := range attribs.ExtraByProvider {
 				for key, value := range extra {
@@ -318,12 +356,7 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *a
 			}
 			return extraInfo
 		}
-		// AuthProvider is set in the token. Extras are keyed by the AuthConfig
-		// the token was issued for.
-		configName, err := common.ConfigNameFromToken(token)
-		if err != nil {
-			configName = ap
-		}
+		// Extras are keyed by the AuthConfig the token was issued for.
 		if extra, ok := attribs.ExtraByProvider[configName]; ok {
 			for key, value := range extra {
 				if common.IsValidUserExtraAttribute(key) {
@@ -334,7 +367,7 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *a
 		}
 	}
 
-	extraInfo = providers.GetUserExtraAttributes(ap, token.GetUserPrincipal())
+	extraInfo = providers.GetUserExtraAttributes(providerName, token.GetUserPrincipal())
 
 	// If principal id is not set in extra, read from user.
 	if extraInfo != nil {
@@ -496,7 +529,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token, error: %v", err)
 		}
 	} else {
-		storedToken = objs[0].(*v3.Token)
+		storedToken = objs[0].(*apiv3.Token)
 	}
 
 	if tokenClaims != nil {

@@ -301,7 +301,9 @@ func run(ctx context.Context) error {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	for {
+	// Resolved before every attempt: the agent registers on its first
+	// connection and uses the plain path for each reconnect after that.
+	wsURLFor := func() string {
 		safeHost := serverURL.Host
 		if utils.IsPlainIPV6(safeHost) {
 			safeHost = fmt.Sprintf("[%s]", safeHost)
@@ -310,21 +312,54 @@ func run(ctx context.Context) error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
-
-		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
-		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
-			switch proto {
-			case "tcp":
-				return true
-			case "unix":
-				return address == "/var/run/docker.sock"
-			case "npipe":
-				return address == "//./pipe/docker_engine"
-			}
-			return false
-		}, onConnect)
-		time.Sleep(5 * time.Second)
+		return wsURL
 	}
+
+	logrus.Infof("Connecting to %s with token starting with %s", wsURLFor(), token[:len(token)/2])
+	// Reconnects internally, so it only returns once the context is cancelled.
+	return remotedialer.ClientConnectWithOpts(ctx, "", headers, nil, func(proto, address string) bool {
+		switch proto {
+		case "tcp":
+			return true
+		case "unix":
+			return address == "/var/run/docker.sock"
+		case "npipe":
+			return address == "//./pipe/docker_engine"
+		}
+		return false
+	}, onConnect, &remotedialer.ConnectOpts{
+		URL:     wsURLFor,
+		Backoff: connectBackoff(),
+	})
+}
+
+// connectBackoff reads the reconnect backoff from the environment. A maximum
+// below the minimum would otherwise be ignored, holding every delay at the
+// larger minimum, so it is clamped to keep the configured ceiling.
+func connectBackoff() remotedialer.Backoff {
+	retryMin := retryDurationFromEnv("CATTLE_CONNECT_RETRY_MIN", 10*time.Second)
+	retryMax := retryDurationFromEnv("CATTLE_CONNECT_RETRY_MAX", 0)
+
+	if retryMax > 0 && retryMax < retryMin {
+		logrus.Warnf("CATTLE_CONNECT_RETRY_MAX (%s) is below CATTLE_CONNECT_RETRY_MIN (%s), using %s for both",
+			retryMax, retryMin, retryMax)
+		retryMin = retryMax
+	}
+
+	return remotedialer.Backoff{Min: retryMin, Max: retryMax}
+}
+
+// retryDurationFromEnv parses a duration; unset or invalid values yield def.
+func retryDurationFromEnv(key string, def time.Duration) time.Duration {
+	v := os.Getenv(key)
+	d, err := time.ParseDuration(v)
+	if v != "" && err != nil {
+		logrus.Warnf("Ignoring %s=%q, want a duration like 30s or 5m", key, v)
+	}
+	if d <= 0 {
+		return def
+	}
+	return d
 }
 
 func exitCertWriter(ctx context.Context) {

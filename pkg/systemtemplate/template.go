@@ -223,7 +223,7 @@ spec:
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: {{ .SUCAppNameOverride | quote }}
           {{- if eq .NamespaceOptions.Enabled true }}
-          - name: RANCHER_NAMESPACE_OPTIONS
+          - name: RANCHER_NAMESPACES_OPTIONS
             value: '{{.NamespaceOptions | mustToJson}}'
           {{- end }}
           {{- if .IsPreBootstrap }}

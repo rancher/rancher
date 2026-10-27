@@ -47,20 +47,20 @@ RUN zypper refresh && \
     # Early install coreutils-single (smaller size), otherwise coreutils will be transitively installed
     zypper --installroot /chroot -n in --no-recommends coreutils-single && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates findutils xz gzip tar gawk vim-small openssh-clients \
+      catatonit curl util-linux ca-certificates findutils xz gzip tar gawk vim-small \
       ca-certificates-mozilla `# the -prebuilt package in the base image is not sufficient, as we are running update-ca-certificates in the entrypoint`
 
 
 FROM chroot-builder AS chroot-builder-server
 RUN zypper --installroot /chroot -n in --no-recommends \
-      git-core unzip sed shadow netcat-openbsd mkisofs && \
+      unzip sed shadow netcat-openbsd mkisofs && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+      sed grep jq hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
     rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
     zypper --installroot /chroot -n in -r pkgs kubectl-1.37 && \
@@ -73,7 +73,7 @@ RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.27.2 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.27.3 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
@@ -127,9 +127,9 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.6
-ENV CATTLE_MACHINE_CHECKSUM_amd64=3222b0595ad7d6bfd60b3d36fa332bb9438fef095991223d858e4629b1a83b71
-ENV CATTLE_MACHINE_CHECKSUM_arm64=9d5048f6d9520a2d8d5279681e8b2d5aa583af4aa39af5350159a63895cde315
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.7
+ENV CATTLE_MACHINE_CHECKSUM_amd64=7bccf99b994db92ef3997ea15590666175ced11b948d1e0b5f00de5e10c2d55e
+ENV CATTLE_MACHINE_CHECKSUM_arm64=b1e04efc1d893ed11c334cfb577b49fa13679272a941195a17db810956192925
 ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.7.2
@@ -138,12 +138,12 @@ ENV CATTLE_ETCD_CHECKSUM_arm64=5e3ff99d428fabfcefdc95348f6560d1efe835f7b2d1ab333
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.3.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.1.0
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=52e1b502e7c63b144ab54ca6d6043562aa5f9ab92d01d3f0d4407952221f9157
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=000db720e9e4524de03b0219a10d9cc0904bff8f65ff37ce6da77577085ecddb
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.1.1
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=719ac4b604f2d75143e6d42e917209ff28db5bff06cb89d700ffd63d581cf341
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e47daaa358f744f1b456a80a6f0add84b9f3031323abae8afb86739ace426716
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.8
-ENV CATTLE_WINS_AGENT_CHECKSUM=9ce585756f26da0a34e7811f5e88eafa550b680738d80f167e6bf64fc9adf32c
+ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.9
+ENV CATTLE_WINS_AGENT_CHECKSUM=dc85d9d36bd04f31a2935f9cd88dec420446d3b3f9fb7fc1c4b30fc5eb791e34
 ENV CATTLE_WINS_AGENT_CHECKSUM_install=551ab55e30f0fad203bedbee819662e198ba567f76cd0d31f71fc07dc309d45a
 ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=af543484cfd5c72556dedc677569e3eec5c537b011f9c96ca8974be6090869f7
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -152,9 +152,9 @@ ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.4
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=16747b7b4ee35cbc74f3fb8ea89ee43eb882d216a0b36f26cd2faf840c3f64a6
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=f6b5751f793f2895fa51077c2e7e1d91ce148c768f97481ca1724ff2c3a6e61d
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.5
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=de19eb580dbec7ec5e24b38f6594840857794cd010bd0e15467d8794c82f4089
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=f267b5aede8471a3eefa7884ffa631abfb481858f1df0fe51c196ea62f3b58c8
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8df0997866ffa6f913751e083fbebdad3e219238ab1fa5e8ab33cca095a6e834
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
@@ -295,7 +295,7 @@ ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
 ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION=1.1.11
+ENV CATTLE_API_UI_VERSION=1.2.0
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH=/var/log/auditlog/rancher-api-audit.log

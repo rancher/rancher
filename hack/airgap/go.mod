@@ -2,17 +2,17 @@ module github.com/rancher/rancher/airgap
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 replace (
-	github.com/containerd/containerd/v2 => github.com/containerd/containerd/v2 v2.3.6 // CVE-2024-40635
+	github.com/containerd/containerd/v2 => github.com/containerd/containerd/v2 v2.3.7 // CVE-2024-40635
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.5.2 // containers/storage v1.59.1 uses securejoin.OpenInRoot/Reopen, removed in v0.6.0
 	github.com/docker/docker => github.com/moby/moby v28.5.2+incompatible // CVE-2025-54388
-	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.5 // CVE-2025-27144
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.6 // CVE-2025-27144
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.5.2 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.17 // CVE-2025-58058
-	golang.org/x/crypto => golang.org/x/crypto v0.57.0
-	golang.org/x/net => golang.org/x/net v0.60.0
+	golang.org/x/crypto => golang.org/x/crypto v0.58.0
+	golang.org/x/net => golang.org/x/net v0.61.0
 )
 
 require (
@@ -104,12 +104,12 @@ require (
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.83.2 // indirect

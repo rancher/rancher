@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
-const owner = "owner-user"
+const owner = pkgrbac.LegacyProjectCRBOwnerValue
 
 func newPRTBLifecycle(m *manager, management *config.ManagementContext, nsInformer cache.SharedIndexInformer) *prtbLifecycle {
 	return &prtbLifecycle{

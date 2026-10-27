@@ -28,7 +28,6 @@ type testCase struct {
 }
 
 func TestSetAll(t *testing.T) {
-	t.Skip()
 	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	provider := settingsProvider{
 		settings: client,
@@ -101,6 +100,7 @@ func TestSetAll(t *testing.T) {
 		assert.Equal(t, finalSetting.Default, test.newSetting.Default, failMsg)
 
 		// If the value is configured by an environment variable, then the source should be "env", otherwise it should be empty.
+		// This includes settings that were previously configured by an env var which has since been removed.
 		assert.True(t, finalSetting.Source == "env" == (test.envVar != nil), failMsg)
 
 		var expectedFallbackVal string
@@ -108,6 +108,10 @@ func TestSetAll(t *testing.T) {
 			// Environment variable takes precedence of everything. Setting's value should match as long as it was set.
 			assert.Equal(t, *test.envVar, finalSetting.Value, failMsg)
 			expectedFallbackVal = *test.envVar
+		} else if test.existingSetting != nil && test.existingSetting.Source == "env" {
+			// The env var that previously configured this setting is gone, so the stale env value must be discarded
+			// and the setting must fall back to its default.
+			assert.Equal(t, "", finalSetting.Value, failMsg)
 		} else if test.existingSetting != nil {
 			expectedFallbackVal = test.existingSetting.Value
 			assert.Equal(t, test.existingSetting.Value, finalSetting.Value, failMsg)
@@ -265,6 +269,32 @@ func populateTestCases() []*testCase {
 				Source:  "env",
 			},
 		},
+		{
+			description: "test an existing setting with val and \"env\" source whose env var was removed drops the stale env value and source",
+			newDefVal:   "abc",
+			existingSetting: &v3.Setting{
+				Value:   "stale-env-value",
+				Default: "abc",
+				Source:  "env",
+			},
+		},
+		{
+			description: "test an existing setting with empty val and \"env\" source whose env var was removed drops the source",
+			newDefVal:   "abc",
+			existingSetting: &v3.Setting{
+				Default: "abc",
+				Source:  "env",
+			},
+		},
+		{
+			description: "test an existing setting with val and \"env\" source whose env var was removed also picks up the new default",
+			newDefVal:   "newDef",
+			existingSetting: &v3.Setting{
+				Value:   "stale-env-value",
+				Default: "oldDef",
+				Source:  "env",
+			},
+		},
 	}
 
 	for index, test := range testCases {
@@ -281,10 +311,7 @@ func populateTestCases() []*testCase {
 }
 
 func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
-	t.Skip()
-	t.Parallel()
 	t.Run("setting gets regular default on fresh install", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -311,7 +338,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting exists and keeps its default on upgrade having the special upgrade default", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -342,7 +368,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting exists and keeps its default on upgrade in absence of an upgrade default value", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -372,7 +397,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting exists and gets its new default on upgrade in absence of an upgrade default value", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -402,7 +426,6 @@ func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
 	})
 
 	t.Run("setting does not exist and gets a special default on upgrade value on non fresh install", func(t *testing.T) {
-		t.Parallel()
 		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 		provider := settingsProvider{
 			settings: client,
@@ -458,3 +481,44 @@ func storeOperations(store map[string]v3.Setting) (get, set, list) {
 type get func(name string, opts metav1.GetOptions) (*v3.Setting, error)
 type set func(setting *v3.Setting) (*v3.Setting, error)
 type list func(opts metav1.ListOptions) (*v3.SettingList, error)
+
+func TestSetAllStaleEnvSettingRejectedByWebhook(t *testing.T) {
+	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+	provider := settingsProvider{
+		settings: client,
+	}
+	store := map[string]v3.Setting{
+		"some-setting": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "some-setting",
+			},
+			Value:   "stale-env-value",
+			Default: "old-default",
+			Source:  "env",
+		},
+	}
+	get, set, list := storeOperations(store)
+
+	client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+	client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+	// Mimic older versions of rancher-webhook, which reject changing the source of a setting away from "env".
+	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(setting *v3.Setting) (*v3.Setting, error) {
+		if store[setting.Name].Source == "env" && setting.Source != "env" {
+			return nil, apierrors.NewBadRequest("setting with source \"\" cannot update setting with source \"env\"")
+		}
+		return set(setting)
+	}).Times(2)
+
+	values := map[string]settings.Setting{
+		"some-setting": settings.NewSetting("some-setting", "new-default"),
+	}
+	err := provider.SetAll(values)
+	require.NoError(t, err)
+
+	s, err := get("some-setting", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "env", s.Source)
+	assert.Equal(t, "stale-env-value", s.Value)
+	assert.Equal(t, "new-default", s.Default)
+	assert.Equal(t, "stale-env-value", provider.fallback["some-setting"])
+}

@@ -144,16 +144,35 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Value = envValue
 				update = true
 			}
+			resetEnv := false
+			staleEnvValue := obj.Value
+			if !envOk && obj.Source == "env" {
+				// The env var that used to configure this setting is gone, so drop the stale env value.
+				obj.Source = ""
+				obj.Value = ""
+				update = true
+				resetEnv = true
+			}
+			if update {
+				_, err := s.settings.Update(obj)
+				if err != nil && resetEnv {
+					// Older versions of rancher-webhook reject changing the source of a setting away from "env".
+					// Don't fail startup over it, keep the stale env value and still apply any other changes.
+					logrus.Warnf("Failed to reset setting %s after its env var %s was removed, keeping its previous value: %v", obj.Name, key, err)
+					obj.Source = "env"
+					obj.Value = staleEnvValue
+					_, err = s.settings.Update(obj)
+				} else if err == nil && resetEnv {
+					logrus.Warnf("Setting %s was configured by env var %s which is no longer set, reset it to its default", obj.Name, key)
+				}
+				if err != nil {
+					return err
+				}
+			}
 			if obj.Value == "" {
 				fallback[obj.Name] = obj.Default
 			} else {
 				fallback[obj.Name] = obj.Value
-			}
-			if update {
-				_, err := s.settings.Update(obj)
-				if err != nil {
-					return err
-				}
 			}
 		}
 	}

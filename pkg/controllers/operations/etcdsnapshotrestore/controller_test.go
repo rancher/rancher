@@ -1768,7 +1768,7 @@ func TestBuildRestartPlan(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decoding drop-in: %v", err)
 		}
-		if want := "server: \"https://10.0.0.1:9345\"\n"; string(content) != want {
+		if want := "server: \"https://10.0.0.1:9345\"\ntoken-file: \"/var/lib/rancher/rke2/server/token\"\n"; string(content) != want {
 			t.Errorf("drop-in = %q, want %q", string(content), want)
 		}
 

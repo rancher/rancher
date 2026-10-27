@@ -11,7 +11,7 @@ import (
 
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	util "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
@@ -138,11 +138,11 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 				return nil, err
 			}
 			// Copy conditions this controller owns
-			util.CopyCondition(apisv3.NamespaceBackedResource, cluster, toUpdate)
-			util.CopyCondition(apisv3.ClusterConditionDefaultProjectCreated, cluster, toUpdate)
-			util.CopyCondition(apisv3.ClusterConditionSystemProjectCreated, cluster, toUpdate)
-			util.CopyCondition(apisv3.CreatorMadeOwner, cluster, toUpdate)
-			util.CopyCondition(apisv3.ClusterConditionInitialRolesPopulated, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.NamespaceBackedResource, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.ClusterConditionDefaultProjectCreated, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.ClusterConditionSystemProjectCreated, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.CreatorMadeOwner, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.ClusterConditionInitialRolesPopulated, cluster, toUpdate)
 			_, err = l.clusterClient.UpdateStatus(toUpdate)
 			if err != nil {
 				return nil, err
@@ -392,7 +392,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			}
 
 			if principalName := cluster.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
-				if !strings.HasPrefix(principalName, "local") {
+				if !strings.HasPrefix(principalName, "local://") {
 					// Setting UserPrincipalName only makes sense for non-local users.
 					crtb.UserPrincipalName = principalName
 					crtb.UserName = ""

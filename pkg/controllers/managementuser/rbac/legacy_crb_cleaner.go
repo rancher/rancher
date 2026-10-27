@@ -143,7 +143,7 @@ func (c *crbCleaner) hasGlobalAdminRole(subj rbacv1.Subject) (bool, error) {
 }
 
 func (c *crbCleaner) eligibleForDeletion(crb *rbacv1.ClusterRoleBinding) (bool, error) {
-	if !crbNamePattern.MatchString(crb.Name) {
+	if !crbNamePattern.MatchString(crb.Name) && !isLegacyProjectCRB(crb) {
 		return false, nil
 	}
 
@@ -166,4 +166,24 @@ func (c *crbCleaner) eligibleForDeletion(crb *rbacv1.ClusterRoleBinding) (bool, 
 	}
 
 	return false, nil
+}
+
+// isLegacyProjectCRB reports whether crb is a crb-<hash> project ClusterRoleBinding owned only through legacy owner-user
+// labels. Aggregated bindings share the crb-<hash> naming but use "true" owner labels, which noRemainingOwnerLabels doesn't
+// recognise, so any binding with an aggregated label is excluded to avoid deleting it.
+func isLegacyProjectCRB(crb *rbacv1.ClusterRoleBinding) bool {
+	if !strings.HasPrefix(crb.Name, "crb-") {
+		return false
+	}
+
+	hasLegacyOwner := false
+	for k, v := range crb.Labels {
+		if k == rbac.AggregationFeatureLabel || strings.HasPrefix(k, rbac.PrtbOwnerLabel) || strings.HasPrefix(k, rbac.CrtbOwnerLabel) {
+			return false
+		}
+		if v == owner {
+			hasLegacyOwner = true
+		}
+	}
+	return hasLegacyOwner
 }

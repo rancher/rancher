@@ -125,7 +125,7 @@ var (
 	AggregatedRoleTemplates = newFeature(
 		"aggregated-roletemplates",
 		"Make RoleTemplates use aggregation for generated RBAC roles",
-		true,
+		false,
 		true,
 		true)
 	ClusterAgentSchedulingCustomization = newFeature(
@@ -255,6 +255,13 @@ var (
 		true,
 		true,
 		true)
+	AuditLogUsername = newFeature(
+		"audit-log-username",
+		"Add the human-readable username of the user, and of the impersonator, to the audit log entries",
+		false,
+		true,
+		true,
+	)
 	MultiAuthProviderCross = newPrimeFeature(
 		"multiple-auth-provider-cross",
 		"Search across all auth-providers",

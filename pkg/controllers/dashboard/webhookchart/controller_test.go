@@ -1,6 +1,8 @@
 package webhookchart
 
 import (
+	"context"
+
 	"errors"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
@@ -296,22 +299,16 @@ func TestOnRepo_PriorityClassNotFoundIsNotFatal(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestOnRepo_MCMAgentEnabled_SkipsLocalClusterLookup(t *testing.T) {
-	mocks := newTestMocks(t)
+func TestRegister_SkipsDownstreamClusters(t *testing.T) {
+	// The cluster agent runs the same dashboard controllers; there, systemcharts manages the webhook.
+	// Registering here as well would make two handlers fight over the same release.
+	newTestMocks(t)
 	features.MCMAgent.Set(true)
 
-	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).
-		Return(priorityConfig, nil).AnyTimes()
-	// No clusterCache/clusters expectations: on a downstream (MCMAgent) install, webhook
-	// customization comes from the rancher-config ConfigMap only, and status is
-	// management-server-owned — the local cluster must not be touched at all.
-	mocks.manager.EXPECT().Ensure(
-		namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", gomock.Any(), gomock.Any(), true, "",
-	).Return(nil)
-
-	h := mocks.Handler()
-	_, err := h.onRepo("", repo)
-	require.NoError(t, err)
+	// An empty context: registering would dereference its clients and panic.
+	require.NotPanics(t, func() {
+		require.NoError(t, Register(context.Background(), &wrangler.Context{}, ""))
+	})
 }
 
 func TestOnRepo_EnsureErrorIsPropagated(t *testing.T) {

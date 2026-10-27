@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -43,15 +44,37 @@ func TestSaveOIDCConfigUpdatesConfigWithSecretReferences(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			// The fake API server checks resourceVersion like the real one, so
+			// a second update with the resourceVersion the first one used gets
+			// a conflict.
 			var updated map[string]any
+			updates := 0
+			resourceVersion := 1
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, http.MethodPut, r.Method)
+				updates++
 				body, err := io.ReadAll(r.Body)
 				require.NoError(t, err)
-				require.NoError(t, json.Unmarshal(body, &updated))
+				var obj map[string]any
+				require.NoError(t, json.Unmarshal(body, &obj))
 
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(body)
+				metadata := obj["metadata"].(map[string]any)
+				if metadata["resourceVersion"] != strconv.Itoa(resourceVersion) {
+					w.WriteHeader(http.StatusConflict)
+					_ = json.NewEncoder(w).Encode(metav1.Status{
+						TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+						Status:   metav1.StatusFailure,
+						Reason:   metav1.StatusReasonConflict,
+						Code:     http.StatusConflict,
+						Message:  "the object has been modified",
+					})
+					return
+				}
+				resourceVersion++
+				metadata["resourceVersion"] = strconv.Itoa(resourceVersion)
+				updated = obj
+				_ = json.NewEncoder(w).Encode(obj)
 			}))
 			t.Cleanup(srv.Close)
 
@@ -86,6 +109,7 @@ func TestSaveOIDCConfigUpdatesConfigWithSecretReferences(t *testing.T) {
 			}
 			require.NoError(t, o.saveOIDCConfig(config))
 
+			assert.Equal(t, 1, updates, "the AuthConfig should be updated once")
 			require.NotNil(t, updated, "the AuthConfig should be updated")
 			assert.Equal(t, common.SecretsNamespace+":"+tt.wantPrefix+"-privatekey", updated["privateKey"])
 			assert.Equal(t, common.SecretsNamespace+":"+tt.wantPrefix+"-clientsecret", updated["clientSecret"])

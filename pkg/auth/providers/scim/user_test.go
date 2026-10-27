@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,6 +119,7 @@ func TestListUsersPagination(t *testing.T) {
 	}).AnyTimes()
 
 	srv := &SCIMServer{
+		getConfig:          testDefaultGetConfig,
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
 	}
@@ -260,6 +263,7 @@ func TestListUsersPaginationConsistency(t *testing.T) {
 	}).AnyTimes()
 
 	srv := &SCIMServer{
+		getConfig:          testDefaultGetConfig,
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
 	}
@@ -336,7 +340,7 @@ func TestListUsersWithFilter(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
-					"principalid": {provider + "_user://" + name},
+					"principalid": {provider + "_user://" + usernames[name]},
 					"username":    {usernames[name]},
 				},
 			},
@@ -344,6 +348,7 @@ func TestListUsersWithFilter(t *testing.T) {
 	}).AnyTimes()
 
 	srv := &SCIMServer{
+		getConfig:          testDefaultGetConfig,
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
 	}
@@ -384,9 +389,9 @@ func TestListUsersWithExternalIdFilter(t *testing.T) {
 	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributeCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.UserAttribute, error) {
 		attrs := map[string]map[string][]string{
-			"u-aaa": {"principalid": {provider + "_user://u-aaa"}, "username": {"john.doe"}, "externalid": {"obj-111"}},
-			"u-bbb": {"principalid": {provider + "_user://u-bbb"}, "username": {"jane.smith"}, "externalid": {"obj-222"}},
-			"u-ccc": {"principalid": {provider + "_user://u-ccc"}, "username": {"bob.wilson"}, "externalid": {"obj-333"}},
+			"u-aaa": {"principalid": {provider + "_user://john.doe"}, "username": {"john.doe"}, "externalid": {"obj-111"}},
+			"u-bbb": {"principalid": {provider + "_user://jane.smith"}, "username": {"jane.smith"}, "externalid": {"obj-222"}},
+			"u-ccc": {"principalid": {provider + "_user://bob.wilson"}, "username": {"bob.wilson"}, "externalid": {"obj-333"}},
 		}
 		return &v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: name},
@@ -395,6 +400,7 @@ func TestListUsersWithExternalIdFilter(t *testing.T) {
 	}).AnyTimes()
 
 	srv := &SCIMServer{
+		getConfig:          testDefaultGetConfig,
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
 	}
@@ -454,6 +460,7 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 		}).AnyTimes()
 
 		srv := &SCIMServer{
+			getConfig:          testDefaultGetConfig,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 		}
@@ -499,6 +506,7 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 		userAttributeCache.EXPECT().Get("u-bbb").Return(nil, fmt.Errorf("cache error"))
 
 		srv := &SCIMServer{
+			getConfig:          testDefaultGetConfig,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 		}
@@ -548,6 +556,7 @@ func TestGetUser(t *testing.T) {
 		}, false, nil)
 
 		srv := &SCIMServer{
+			getConfig: testDefaultGetConfig,
 			userCache: userCache,
 			userMGR:   userMGR,
 		}
@@ -609,6 +618,7 @@ func TestGetUser(t *testing.T) {
 		}, false, nil)
 
 		srv := &SCIMServer{
+			getConfig: testDefaultGetConfig,
 			userCache: userCache,
 			userMGR:   userMGR,
 		}
@@ -641,6 +651,7 @@ func TestGetUser(t *testing.T) {
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 
 		srv := &SCIMServer{
+			getConfig:          testDefaultGetConfig,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 		}
@@ -673,6 +684,7 @@ func TestGetUser(t *testing.T) {
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 
 		srv := &SCIMServer{
+			getConfig:          testDefaultGetConfig,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 		}
@@ -709,6 +721,7 @@ func TestGetUser(t *testing.T) {
 		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(nil, false, fmt.Errorf("cache error"))
 
 		srv := &SCIMServer{
+			getConfig: testDefaultGetConfig,
 			userCache: userCache,
 			userMGR:   userMGR,
 		}
@@ -750,6 +763,7 @@ func TestGetUser(t *testing.T) {
 		}, true, nil)
 
 		srv := &SCIMServer{
+			getConfig: testDefaultGetConfig,
 			userCache: userCache,
 			userMGR:   userMGR,
 		}
@@ -799,6 +813,7 @@ func TestGetUser(t *testing.T) {
 		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(attr, false, nil)
 
 		srv := &SCIMServer{
+			getConfig: testDefaultGetConfig,
 			userCache: userCache,
 			userMGR:   userMGR,
 		}
@@ -842,10 +857,10 @@ func TestCreateUser(t *testing.T) {
 			"u-abc123",
 			provider,
 			map[string][]string{
-				"username":    {"john.doe"},
-				"externalid":  {"ext-12345"},
-				"principalid": {"okta_user://john.doe"},
-				"email":       {"john.doe@example.com"},
+				"scimusername": {"john.doe"},
+				"externalid":   {"ext-12345"},
+				"principalid":  {"okta_user://john.doe"},
+				"email":        {"john.doe@example.com"},
 			},
 		).Return(nil)
 
@@ -915,10 +930,10 @@ func TestCreateUser(t *testing.T) {
 			"u-def456",
 			provider,
 			map[string][]string{
-				"username":    {"jane.doe"},
-				"externalid":  {"ext-67890"},
-				"principalid": {"okta_user://jane.doe"},
-				"email":       {""},
+				"scimusername": {"jane.doe"},
+				"externalid":   {"ext-67890"},
+				"principalid":  {"okta_user://jane.doe"},
+				"email":        {""},
 			},
 		).Return(nil)
 
@@ -994,6 +1009,102 @@ func TestCreateUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, resp.Schemas, errorSchemaID)
 		assert.Equal(t, http.StatusConflict, resp.Status)
+	})
+
+	t.Run("conflict when a case variant of userName exists for a holder who logged in", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingUser := &v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-existing"},
+			PrincipalIDs: []string{"local://u-existing", provider + "_user://john.doe"},
+			Enabled:      ptr.To(true),
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-existing").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-existing"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"principalid": {provider + "_user://john.doe"},
+					"username":    {"john.doe"},
+				},
+			},
+			LastLogin: &metav1.Time{Time: time.Now()},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "John.Doe",
+			"externalId": "ext-12345"
+		}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		w := httptest.NewRecorder()
+
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "User with username John.Doe already exists", resp.Detail)
+	})
+
+	t.Run("conflict when userName equals another user's login name", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingUser := &v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-bob"},
+			PrincipalIDs: []string{"local://u-bob", provider + "_user://bob"},
+			Enabled:      ptr.To(true),
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-bob").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-bob"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"principalid":  {provider + "_user://bob"},
+					"scimusername": {"bob"},
+					"username":     {"alice"},
+					"externalid":   {"ext-bob"},
+				},
+			},
+			LastLogin: &metav1.Time{Time: time.Now()},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "alice",
+			"externalId": "ext-alice"
+		}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		w := httptest.NewRecorder()
+
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "User with username alice already exists", resp.Detail)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -1224,7 +1335,7 @@ func TestCreateUser(t *testing.T) {
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
-			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["scimusername"]))
 			assert.Equal(t, "new@example.com", first(attr.ExtraByProvider[provider]["email"]))
 			return attr, nil
 		})
@@ -1294,9 +1405,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: disabledUserID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
-					"username":    {"new.name"},
-					"externalid":  {"ext-shared"},
-					"principalid": {provider + "_user://ext-shared"},
+					"scimusername": {"new.name"},
+					"externalid":   {"ext-shared"},
+					"principalid":  {provider + "_user://ext-shared"},
 				},
 			},
 		}
@@ -1309,7 +1420,7 @@ func TestCreateUser(t *testing.T) {
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
-			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["scimusername"]))
 			return attr, nil
 		})
 
@@ -1577,18 +1688,20 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 	)
 
 	tests := []struct {
-		name            string
-		mode            string
-		enabled         bool
-		loggedIn        bool
-		principalID     string
-		storedUserName  string
-		payloadUserName string
-		wantCode        int
-		wantDetail      string
-		wantEnsure      string
-		wantReprovision bool
-		wantActive      bool
+		name               string
+		mode               string
+		enabled            bool
+		loggedIn           bool
+		principalID        string
+		storedUserName     string
+		storedSCIMUserName string
+		payloadUserName    string
+		payloadExternalID  string
+		wantCode           int
+		wantDetail         string
+		wantEnsure         string
+		wantReprovision    bool
+		wantActive         bool
 	}{
 		{
 			name:            "externalId mode, active user who logged in with a different login name",
@@ -1622,8 +1735,32 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 			principalID:     provider + "_user://" + externalID,
 			storedUserName:  "alice",
 			payloadUserName: "alice",
-			wantCode:        http.StatusConflict,
-			wantDetail:      "User with username alice already exists",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://" + externalID,
+			wantActive:      true,
+		},
+		{
+			name:               "externalId mode, active user who logged in with scimusername equal to userName",
+			mode:               scimconfig.UserIDExternalID,
+			enabled:            true,
+			loggedIn:           true,
+			principalID:        provider + "_user://" + externalID,
+			storedUserName:     "alice.login",
+			storedSCIMUserName: "alice",
+			payloadUserName:    "alice",
+			wantCode:           http.StatusCreated,
+			wantEnsure:         provider + "_user://" + externalID,
+			wantActive:         true,
+		},
+		{
+			name:               "externalId mode, active user who never logged in with scimusername equal to userName",
+			mode:               scimconfig.UserIDExternalID,
+			enabled:            true,
+			principalID:        provider + "_user://" + externalID,
+			storedSCIMUserName: "alice",
+			payloadUserName:    "alice",
+			wantCode:           http.StatusConflict,
+			wantDetail:         "User with username alice already exists",
 		},
 		{
 			name:            "userName mode, active user who logged in with the login name equal to userName",
@@ -1633,8 +1770,32 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 			principalID:     provider + "_user://alice",
 			storedUserName:  "alice",
 			payloadUserName: "alice",
-			wantCode:        http.StatusConflict,
-			wantDetail:      "User with username alice already exists",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://alice",
+			wantActive:      true,
+		},
+		{
+			name:               "userName mode, active user who logged in with scimusername equal to userName",
+			mode:               scimconfig.UserIDUserName,
+			enabled:            true,
+			loggedIn:           true,
+			principalID:        provider + "_user://alice",
+			storedUserName:     "alice.login",
+			storedSCIMUserName: "alice",
+			payloadUserName:    "alice",
+			wantCode:           http.StatusCreated,
+			wantEnsure:         provider + "_user://alice",
+			wantActive:         true,
+		},
+		{
+			name:               "userName mode, active user who never logged in with scimusername equal to userName",
+			mode:               scimconfig.UserIDUserName,
+			enabled:            true,
+			principalID:        provider + "_user://alice",
+			storedSCIMUserName: "alice",
+			payloadUserName:    "alice",
+			wantCode:           http.StatusConflict,
+			wantDetail:         "User with username alice already exists",
 		},
 		{
 			name:            "externalId mode, active user who never logged in, new userName",
@@ -1700,6 +1861,17 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 			wantEnsure:      provider + "_user://alice",
 			wantActive:      false,
 		},
+		{
+			name:              "userName mode, disabled user who logged in with a matching userName and a different externalId",
+			mode:              scimconfig.UserIDUserName,
+			loggedIn:          true,
+			principalID:       provider + "_user://alice",
+			storedUserName:    "alice",
+			payloadUserName:   "alice",
+			payloadExternalID: "ext-other",
+			wantCode:          http.StatusConflict,
+			wantDetail:        "User with username alice already exists",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1717,11 +1889,16 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 				ExtraByProvider: map[string]map[string][]string{
 					provider: {
 						"principalid": {tt.principalID},
-						"username":    {tt.storedUserName},
 						"externalid":  {externalID},
 						"email":       {"alice@example.com"},
 					},
 				},
+			}
+			if tt.storedUserName != "" {
+				existingAttr.ExtraByProvider[provider]["username"] = []string{tt.storedUserName}
+			}
+			if tt.storedSCIMUserName != "" {
+				existingAttr.ExtraByProvider[provider]["scimusername"] = []string{tt.storedSCIMUserName}
 			}
 			if tt.loggedIn {
 				existingAttr.LastLogin = &metav1.Time{Time: time.Now()}
@@ -1762,11 +1939,15 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 				},
 			}
 
+			payloadExternalID := externalID
+			if tt.payloadExternalID != "" {
+				payloadExternalID = tt.payloadExternalID
+			}
 			body := fmt.Sprintf(`{
 				"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
 				"userName": %q,
 				"externalId": %q
-			}`, tt.payloadUserName, externalID)
+			}`, tt.payloadUserName, payloadExternalID)
 			r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
 			r.SetPathValue("provider", provider)
 			w := httptest.NewRecorder()
@@ -1823,7 +2004,7 @@ func TestUpdateUser(t *testing.T) {
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
-			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["scimusername"]))
 			return attr, nil
 		})
 
@@ -1899,7 +2080,7 @@ func TestUpdateUser(t *testing.T) {
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
-			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["scimusername"]))
 			return attr, nil
 		})
 
@@ -2069,11 +2250,17 @@ func TestUpdateUser(t *testing.T) {
 			return u, nil
 		})
 
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			return attr, nil
+		})
+
 		srv := &SCIMServer{
-			userCache: userCache,
-			users:     userClient,
-			userMGR:   userMGR,
-			getConfig: testDefaultGetConfig,
+			userAttributes: userAttrClient,
+			userCache:      userCache,
+			users:          userClient,
+			userMGR:        userMGR,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2128,11 +2315,17 @@ func TestUpdateUser(t *testing.T) {
 			return u, nil
 		})
 
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			return attr, nil
+		})
+
 		srv := &SCIMServer{
-			userCache: userCache,
-			users:     userClient,
-			userMGR:   userMGR,
-			getConfig: testDefaultGetConfig,
+			userAttributes: userAttrClient,
+			userCache:      userCache,
+			users:          userClient,
+			userMGR:        userMGR,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2173,8 +2366,9 @@ func TestUpdateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
-					"username":   {"john.doe"},
-					"externalid": {"ext-12345"},
+					"scimusername": {"john.doe"},
+					"username":     {"john.doe"},
+					"externalid":   {"ext-12345"},
 				},
 			},
 		}
@@ -2431,11 +2625,17 @@ func TestUpdateUser(t *testing.T) {
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
 
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			return attr, nil
+		})
+
 		srv := &SCIMServer{
-			userCache: userCache,
-			users:     userClient,
-			userMGR:   userMGR,
-			getConfig: testDefaultGetConfig,
+			userAttributes: userAttrClient,
+			userCache:      userCache,
+			users:          userClient,
+			userMGR:        userMGR,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3238,7 +3438,7 @@ func TestPatchUser(t *testing.T) {
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
-			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["scimusername"]))
 			return attr, nil
 		})
 
@@ -3341,10 +3541,16 @@ func TestPatchUser(t *testing.T) {
 		userMGR := mocks.NewMockManager(ctrl)
 		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			return attr, nil
+		})
+
 		srv := &SCIMServer{
-			userCache: userCache,
-			userMGR:   userMGR,
-			getConfig: testDefaultGetConfig,
+			userAttributes: userAttrClient,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -4206,11 +4412,12 @@ func TestUserHandlersOwnership(t *testing.T) {
 	notOwned := []string{"u-other", "u-othermember", "u-stale", "u-local", "u-admin", "u-system", "u-missing"}
 	owned := []string{"u-owned", "u-loginowned", "u-loginpassword", "u-multi", "u-locallinked", "u-locallinkednm", "u-passwordfield", "u-usernameonly"}
 
-	// putPayload deactivates the user and keeps its userName and externalId.
+	// putPayload deactivates the user and keeps its externalId and the userName its principal was
+	// built from.
 	putPayload := func(f *ownershipFixtures, id string) map[string]any {
 		userName, externalID := "someone", ""
-		if attr, ok := f.attrs[id]; ok && first(attr.ExtraByProvider[providerA]["username"]) != "" {
-			userName = first(attr.ExtraByProvider[providerA]["username"])
+		if attr, ok := f.attrs[id]; ok && first(attr.ExtraByProvider[providerA]["principalid"]) != "" {
+			userName = strings.TrimPrefix(first(attr.ExtraByProvider[providerA]["principalid"]), userPrincipalName(providerA, ""))
 			externalID = first(attr.ExtraByProvider[providerA]["externalid"])
 		}
 		return map[string]any{
@@ -4306,6 +4513,11 @@ func TestUserHandlersOwnership(t *testing.T) {
 				// externalId mode lets the userName change.
 				srv.getConfig = externalIDUserConfig
 				srv.userAttributes.EXPECT().Create(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+					return attr, nil
+				})
+			} else {
+				// The PUT stores the userName as scimusername.
+				srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
 					return attr, nil
 				})
 			}
@@ -4405,7 +4617,7 @@ func TestListUsersOwnership(t *testing.T) {
 	})
 
 	t.Run("the userName filter finds a local user who linked the provider", func(t *testing.T) {
-		resp := list(t, "filter=userName%20eq%20%22linked.user%22")
+		resp := list(t, "filter=userName%20eq%20%22u3%22")
 		assert.Equal(t, 1, resp.TotalResults)
 		assert.Equal(t, []string{"u-locallinked"}, ids(resp))
 	})
@@ -4417,13 +4629,13 @@ func TestListUsersOwnership(t *testing.T) {
 	})
 
 	t.Run("the userName filter doesn't find a local user by a stale extra", func(t *testing.T) {
-		resp := list(t, "filter=userName%20eq%20%22local.user%22")
+		resp := list(t, "filter=userName%20eq%20%22u15%22")
 		assert.Equal(t, 0, resp.TotalResults)
 		assert.Empty(t, resp.Resources)
 	})
 
 	t.Run("the userName filter doesn't find the default admin", func(t *testing.T) {
-		resp := list(t, "filter=userName%20eq%20%22admin.user%22")
+		resp := list(t, "filter=userName%20eq%20%22u8%22")
 		assert.Equal(t, 0, resp.TotalResults)
 		assert.Empty(t, resp.Resources)
 	})
@@ -4459,7 +4671,7 @@ func TestCheckUserConflictOwnership(t *testing.T) {
 		{
 			name:       "externalId of the default admin",
 			getConfig:  testDefaultGetConfig,
-			put:        map[string]any{"userName": "owned.user", "externalId": "ext-u8", "active": true},
+			put:        map[string]any{"userName": "u1", "externalId": "ext-u8", "active": true},
 			patch:      map[string]any{"op": "replace", "path": "externalId", "value": "ext-u8"},
 			wantStatus: http.StatusOK,
 		},
@@ -4473,7 +4685,7 @@ func TestCheckUserConflictOwnership(t *testing.T) {
 		{
 			name:       "externalId of a local user who linked the provider",
 			getConfig:  testDefaultGetConfig,
-			put:        map[string]any{"userName": "owned.user", "externalId": "ext-u3", "active": true},
+			put:        map[string]any{"userName": "u1", "externalId": "ext-u3", "active": true},
 			patch:      map[string]any{"op": "replace", "path": "externalId", "value": "ext-u3"},
 			wantStatus: http.StatusConflict,
 		},
@@ -4662,7 +4874,7 @@ func TestCreateUserOwnership(t *testing.T) {
 		srv.getConfig = externalIDUserConfig
 		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
 			assert.Equal(t, "u-locallinked", attr.Name)
-			assert.Equal(t, []string{"new.name"}, attr.ExtraByProvider[providerA]["username"])
+			assert.Equal(t, []string{"new.name"}, attr.ExtraByProvider[providerA]["scimusername"])
 			return attr, nil
 		})
 		srv.users.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
@@ -4710,6 +4922,490 @@ func TestCreateUserOwnership(t *testing.T) {
 			var resp map[string]any
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			assert.Equal(t, tt.holder, resp["id"])
+		})
+	}
+}
+
+// newUserFixtures returns fixtures with no users, groups or attributes.
+func newUserFixtures() *ownershipFixtures {
+	return &ownershipFixtures{
+		users:  map[string]*v3.User{},
+		attrs:  map[string]*v3.UserAttribute{},
+		groups: map[string]*v3.Group{},
+	}
+}
+
+// addUser adds an enabled user who holds principal and has extras for provider A.
+func (f *ownershipFixtures) addUser(name, principal string, extras map[string][]string, loggedIn bool) {
+	f.users[name] = &v3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: name},
+		PrincipalIDs: []string{"local://" + name, principal},
+		Enabled:      ptr.To(true),
+	}
+	f.attrs[name] = &v3.UserAttribute{
+		ObjectMeta:      metav1.ObjectMeta{Name: name},
+		ExtraByProvider: map[string]map[string][]string{providerA: extras},
+	}
+	if loggedIn {
+		f.attrs[name].LastLogin = &metav1.Time{Time: time.Now()}
+	}
+}
+
+func userPutBody(userName, externalID string, active bool) map[string]any {
+	return map[string]any{
+		"schemas":    []string{userSchemaID},
+		"userName":   userName,
+		"externalId": externalID,
+		"active":     active,
+	}
+}
+
+func userPatchBody(path string, value any) map[string]any {
+	return map[string]any{
+		"schemas":    []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+		"Operations": []map[string]any{{"op": "replace", "path": path, "value": value}},
+	}
+}
+
+// sendUserUpdate sends a PUT or a PATCH for id.
+func sendUserUpdate(t *testing.T, srv *ownershipServer, method, id string, body map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+
+	w := httptest.NewRecorder()
+	r := newSCIMRequest(t, method, providerA, userEndpoint, id, body)
+	if method == http.MethodPut {
+		srv.UpdateUser(w, r)
+	} else {
+		srv.PatchUser(w, r)
+	}
+
+	return w
+}
+
+func TestUserWritesSCIMUserName(t *testing.T) {
+	t.Run("POST stores scimusername and not username", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newUserFixtures().server(ctrl)
+
+		principal := userPrincipalName(providerA, "alice")
+		srv.userMGR.EXPECT().EnsureUser(principal, "alice").Return(&v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-new"},
+			PrincipalIDs: []string{"local://u-new", principal},
+		}, nil)
+		srv.userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups("u-new", providerA, map[string][]string{
+			"scimusername": {"alice"},
+			"externalid":   {"ext-1"},
+			"principalid":  {principal},
+			"email":        {""},
+		}).Return(nil)
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", userPutBody("alice", "ext-1", true)))
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	})
+
+	t.Run("reprovision stores scimusername and keeps username and the stored email", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newUserFixtures()
+		f.addUser("u-alice", userPrincipalName(providerA, "ext-1"), map[string][]string{
+			"principalid": {userPrincipalName(providerA, "ext-1")},
+			"username":    {"alice.login"},
+			"externalid":  {"ext-1"},
+			"email":       {"alice@example.com"},
+		}, true)
+		f.users["u-alice"].Enabled = ptr.To(false)
+		srv := f.server(ctrl)
+		srv.getConfig = externalIDUserConfig
+
+		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, []string{"alice"}, attr.ExtraByProvider[providerA]["scimusername"])
+			assert.Equal(t, []string{"alice.login"}, attr.ExtraByProvider[providerA]["username"])
+			assert.Equal(t, []string{"alice@example.com"}, attr.ExtraByProvider[providerA]["email"])
+			return attr, nil
+		})
+		srv.users.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+			assert.True(t, user.GetEnabled())
+			return user, nil
+		})
+
+		w := httptest.NewRecorder()
+		srv.CreateUser(w, newSCIMRequest(t, http.MethodPost, providerA, userEndpoint, "", userPutBody("alice", "ext-1", true)))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "u-alice", resp["id"])
+		assert.Equal(t, "ext-1", resp["externalId"])
+	})
+
+	for _, tt := range []struct {
+		method string
+		body   map[string]any
+	}{
+		{method: http.MethodPut, body: userPutBody("alice.new", "ext-1", true)},
+		{method: http.MethodPatch, body: userPatchBody("userName", "alice.new")},
+	} {
+		t.Run(tt.method+" in externalId mode stores scimusername and not username", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newUserFixtures()
+			f.addUser("u-alice", userPrincipalName(providerA, "ext-1"), map[string][]string{
+				"principalid": {userPrincipalName(providerA, "ext-1")},
+				"username":    {"alice"},
+				"externalid":  {"ext-1"},
+			}, false)
+			srv := f.server(ctrl)
+			srv.getConfig = externalIDUserConfig
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+				assert.Equal(t, []string{"alice.new"}, attr.ExtraByProvider[providerA]["scimusername"])
+				assert.Equal(t, []string{"alice"}, attr.ExtraByProvider[providerA]["username"])
+				return attr, nil
+			})
+
+			w := sendUserUpdate(t, srv, tt.method, "u-alice", tt.body)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "alice.new", resp["userName"])
+			assert.Equal(t, "ext-1", resp["externalId"])
+		})
+	}
+}
+
+func TestUserNameModeAfterLogin(t *testing.T) {
+	// LDAP with the DN as the principal: login stores the login name as username.
+	const dn = "CN=alice,OU=people,DC=example,DC=com"
+	newFixtures := func() *ownershipFixtures {
+		f := newUserFixtures()
+		f.addUser("u-alice", userPrincipalName(providerA, dn), map[string][]string{
+			"principalid": {userPrincipalName(providerA, dn)},
+			"username":    {"alice"},
+			"externalid":  {"ext-1"},
+			"email":       {"alice@example.com"},
+		}, true)
+		return f
+	}
+
+	t.Run("GET returns the principal value as userName", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newFixtures()
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+
+		w := httptest.NewRecorder()
+		srv.GetUser(w, newSCIMRequest(t, http.MethodGet, providerA, userEndpoint, "u-alice", nil))
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, dn, resp["userName"])
+		assert.Equal(t, "ext-1", resp["externalId"])
+	})
+
+	t.Run("the userName filter finds the user by the principal value", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := newFixtures().server(ctrl)
+
+		r := newSCIMRequest(t, http.MethodGet, providerA, userEndpoint, "", nil)
+		r.URL.RawQuery = "filter=" + url.QueryEscape(`userName eq "`+dn+`"`)
+		w := httptest.NewRecorder()
+		srv.ListUsers(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp listResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Len(t, resp.Resources, 1)
+		resource := resp.Resources[0].(map[string]any)
+		assert.Equal(t, "u-alice", resource["id"])
+		assert.Equal(t, dn, resource["userName"])
+	})
+
+	for _, tt := range []struct {
+		method string
+		body   map[string]any
+	}{
+		{method: http.MethodPut, body: userPutBody(dn, "ext-1", false)},
+		{method: http.MethodPatch, body: userPatchBody("userName", dn)},
+	} {
+		t.Run(tt.method+" with the unchanged userName stores scimusername", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newFixtures()
+			srv := f.server(ctrl)
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+				assert.Equal(t, []string{dn}, attr.ExtraByProvider[providerA]["scimusername"])
+				assert.Equal(t, []string{"alice"}, attr.ExtraByProvider[providerA]["username"])
+				return attr, nil
+			})
+			if tt.method == http.MethodPut {
+				srv.users.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+					assert.False(t, user.GetEnabled())
+					return user, nil
+				})
+			}
+
+			w := sendUserUpdate(t, srv, tt.method, "u-alice", tt.body)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, dn, resp["userName"])
+		})
+	}
+
+	t.Run("PUT with the unchanged userName when the IdP sends the same userName and externalId", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newUserFixtures()
+		f.addUser("u-alice", userPrincipalName(providerA, "alice"), map[string][]string{
+			"principalid": {userPrincipalName(providerA, "alice")},
+			"username":    {"alice.login"},
+			"externalid":  {"alice"},
+		}, true)
+		srv := f.server(ctrl)
+		srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+		srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, []string{"alice"}, attr.ExtraByProvider[providerA]["scimusername"])
+			return attr, nil
+		})
+
+		w := sendUserUpdate(t, srv, http.MethodPut, "u-alice", userPutBody("alice", "alice", true))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	})
+}
+
+func TestUserNameModeMutabilityRejects(t *testing.T) {
+	fixtures := []struct {
+		name     string
+		extras   map[string][]string
+		loggedIn bool
+	}{
+		{
+			name: "data written by POST",
+			extras: map[string][]string{
+				"principalid":  {userPrincipalName(providerA, "alice")},
+				"scimusername": {"alice"},
+				"externalid":   {"ext-1"},
+				"email":        {""},
+			},
+		},
+		{
+			name: "login name stored",
+			extras: map[string][]string{
+				"principalid": {userPrincipalName(providerA, "alice")},
+				"username":    {"alice.login"},
+				"externalid":  {"ext-1"},
+			},
+			loggedIn: true,
+		},
+	}
+	requests := []struct {
+		name   string
+		method string
+		body   map[string]any
+	}{
+		{name: "PUT with a case variant of the principal value", method: http.MethodPut, body: userPutBody("Alice", "ext-1", true)},
+		{name: "PUT with an unrelated userName", method: http.MethodPut, body: userPutBody("bob", "ext-1", true)},
+		{name: "PATCH with a case variant of the principal value", method: http.MethodPatch, body: userPatchBody("userName", "Alice")},
+		{name: "PATCH with an unrelated userName", method: http.MethodPatch, body: userPatchBody("userName", "bob")},
+	}
+
+	for _, fx := range fixtures {
+		for _, req := range requests {
+			t.Run(fx.name+": "+req.name, func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				f := newUserFixtures()
+				f.addUser("u-alice", userPrincipalName(providerA, "alice"), fx.extras, fx.loggedIn)
+				srv := f.server(ctrl)
+				srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+
+				w := sendUserUpdate(t, srv, req.method, "u-alice", req.body)
+				require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+
+				var resp Error
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, "mutability", resp.ScimType)
+			})
+		}
+	}
+}
+
+func TestExternalIDModeStoresExternalIDFromPrincipal(t *testing.T) {
+	// u-alice lost externalid to a login. u-stale is another owned user with the same stored
+	// externalid, so an externalId conflict check would return 409.
+	newFixtures := func() *ownershipFixtures {
+		f := newUserFixtures()
+		f.addUser("u-alice", userPrincipalName(providerA, "ext-1"), map[string][]string{
+			"principalid": {userPrincipalName(providerA, "ext-1")},
+			"username":    {"alice.login"},
+		}, true)
+		f.addUser("u-stale", userPrincipalName(providerA, "ext-9"), map[string][]string{
+			"principalid": {userPrincipalName(providerA, "ext-9")},
+			"username":    {"stale.user"},
+			"externalid":  {"ext-1"},
+		}, false)
+		return f
+	}
+
+	for _, tt := range []struct {
+		method string
+		body   map[string]any
+	}{
+		{method: http.MethodPut, body: userPutBody("alice.login", "ext-1", true)},
+		{method: http.MethodPatch, body: userPatchBody("externalId", "ext-1")},
+	} {
+		t.Run(tt.method+" with the principal's externalId stores externalid", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newFixtures()
+			srv := f.server(ctrl)
+			srv.getConfig = externalIDUserConfig
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+				assert.Equal(t, []string{"ext-1"}, attr.ExtraByProvider[providerA]["externalid"])
+				return attr, nil
+			})
+
+			w := sendUserUpdate(t, srv, tt.method, "u-alice", tt.body)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "ext-1", resp["externalId"])
+		})
+	}
+}
+
+func TestExternalIDModeUserNameConflict(t *testing.T) {
+	// u-bob logged in: both his scimusername and his login name count. u-carol was renamed after
+	// the change and never logged in, so her username is an old SCIM value that doesn't count.
+	newFixtures := func() *ownershipFixtures {
+		f := newUserFixtures()
+		f.addUser("u-alice", userPrincipalName(providerA, "ext-1"), map[string][]string{
+			"principalid":  {userPrincipalName(providerA, "ext-1")},
+			"scimusername": {"alice"},
+			"externalid":   {"ext-1"},
+		}, false)
+		f.addUser("u-bob", userPrincipalName(providerA, "ext-2"), map[string][]string{
+			"principalid":  {userPrincipalName(providerA, "ext-2")},
+			"scimusername": {"bob"},
+			"username":     {"bob.login"},
+			"externalid":   {"ext-2"},
+		}, true)
+		f.addUser("u-carol", userPrincipalName(providerA, "ext-3"), map[string][]string{
+			"principalid":  {userPrincipalName(providerA, "ext-3")},
+			"scimusername": {"carol.new"},
+			"username":     {"carol.old"},
+			"externalid":   {"ext-3"},
+		}, false)
+		return f
+	}
+
+	tests := []struct {
+		name       string
+		userName   string
+		wantStatus int
+	}{
+		{name: "scimusername of another user", userName: "bob", wantStatus: http.StatusConflict},
+		{name: "login name of another user", userName: "bob.login", wantStatus: http.StatusConflict},
+		{name: "current userName of a renamed user", userName: "carol.new", wantStatus: http.StatusConflict},
+		{name: "old userName of a renamed user who never logged in", userName: "carol.old", wantStatus: http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		for _, method := range []string{http.MethodPut, http.MethodPatch} {
+			t.Run(method+" with the "+tt.name, func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				f := newFixtures()
+				srv := f.server(ctrl)
+				srv.getConfig = externalIDUserConfig
+				srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-alice").DoAndReturn(f.ensureAndGetUserAttribute)
+				if tt.wantStatus == http.StatusOK {
+					srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+						assert.Equal(t, []string{tt.userName}, attr.ExtraByProvider[providerA]["scimusername"])
+						return attr, nil
+					})
+				}
+
+				body := userPutBody(tt.userName, "ext-1", true)
+				if method == http.MethodPatch {
+					body = userPatchBody("userName", tt.userName)
+				}
+				w := sendUserUpdate(t, srv, method, "u-alice", body)
+				require.Equal(t, tt.wantStatus, w.Code, w.Body.String())
+			})
+		}
+	}
+}
+
+func TestExternalIDModeUserNameEqualToHelperValue(t *testing.T) {
+	// u-dave has no scimusername, so the helper returns his login name. u-erin logged in with the
+	// same login name. Storing the helper value for the first time isn't a change, so it runs no
+	// conflict check.
+	newFixtures := func() *ownershipFixtures {
+		f := newUserFixtures()
+		f.addUser("u-dave", userPrincipalName(providerA, "ext-4"), map[string][]string{
+			"principalid": {userPrincipalName(providerA, "ext-4")},
+			"username":    {"dave.login"},
+			"externalid":  {"ext-4"},
+		}, true)
+		f.addUser("u-erin", userPrincipalName(providerA, "ext-5"), map[string][]string{
+			"principalid":  {userPrincipalName(providerA, "ext-5")},
+			"scimusername": {"erin"},
+			"username":     {"dave.login"},
+			"externalid":   {"ext-5"},
+		}, true)
+		return f
+	}
+
+	for _, method := range []string{http.MethodPut, http.MethodPatch} {
+		t.Run(method+" stores scimusername without a conflict", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newFixtures()
+			srv := f.server(ctrl)
+			srv.getConfig = externalIDUserConfig
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-dave").DoAndReturn(f.ensureAndGetUserAttribute)
+			srv.userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+				assert.Equal(t, []string{"dave.login"}, attr.ExtraByProvider[providerA]["scimusername"])
+				return attr, nil
+			})
+
+			body := userPutBody("dave.login", "ext-4", true)
+			if method == http.MethodPatch {
+				body = userPatchBody("userName", "dave.login")
+			}
+			w := sendUserUpdate(t, srv, method, "u-dave", body)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		})
+	}
+}
+
+func TestPatchUserEmptyUserName(t *testing.T) {
+	configs := map[string]func(string) scimconfig.Config{
+		"userName mode":   testDefaultGetConfig,
+		"externalId mode": externalIDUserConfig,
+	}
+
+	for name, getConfig := range configs {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			f := newUserFixtures()
+			f.addUser("u-frank", userPrincipalName(providerA, "ext-6"), map[string][]string{
+				"principalid":  {userPrincipalName(providerA, "ext-6")},
+				"scimusername": {"frank"},
+				"username":     {"frank.login"},
+				"externalid":   {"ext-6"},
+			}, true)
+			srv := f.server(ctrl)
+			srv.getConfig = getConfig
+			srv.userMGR.EXPECT().EnsureAndGetUserAttribute("u-frank").DoAndReturn(f.ensureAndGetUserAttribute)
+
+			w := sendUserUpdate(t, srv, http.MethodPatch, "u-frank", userPatchBody("userName", ""))
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+
+			var resp Error
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Contains(t, resp.Detail, "userName is required")
+			assert.Empty(t, resp.ScimType)
 		})
 	}
 }

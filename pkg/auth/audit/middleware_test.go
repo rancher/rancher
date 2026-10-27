@@ -3,6 +3,7 @@ package audit
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -471,6 +472,56 @@ func TestMiddlewareMemoryUsage(t *testing.T) {
 				t.Logf("WARNING: %s - This test currently demonstrates the bug. "+
 					"The middleware buffers all %d bytes even though audit level %d doesn't need it.",
 					tt.description, tt.responseSize, tt.level)
+			}
+		})
+	}
+}
+
+// TestMiddlewareLoginNameIsIndependentOfLevel guards the forced read of login request bodies: the login name
+// comes from the request body, so it must be captured at every level even though the body itself is only
+// kept at LevelRequest and above.
+func TestMiddlewareLoginNameIsIndependentOfLevel(t *testing.T) {
+	const loginBody = `{"type":"localProvider","username":"alice","password":"secret"}`
+
+	tests := map[string]struct {
+		level         auditlogv1.Level
+		uri           string
+		wantLoginName string
+		wantBody      bool
+	}{
+		"LevelNull login":            {level: auditlogv1.LevelNull, uri: "/v3-public/localProviders/local?action=login", wantLoginName: "alice"},
+		"LevelHeaders login":         {level: auditlogv1.LevelHeaders, uri: "/v3-public/localProviders/local?action=login", wantLoginName: "alice"},
+		"LevelRequest login":         {level: auditlogv1.LevelRequest, uri: "/v3-public/localProviders/local?action=login", wantLoginName: "alice", wantBody: true},
+		"LevelRequestResponse login": {level: auditlogv1.LevelRequestResponse, uri: "/v3-public/localProviders/local?action=login", wantLoginName: "alice", wantBody: true},
+		"LevelNull non-login":        {level: auditlogv1.LevelNull, uri: "/v3/clusters"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			writer, out := newTestAuditWriter(tt.level)
+
+			handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				body, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+				assert.Equal(t, loginBody, string(body), "handler must still be able to read the body")
+				rw.WriteHeader(http.StatusOK)
+			})
+
+			req := newTestRequest(http.MethodPost, tt.uri, strings.NewReader(loginBody))
+			NewAuditLogMiddleware(writer)(handler).ServeHTTP(httptest.NewRecorder(), req)
+
+			var entry map[string]any
+			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+
+			if tt.wantLoginName == "" {
+				assert.NotContains(t, entry, "userLoginName")
+			} else {
+				assert.Equal(t, tt.wantLoginName, entry["userLoginName"])
+			}
+			if tt.wantBody {
+				assert.Contains(t, entry, "requestBody")
+			} else {
+				assert.NotContains(t, entry, "requestBody")
 			}
 		})
 	}

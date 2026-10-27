@@ -5,8 +5,11 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/rancher/norman/httperror"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -694,4 +697,100 @@ func (r *mockPasswordVerifier) ComparePassword(password string, hashedPassword, 
 	})
 
 	return nil
+}
+
+// fakeUsersByPrincipal finds users by principal ID in a map.
+type fakeUsersByPrincipal struct {
+	users map[string]*v3.User
+	err   error
+}
+
+func (f fakeUsersByPrincipal) GetUserByPrincipalID(principalID string) (*v3.User, error) {
+	return f.users[principalID], f.err
+}
+
+func TestGetKnownPrincipal(t *testing.T) {
+	bob := &v3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "u-bob"},
+		Username:     "bob",
+		DisplayName:  "Bob",
+		PrincipalIDs: []string{"okta-eu_user://bob", "local://u-bob"},
+	}
+	lister := authconfigtest.NewLister(t, map[string]any{
+		"metadata": map[string]any{"name": "okta-eu"},
+		"type":     client.OKTAConfigType,
+	}, map[string]any{
+		"metadata": map[string]any{"name": "localsaml"},
+		"type":     client.OKTAConfigType,
+	})
+
+	t.Run("principal of a config named like local gets the config's provider", func(t *testing.T) {
+		frank := &v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-frank"},
+			Username:     "frank",
+			DisplayName:  "Frank",
+			PrincipalIDs: []string{"localsaml_user://frank", "local://u-frank"},
+		}
+		provider := &Provider{
+			users:            fakeUsersByPrincipal{users: map[string]*v3.User{"localsaml_user://frank": frank}},
+			authConfigLister: lister,
+		}
+
+		got, err := provider.GetKnownPrincipal("localsaml_user://frank", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "okta", got.Provider)
+	})
+
+	t.Run("principal of a known user", func(t *testing.T) {
+		provider := &Provider{
+			users:            fakeUsersByPrincipal{users: map[string]*v3.User{"okta-eu_user://bob": bob}},
+			authConfigLister: lister,
+		}
+
+		got, err := provider.GetKnownPrincipal("okta-eu_user://bob", nil)
+		require.NoError(t, err)
+		assert.Equal(t, v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: "okta-eu_user://bob"},
+			DisplayName:   "Bob",
+			LoginName:     "bob",
+			Provider:      "okta",
+			PrincipalType: "user",
+		}, got)
+	})
+
+	t.Run("principal of no user", func(t *testing.T) {
+		provider := &Provider{users: fakeUsersByPrincipal{}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_user://alice", nil)
+		assert.True(t, httperror.IsNotFound(err), "expected a not found error, got %v", err)
+	})
+
+	t.Run("group principal", func(t *testing.T) {
+		// Users only have user principals, so no user has a group principal.
+		provider := &Provider{users: fakeUsersByPrincipal{users: map[string]*v3.User{"okta-eu_user://bob": bob}}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_group://admins", nil)
+		assert.True(t, httperror.IsNotFound(err), "expected a not found error, got %v", err)
+	})
+
+	t.Run("error looking up the user", func(t *testing.T) {
+		provider := &Provider{users: fakeUsersByPrincipal{err: errors.New("unavailable")}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_user://bob", nil)
+		assert.ErrorContains(t, err, "unavailable")
+	})
+
+	t.Run("no way to look up users", func(t *testing.T) {
+		provider := &Provider{authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_user://bob", nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("principal that can't be parsed", func(t *testing.T) {
+		provider := &Provider{users: fakeUsersByPrincipal{}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("not-a-principal", nil)
+		assert.ErrorContains(t, err, "invalid principal id")
+	})
 }

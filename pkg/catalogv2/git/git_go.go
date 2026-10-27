@@ -285,6 +285,7 @@ func (g *gitGo) clone(branch string) error {
 		return nil
 	}
 
+	clearCheckedOut(g.Directory)
 	if err := os.RemoveAll(g.Directory); err != nil {
 		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
 	}
@@ -544,16 +545,32 @@ func (g *gitGo) reset(rev string) error {
 	}
 
 	// Hard reset
-	err = w.Reset(&gogit.ResetOptions{
+	resetOpts := &gogit.ResetOptions{
 		Commit: hash,
 		Mode:   gogit.HardReset,
-	})
+	}
+	err = w.Reset(resetOpts)
+	if errors.Is(err, io.EOF) {
+		// go-git reads the index before resetting, and a truncated one (the process was killed while
+		// writing it, as happens when stopping a debugger) fails with a bare EOF forever, since clone
+		// doesn't touch an existing .git. A hard reset rebuilds the index, so drop it and retry.
+		logrus.Warnf("catalog repository %s: index is corrupt, rebuilding it", g.Directory)
+		if rmErr := os.Remove(filepath.Join(g.Directory, ".git", "index")); rmErr != nil && !os.IsNotExist(rmErr) {
+			return rmErr
+		}
+		err = w.Reset(resetOpts)
+	}
 	if err != nil {
 		return err
 	}
 
 	// Update HEAD to point to the commit
-	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, hash))
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, hash)); err != nil {
+		return err
+	}
+
+	markCheckedOut(g.Directory)
+	return nil
 }
 
 // currentCommit returns the current HEAD commit SHA

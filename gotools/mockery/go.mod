@@ -2,7 +2,7 @@ module github.com/rancher/rancher/gotools/mockery
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 tool github.com/vektra/mockery/v2
 

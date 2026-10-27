@@ -875,3 +875,17 @@ xcJQAAAADdGVzdAECAwQFBgcICQ==
 		require.Contains(t, err.Error(), "x509: malformed certificate")
 	})
 }
+
+func TestResetRecoversFromCorruptIndex(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "test-repo")
+	g, err := newGitGo(dir, chartsSmallForkURL, nil)
+	require.NoError(t, err)
+	require.NoError(t, g.clone(mainBranch))
+	require.NoError(t, g.reset("HEAD"))
+
+	// An index truncated by a killed process fails with a bare EOF
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".git", "index"), nil, 0o644))
+
+	require.NoError(t, g.reset("HEAD"))
+	require.FileExists(t, filepath.Join(dir, "README.md"))
+}

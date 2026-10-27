@@ -711,6 +711,7 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]sc
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
+	cfg := s.getConfig(provider)
 	uniqueGroups := make(map[string][]scimMember)
 	for _, user := range list {
 		if user.IsSystem() {
@@ -725,10 +726,11 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]sc
 			return nil, fmt.Errorf("failed to get user attributes for %s: %w", user.Name, err)
 		}
 
+		userName, _ := scimconfig.UserIdentity(attr.ExtraByProvider[provider], provider, cfg)
 		for _, group := range attr.GroupPrincipals[provider].Items {
 			uniqueGroups[group.Name] = append(uniqueGroups[group.Name], scimMember{
 				Value:   user.Name,
-				Display: first(attr.ExtraByProvider[provider]["username"]),
+				Display: userName,
 				Type:    userResource,
 			})
 		}
@@ -745,6 +747,7 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, principalName strin
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
+	cfg := s.getConfig(provider)
 	var members []scimMember
 	for _, user := range list {
 		if user.IsSystem() {
@@ -761,9 +764,10 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, principalName strin
 
 		for _, group := range attr.GroupPrincipals[provider].Items {
 			if group.Name == principalName {
+				userName, _ := scimconfig.UserIdentity(attr.ExtraByProvider[provider], provider, cfg)
 				members = append(members, scimMember{
 					Value:   user.Name,
-					Display: first(attr.ExtraByProvider[provider]["username"]),
+					Display: userName,
 					Type:    userResource,
 				})
 				break // No need to check other groups.

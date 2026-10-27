@@ -8,7 +8,7 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	"github.com/rancher/rancher/pkg/cluster"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -1522,7 +1522,7 @@ func newPauseCluster(annotations map[string]string) *mgmtv3.Cluster {
 func TestImportedAdapter_PauseCluster(t *testing.T) {
 	t.Parallel()
 
-	const anno = importedclusterversionmanagement.VersionManagementPausedAnno
+	const anno = mgmtv3.ClusterImportedVersionManagementPausedAnnotation
 
 	tests := []struct {
 		name        string
@@ -1539,7 +1539,7 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 		},
 		{
 			name:        "pausing preserves unrelated annotations",
-			annotations: map[string]string{importedclusterversionmanagement.VersionManagementAnno: "true"},
+			annotations: map[string]string{mgmtv3.ClusterImportedVersionManagementAnnotation: "true"},
 			pause:       true,
 			wantUpdate:  true,
 			wantPaused:  true,
@@ -1592,13 +1592,13 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 
 			latest, err := clusters.Get("c-mine", metav1.GetOptions{})
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantPaused, importedclusterversionmanagement.Paused(latest))
+			assert.Equal(t, tt.wantPaused, cluster.ImportedVersionManagementPaused(latest))
 
 			if !tt.wantPaused && tt.wantUpdate {
 				assert.NotContains(t, latest.Annotations, anno, "unpausing must remove the annotation, not blank it")
 			}
-			if tt.annotations[importedclusterversionmanagement.VersionManagementAnno] != "" {
-				assert.Equal(t, "true", latest.Annotations[importedclusterversionmanagement.VersionManagementAnno],
+			if tt.annotations[mgmtv3.ClusterImportedVersionManagementAnnotation] != "" {
+				assert.Equal(t, "true", latest.Annotations[mgmtv3.ClusterImportedVersionManagementAnnotation],
 					"unrelated annotations must survive")
 			}
 		})

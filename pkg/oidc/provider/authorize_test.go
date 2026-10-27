@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,8 +18,11 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -66,8 +70,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -114,6 +119,135 @@ func TestAuthEndpoint(t *testing.T) {
 			wantHttpCode:                       http.StatusFound,
 			wantRedirect:                       fakeRedirectUri + "?code=fake-code",
 			wantAccessControlAllowOriginHeader: fakeRedirectUri,
+		},
+		"redirect to login page if Rancher token has no principal": {
+			// Most tokens Rancher issues for its own controllers have no
+			// user principal. They must not be used to log in to OIDC
+			// clients, even if they aren't derived.
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
+		"redirect to login page if Rancher token has a principal that can't be parsed": {
+			// The token isn't treated as one with no principal, which would
+			// fall back to the local config.
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "not-a-principal"}},
+				}, nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
+		"redirect to login page if Rancher token is derived": {
+			// Derived tokens, e.g. API keys and the tokens Rancher issues for
+			// the cluster autoscaler, which have a local user principal, must
+			// not be used to log in to OIDC clients.
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				token := newTestTokenWithPrincipal(fakeTokenName, fakeTokenValue, fakeUserID, "local://"+fakeUserID)
+				token.IsDerived = true
+				token.Labels = map[string]string{tokens.TokenKindLabel: "autoscaler"}
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(token, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+					PrincipalIDs: []string{"local://" + fakeUserID},
+				}, nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
+		"redirect to login page if Rancher token belongs to a system user": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(newTestTokenWithPrincipal(fakeTokenName, fakeTokenValue, fakeUserID, "local://"+fakeUserID), nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+					PrincipalIDs: []string{"system://c-1", "local://" + fakeUserID},
+				}, nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
 		},
 		"redirect with code when ext token is present": {
 			mockSetup: func(m mockParams) {
@@ -215,6 +349,124 @@ func TestAuthEndpoint(t *testing.T) {
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
 		},
+		"redirect with code when Rancher token was issued by an enabled non-local AuthConfig": {
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(newTestTokenWithPrincipal(fakeTokenName, fakeTokenValue, fakeUserID, "github-eu_user://1"), nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.sessionAdder.EXPECT().Add(fakeCode, session.Session{
+					ClientID:      fakeClientID,
+					TokenName:     fakeTokenName,
+					Scope:         []string{"openid"},
+					CodeChallenge: "code-challenge",
+					CreatedAt:     fakeTime,
+				})
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
+				m.codeCreator.EXPECT().GenerateCode().Return(fakeCode, nil)
+			},
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid&redirect_uri=" + fakeRedirectUri,
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?code=fake-code",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
+		},
+		"redirect to login page if Rancher token was issued by an AuthConfig that doesn't exist": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				// The token is otherwise valid, the user must not be looked up.
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(newTestTokenWithPrincipal(fakeTokenName, fakeTokenValue, fakeUserID, "github-missing_user://1"), nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
+		"redirect to login page if Rancher token was issued by a disabled AuthConfig": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				// The token is otherwise valid, the user must not be looked up.
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(newTestTokenWithPrincipal(fakeTokenName, fakeTokenValue, fakeUserID, "github-off_user://1"), nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
+		"redirect to login page if Rancher token was issued by an AuthConfig that can't be checked": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				// The token is otherwise valid, the user must not be looked up.
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(newTestTokenWithPrincipal(fakeTokenName, fakeTokenValue, fakeUserID, "github-err_user://1"), nil)
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
 		"redirect to login page if Rancher token does not match": {
 			req: func() *http.Request {
 				req := &http.Request{
@@ -236,8 +488,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  "invalid",
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         "invalid",
+					UserID:        fakeUserID,
 				}, nil)
 			},
 			wantHttpCode: http.StatusFound,
@@ -325,8 +578,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -373,8 +627,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -421,8 +676,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -469,8 +725,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -518,8 +775,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -575,8 +833,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -623,8 +882,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -657,8 +917,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -677,8 +938,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -712,8 +974,9 @@ func TestAuthEndpoint(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fakeTokenName,
 					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -756,9 +1019,10 @@ func TestAuthEndpoint(t *testing.T) {
 			// check is done after token verification. kind of token does not matter
 			mockSetup: func(m mockParams) {
 				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
-					ObjectMeta: metav1.ObjectMeta{Name: fakeTokenName},
-					Token:      fakeTokenValue,
-					UserID:     fakeUserID,
+					ObjectMeta:    metav1.ObjectMeta{Name: fakeTokenName},
+					UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://" + fakeUserID}},
+					Token:         fakeTokenValue,
+					UserID:        fakeUserID,
 				}, nil)
 				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{ObjectMeta: metav1.ObjectMeta{Name: fakeUserID}}, nil)
 			},
@@ -781,11 +1045,7 @@ func TestAuthEndpoint(t *testing.T) {
 		},
 	}
 
-	// register auth provider
-	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider("local").Return(false, nil).AnyTimes()
-	providers.SetProviders(map[string]common.AuthProvider{"local": mockProvider})
-	t.Cleanup(func() { providers.SetProviders(nil) })
+	registerTestAuthProviders(t, ctrl)
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -826,5 +1086,54 @@ func TestAuthEndpoint(t *testing.T) {
 				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			}
 		})
+	}
+}
+
+// registerTestAuthProviders registers the local provider and a github provider
+// that implements three AuthConfigs: "github-eu", which is enabled,
+// "github-off", which is disabled, and "github-err", which can't be checked.
+// No other non-local AuthConfig exists.
+func registerTestAuthProviders(t *testing.T, ctrl *gomock.Controller) {
+	t.Helper()
+
+	localProvider := providermocks.NewMockAuthProvider(ctrl)
+	localProvider.EXPECT().IsDisabledProvider("local").Return(false, nil).AnyTimes()
+	githubProvider := providermocks.NewMockAuthProvider(ctrl)
+	githubProvider.EXPECT().IsDisabledProvider("github-eu").Return(false, nil).AnyTimes()
+	githubProvider.EXPECT().IsDisabledProvider("github-off").Return(true, nil).AnyTimes()
+	githubProvider.EXPECT().IsDisabledProvider("github-err").Return(false, fmt.Errorf("can't get auth config")).AnyTimes()
+	providers.SetProviders(map[string]common.AuthProvider{
+		"local":  localProvider,
+		"github": githubProvider,
+	})
+	providers.SetAuthConfigLister(&fakes.AuthConfigListerMock{
+		GetFunc: func(_ string, name string) (*v3.AuthConfig, error) {
+			switch name {
+			case "github-eu", "github-off", "github-err":
+				return &v3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: name}, Type: client.GithubConfigType}, nil
+			}
+			return nil, errors.NewNotFound(v3.Resource("authconfigs"), name)
+		},
+	})
+	t.Cleanup(func() {
+		providers.SetProviders(nil)
+		providers.SetAuthConfigLister(nil)
+	})
+}
+
+// newTestTokenWithPrincipal returns a valid token for the user issued by the
+// AuthConfig of the principal.
+func newTestTokenWithPrincipal(name, value, userID, principalID string) *v3.Token {
+	return &v3.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: principalID,
+			},
+		},
+		Token:  value,
+		UserID: userID,
 	}
 }

@@ -45,11 +45,14 @@ const (
 var scopes = []string{"openid", "profile", "email", admin.AdminDirectoryUserReadonlyScope, admin.AdminDirectoryGroupReadonlyScope}
 
 type googleOauthProvider struct {
-	authConfigs  v3.AuthConfigInterface
-	secrets      wcorev1.SecretController
-	goauthClient *GClient
-	userMGR      user.Manager
-	tokenMGR     *tokens.Manager
+	authConfigs      v3.AuthConfigInterface
+	authConfigLister v3.AuthConfigLister
+	secrets          wcorev1.SecretController
+	goauthClient     *GClient
+	userMGR          user.Manager
+	tokenMGR         *tokens.Manager
+	// getConfig loads a GoogleOauthConfig by name; injectable for testing.
+	getConfig func(string) (*apiv3.GoogleOauthConfig, error)
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -58,13 +61,16 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 			Timeout: time.Second * 30,
 		},
 	}
-	return &googleOauthProvider{
-		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
-		secrets:      mgmtCtx.Wrangler.Core.Secret(),
-		goauthClient: &gClient,
-		userMGR:      userMGR,
-		tokenMGR:     tokenMGR,
+	p := &googleOauthProvider{
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		goauthClient:     &gClient,
+		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
 	}
+	p.getConfig = p.getGoogleOAuthConfigCR
+	return p
 }
 
 func (g *googleOauthProvider) AuthenticateUser(_ http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
@@ -88,8 +94,12 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 		configName = cmp.Or(configName, config.Name)
 	}
 	if config == nil {
+		configName, err = common.LoginConfigName(g.authConfigLister, configName, ProviderName)
+		if err != nil {
+			return userPrincipal, groupPrincipals, "", err
+		}
 		logrus.Debugf("Loading GoogleOAuth config %s", configName)
-		config, err = g.getGoogleOAuthConfigCR(configName)
+		config, err = g.getConfig(configName)
 		if err != nil {
 			return userPrincipal, groupPrincipals, "", err
 		}
@@ -174,7 +184,7 @@ func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, 
 }
 
 func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	configName, err := common.ConfigNameFromToken(token)
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	var principal apiv3.Principal
 	if err != nil {
 		return principal, err

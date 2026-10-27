@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/api/writer"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -591,7 +592,6 @@ func TestLogout(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			token := &v3.Token{
-				AuthProvider: ProviderName,
 				UserPrincipal: v3.Principal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "azuread_user://9253000",
@@ -626,7 +626,6 @@ func TestLogoutAllDisabled(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	token := &v3.Token{
-		AuthProvider: ProviderName,
 		UserPrincipal: v3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "azuread_user://1",
@@ -705,7 +704,6 @@ func TestLogoutAll(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			token := &v3.Token{
-				AuthProvider: ProviderName,
 				UserPrincipal: v3.Principal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "azuread_user://1",
@@ -752,4 +750,20 @@ func TestSetIDTokenCookie(t *testing.T) {
 	require.NotNil(t, found, "expected %s cookie to be set", IDTokenCookie)
 	assert.Equal(t, "my.id.token", found.Value)
 	assert.True(t, found.HttpOnly)
+}
+
+func TestGetPrincipalRejectsOtherConfig(t *testing.T) {
+	// The provider has no clients configured, so this fails if the principal
+	// is looked up.
+	provider := &Provider{}
+	token := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "azuread-corp_user://1"},
+		},
+	}
+
+	for _, principalID := range []string{"azuread-it_user://2", "azuread-it_group://3", "azuread_user://2"} {
+		_, err := provider.GetPrincipal(principalID, token)
+		assert.True(t, httperror.IsNotFound(err), "expected NotFound for %s, got %v", principalID, err)
+	}
 }

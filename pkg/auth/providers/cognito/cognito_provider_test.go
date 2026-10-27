@@ -38,8 +38,7 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 			PrincipalType: "user",
 		},
 
-		UserID:       userId,
-		AuthProvider: providerName,
+		UserID: userId,
 	}
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
@@ -78,8 +77,7 @@ func TestLogoutAll(t *testing.T) {
 			PrincipalType: "user",
 		},
 
-		UserID:       userId,
-		AuthProvider: providerName,
+		UserID: userId,
 	}
 
 	o := CognitoProvider{
@@ -126,8 +124,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 			PrincipalType: "user",
 		},
 
-		UserID:       userId,
-		AuthProvider: providerName,
+		UserID: userId,
 	}
 
 	o := CognitoProvider{
@@ -179,8 +176,7 @@ func TestLogout(t *testing.T) {
 			PrincipalType: "user",
 		},
 
-		UserID:       userId,
-		AuthProvider: providerName,
+		UserID: userId,
 	}
 
 	for name, tt := range logoutTests {

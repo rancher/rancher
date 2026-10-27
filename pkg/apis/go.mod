@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 replace (
 	github.com/rancher/rancher/pkg/plan => ../plan
@@ -36,19 +36,19 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.16.0-rc.3
-	github.com/rancher/ali-operator v1.16.0-rc.2
-	github.com/rancher/eks-operator v1.16.0-rc.2
-	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.7
-	github.com/rancher/gke-operator v1.16.0-rc.3
+	github.com/rancher/aks-operator v1.16.0-rc.5
+	github.com/rancher/ali-operator v1.16.0-rc.3
+	github.com/rancher/eks-operator v1.16.0-rc.3
+	github.com/rancher/fleet/pkg/apis v0.17.0-beta.2
+	github.com/rancher/gke-operator v1.16.0-rc.4
 	github.com/rancher/norman v0.10.1
-	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
+	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
 	github.com/rancher/wrangler/v3 v3.8.0-rc.3
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
-	sigs.k8s.io/cluster-api/api v1.14.2
+	sigs.k8s.io/cluster-api/api v1.14.3
 )
 
 require (
@@ -88,13 +88,13 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/time v0.16.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
