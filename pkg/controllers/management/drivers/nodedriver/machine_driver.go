@@ -103,7 +103,11 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
 	obj.Spec.DisplayName = driverName
 	v32.NodeDriverConditionDownloaded.True(obj)
+	v32.NodeDriverConditionDownloaded.Reason(obj, "")
+	v32.NodeDriverConditionDownloaded.Message(obj, "")
 	v32.NodeDriverConditionInstalled.True(obj)
+	v32.NodeDriverConditionInstalled.Reason(obj, "")
+	v32.NodeDriverConditionInstalled.Message(obj, "")
 
 	needsUpdate := m.checkDriverVersion(obj)
 
