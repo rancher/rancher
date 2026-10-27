@@ -67,16 +67,19 @@ func (d *DynamicDriver) assetPath() string {
 	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
 }
 
-// Valid returns whether the driver binary is correctly downloaded and matches the expected checksum
+// Valid returns whether the driver binary is correctly downloaded and installed
 func (d *DynamicDriver) Valid() bool {
 	if !d.Exists() {
 		return false
-	}
-
-	hasher := d.getHasher()
-	if hasher == nil {
+	} else if d.Builtin {
 		return true
 	}
+
+	expectedHash, err := os.ReadFile(d.srcBinHashFile())
+	if err != nil {
+		return false
+	}
+	hasher := sha256.New()
 
 	f, err := os.Open(d.assetPath())
 	if err != nil {
@@ -87,7 +90,7 @@ func (d *DynamicDriver) Valid() bool {
 	if _, err := io.Copy(hasher, f); err != nil {
 		return false
 	}
-	_, matches := compare(hasher, d.DriverHash)
+	_, matches := compare(hasher, string(expectedHash))
 	return matches
 }
 
