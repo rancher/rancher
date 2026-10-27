@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 var (
