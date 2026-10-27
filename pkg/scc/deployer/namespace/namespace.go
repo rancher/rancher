@@ -82,21 +82,21 @@ func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 		// Check if namespace is actually gone after removing finalizers
 		var getErr error
 		_, retryErr := backoff.Retry(ctx,
-			func() (struct{}, error) {
-				var ns *corev1.Namespace
-				ns, getErr = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
-				if getErr != nil && !errors.IsNotFound(getErr) {
-					return struct{}{}, nil
+			func() (*struct{}, error) {
+				_, getErr = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
+				if errors.IsNotFound(getErr) {
+					// Namespace is gone, stop retrying
+					return nil, nil
+				}
+				if getErr != nil {
+					// Unexpected error, bail out without retrying
+					return nil, backoff.Permanent(fmt.Errorf("error getting namespace %s: %w", consts.DefaultSCCNamespace, getErr))
 				}
 
-				if ns != nil {
-					return struct{}{}, fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
-				}
-
-				return struct{}{}, nil
+				return nil, fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
 			},
 			// Initial attempt plus three retries, matching the previous
-			// WithMaxRetries(..., 3) behaviour. v7 additionally enables a 15
+			// WithMaxRetries(..., 3) behavior. v7 additionally enables a 15
 			// minute elapsed-time limit by default, which could cut the loop
 			// short while a slow Get is still failing; disable it so only the
 			// attempt count bounds the retries.
