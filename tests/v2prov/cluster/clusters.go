@@ -98,6 +98,13 @@ type ImportedClusterOptions struct {
 	// Network, when set, selects the addresses the nodes use to reach each other. Nil keeps the
 	// distro defaults: a single-stack IPv4 cluster on the pod's primary address.
 	Network *ImportedNetwork
+	// ExternalCloudProvider runs the nodes the way they run under an external cloud controller: the
+	// distro's own cloud controller is disabled and every kubelet runs with cloud-provider=external.
+	// The kubelet then neither sets nor overwrites the node's addresses, and registers the node with
+	// the node.cloudprovider.kubernetes.io/uninitialized taint, both of which are left to whatever
+	// plays the cloud controller — in tests, the test itself. This is how a Node can report addresses
+	// the distro knows nothing about, and so has not put in its serving certificate.
+	ExternalCloudProvider bool
 	// BeforeJoin, when set, is called with the running init node pod — after its server token has
 	// been extracted, with ExtractServerToken — and before any joining node is created. Joining
 	// nodes are only created once it returns nil. It lets a test observe the init node before anything
@@ -1101,6 +1108,14 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 		configLines = append(configLines, "flannel-iface: "+network.Interface)
 	}
 
+	if options.ExternalCloudProvider {
+		// kubelet-arg+ appends to, rather than replaces, the kubelet args other drop-ins set.
+		configLines = append(configLines, "kubelet-arg+:\n  - cloud-provider=external")
+		if isServer {
+			configLines = append(configLines, "disable-cloud-controller: true")
+		}
+	}
+
 	if isServer {
 		serviceCIDR, clusterCIDR := "10.45.0.0/16", "10.44.0.0/16"
 		if network != nil {
@@ -1132,14 +1147,14 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 		}
 	}
 
-	var extraFiles string
+	var extraFiles strings.Builder
 	if isServer {
 		for _, key := range slices.Sorted(maps.Keys(options.ServerConfig)) {
 			configLines = append(configLines, fmt.Sprintf("%s: %s", key, options.ServerConfig[key]))
 		}
 		for _, path := range slices.Sorted(maps.Keys(options.ServerFiles)) {
-			extraFiles += fmt.Sprintf("mkdir -p %s\ncat > %s <<'EXTRAFILE'\n%s\nEXTRAFILE\n",
-				filepath.Dir(path), path, options.ServerFiles[path])
+			extraFiles.WriteString(fmt.Sprintf("mkdir -p %s\ncat > %s <<'EXTRAFILE'\n%s\nEXTRAFILE\n",
+				filepath.Dir(path), path, options.ServerFiles[path]))
 		}
 	}
 
@@ -1179,7 +1194,7 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 	}
 
 	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
-		configDir, configDir, configContent, nodeIPBlock, extraFiles, registryBlock, installCmd, serviceName, serviceName)
+		configDir, configDir, configContent, nodeIPBlock, extraFiles.String(), registryBlock, installCmd, serviceName, serviceName)
 }
 
 func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {

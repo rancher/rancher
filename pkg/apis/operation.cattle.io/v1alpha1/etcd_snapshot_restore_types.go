@@ -64,6 +64,10 @@ const (
 
 	// ETCDSnapshotRestoreStepRestartCluster indicates the step is restarting the cluster by performing a full reconciliation.
 	ETCDSnapshotRestoreStepRestartCluster ETCDSnapshotRestoreStep = "RestartCluster"
+
+	// ETCDSnapshotRestoreStepPostflight indicates the step is verifying that every etcd node came back
+	// as a healthy member of the cluster restored on the leader, rather than of a cluster of its own.
+	ETCDSnapshotRestoreStepPostflight ETCDSnapshotRestoreStep = "Postflight"
 )
 
 // ETCDSnapshotRestoreStatus defines the observed state of ETCDSnapshotRestore.
@@ -73,7 +77,7 @@ type ETCDSnapshotRestoreStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Preflight;RestoreClusterConfig;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster
+	// +kubebuilder:validation:Enum=Preflight;RestoreClusterConfig;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster;Postflight
 	// +optional
 	Step ETCDSnapshotRestoreStep `json:"step,omitempty"`
 }

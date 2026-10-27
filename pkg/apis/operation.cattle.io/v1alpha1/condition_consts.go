@@ -82,6 +82,10 @@ const (
 	// PreflightCheckFailedReason surfaces when an operation with a preflight phase encounters an error.
 	PreflightCheckFailedReason = "PreflightCheckFailed"
 
+	// PostflightCheckFailedReason surfaces when an operation with a postflight phase finds that the
+	// operation did not leave the cluster in the expected state.
+	PostflightCheckFailedReason = "PostflightCheckFailed"
+
 	// FailedReason surfaces when an operation is failed. It is a generic, non-descript reason.
 	FailedReason = "Failed"
 )

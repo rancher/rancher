@@ -366,6 +366,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 		{"InitialRestartCluster", etcdsnapshotrestore.InitialRestartClusterStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster},
 		{"PostRestoreNodeCleanup", etcdsnapshotrestore.PostRestoreNodeCleanupStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup},
 		{"RestartCluster", etcdsnapshotrestore.RestartClusterStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepRestartCluster},
+		{"Postflight", etcdsnapshotrestore.PostflightStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepPostflight},
 	}
 	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 

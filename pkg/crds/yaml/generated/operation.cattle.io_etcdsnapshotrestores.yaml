@@ -240,6 +240,7 @@ spec:
                 - InitialRestartCluster
                 - PostRestoreNodeCleanup
                 - RestartCluster
+                - Postflight
                 type: string
             type: object
         required:

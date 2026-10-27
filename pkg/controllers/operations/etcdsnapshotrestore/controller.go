@@ -3,6 +3,7 @@ package etcdsnapshotrestore
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
@@ -83,9 +84,17 @@ const (
 	// server-URL override and lets each node return to its normal reconciliation.
 	RestartClusterStepHookLabelPrefix = "restart-cluster.step.hook.operation.cattle.io/"
 
+	// PostflightStepHookLabelPrefix gates the Postflight step, before the controller checks that
+	// every etcd node came back as a healthy member of the cluster restored on the leader.
+	PostflightStepHookLabelPrefix = "postflight.step.hook.operation.cattle.io/"
+
 	// preflightInstructionName is the name of the Preflight step's instruction, and therefore the key its output is
 	// saved under on the machine-plan secret.
 	preflightInstructionName = "preflight"
+
+	// postflightInstructionName is the name of the Postflight step's instruction, and therefore the key its output is
+	// saved under on the machine-plan secret.
+	postflightInstructionName = "postflight"
 
 	// TokenHashCommandFormat is the shell command the Preflight step runs on every etcd node to hash the server token
 	// persisted on disk, so it can be compared against the hash the distro stamped on the snapshot.
@@ -389,6 +398,32 @@ func (s *scope) idempotencyValue() string {
 	return string(s.op.UID)
 }
 
+// restoreLeader returns the machine-plan secret of the node the Restore step reset etcd on: the one
+// marked as this operation's leader. Unlike the adapter's FindOrElectLeader it never elects. Every
+// step after the reset has to act on that exact node — it alone holds the restored etcd, the others
+// are wiped and rejoin it — and re-electing because the node is briefly not Ready, as it usually is
+// straight after a restore, would point the cluster at a node that was never reset and wipe the one
+// that was. Returns nil, nil if no leader is marked.
+func (h *handler) restoreLeader(s *scope) (*corev1.Secret, error) {
+	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithFilter(ops.IsEtcd).
+		WithFilter(func(secret *corev1.Secret) bool {
+			return secret.Annotations[ops.OperationLeaderAnnotation] == s.ownerKey
+		}).
+		Collect()
+	if err != nil {
+		return nil, err
+	}
+	switch len(secrets) {
+	case 0:
+		return nil, nil
+	case 1:
+		return secrets[0], nil
+	default:
+		return nil, fmt.Errorf("%d machine-plan secrets are marked as the restore leader", len(secrets))
+	}
+}
+
 // lifecycleHookDelegate returns (suffix, delegate) for the first label on the operation whose key
 // starts with prefix. Returns ("", "") when no such label is set. The suffix is informational —
 // only the delegate value is consulted to drive the beacon push.
@@ -473,6 +508,8 @@ func stepHookPrefixFor(step opv1alpha1.ETCDSnapshotRestoreStep) string {
 		return PostRestoreNodeCleanupStepHookLabelPrefix
 	case opv1alpha1.ETCDSnapshotRestoreStepRestartCluster:
 		return RestartClusterStepHookLabelPrefix
+	case opv1alpha1.ETCDSnapshotRestoreStepPostflight:
+		return PostflightStepHookLabelPrefix
 	}
 	return ""
 }
@@ -626,14 +663,16 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	case opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup:
 		return h.reconcilePostRestoreNodeCleanup(s, status)
 	case opv1alpha1.ETCDSnapshotRestoreStepRestartCluster:
-		return h.reconcileRestartCluster(s, status, "")
+		return h.reconcileRestartCluster(s, status, opv1alpha1.ETCDSnapshotRestoreStepPostflight)
+	case opv1alpha1.ETCDSnapshotRestoreStepPostflight:
+		return h.reconcilePostflight(s, status)
 	}
 
 	status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
+	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
 		status.Step,
 		opv1alpha1.ETCDSnapshotRestoreStepPreflight,
 		opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
@@ -642,7 +681,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 		opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
 		opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster,
 		opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup,
-		opv1alpha1.ETCDSnapshotRestoreStepRestartCluster))
+		opv1alpha1.ETCDSnapshotRestoreStepRestartCluster,
+		opv1alpha1.ETCDSnapshotRestoreStepPostflight))
 
 	return status, nil
 }
@@ -1254,8 +1294,10 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		return status, nil
 	}
 
-	etcdSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, nil)
-	if err != nil {
+	etcdSecret, err := h.restoreLeader(s)
+	if plan.IsTransient(err) {
+		return status, err
+	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -1266,13 +1308,13 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 		return status, nil
 	} else if etcdSecret == nil {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for pod cleanup", s.op.Namespace, s.op.Name)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no restore leader is marked for pod cleanup", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for pod cleanup")
+		opv1alpha1.FailedCondition.Message(&status, "no restore leader is marked for pod cleanup")
 
 		return status, nil
 	}
@@ -1481,8 +1523,8 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus, nextStep opv1alpha1.ETCDSnapshotRestoreStep) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling cluster restart", s.op.Namespace, s.op.Name)
 
-	// The same reconcile function backs both InitialRestartCluster (nextStep set) and the final
-	// RestartCluster (nextStep == ""). Route the hook check to the matching prefix so a delegate
+	// The same reconcile function backs both InitialRestartCluster and the final RestartCluster, which
+	// hand over to nextStep once every node is back. Route the hook check to the matching prefix so a delegate
 	// can subscribe to one restart pass without gating the other.
 	delegated, err := h.handleHook(s, restartClusterHookPrefix(s.op.Status.Step))
 	if err != nil {
@@ -1515,7 +1557,8 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	// restart as already-reconciled.
 	value := s.idempotencyValue()
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-	if nextStep != "" {
+	initialPass := s.op.Status.Step == opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster
+	if initialPass {
 		value = value + "/initial"
 	} else {
 		value = value + "/final"
@@ -1525,8 +1568,12 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		return status, err
 	}
 
-	etcdSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
-	if err != nil {
+	// The restart is built around the node etcd was reset on; see restoreLeader for why it is never
+	// re-elected here.
+	etcdSecret, err := h.restoreLeader(s)
+	if plan.IsTransient(err) {
+		return status, err
+	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -1536,13 +1583,13 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	} else if etcdSecret == nil {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: no eligible etcd leader for restart", s.op.Namespace, s.op.Name)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: no restore leader is marked for restart", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for restart")
+		opv1alpha1.FailedCondition.Message(&status, "no restore leader is marked for restart")
 
 		return status, nil
 	}
@@ -1592,7 +1639,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		if !ops.IsEtcd(secret) && !ops.IsControlPlane(secret) && ops.IsWorker(secret) {
 			initSecret = controlPlaneSecret
 		}
-		nodePlan, err := buildRestartPlan(s, secret, initSecret, serverURL, value, nextStep != "")
+		nodePlan, err := buildRestartPlan(s, secret, initSecret, serverURL, value, initialPass)
 		if err != nil {
 			return status, err
 		}
@@ -1636,10 +1683,125 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		return status, nil
 	}
 
-	if nextStep != "" {
-		logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to %s", s.op.Namespace, s.op.Name, nextStep)
-		status.SetStep(nextStep)
+	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to %s", s.op.Namespace, s.op.Name, nextStep)
+	status.SetStep(nextStep)
+	return status, nil
+}
+
+// reconcilePostflight checks that the restore left one cluster: that every etcd node is a healthy,
+// voting member of the cluster restored on the leader, and sees exactly the membership the leader
+// does. It is the last step, and the only one that can tell a node that rejoined the restored cluster
+// from one that came back as a cluster of its own — both pass their health probes, since those only
+// ask the node about itself.
+//
+// Each etcd node reports the member list of its own etcd (see buildPostflightPlan), and the reports
+// are compared against the leader's, so the check depends only on etcd's own view of membership. In
+// particular it does not care how a node reaches the cluster: its configured server may be the
+// leader, another server, or a load balancer in front of them.
+func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling postflight", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, PostflightStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
 		return status, nil
+	}
+
+	fail := func(message string) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, message)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PostflightCheckFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, message)
+		return status, nil
+	}
+
+	leader, err := h.restoreLeader(s)
+	if plan.IsTransient(err) {
+		return status, err
+	} else if err != nil {
+		return fail(fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+	} else if leader == nil {
+		return fail("no restore leader is marked to check the restored cluster against")
+	}
+
+	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithFilter(nonWindowsSecret).
+		WithFilter(ops.IsEtcd).
+		WithSorter(plan.DefaultSorter()).
+		Collect()
+	if plan.IsTransient(err) {
+		return status, err
+	} else if err != nil {
+		return fail(fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+	}
+
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+	results := make([]plan.PlanStatus, 0, len(secrets))
+	views := make([]postflightView, 0, len(secrets))
+	var leaderView *postflightView
+	waiting := false
+
+	for _, secret := range secrets {
+		nodePlan, err := buildPostflightPlan(s, secret)
+		if err != nil {
+			return status, err
+		}
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+		if err != nil {
+			return status, err
+		}
+		results = append(results, *planStatus)
+
+		if planStatus.Failure() {
+			return fail(fmt.Sprintf("postflight check could not run on %s/%s", secret.Namespace, secret.Name))
+		}
+		// Every node runs its check at once; the membership can only be compared once all have reported.
+		if planStatus.Waiting() {
+			logrus.Debugf("[etcdsnapshotrestore] %s/%s: waiting for postflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+			waiting = true
+			continue
+		}
+
+		output, err := plan.ReadAppliedOutput(secret)
+		if err != nil {
+			return fail(fmt.Sprintf("could not read postflight check output for %s/%s: %v", secret.Namespace, secret.Name, err))
+		}
+		view := parsePostflightOutput(output[postflightInstructionName])
+		view.node = secret.Labels[capr.NodeNameLabel]
+		view.display = view.node
+		if view.display == "" {
+			view.display = secret.Namespace + "/" + secret.Name
+		}
+		views = append(views, view)
+		if secret.UID == leader.UID {
+			leaderView = &views[len(views)-1]
+		}
+	}
+
+	if waiting {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: %s", status.Step, plan.Message(results)))
+		return status, nil
+	}
+
+	if leaderView == nil {
+		return fail(fmt.Sprintf("restore leader %s/%s is not among the etcd nodes checked", leader.Namespace, leader.Name))
+	}
+
+	skipped, problem := evaluatePostflight(*leaderView, views)
+	if problem != "" {
+		return fail(problem)
+	}
+	for _, node := range skipped {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: postflight check skipped on %s: %s", s.op.Namespace, s.op.Name, node.display, node.unavailable)
 	}
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking as success", s.op.Namespace, s.op.Name)
@@ -1651,6 +1813,210 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	opv1alpha1.SucceededCondition.Message(&status, "Operation completed successfully")
 
 	return status, nil
+}
+
+const (
+	// postflightAttempts and postflightIntervalSeconds bound how long the postflight check waits on a
+	// node for its etcd membership to settle (no learners left) before reporting what it has.
+	postflightAttempts        = 60
+	postflightIntervalSeconds = 5
+
+	// postflightErrorPrefix and postflightUnavailablePrefix mark postflight output that is not a member
+	// list: a failure to read the membership, or a node that cannot run the check at all.
+	postflightErrorPrefix       = "ERROR: "
+	postflightUnavailablePrefix = "UNAVAILABLE: "
+)
+
+// postflightCommandFormat is the shell the Postflight step runs on every etcd node. It reads the
+// member list of the node's local etcd through the distro supervisor's /db/info endpoint — the same
+// handler joining servers use — authenticated with the server token's password and verified against
+// the cluster CA, and prints it as JSON. It retries until the list has no learners, since a node that
+// has just rejoined is added as one and promoted shortly after, and prints the last list it read once
+// it runs out of attempts. The request goes to the node's own supervisor on its loopback address, so it
+// reports the node's view, whatever server or load balancer the node is configured to join through.
+//
+// Arguments: data directory, supervisor base URL, attempts, interval in seconds.
+const postflightCommandFormat = `f=%[1]s/server/token
+ca=%[1]s/server/tls/server-ca.crt
+if ! command -v curl >/dev/null 2>&1; then echo "UNAVAILABLE: curl not found"; exit 0; fi
+p=$(head -n 1 "$f" 2>/dev/null | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^K10[^:]*:://' -e 's/^[^:]*://')
+if [ -z "$p" ]; then echo "ERROR: no server token password found in $f"; exit 0; fi
+i=0
+out=""
+err=""
+while [ "$i" -lt %[3]d ]; do
+  if res=$(curl -sS --globoff --max-time 10 --cacert "$ca" -u "server:$p" "%[2]s/db/info" 2>&1); then
+    out=$res
+    err=""
+    case "$out" in
+      *'"isLearner":true'*) ;;
+      *) printf '%%s\n' "$out"; exit 0 ;;
+    esac
+  else
+    err=$res
+  fi
+  i=$((i+1))
+  sleep %[4]d
+done
+if [ -n "$out" ] && [ -z "$err" ]; then printf '%%s\n' "$out"; exit 0; fi
+printf 'ERROR: %%s\n' "${err:-no membership read}"
+`
+
+// buildPostflightPlan assembles the plan that reports a node's etcd membership for the Postflight
+// step. Like the preflight check it is not wrapped in the idempotent script, whose "already reconciled"
+// message would otherwise land in the saved output; the operation environment keeps the plan unique.
+func buildPostflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
+	dataDir, err := s.adapter.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
+	base := supervisorURL(strings.Trim(s.adapter.LoopbackAddress(secret), "[]"), s.adapter.GetSupervisorPort(secret))
+	return &plan.Plan{
+		OneTimeInstructions: []plan.OneTimeInstruction{
+			{
+				SaveOutput: true,
+				Name:       postflightInstructionName,
+				Command:    "/bin/sh",
+				Args: []string{
+					"-c",
+					fmt.Sprintf(postflightCommandFormat, dataDir, base, postflightAttempts, postflightIntervalSeconds),
+				},
+			},
+		},
+	}, nil
+}
+
+// etcdMember is the subset of an etcd member the postflight check reads from /db/info, which encodes
+// the etcd client's member list as JSON: IDs as numbers, and isLearner omitted when false.
+type etcdMember struct {
+	ID        uint64   `json:"ID"`
+	Name      string   `json:"name"`
+	PeerURLs  []string `json:"peerURLs"`
+	IsLearner bool     `json:"isLearner"`
+}
+
+// postflightView is one etcd node's report from the postflight check.
+type postflightView struct {
+	// node is the node's name, or "" if its machine-plan secret does not record it; display is how
+	// the node is referred to in messages.
+	node    string
+	display string
+	members []etcdMember
+	// err is set when the node could not read its membership; unavailable when it cannot run the check.
+	err         string
+	unavailable string
+}
+
+// parsePostflightOutput turns the saved output of the postflight instruction into a postflightView.
+func parsePostflightOutput(raw []byte) postflightView {
+	text := strings.TrimSpace(string(raw))
+	switch {
+	case text == "":
+		return postflightView{err: "no output"}
+	case strings.HasPrefix(text, postflightUnavailablePrefix):
+		return postflightView{unavailable: strings.TrimPrefix(text, postflightUnavailablePrefix)}
+	case strings.HasPrefix(text, postflightErrorPrefix):
+		return postflightView{err: strings.TrimPrefix(text, postflightErrorPrefix)}
+	}
+
+	var list struct {
+		Members []etcdMember `json:"members"`
+	}
+	if err := json.Unmarshal([]byte(text), &list); err != nil {
+		return postflightView{err: fmt.Sprintf("could not parse etcd member list %q: %v", text, err)}
+	}
+	if len(list.Members) == 0 {
+		return postflightView{err: "etcd reported no members"}
+	}
+	return postflightView{members: list.Members}
+}
+
+// memberOf reports whether member belongs to node. The distro names a node's etcd member
+// "<node name>-<random suffix>".
+func memberOf(member etcdMember, node string) bool {
+	return node != "" && strings.HasPrefix(member.Name, node+"-")
+}
+
+// describeMembers renders a member list for messages, sorted for stable output.
+func describeMembers(members []etcdMember) string {
+	parts := make([]string, 0, len(members))
+	for _, m := range members {
+		part := fmt.Sprintf("%s(%x)", m.Name, m.ID)
+		if m.IsLearner {
+			part += "[learner]"
+		}
+		parts = append(parts, part)
+	}
+	slices.Sort(parts)
+	return "[" + strings.Join(parts, " ") + "]"
+}
+
+// evaluatePostflight checks the etcd nodes' reports against the leader's. It returns the reports that
+// were skipped because the node could not run the check, and a description of the first problem
+// found, or "" if the cluster is whole:
+//
+//   - every node read its membership, and none of it is a learner — i.e. every member is a voter;
+//   - every node sees exactly the members the leader sees, so they are all in the leader's cluster —
+//     a node that came back as a cluster of its own sees only itself;
+//   - every etcd node is itself a member of the leader's cluster, and every member of it belongs to
+//     one of the etcd nodes, so no node was left out and no stale member was left behind.
+//
+// The last check relies on node names; it is skipped for any node whose name is not known.
+func evaluatePostflight(leader postflightView, views []postflightView) ([]postflightView, string) {
+	if leader.unavailable != "" {
+		return nil, fmt.Sprintf("postflight check cannot run on restore leader %s: %s", leader.display, leader.unavailable)
+	}
+	if leader.err != "" {
+		return nil, fmt.Sprintf("could not read etcd membership on restore leader %s: %s", leader.display, leader.err)
+	}
+
+	leaderIDs := make([]uint64, 0, len(leader.members))
+	for _, m := range leader.members {
+		leaderIDs = append(leaderIDs, m.ID)
+	}
+	slices.Sort(leaderIDs)
+
+	var skipped []postflightView
+	namesKnown := true
+	for _, view := range views {
+		if view.node == "" {
+			namesKnown = false
+		}
+		if view.unavailable != "" {
+			skipped = append(skipped, view)
+			continue
+		}
+		if view.err != "" {
+			return skipped, fmt.Sprintf("could not read etcd membership on %s: %s", view.display, view.err)
+		}
+
+		ids := make([]uint64, 0, len(view.members))
+		for _, m := range view.members {
+			if m.IsLearner {
+				return skipped, fmt.Sprintf("etcd member %s seen by %s is still a learner: %s", m.Name, view.display, describeMembers(view.members))
+			}
+			ids = append(ids, m.ID)
+		}
+		slices.Sort(ids)
+		if !slices.Equal(ids, leaderIDs) {
+			return skipped, fmt.Sprintf("%s is not in the cluster restored on %s (split brain): %s sees etcd members %s, but %s sees %s",
+				view.display, leader.display, view.display, describeMembers(view.members), leader.display, describeMembers(leader.members))
+		}
+
+		if view.node != "" && !slices.ContainsFunc(leader.members, func(m etcdMember) bool { return memberOf(m, view.node) }) {
+			return skipped, fmt.Sprintf("%s is not a member of the cluster restored on %s: %s", view.display, leader.display, describeMembers(leader.members))
+		}
+	}
+
+	if namesKnown {
+		for _, m := range leader.members {
+			if !slices.ContainsFunc(views, func(v postflightView) bool { return memberOf(m, v.node) }) {
+				return skipped, fmt.Sprintf("etcd member %s of the cluster restored on %s belongs to none of its etcd nodes: %s", m.Name, leader.display, describeMembers(leader.members))
+			}
+		}
+	}
+
+	return skipped, ""
 }
 
 // buildPreflightPlan assembles the plan which hashes the server token the node currently has on
@@ -1779,6 +2145,24 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 // cleanup has run. The initial pass writes the `server:` drop-in on every node other than the leader,
 // so they rejoin through it rather than through whatever endpoint they were using; the final pass
 // removes it again, on the leader too.
+//
+// # Rejoining etcd nodes start without etcd data
+//
+// On the initial pass every etcd node other than the leader has its etcd data directory removed
+// right before it is restarted. The Shutdown step only tombstones that directory, and a node that
+// starts with its old data still on disk counts as already initialized: the distro then validates the
+// join URL but ignores the result, deletes the data because of the tombstone, and — if validation
+// failed — starts etcd as a brand-new single-member cluster. That is a split brain the node's own
+// health probes cannot see. Without the data the node is uninitialized, which makes a join URL that
+// does not validate (an unreachable address, or one outside the leader's certificate) fatal, so the
+// restart fails and the operation with it. The leader is never touched: its data is the restored etcd.
+//
+// # A changed join target restarts the node again
+//
+// The idempotency value for the wipe and the restart covers the drop-in's contents, so when the server
+// URL changes between reconciles — say Rancher's view of the leader's address was stale when the plan
+// was first rendered and has since been refreshed — the node is wiped and restarted against the new
+// URL instead of the change being written to disk and ignored.
 func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, value string, initialPass bool) (*plan.Plan, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 
@@ -1792,24 +2176,19 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 		unit = s.adapter.RuntimeCommand() + "-agent"
 	}
 
-	instructions := []plan.OneTimeInstruction{
-		ops.IdempotentInstruction(
-			provisioningDir, idempotencyKey+"/restart", value, "systemctl", []string{"restart", unit}, nil),
-	}
-
-	nodePlan := &plan.Plan{
-		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
-		OneTimeInstructions: instructions,
-		Probes:              probes,
-	}
-
 	serverArgPath := path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml")
 	dataDir, err := s.adapter.DistroDataDirectory(secret)
 	if err != nil {
 		return nil, err
 	}
 
-	if initialPass && secret.UID != initSecret.UID {
+	nodePlan := &plan.Plan{
+		Files:  []plan.File{ops.IdempotentScriptFile(provisioningDir)},
+		Probes: probes,
+	}
+
+	rejoining := initialPass && secret.UID != initSecret.UID
+	if rejoining {
 		arg := fmt.Sprintf("server: %q\n", supervisorURL(serverURL, s.adapter.GetSupervisorPort(secret)))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
 			arg = fmt.Sprintf("%stoken-file: \"%s\"\n", arg, path.Join(dataDir, "server/token"))
@@ -1820,7 +2199,27 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 			),
 			Path: serverArgPath,
 		})
-	} else if !initialPass {
+
+		value = value + "/" + arg
+
+		if ops.IsEtcd(secret) {
+			// The service is stopped first: on the first pass it is down already (Shutdown stopped it),
+			// but a later pass for a changed URL can find it running, and etcd's data must not be
+			// removed from under a live etcd.
+			nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
+				ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/rejoin-clean-etcd-dir", value, plan.OneTimeInstruction{
+					Name:    "remove-etcd-db-dir",
+					Command: "/bin/sh",
+					Args:    []string{"-c", fmt.Sprintf("systemctl stop %s; rm -rf %s", unit, path.Join(dataDir, "server/db/etcd"))},
+				}))
+		}
+	}
+
+	nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
+		ops.IdempotentInstruction(
+			provisioningDir, idempotencyKey+"/restart", value, "systemctl", []string{"restart", unit}, nil))
+
+	if !initialPass {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
 			Name:    "remove-server-arg",
 			Command: "rm",
