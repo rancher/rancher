@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"path"
@@ -1711,14 +1712,14 @@ func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRe
 		return status, nil
 	}
 
-	fail := func(message string) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, message)
+	fail := func(err error) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, err.Error())
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PostflightCheckFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, message)
+		opv1alpha1.FailedCondition.Message(&status, err.Error())
 		return status, nil
 	}
 
@@ -1726,9 +1727,9 @@ func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRe
 	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
-		return fail(fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		return fail(fmt.Errorf("encountered terminal error collecting machine-plan secrets: %w", err))
 	} else if leader == nil {
-		return fail("no restore leader is marked to check the restored cluster against")
+		return fail(errors.New("no restore leader is marked to check the restored cluster against"))
 	}
 
 	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
@@ -1739,7 +1740,7 @@ func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRe
 	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
-		return fail(fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		return fail(fmt.Errorf("encountered terminal error collecting machine-plan secrets: %w", err))
 	}
 
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
@@ -1760,7 +1761,7 @@ func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRe
 		results = append(results, *planStatus)
 
 		if planStatus.Failure() {
-			return fail(fmt.Sprintf("postflight check could not run on %s/%s", secret.Namespace, secret.Name))
+			return fail(fmt.Errorf("postflight check could not run on %s/%s", secret.Namespace, secret.Name))
 		}
 		// Every node runs its check at once; the membership can only be compared once all have reported.
 		if planStatus.Waiting() {
@@ -1771,7 +1772,7 @@ func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRe
 
 		output, err := plan.ReadAppliedOutput(secret)
 		if err != nil {
-			return fail(fmt.Sprintf("could not read postflight check output for %s/%s: %v", secret.Namespace, secret.Name, err))
+			return fail(fmt.Errorf("could not read postflight check output for %s/%s: %w", secret.Namespace, secret.Name, err))
 		}
 		view := parsePostflightOutput(output[postflightInstructionName])
 		view.node = secret.Labels[capr.NodeNameLabel]
@@ -1793,15 +1794,12 @@ func (h *handler) reconcilePostflight(s *scope, status opv1alpha1.ETCDSnapshotRe
 	}
 
 	if leaderView == nil {
-		return fail(fmt.Sprintf("restore leader %s/%s is not among the etcd nodes checked", leader.Namespace, leader.Name))
+		return fail(fmt.Errorf("restore leader %s/%s is not among the etcd nodes checked", leader.Namespace, leader.Name))
 	}
 
-	skipped, problem := evaluatePostflight(*leaderView, views)
-	if problem != "" {
-		return fail(problem)
-	}
-	for _, node := range skipped {
-		logrus.Warnf("[etcdsnapshotrestore] %s/%s: postflight check skipped on %s: %s", s.op.Namespace, s.op.Name, node.display, node.unavailable)
+	err = evaluatePostflight(*leaderView, views)
+	if err != nil {
+		return fail(err)
 	}
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking as success", s.op.Namespace, s.op.Name)
@@ -1962,12 +1960,12 @@ func describeMembers(members []etcdMember) string {
 //     one of the etcd nodes, so no node was left out and no stale member was left behind.
 //
 // The last check relies on node names; it is skipped for any node whose name is not known.
-func evaluatePostflight(leader postflightView, views []postflightView) ([]postflightView, string) {
+func evaluatePostflight(leader postflightView, views []postflightView) error {
 	if leader.unavailable != "" {
-		return nil, fmt.Sprintf("postflight check cannot run on restore leader %s: %s", leader.display, leader.unavailable)
+		return fmt.Errorf("postflight check cannot run on restore leader %s: %s", leader.display, leader.unavailable)
 	}
 	if leader.err != "" {
-		return nil, fmt.Sprintf("could not read etcd membership on restore leader %s: %s", leader.display, leader.err)
+		return fmt.Errorf("could not read etcd membership on restore leader %s: %s", leader.display, leader.err)
 	}
 
 	leaderIDs := make([]uint64, 0, len(leader.members))
@@ -1976,47 +1974,45 @@ func evaluatePostflight(leader postflightView, views []postflightView) ([]postfl
 	}
 	slices.Sort(leaderIDs)
 
-	var skipped []postflightView
 	namesKnown := true
 	for _, view := range views {
 		if view.node == "" {
 			namesKnown = false
 		}
 		if view.unavailable != "" {
-			skipped = append(skipped, view)
-			continue
+			return fmt.Errorf("postflight check cannot run on %s: %s", view.display, view.unavailable)
 		}
 		if view.err != "" {
-			return skipped, fmt.Sprintf("could not read etcd membership on %s: %s", view.display, view.err)
+			return fmt.Errorf("could not read etcd membership on %s: %s", view.display, view.err)
 		}
 
 		ids := make([]uint64, 0, len(view.members))
 		for _, m := range view.members {
 			if m.IsLearner {
-				return skipped, fmt.Sprintf("etcd member %s seen by %s is still a learner: %s", m.Name, view.display, describeMembers(view.members))
+				return fmt.Errorf("etcd member %s seen by %s is still a learner: %s", m.Name, view.display, describeMembers(view.members))
 			}
 			ids = append(ids, m.ID)
 		}
 		slices.Sort(ids)
 		if !slices.Equal(ids, leaderIDs) {
-			return skipped, fmt.Sprintf("%s is not in the cluster restored on %s (split brain): %s sees etcd members %s, but %s sees %s",
+			return fmt.Errorf("%s is not in the cluster restored on %s (split brain): %s sees etcd members %s, but %s sees %s",
 				view.display, leader.display, view.display, describeMembers(view.members), leader.display, describeMembers(leader.members))
 		}
 
 		if view.node != "" && !slices.ContainsFunc(leader.members, func(m etcdMember) bool { return memberOf(m, view.node) }) {
-			return skipped, fmt.Sprintf("%s is not a member of the cluster restored on %s: %s", view.display, leader.display, describeMembers(leader.members))
+			return fmt.Errorf("%s is not a member of the cluster restored on %s: %s", view.display, leader.display, describeMembers(leader.members))
 		}
 	}
 
 	if namesKnown {
 		for _, m := range leader.members {
 			if !slices.ContainsFunc(views, func(v postflightView) bool { return memberOf(m, v.node) }) {
-				return skipped, fmt.Sprintf("etcd member %s of the cluster restored on %s belongs to none of its etcd nodes: %s", m.Name, leader.display, describeMembers(leader.members))
+				return fmt.Errorf("etcd member %s of the cluster restored on %s belongs to none of its etcd nodes: %s", m.Name, leader.display, describeMembers(leader.members))
 			}
 		}
 	}
 
-	return skipped, ""
+	return nil
 }
 
 // buildPreflightPlan assembles the plan which hashes the server token the node currently has on
@@ -2379,8 +2375,10 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	initSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
-	if err != nil {
+	initSecret, err := h.restoreLeader(s)
+	if plan.IsTransient(err) {
+		return status, err
+	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -2389,11 +2387,14 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
-	}
+	} else if initSecret == nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-	if initSecret == nil {
-		logrus.Warnf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for node cleanup, skipping", s.op.Namespace, s.op.Name)
-		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepRestartCluster)
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 

@@ -1726,12 +1726,6 @@ func TestEvaluatePostflight(t *testing.T) {
 			problem: "on restore leader imported-node-1",
 		},
 		{
-			name:    "node that cannot run the check is skipped",
-			leader:  leaderWhole,
-			views:   []postflightView{view("imported-init-0", whole), leaderWhole, view("imported-node-2", "UNAVAILABLE: curl not found")},
-			skipped: 1,
-		},
-		{
 			// Every node agrees, but the cluster carries a member for a node that is not one of
 			// its etcd nodes — left behind by a node that was wiped and rejoined, say.
 			name:    "stale member",
@@ -1746,14 +1740,15 @@ func TestEvaluatePostflight(t *testing.T) {
 			problem: "imported-init-0 is not a member of the cluster restored on imported-node-1",
 		},
 	} {
-		skipped, problem := evaluatePostflight(tc.leader, tc.views)
-		if tc.problem == "" && problem != "" {
-			t.Errorf("%s: unexpected problem %q", tc.name, problem)
-		} else if tc.problem != "" && !strings.Contains(problem, tc.problem) {
-			t.Errorf("%s: problem %q, want it to mention %q", tc.name, problem, tc.problem)
-		}
-		if len(skipped) != tc.skipped {
-			t.Errorf("%s: skipped %d nodes, want %d", tc.name, len(skipped), tc.skipped)
+		err := evaluatePostflight(tc.leader, tc.views)
+		if tc.problem == "" && err != nil {
+			t.Errorf("%s: unexpected problem %q", tc.name, err.Error())
+		} else if tc.problem != "" {
+			if err == nil {
+				t.Errorf("%s: expected problem %q", tc.name, tc.problem)
+			} else if !strings.Contains(err.Error(), tc.problem) {
+				t.Errorf("%s: problem %q, want it to mention %q", tc.name, err.Error(), tc.problem)
+			}
 		}
 	}
 }

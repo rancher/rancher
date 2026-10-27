@@ -166,9 +166,9 @@ if [ -z "${SOME_K8S_VERSION_PREV}" ]; then
   if [ -n "${current_minor}" ] && [ "${current_minor}" -gt 0 ]; then
     export SOME_K8S_VERSION_PREV=$(curl -sS "${KDM_DATA_URL}" | jq -r --arg dist "${DIST}" --arg minor "$((current_minor - 1))" '
       [ .[$dist].releases[].version
-        | capture("^v(?<major>[0-9]+)\\.(?<minor>[0-9]+)\\.(?<patch>[0-9]+)\\+(k3s|rke2r)(?<revision>[0-9]+)$") as $v
-        | select($v.major == "1" and $v.minor == $minor)
-        | {version: ., key: ([$v.patch, $v.revision] | map(tonumber))} ]
+        | try (capture("^v(?<major>[0-9]+)\\.(?<minor>[0-9]+)\\.(?<patch>[0-9]+)\\+(k3s|rke2r)(?<revision>[0-9]+)$") as $v
+            | select($v.major == "1" and $v.minor == $minor)
+            | {version: ., key: ([$v.patch, $v.revision] | map(tonumber))}) catch empty
       | sort_by(.key) | last | .version // empty')
   fi
   if [ -n "${SOME_K8S_VERSION_PREV}" ]; then

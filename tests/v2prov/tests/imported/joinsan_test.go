@@ -167,7 +167,7 @@ func assertServingCertOmits(t *testing.T, cs *clients.Clients, namespace, pod, r
 	out, err := cluster.ExecOnPod(cs, namespace, pod, "sh", "-c", fmt.Sprintf(
 		"%s get secret -n kube-system %s-serving -o jsonpath='{.metadata.annotations}'", distroKubectl(runtime), runtime))
 	require.NoError(t, err, "reading the %s-serving secret on %s: %s", runtime, pod, out)
-	assert.NotContains(t, out, `":"`+ip+`"`, "the %s serving certificate should not list %s: %s", pod, ip, out)
+	assert.NotContains(t, out, ip, "the %s serving certificate should not list %s: %s", pod, ip, out)
 }
 
 // assertProbeRejectedBySAN fails unless probeServerTLS of serverURL from pod fails on certificate

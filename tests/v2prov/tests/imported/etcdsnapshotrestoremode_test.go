@@ -1289,7 +1289,7 @@ func etcdMemberNodeName(member string, nodes map[string]string) string {
 // `server:` value written to the node's zz_etcd-snapshot-restore.yaml drop-in, in the order seen.
 //
 // The drop-in only exists while the restore runs — the final restart removes it — so it cannot be read
-// off the nodes afterwards. Instead this watches the machine-plan secrets the restore writes, which
+// off the nodes afterward. Instead this watches the machine-plan secrets the restore writes, which
 // carry every file the plan lays down. The restore leader's own drop-in is `server: ""`, blanking the
 // server its config would otherwise join; every other node's points at the leader.
 func watchRestoreServerArgs(t *testing.T, cs *clients.Clients, clusterNamespace string) func() map[string][]string {
@@ -1331,9 +1331,19 @@ func watchRestoreServerArgs(t *testing.T, cs *clients.Clients, clusterNamespace 
 		}
 	}
 
+	opts := metav1.ListOptions{FieldSelector: fmt.Sprintf("type=%s", capr.SecretTypeMachinePlan)}
+
+	// 1. Synchronously list existing plans before returning, capturing any updates that occurred prior to watch setup.
+	if list, err := cs.Core.Secret().List(clusterNamespace, opts); err == nil {
+		for i := range list.Items {
+			record(&list.Items[i])
+		}
+		// Set ResourceVersion so the subsequent watch resumes from this snapshot point without missing events.
+		opts.ResourceVersion = list.ResourceVersion
+	}
+
 	go func() {
 		defer close(done)
-		opts := metav1.ListOptions{FieldSelector: fmt.Sprintf("type=%s", capr.SecretTypeMachinePlan)}
 		// Re-establish the watch until stopped: a watch can be closed by the server at any time, and
 		// missing the window in which the drop-ins are assigned would make the assertion vacuous.
 		for ctx.Err() == nil {
@@ -1357,6 +1367,8 @@ func watchRestoreServerArgs(t *testing.T, cs *clients.Clients, clusterNamespace 
 						}
 						if secret, ok := event.Object.(*corev1.Secret); ok {
 							record(secret)
+							// Track the latest ResourceVersion so re-established watches resume where left off.
+							opts.ResourceVersion = secret.ResourceVersion
 						}
 					}
 				}
