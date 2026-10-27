@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"time"
 
 	"github.com/cenkalti/backoff/v7"
 	"github.com/rancher/rancher/pkg/scc/consts"
@@ -100,7 +101,7 @@ func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 			// minute elapsed-time limit by default, which could cut the loop
 			// short while a slow Get is still failing; disable it so only the
 			// attempt count bounds the retries.
-			backoff.WithBackOff(backoff.NewConstantBackOff(3)),
+			backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
 			backoff.WithMaxTries(4),
 			backoff.WithMaxElapsedTime(0),
 		)
