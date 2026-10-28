@@ -56,7 +56,7 @@ const (
 	TokenNamespace       = "cattle-tokens"
 	UserIDLabel          = "cattle.io/user-id"
 	KindLabel            = "authn.management.cattle.io/kind"
-	IsLogin              = "session"
+	KindSession          = "session"
 	KindKubeconfig       = "kubeconfig"
 	SecretKindLabel      = "cattle.io/kind"
 	SecretKindLabelValue = "token"
@@ -1776,7 +1776,7 @@ func setExpired(token *ext.Token) error {
 func TTLLimits(kind string) (defaultTTL, maxTTL int64, err error) {
 	var defaultSetting settings.Setting
 	switch kind {
-	case IsLogin:
+	case KindSession:
 		defaultSetting = settings.AuthUserSessionTTLMinutes
 		maxTTL, err = parseMaxTTL(settings.AuthUserSessionTTLMinutes)
 	case KindKubeconfig:

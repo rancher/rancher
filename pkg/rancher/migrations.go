@@ -301,7 +301,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 	// bulk delete all ext tokens that were created for the dashboard,
 	// forcing their users to be redirected to the login page
 	err = extTokenDeleter.DeleteCollection(&metav1.ListOptions{
-		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
+		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.KindSession}.AsSelector().String(),
 	})
 	if err != nil {
 		logrus.WithError(err).Error("Failed to delete ext session tokens for upgrade forced logout")

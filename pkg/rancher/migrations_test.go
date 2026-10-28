@@ -371,7 +371,7 @@ type extDeletionStub struct {
 func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {
 	require.Equal(e.t, options, &metav1.ListOptions{
 		LabelSelector: labels.Set{
-			exttokenstore.KindLabel: exttokenstore.IsLogin,
+			exttokenstore.KindLabel: exttokenstore.KindSession,
 		}.AsSelector().String(),
 	})
 	e.count = e.count + 1
