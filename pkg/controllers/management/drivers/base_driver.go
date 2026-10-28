@@ -28,6 +28,10 @@ type BaseDriver struct {
 	DriverHash   string
 	DriverName   string
 	BinaryPrefix string
+	DevMode      bool
+
+	BinDir   string
+	CacheDir string
 }
 
 func (d *BaseDriver) Name() string {
@@ -49,10 +53,11 @@ func (d *BaseDriver) Remove() error {
 		return err
 	}
 
-	dest := path.Join(binDir(), string(content))
+	dest := path.Join(d.binDir(), string(content))
 	_ = os.Remove(dest)
 	_ = os.Remove(cacheFilePrefix + "-" + string(content))
 	_ = os.Remove(cacheFilePrefix)
+	_ = os.Remove(cacheFilePrefix + "-" + string(content) + ".hash")
 
 	return nil
 }
@@ -278,7 +283,7 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 // binName is the full path to the binary executable. This does not take in
 // account the version of the binary
 func (d *BaseDriver) binName() string {
-	return path.Join(binDir(), d.DriverName)
+	return path.Join(d.binDir(), d.DriverName)
 }
 
 // srcBinName is the full path of the cached/hashed binary executable. This takes
@@ -292,8 +297,12 @@ func (d *BaseDriver) srcBinHashFile() string {
 	return d.cacheFile() + "-" + d.DriverName + ".hash"
 }
 
-func binDir() string {
-	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
+func (d *BaseDriver) binDir() string {
+	if d.BinDir != "" {
+		return d.BinDir
+	}
+
+	if d.DevMode {
 		return "./management-state/bin"
 	}
 
@@ -340,6 +349,10 @@ func (d *BaseDriver) download(dest io.Writer) error {
 
 func (d *BaseDriver) cacheFile() string {
 	key := sha256Bytes([]byte(d.URL + d.DriverHash))
+
+	if d.CacheDir != "" {
+		return path.Join(d.CacheDir, key)
+	}
 
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {

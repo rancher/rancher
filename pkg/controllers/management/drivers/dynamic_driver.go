@@ -22,6 +22,7 @@ import (
 
 type DynamicDriver struct {
 	BaseDriver
+	AssetDir string
 }
 
 var DockerMachineDriverPrefix = "docker-machine-driver-"
@@ -30,12 +31,13 @@ const ExecutionTimeout = time.Second * 5
 
 func NewDynamicDriver(builtin bool, name, url, hash string) (*DynamicDriver, error) {
 	d := &DynamicDriver{
-		BaseDriver{
+		BaseDriver: BaseDriver{
 			Builtin:      builtin,
 			DriverName:   name,
 			URL:          url,
 			DriverHash:   hash,
 			BinaryPrefix: DockerMachineDriverPrefix,
+			DevMode:      os.Getenv("CATTLE_DEV_MODE") != "",
 		},
 	}
 	if !strings.HasPrefix(d.DriverName, DockerMachineDriverPrefix) {
@@ -56,7 +58,7 @@ func (d *DynamicDriver) Install() error {
 		return err
 	}
 
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
+	if d.DevMode {
 		return nil
 	}
 
@@ -64,6 +66,9 @@ func (d *DynamicDriver) Install() error {
 }
 
 func (d *DynamicDriver) assetPath() string {
+	if d.AssetDir != "" {
+		return filepath.Join(d.AssetDir, d.DriverName)
+	}
 	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
 }
 
