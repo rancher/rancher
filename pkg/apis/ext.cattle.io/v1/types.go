@@ -87,6 +87,8 @@ type TokenSpec struct {
 	// That is, both the ttl here and the default are subject to the
 	// `auth-token-max-ttl-minutes` setting, i.e. will be clamped to it if they
 	// represent a larger value than that.
+	// For tokens of kind "session" the `auth-user-session-ttl-minutes` setting provides both the
+	// default and the max instead.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an

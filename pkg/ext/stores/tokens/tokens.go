@@ -730,6 +730,13 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rest.FillObjectMetaSystemFields(token)
 
+	// Converting resolves the TTL, so a dry run returns the TTL that would be stored.
+	secret, err := toSecret(token)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
+			token.Name, err))
+	}
+
 	// Return early as the user does not wish to actually change anything.
 	if dryRun {
 		// enforce our choice of name
@@ -738,13 +745,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		if err != nil {
 			return nil, err
 		}
+		// Users don't care about the hashed value.
+		token.Status.Hash = ""
 		return token, nil
-	}
-
-	secret, err := toSecret(token)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
-			token.Name, err))
 	}
 
 	// enforce our choice of name, without racing create
@@ -1010,7 +1013,8 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
+		maxSetting, defaultSetting := ttlSettings(token.Spec.Kind)
+		ttl, err := IngestTTL(token.Spec.TTL, maxSetting, defaultSetting)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
@@ -1611,7 +1615,8 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
+	maxSetting, defaultSetting := ttlSettings(token.Spec.Kind)
+	ttl, err := IngestTTL(token.Spec.TTL, maxSetting, defaultSetting)
 	if err != nil {
 		return nil, err
 	}
@@ -1760,6 +1765,15 @@ func setExpired(token *ext.Token) error {
 	token.Status.Expired = time.Now().After(expiresAt)
 	token.Status.ExpiresAt = expiresAt.Format(time.RFC3339)
 	return nil
+}
+
+// ttlSettings returns the max and default TTL settings for a token of the given kind. Login tokens
+// follow the login session lifetime, as v3 login tokens do.
+func ttlSettings(kind string) (maxSetting, defaultSetting settings.Setting) {
+	if kind == IsLogin {
+		return settings.AuthUserSessionTTLMinutes, settings.AuthUserSessionTTLMinutes
+	}
+	return settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes
 }
 
 // IngestTTL returns the input ttl (milliseconds) with requests for defaults
