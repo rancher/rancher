@@ -115,6 +115,8 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
 			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
 			assert.Equal(t, testUser, s.StringData[exttokenstore.FieldUserID])
+			// The kind picks the TTL limits the ext token store applies.
+			assert.Equal(t, exttokenstore.KindKubeconfig, s.StringData[exttokenstore.FieldKind])
 			n := s.DeepCopy()
 			n.Name = "token-xxx"
 			n.Data = map[string][]byte{}

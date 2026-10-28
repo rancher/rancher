@@ -68,7 +68,7 @@ type userManager interface {
 }
 
 type tokenManager interface {
-	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, description string, request *types.APIContext) error
 }
 
 type ldapProvider struct {

@@ -88,7 +88,10 @@ type TokenSpec struct {
 	// `auth-token-max-ttl-minutes` setting, i.e. will be clamped to it if they
 	// represent a larger value than that.
 	// For tokens of kind "session" the `auth-user-session-ttl-minutes` setting provides both the
-	// default and the max instead.
+	// default and the max instead. For tokens of kind "kubeconfig" the default comes from the
+	// `kubeconfig-default-token-ttl-minutes` setting, and the max is the smaller of the
+	// `kubeconfig-max-token-ttl-minutes` and `auth-token-max-ttl-minutes` settings, where `0` is no
+	// limit.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an

@@ -3641,6 +3641,211 @@ func setTTLSettings(t *testing.T, maxMinutes, defaultMinutes, sessionMinutes str
 	}
 }
 
+// setKubeconfigTTLSettings sets the kubeconfig TTL settings, in minutes, for the duration of the test.
+func setKubeconfigTTLSettings(t *testing.T, maxMinutes, defaultMinutes string) {
+	t.Helper()
+
+	for setting, value := range map[*settings.Setting]string{
+		&settings.KubeconfigMaxTokenTTLMinutes:     maxMinutes,
+		&settings.KubeconfigDefaultTokenTTLMinutes: defaultMinutes,
+	} {
+		prior := setting.Get()
+		require.NoError(t, setting.Set(value))
+		t.Cleanup(func() {
+			assert.NoError(t, setting.Set(prior))
+		})
+	}
+}
+
+func TestTTLLimits(t *testing.T) {
+	const (
+		hour  = int64(time.Hour / time.Millisecond)
+		day   = 24 * hour
+		never = int64(-1)
+	)
+
+	tests := []struct {
+		name                     string
+		kind                     string
+		maxMinutes               string
+		defaultMinutes           string
+		sessionMinutes           string
+		kubeconfigMaxMinutes     string
+		kubeconfigDefaultMinutes string
+		wantDefault              int64
+		wantMax                  int64
+	}{
+		{
+			name:        "session",
+			kind:        IsLogin,
+			wantDefault: 16 * hour,
+			wantMax:     16 * hour,
+		},
+		{
+			name:           "session, no session ttl limit",
+			kind:           IsLogin,
+			sessionMinutes: "0",
+			wantDefault:    never,
+			wantMax:        never,
+		},
+		{
+			name:        "session ignores the token max",
+			kind:        IsLogin,
+			maxMinutes:  "60",
+			wantDefault: 16 * hour,
+			wantMax:     16 * hour,
+		},
+		{
+			name:        "derived",
+			kind:        "",
+			wantDefault: 90 * day,
+			wantMax:     90 * day,
+		},
+		{
+			name:           "derived, default below the max",
+			kind:           "",
+			defaultMinutes: "43200",
+			wantDefault:    30 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, default above the max",
+			kind:           "",
+			defaultMinutes: "144000",
+			wantDefault:    90 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, default 0",
+			kind:           "",
+			defaultMinutes: "0",
+			wantDefault:    90 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, no max",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "43200",
+			wantDefault:    30 * day,
+			wantMax:        never,
+		},
+		{
+			name:           "derived, no max, default 0",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "0",
+			wantDefault:    never,
+			wantMax:        never,
+		},
+		{
+			name:        "derived, negative max",
+			kind:        "",
+			maxMinutes:  "-5",
+			wantDefault: 90 * day,
+			wantMax:     never,
+		},
+		{
+			name:        "kubeconfig",
+			kind:        KindKubeconfig,
+			wantDefault: 30 * day,
+			wantMax:     90 * day,
+		},
+		{
+			name:           "kubeconfig ignores the token default",
+			kind:           KindKubeconfig,
+			defaultMinutes: "1440",
+			wantDefault:    30 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max above the max",
+			kind:                 KindKubeconfig,
+			kubeconfigMaxMinutes: "259200",
+			wantDefault:          30 * day,
+			wantMax:              90 * day,
+		},
+		{
+			name:                     "kubeconfig, kubeconfig max below the max",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "28800",
+			kubeconfigDefaultMinutes: "86400",
+			wantDefault:              20 * day,
+			wantMax:                  20 * day,
+		},
+		{
+			name:                     "kubeconfig, default above the max",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "259200",
+			kubeconfigDefaultMinutes: "259200",
+			wantDefault:              90 * day,
+			wantMax:                  90 * day,
+		},
+		{
+			name:                 "kubeconfig, no kubeconfig max",
+			kind:                 KindKubeconfig,
+			kubeconfigMaxMinutes: "0",
+			wantDefault:          30 * day,
+			wantMax:              90 * day,
+		},
+		{
+			name:                 "kubeconfig, no max",
+			kind:                 KindKubeconfig,
+			maxMinutes:           "0",
+			kubeconfigMaxMinutes: "86400",
+			wantDefault:          30 * day,
+			wantMax:              60 * day,
+		},
+		{
+			name:                     "kubeconfig, both kubeconfig settings 0",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantDefault:              90 * day,
+			wantMax:                  90 * day,
+		},
+		{
+			name:                     "kubeconfig, no max at any level",
+			kind:                     KindKubeconfig,
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantDefault:              never,
+			wantMax:                  never,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			orDefault := func(value, fallback string) string {
+				if value == "" {
+					return fallback
+				}
+				return value
+			}
+			setTTLSettings(t,
+				orDefault(test.maxMinutes, "129600"),
+				orDefault(test.defaultMinutes, "129600"),
+				orDefault(test.sessionMinutes, "960"))
+			setKubeconfigTTLSettings(t,
+				orDefault(test.kubeconfigMaxMinutes, "129600"),
+				orDefault(test.kubeconfigDefaultMinutes, "43200"))
+
+			defaultTTL, maxTTL, err := TTLLimits(test.kind)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantDefault, defaultTTL, "default")
+			assert.Equal(t, test.wantMax, maxTTL, "max")
+		})
+	}
+}
+
+func TestTTLLimitsInvalidSetting(t *testing.T) {
+	setTTLSettings(t, "90d", "129600", "960")
+
+	_, _, err := TTLLimits("")
+	assert.ErrorContains(t, err, "auth-token-max-ttl-minutes")
+}
+
 func TestToSecretTTL(t *testing.T) {
 	const (
 		hour  = int64(time.Hour / time.Millisecond)
@@ -3649,12 +3854,13 @@ func TestToSecretTTL(t *testing.T) {
 	)
 
 	tests := []struct {
-		name           string
-		kind           string
-		ttl            int64
-		maxMinutes     string
-		sessionMinutes string
-		want           int64
+		name                 string
+		kind                 string
+		ttl                  int64
+		maxMinutes           string
+		sessionMinutes       string
+		kubeconfigMaxMinutes string
+		want                 int64
 	}{
 		{
 			name: "session, default",
@@ -3705,22 +3911,56 @@ func TestToSecretTTL(t *testing.T) {
 		},
 		{
 			name:       "derived, never expires, no max",
-			kind:       "kubeconfig",
+			kind:       "",
 			ttl:        never,
 			maxMinutes: "0",
 			want:       never,
 		},
 		{
 			name: "derived, longer than the session ttl",
-			kind: "kubeconfig",
+			kind: "",
 			ttl:  30 * day,
 			want: 30 * day,
 		},
 		{
 			name: "derived, longer than the max",
-			kind: "kubeconfig",
+			kind: "",
 			ttl:  100 * day,
 			want: 90 * day,
+		},
+		{
+			name: "kubeconfig, default",
+			kind: KindKubeconfig,
+			want: 30 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max above the max",
+			kind:                 KindKubeconfig,
+			ttl:                  150 * day,
+			kubeconfigMaxMinutes: "259200", // 180 days
+			want:                 90 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max below the max",
+			kind:                 KindKubeconfig,
+			ttl:                  60 * day,
+			kubeconfigMaxMinutes: "28800", // 20 days
+			want:                 20 * day,
+		},
+		{
+			name:       "kubeconfig, never expires, no max, kubeconfig max",
+			kind:       KindKubeconfig,
+			ttl:        never,
+			maxMinutes: "0",
+			want:       90 * day,
+		},
+		{
+			name:                 "kubeconfig, never expires, no max at either level",
+			kind:                 KindKubeconfig,
+			ttl:                  never,
+			maxMinutes:           "0",
+			kubeconfigMaxMinutes: "0",
+			want:                 never,
 		},
 	}
 
@@ -3734,7 +3974,12 @@ func TestToSecretTTL(t *testing.T) {
 			if test.sessionMinutes != "" {
 				sessionMinutes = test.sessionMinutes
 			}
+			kubeconfigMaxMinutes := "129600"
+			if test.kubeconfigMaxMinutes != "" {
+				kubeconfigMaxMinutes = test.kubeconfigMaxMinutes
+			}
 			setTTLSettings(t, maxMinutes, "129600", sessionMinutes)
+			setKubeconfigTTLSettings(t, kubeconfigMaxMinutes, "43200")
 
 			token := &ext.Token{
 				Spec: ext.TokenSpec{
@@ -3753,7 +3998,7 @@ func TestToSecretTTL(t *testing.T) {
 	}
 }
 
-func TestSystemStoreUpdateSessionTTL(t *testing.T) {
+func TestSystemStoreUpdateTTL(t *testing.T) {
 	const (
 		hour = int64(time.Hour / time.Millisecond)
 		day  = 24 * hour
@@ -3761,33 +4006,52 @@ func TestSystemStoreUpdateSessionTTL(t *testing.T) {
 
 	tests := []struct {
 		name   string
+		kind   string
 		oldTTL int64
 		ttl    int64
 		want   int64
 	}{
 		{
-			name:   "default is the session ttl",
+			name:   "session, default is the session ttl",
+			kind:   IsLogin,
 			oldTTL: 16 * hour,
 			ttl:    0,
 			want:   16 * hour,
 		},
 		{
-			name:   "longer ttl is limited to the session ttl",
+			name:   "session, longer ttl is limited to the session ttl",
+			kind:   IsLogin,
 			oldTTL: 90 * day,
 			ttl:    90 * day,
 			want:   16 * hour,
 		},
 		{
-			name:   "shorter ttl is kept",
+			name:   "session, shorter ttl is kept",
+			kind:   IsLogin,
 			oldTTL: 16 * hour,
 			ttl:    hour,
 			want:   hour,
+		},
+		{
+			name:   "kubeconfig, default is capped to the kubeconfig max",
+			kind:   KindKubeconfig,
+			oldTTL: 30 * day,
+			ttl:    0,
+			want:   20 * day,
+		},
+		{
+			name:   "kubeconfig, longer ttl is limited to the kubeconfig max",
+			kind:   KindKubeconfig,
+			oldTTL: 90 * day,
+			ttl:    90 * day,
+			want:   20 * day,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			setTTLSettings(t, "129600", "129600", "960")
+			setKubeconfigTTLSettings(t, "28800", "43200") // 20 days, 30 days
 
 			ctrl := gomock.NewController(t)
 
@@ -3810,6 +4074,7 @@ func TestSystemStoreUpdateSessionTTL(t *testing.T) {
 			store := NewSystem(nil, nil, secrets, users, nil, nil, timer, NewMockhashHandler(ctrl), NewMockauthHandler(ctrl))
 
 			old := properToken.DeepCopy()
+			old.Spec.Kind = test.kind
 			old.Spec.TTL = test.oldTTL
 			token := old.DeepCopy()
 			token.Spec.TTL = test.ttl

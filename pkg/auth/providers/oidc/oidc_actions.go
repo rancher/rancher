@@ -141,7 +141,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: Failed to create or update userAttribute: %v", err))
 	}
 
-	return o.TokenMgr.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
+	return o.TokenMgr.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, "Token via OIDC Configuration", request)
 }
 
 // configFromApplyInput returns the OIDCConfig to apply and the OIDCLogin to
