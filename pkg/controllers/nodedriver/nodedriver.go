@@ -43,9 +43,5 @@ func onChange(_ string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, err
 	}
 
-	if err := driver.Executable(); err != nil {
-		return obj, err
-	}
-
 	return obj, nil
 }
