@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,13 +48,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		secretStore:      management.Core.Secrets(""),
 		nsStore:          management.Core.Namespaces(""),
 		schemas:          management.Schemas,
-	}
 
-	version, err := getRancherMachineVersion()
-	if err != nil {
-		logrus.Warnf("error getting rancher-machine version: %v", err)
+		dockerMachineVersion: settings.MachineVersion.Get(),
 	}
-	nodeDriverLifecycle.dockerMachineVersion = version
 
 	nodeDriverClient.AddLifecycle(ctx, "node-driver-controller", nodeDriverLifecycle)
 }
@@ -491,10 +487,4 @@ func updateDefault(credField v32.Field, val, kind string) v32.Field {
 		logrus.Errorf("unsupported kind for default val:%s kind:%s", val, kind)
 	}
 	return credField
-}
-
-func getRancherMachineVersion() (string, error) {
-	cmd := exec.Command("rancher-machine", "--version")
-	out, err := cmd.CombinedOutput()
-	return string(out), err
 }
