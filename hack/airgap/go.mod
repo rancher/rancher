@@ -7,7 +7,7 @@ toolchain go1.26.10
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.36 // CVE-2026-46680
 	github.com/docker/docker => github.com/docker/docker v28.5.2+incompatible // Highest available on legacy module path
-	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.4 // CVE-2026-34986
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.6 // CVE-2026-34986
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.3.6
 	golang.org/x/crypto => golang.org/x/crypto v0.56.0
 	golang.org/x/net => golang.org/x/net v0.60.0
@@ -48,7 +48,7 @@ require (
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
