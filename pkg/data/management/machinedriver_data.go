@@ -166,6 +166,7 @@ func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
 		harvesterEnabled = false
 	}
 
+	const builtin = false
 	return addMachineDriver(
 		HarvesterDriver,
 		harvesterDriverURL,
@@ -173,7 +174,7 @@ func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
 		harvesterDriverChecksum,
 		[]string{"github.com"},
 		harvesterEnabled,
-		harvesterEnabled,
+		builtin,
 		false,
 		&harvesterEnabled,
 		mgmt,
