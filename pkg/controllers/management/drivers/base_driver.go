@@ -348,10 +348,8 @@ func (d *BaseDriver) download(dest io.Writer) error {
 }
 
 func (d *BaseDriver) cacheFile() string {
-	key := sha256Bytes([]byte(d.URL + d.DriverHash))
-
 	if d.CacheDir != "" {
-		return path.Join(d.CacheDir, key)
+		return path.Join(d.CacheDir, d.cacheKey())
 	}
 
 	base := os.Getenv("CATTLE_HOME")
@@ -359,7 +357,11 @@ func (d *BaseDriver) cacheFile() string {
 		base = "./management-state"
 	}
 
-	return path.Join(base, "machine-drivers", key)
+	return path.Join(base, "machine-drivers", d.cacheKey())
+}
+
+func (d *BaseDriver) cacheKey() string {
+	return sha256Bytes([]byte(d.URL + d.DriverHash))
 }
 
 func isInstalled(file string) (string, error) {
