@@ -3,11 +3,13 @@ package nodedriver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/types"
@@ -18,10 +20,16 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	batchcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/batch/v1"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -47,12 +55,31 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		schemaLister:     management.Management.DynamicSchemas("").Controller().Lister(),
 		secretStore:      management.Core.Secrets(""),
 		nsStore:          management.Core.Namespaces(""),
+		k8sClient:        management.K8sClient,
+		jobClient:        management.Wrangler.Batch.Job(),
+		jobCache:         management.Wrangler.Batch.Job().Cache(),
+		podCache:         management.Wrangler.Core.Pod().Cache(),
 		schemas:          management.Schemas,
 
 		dockerMachineVersion: settings.MachineVersion.Get(),
 	}
 
 	nodeDriverClient.AddLifecycle(ctx, "node-driver-controller", nodeDriverLifecycle)
+
+	// Watch for Job changes to re-enqueue NodeDrivers when get-flags Jobs complete or fail
+	relatedresource.Watch(ctx, "node-driver-getcreateflags", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if obj == nil {
+			return nil, nil
+		}
+		job, ok := obj.(*batchv1.Job)
+		if !ok || !isJobFinished(job) || job.DeletionTimestamp != nil {
+			return nil, nil
+		}
+		if driverName := job.Labels[JobLabelDriver]; driverName != "" {
+			return []relatedresource.Key{{Name: driverName}}, nil
+		}
+		return nil, nil
+	}, management.Management.NodeDrivers("").Controller(), management.Wrangler.Batch.Job())
 }
 
 type Lifecycle struct {
@@ -61,6 +88,10 @@ type Lifecycle struct {
 	schemaLister         v3.DynamicSchemaLister
 	secretStore          v1.SecretInterface
 	nsStore              v1.NamespaceInterface
+	k8sClient            kubernetes.Interface
+	jobClient            batchcontrollers.JobClient
+	jobCache             batchcontrollers.JobCache
+	podCache             corecontrollers.PodCache
 	schemas              *types.Schemas
 	dockerMachineVersion string
 }
@@ -71,12 +102,22 @@ func (m *Lifecycle) Create(obj *v32.NodeDriver) (runtime.Object, error) {
 }
 
 func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
-	logrus.Debugf("Downloading node driver %s", obj.Name)
-	driverLock.Lock()
-	defer driverLock.Unlock()
 	if !obj.Spec.Active && !obj.Spec.AddCloudCredential {
+		driverName := obj.Spec.DisplayName
+		if driverName == "" {
+			driverName = obj.Name
+		}
+		if driverName != "" {
+			jobName := getCreateFlagsJobName(driverName)
+			if err := m.deleteJob(jobName); err != nil && !apierrors.IsNotFound(err) {
+				logrus.Warnf("failed to delete job %s for inactive driver %s: %v", jobName, obj.Name, err)
+			}
+		}
 		return obj, nil
 	}
+	driverLock.Lock()
+	defer driverLock.Unlock()
+	logrus.Debugf("Downloading node driver %s", obj.Name)
 
 	// if node driver was created, we also activate the driver by default
 	driver, err := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
@@ -89,11 +130,6 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		v32.NodeDriverConditionDownloaded.Unknown(obj)
 		v32.NodeDriverConditionInstalled.Unknown(obj)
 		return obj, fmt.Errorf("node driver binary is not ready")
-	} else if err := driver.Executable(); err != nil {
-		v32.NodeDriverConditionDownloaded.True(obj)
-		v32.NodeDriverConditionInstalled.False(obj)
-		v32.NodeDriverConditionInstalled.Reason(obj, err.Error())
-		return obj, err
 	}
 
 	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
@@ -146,10 +182,19 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		return nil, fmt.Errorf("failed JSON in addUIHintsAnno: %w", err)
 	}
 
-	flags, err := getCreateFlagsForDriver(driverName)
+	// Resolve create flags asynchronously via Job
+	flags, ready, err := m.resolveCreateFlags(obj, driverName)
 	if err != nil {
+		if errors.Is(err, controller.ErrIgnore) {
+			return obj, controller.ErrIgnore
+		}
 		return nil, err
+	} else if !ready {
+		m.nodeDriverClient.Controller().EnqueueAfter("", obj.Name, 10*time.Second)
+		logrus.Debugf("discovery job for NodeDriver %q is still pending, re-queueing...", obj.Name)
+		return nil, controller.ErrIgnore
 	}
+
 	credFields := map[string]v32.Field{}
 	resourceFields := map[string]v32.Field{}
 	pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
@@ -158,10 +203,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		if err != nil {
 			return nil, err
 		}
-		field, err := fieldFromFlag(flag)
-		if err != nil {
-			return nil, err
-		}
+		field := flag.toV3Field()
 		if fileToFieldAliases, exists := obj.Annotations[FileToFieldAliasesAnno]; exists && strings.Contains(fileToFieldAliases, name) {
 			fields := ParseKeyValueString(fileToFieldAliases)
 			for schemaField, driverField := range fields {
@@ -206,18 +248,20 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 
 	_, err = m.schemaClient.Create(dynamicSchema)
 	if err != nil {
-		if !errors.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			return obj, err
 		}
-		ds, err := m.schemaClient.Get(dynamicSchema.Name, metav1.GetOptions{})
+		existingSchema, err := m.schemaClient.Get(dynamicSchema.Name, metav1.GetOptions{})
 		if err != nil {
 			return obj, err
 		}
-		ds.Spec.ResourceFields = resourceFields
-
-		_, err = m.schemaClient.Update(ds)
-		if err != nil {
-			return obj, err
+		if !reflect.DeepEqual(existingSchema.Spec.ResourceFields, dynamicSchema.Spec.ResourceFields) {
+			toUpdate := existingSchema.DeepCopy()
+			toUpdate.Spec.ResourceFields = dynamicSchema.Spec.ResourceFields
+			_, err := m.schemaClient.Update(toUpdate)
+			if err != nil {
+				return obj, err
+			}
 		}
 	}
 
@@ -239,7 +283,7 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 	}
 
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			credentialSchema := &v32.DynamicSchema{
 				Spec: v32.DynamicSchemaSpec{
 					ResourceFields: credFields,
@@ -269,6 +313,89 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 	return obj, nil
 }
 
+// resolveCreateFlags retrieves driver create flags by ensuring a Job runs to completion.
+// Returns (flags, ready, error). If ready=false, the caller should requeue.
+func (m *Lifecycle) resolveCreateFlags(obj *v32.NodeDriver, driverName string) ([]driverFlag, bool, error) {
+	var url, hash string
+	if !obj.Spec.Builtin {
+		var err error
+		url, hash, err = drivers.GetDriverDownloadURL(obj)
+		if err != nil {
+			logrus.Warnf("failed to get local driver download URL for %s, falling back to spec URL: %v", obj.Name, err)
+			url = obj.Spec.URL
+			hash = obj.Spec.Checksum
+		}
+	}
+
+	expectedHash := m.objectKey(obj)
+
+	// Check if Job exists
+	jobName := getCreateFlagsJobName(driverName)
+	status, payload, err := m.getJobStatus(jobName, expectedHash)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get job status: %w", err)
+	}
+
+	switch status {
+	case jobStatusStale:
+		logrus.Infof("canceling stale discovery job %s for driver %s", jobName, driverName)
+		if delErr := m.deleteJob(jobName); delErr != nil && !apierrors.IsNotFound(delErr) {
+			return nil, false, fmt.Errorf("failed to delete stale job: %w", delErr)
+		}
+		return nil, false, nil
+
+	case jobStatusNotFound:
+		// Create the Job
+		_, err := m.createGetFlagsJob(driverName, expectedHash, url, hash)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return nil, false, fmt.Errorf("failed to create get-flags job: %w", err)
+		}
+		return nil, false, nil
+
+	case jobStatusRunning:
+		// Job is still running - requeue
+		return nil, false, nil
+
+	case jobStatusSucceeded:
+		// Job succeeded - decode, delete job, return
+		flags, err := decodeFields(payload)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to decode flags from job: %w", err)
+		}
+
+		// Delete the job
+		if err := m.deleteJob(jobName); err != nil {
+			logrus.Warnf("failed to delete job %s: %v", jobName, err)
+		}
+
+		return flags, true, nil
+
+	case jobStatusFailed:
+		failMsg := string(payload)
+		if failMsg == "" {
+			failMsg = "get-create-flags job failed"
+		}
+		v32.NodeDriverConditionInstalled.False(obj)
+		v32.NodeDriverConditionInstalled.Message(obj, failMsg)
+		v32.NodeDriverConditionDownloaded.False(obj)
+		v32.NodeDriverConditionDownloaded.Message(obj, failMsg)
+		return nil, false, controller.ErrIgnore
+
+	default:
+		return nil, false, fmt.Errorf("unknown job status: %s", status)
+	}
+}
+
+func (m *Lifecycle) objectKey(obj *v32.NodeDriver) string {
+	driverName := obj.Spec.DisplayName
+	if obj.Spec.Builtin {
+		// For builtin drivers, key by rancher-machine version
+		return name.SafeConcatName(driverName, m.dockerMachineVersion)
+	}
+	// For non-builtin drivers, include both rancher-machine version and URL+checksum hash
+	return name.SafeConcatName(driverName, m.dockerMachineVersion, name.Hex(obj.Spec.URL+obj.Spec.Checksum, 16))
+}
+
 func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 	if !v32.NodeDriverConditionDownloaded.IsTrue(obj) || !v32.NodeDriverConditionInstalled.IsTrue(obj) {
 		return true
@@ -280,22 +407,23 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 		}
 	}
 
-	// Builtin drivers use the rancher-machine version to validate against
-	if obj.Spec.Builtin {
-		return obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion
+	// Any driver version changed if rancher-machine version differs
+	if obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion {
+		return true
 	}
 
-	if obj.Spec.URL != obj.Status.AppliedURL || obj.Spec.Checksum != obj.Status.AppliedChecksum {
-		return true
+	if !obj.Spec.Builtin {
+		if obj.Spec.URL != obj.Status.AppliedURL || obj.Spec.Checksum != obj.Status.AppliedChecksum {
+			return true
+		}
 	}
 
 	return false
 }
 
 func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) {
-	if obj.Spec.Builtin {
-		obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
-	} else {
+	obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
+	if !obj.Spec.Builtin {
 		obj.Status.AppliedURL = obj.Spec.URL
 		obj.Status.AppliedChecksum = obj.Spec.Checksum
 	}
@@ -349,6 +477,17 @@ func (m *Lifecycle) Updated(obj *v32.NodeDriver) (runtime.Object, error) {
 }
 
 func (m *Lifecycle) Remove(obj *v32.NodeDriver) (runtime.Object, error) {
+	driverName := obj.Spec.DisplayName
+	if driverName == "" {
+		driverName = obj.Name
+	}
+	if driverName != "" {
+		jobName := getCreateFlagsJobName(driverName)
+		if err := m.deleteJob(jobName); err != nil && !apierrors.IsNotFound(err) {
+			logrus.Warnf("failed to delete job %s when removing driver %s: %v", jobName, obj.Name, err)
+		}
+	}
+
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})
@@ -388,9 +527,9 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedType(embeddedType, fieldName st
 
 func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded, update bool) error {
 	nodeSchema, err := m.schemaLister.Get("", schemaID)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
-	} else if errors.IsNotFound(err) {
+	} else if apierrors.IsNotFound(err) {
 		resourceField := map[string]v32.Field{}
 		if embedded {
 			resourceField[fieldName] = v32.Field{
