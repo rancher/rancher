@@ -627,6 +627,11 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 	if !userMatchOrDefault(userInfo.GetName(), token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
+	// Login tokens are created by Rancher only. Rancher treats them differently from derived tokens,
+	// e.g. for user activity and OIDC.
+	if token.Spec.Kind == IsLogin {
+		return nil, apierrors.NewBadRequest("unable to create token of kind session")
+	}
 	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options, userInfo)
 }
 

@@ -74,6 +74,7 @@ type TokenSpec struct {
 	// Kind describes the nature of the token. The value "session" indicates
 	// a login/session token. Any other value, including the empty string,
 	// which is the default, stands for some kind of derived token.
+	// The value "session" is reserved for Rancher and is rejected on create.
 	// +optional
 	Kind string `json:"kind"`
 	// Human readable free-form description of the token. For example, its purpose.

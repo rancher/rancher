@@ -1000,7 +1000,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token.",
+							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token. The value \"session\" is reserved for Rancher and is rejected on create.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
