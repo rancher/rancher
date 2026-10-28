@@ -363,9 +363,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
-ENV CGO_ENABLED=1
 ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
-RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
