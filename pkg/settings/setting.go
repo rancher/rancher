@@ -182,10 +182,15 @@ var (
 	// CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=true to override.
 	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", "").WithEnvDefault("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT")
 
-	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
+	// AuthTokenMaxTTLMinutes is the max time to live for all tokens except login session tokens, which
+	// AuthUserSessionTTLMinutes controls. It also limits kubeconfig tokens, together with
+	// KubeconfigMaxTokenTTLMinutes. 0 means no limit. The limit applies when a token is created or
+	// updated.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
 
-	// AuthTokenDefaultTTLMinutes is the default allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
+	// AuthTokenDefaultTTLMinutes is the default time to live for tokens other than login session and
+	// kubeconfig tokens. 0 means the max. A default above the max is capped to the max. The default
+	// applies when a token is created or updated without a TTL.
 	AuthTokenDefaultTTLMinutes = NewSetting("auth-token-default-ttl-minutes", "129600") // 90 days
 
 	// AuthUserInfoMaxAgeSeconds represents the maximum age of a users auth tokens before an auth provider group membership sync will be performed.
@@ -256,10 +261,15 @@ var (
 	AliOperatorVersion = NewSetting("ali-operator-version", "")
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
+	// 0 means the max. A default above the max is capped to the max, which is the smaller of
+	// KubeconfigMaxTokenTTLMinutes and AuthTokenMaxTTLMinutes, where 0 is no limit. The default applies
+	// when a token is created or updated without a TTL.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "43200") // 30 days
 
 	// KubeconfigMaxTokenTTLMinutes is the max time to live applied to kubeconfigs created for users.
+	// It can't raise the limit set by AuthTokenMaxTTLMinutes: kubeconfig tokens get the smaller of the
+	// two, where 0 is no limit. The limit applies when a token is created or updated.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigMaxTokenTTLMinutes = NewSetting("kubeconfig-max-token-ttl-minutes", "129600") // 90 days
 

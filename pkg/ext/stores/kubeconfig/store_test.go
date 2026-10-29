@@ -25,6 +25,9 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
@@ -1533,6 +1536,89 @@ func TestStoreCreate(t *testing.T) {
 		assert.True(t, apierrors.IsBadRequest(err))
 		assert.ErrorContains(t, err, "exceeds max ttl")
 	})
+	for _, test := range []struct {
+		name                     string
+		maxMinutes               string
+		kubeconfigMaxMinutes     string
+		kubeconfigDefaultMinutes string
+		ttlSeconds               int64
+		wantTTLSeconds           int64
+		wantErr                  string
+	}{
+		{
+			name:                     "ttl above the token max and below the kubeconfig max",
+			maxMinutes:               "129600", // 90 days
+			kubeconfigMaxMinutes:     "259200", // 180 days
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               100 * 24 * 3600,
+			wantErr:                  "exceeds max ttl 7776000",
+		},
+		{
+			name:                     "both kubeconfig settings 0 give the token max",
+			maxMinutes:               "129600",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantTTLSeconds:           90 * 24 * 3600,
+		},
+		{
+			name:                     "no limit at any level still needs a ttl",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantErr:                  "please fix the default",
+		},
+	} {
+		t.Run("ttl limits from the settings: "+test.name, func(t *testing.T) {
+			for setting, value := range map[*settings.Setting]string{
+				&settings.AuthTokenMaxTTLMinutes:           test.maxMinutes,
+				&settings.KubeconfigMaxTokenTTLMinutes:     test.kubeconfigMaxMinutes,
+				&settings.KubeconfigDefaultTokenTTLMinutes: test.kubeconfigDefaultMinutes,
+			} {
+				prior := setting.Get()
+				require.NoError(t, setting.Set(value))
+				t.Cleanup(func() {
+					assert.NoError(t, setting.Set(prior))
+				})
+			}
+
+			store := &Store{
+				mcmEnabled:               true,
+				authorizer:               commonAuthorizer,
+				userCache:                userCache,
+				tokenStore:               tokenStore,
+				clusterCache:             clusterCache,
+				nodeCache:                nodeCache,
+				tokenMgr:                 &fakeTokenManager{},
+				getCACert:                func() string { return "" },
+				getDefaultTTL:            tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds,
+				getMaxTTL:                tokens.GetKubeconfigMaxTokenTTLInMilliSeconds,
+				getServerURL:             getServerURL,
+				shouldGenerateToken:      shouldGenerateToken,
+				shouldExecGetToken:       func() bool { return false },
+				shouldPreferRancherProxy: shouldPreferRancherProxy,
+			}
+
+			ctx := userContext(adminID, authTokenID)
+			kubeconfig := &ext.Kubeconfig{
+				Spec: ext.KubeconfigSpec{
+					Clusters:       []string{downstream1},
+					CurrentContext: downstream1,
+					TTL:            test.ttlSeconds,
+				},
+			}
+
+			obj, err := store.Create(ctx, kubeconfig, nil, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if test.wantErr != "" {
+				require.Error(t, err)
+				assert.Nil(t, obj)
+				assert.True(t, apierrors.IsBadRequest(err))
+				assert.ErrorContains(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantTTLSeconds, obj.(*ext.Kubeconfig).Spec.TTL)
+		})
+	}
 	t.Run("exclude default entry with no clusters", func(t *testing.T) {
 		store := &Store{
 			authorizer:    commonAuthorizer,
@@ -5355,6 +5441,22 @@ func TestToListOptions(t *testing.T) {
 		assert.True(t, apierrors.IsBadRequest(err), "expected 400 BadRequest, got: %v", err)
 		assert.Nil(t, result)
 	})
+}
+
+func TestBuildExtTokenKind(t *testing.T) {
+	t.Parallel()
+
+	authToken := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "local://u-abcde"},
+			Provider:   "local",
+		},
+	}
+
+	// The kind picks the TTL limits the ext token store applies on create and update.
+	token := (&Store{}).buildExtToken("u-abcde", authToken, 3600000, "c-m-abcde", "kubeconfig-abcde")
+	assert.Equal(t, exttokens.KindKubeconfig, token.Spec.Kind)
+	assert.Equal(t, int64(3600000), token.Spec.TTL)
 }
 
 func TestIncludeDefaultEntryConfigMapRoundTrip(t *testing.T) {

@@ -157,7 +157,7 @@ func (a ActionHandler) generateKubeConfigBearer(apiContext *types.APIContext) (s
 	kcToken := &ext.Token{
 		Spec: ext.TokenSpec{
 			UserID:      userID,
-			Kind:        "kubeconfig",
+			Kind:        exttokenstore.KindKubeconfig,
 			Description: "Kubeconfig token",
 			TTL:         *defaultTokenTTL,
 		},

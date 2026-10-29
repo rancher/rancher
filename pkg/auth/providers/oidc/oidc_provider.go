@@ -49,7 +49,7 @@ const (
 
 type tokenManager interface {
 	UpdateSecret(userID, provider, secret string) error
-	CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error
 	CreateSecret(userID, provider, secret string) error
 	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
 }

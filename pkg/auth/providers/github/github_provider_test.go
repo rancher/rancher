@@ -21,7 +21,7 @@ import (
 
 type fakeTokensManager struct {
 	getSecretFunc               func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	createTokenAndSetCookieFunc func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	createTokenAndSetCookieFunc func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error
 }
 
 func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
@@ -31,9 +31,9 @@ func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTo
 	return "", nil
 }
 
-func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error {
 	if m.createTokenAndSetCookieFunc != nil {
-		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
+		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, description, request)
 	}
 	return nil
 }

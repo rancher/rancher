@@ -316,7 +316,7 @@ func testOIDCConfig(baseURL string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig
 
 type fakeTokenManager struct {
 	getSecretFunc               func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	createTokenAndSetCookieFunc func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	createTokenAndSetCookieFunc func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error
 	createSecretFunc            func(userID, provider, secret string) error
 	updateSecretFunc            func(userID, provider, secret string) error
 }
@@ -337,12 +337,12 @@ func (m *fakeTokenManager) CreateSecret(userID, provider, secret string) error {
 	return m.createSecretFunc(userID, provider, secret)
 }
 
-func (m *fakeTokenManager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+func (m *fakeTokenManager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error {
 	if m.createTokenAndSetCookieFunc == nil {
 		return errors.New("CreateTokenAndSetCookie called but no function provided")
 	}
 
-	return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
+	return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, description, request)
 }
 
 func (m *fakeTokenManager) UpdateSecret(userID, provider, secret string) error {

@@ -236,7 +236,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							// everything else to satisfy the ext token read checks
 							exttokenstore.FieldEnabled:        []byte("true"),
 							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
 							exttokenstore.FieldPrincipal:      principalBytes,
 							exttokenstore.FieldTTL:            []byte("57600000"),
@@ -442,7 +442,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							// everything else to satisfy the ext token read checks
 							exttokenstore.FieldEnabled:        []byte("true"),
 							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
 							exttokenstore.FieldPrincipal:      principalBytes,
 							exttokenstore.FieldTTL:            []byte("57600000"),

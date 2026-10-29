@@ -997,7 +997,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		Spec: ext.TokenSpec{
 			UserID:  userID,
 			TTL:     57600000,
-			Kind:    exttokenstore.IsLogin,
+			Kind:    exttokenstore.KindSession,
 			Enabled: ptr.To(true),
 			UserPrincipal: ext.TokenPrincipal{
 				Name:        userPrincipalID,
@@ -1024,7 +1024,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		Data: map[string][]byte{
 			exttokenstore.FieldEnabled:        []byte("true"),
 			exttokenstore.FieldHash:           []byte(tokenHash),
-			exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+			exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 			exttokenstore.FieldLastUpdateTime: []byte("13:00"),
 			exttokenstore.FieldPrincipal:      principalBytes,
 			exttokenstore.FieldTTL:            []byte("57600000"),

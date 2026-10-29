@@ -1110,7 +1110,7 @@ func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor,
 		Spec: ext.TokenSpec{
 			UserID:        userName,
 			UserPrincipal: toExtTokenPrincipal(authToken.GetUserPrincipal()),
-			Kind:          KindLabelValue,
+			Kind:          exttokens.KindKubeconfig,
 			Description:   "Kubeconfig token",
 			TTL:           ttl,
 			ClusterName:   clusterID,

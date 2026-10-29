@@ -56,7 +56,8 @@ const (
 	TokenNamespace       = "cattle-tokens"
 	UserIDLabel          = "cattle.io/user-id"
 	KindLabel            = "authn.management.cattle.io/kind"
-	IsLogin              = "session"
+	KindSession          = "session"
+	KindKubeconfig       = "kubeconfig"
 	SecretKindLabel      = "cattle.io/kind"
 	SecretKindLabelValue = "token"
 	GeneratePrefix       = "token-"
@@ -1018,8 +1019,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		maxSetting, defaultSetting := ttlSettings(token.Spec.Kind)
-		ttl, err := IngestTTL(token.Spec.TTL, maxSetting, defaultSetting)
+		ttl, err := IngestTTL(token.Spec.TTL, token.Spec.Kind)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
@@ -1620,8 +1620,7 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	maxSetting, defaultSetting := ttlSettings(token.Spec.Kind)
-	ttl, err := IngestTTL(token.Spec.TTL, maxSetting, defaultSetting)
+	ttl, err := IngestTTL(token.Spec.TTL, token.Spec.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -1772,36 +1771,63 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-// ttlSettings returns the max and default TTL settings for a token of the given kind. Login tokens
-// follow the login session lifetime, as v3 login tokens do.
-func ttlSettings(kind string) (maxSetting, defaultSetting settings.Setting) {
-	if kind == IsLogin {
-		return settings.AuthUserSessionTTLMinutes, settings.AuthUserSessionTTLMinutes
+// TTLLimits returns the default and the max TTL, in milliseconds, for a token of the given kind. A
+// negative value means no limit, i.e. a token that never expires.
+//
+// Login tokens follow the login session lifetime, as v3 login tokens do. Every other token is
+// limited by auth-token-max-ttl-minutes. Kubeconfig tokens are further limited by
+// kubeconfig-max-token-ttl-minutes. A max setting of 0 is no limit at its level. A default of 0
+// falls back to the max, and a default above the max is capped to it.
+func TTLLimits(kind string) (defaultTTL, maxTTL int64, err error) {
+	var defaultSetting settings.Setting
+	switch kind {
+	case KindSession:
+		defaultSetting = settings.AuthUserSessionTTLMinutes
+		maxTTL, err = parseMaxTTL(settings.AuthUserSessionTTLMinutes)
+	case KindKubeconfig:
+		defaultSetting = settings.KubeconfigDefaultTokenTTLMinutes
+		var kubeconfigMax int64
+		kubeconfigMax, err = parseMaxTTL(settings.KubeconfigMaxTokenTTLMinutes)
+		if err == nil {
+			maxTTL, err = parseMaxTTL(settings.AuthTokenMaxTTLMinutes)
+			maxTTL = ClampToMaxTTL(kubeconfigMax, maxTTL)
+		}
+	default:
+		defaultSetting = settings.AuthTokenDefaultTTLMinutes
+		maxTTL, err = parseMaxTTL(settings.AuthTokenMaxTTLMinutes)
 	}
-	return settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes
+	if err != nil {
+		return 0, 0, err
+	}
+
+	defaultTTL, err = ParseTTLToMilliseconds(defaultSetting)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return ClampToMaxTTL(DefaultTTL(defaultTTL, maxTTL), maxTTL), maxTTL, nil
 }
 
-// IngestTTL returns the input ttl (milliseconds) with requests for defaults
-// resolved, and further limited to the maximum allowed, as per the given
-// settings.
-func IngestTTL(ttl int64, maxSetting, defaultSetting settings.Setting) (int64, error) {
-	maxValue, err := ParseTTLToMilliseconds(maxSetting)
+// parseMaxTTL returns a max TTL setting in milliseconds, with -1 for no limit.
+func parseMaxTTL(setting settings.Setting) (int64, error) {
+	maxTTL, err := ParseTTLToMilliseconds(setting)
 	if err != nil {
 		return 0, err
 	}
-	if maxValue < 1 {
-		maxValue = -1 // "0" means no max — use the real "never expires" value.
+	if maxTTL < 1 {
+		return -1, nil
 	}
-	defaultValue, err := ParseTTLToMilliseconds(defaultSetting)
+	return maxTTL, nil
+}
+
+// IngestTTL returns the input ttl (milliseconds) with a request for the default (0) resolved and
+// limited to the max, for a token of the given kind. See TTLLimits.
+func IngestTTL(ttl int64, kind string) (int64, error) {
+	defaultTTL, maxTTL, err := TTLLimits(kind)
 	if err != nil {
 		return 0, err
 	}
-
-	// We fall back to the maximum when the default value requests a default itself
-	defaultValue = DefaultTTL(defaultValue, maxValue)
-
-	// Then resolve a default request in the input and clamp
-	return ClampToMaxTTL(DefaultTTL(ttl, defaultValue), maxValue), nil
+	return ClampToMaxTTL(DefaultTTL(ttl, defaultTTL), maxTTL), nil
 }
 
 // ParseTTLToMilliseconds retrieves a ttl setting (in minutes) and returns it as milliseconds

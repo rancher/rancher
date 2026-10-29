@@ -142,7 +142,7 @@ func TestRefreshAttributes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-login-local"},
 		Spec: ext.TokenSpec{
 			UserID: "user-abcde",
-			Kind:   exttokens.IsLogin,
+			Kind:   exttokens.KindSession,
 			UserPrincipal: ext.TokenPrincipal{
 				Name:      "local://user-abcde",
 				Provider:  local.Name,
@@ -161,7 +161,7 @@ func TestRefreshAttributes(t *testing.T) {
 		Data: map[string][]byte{
 			exttokens.FieldEnabled:        []byte("true"),
 			exttokens.FieldHash:           []byte("kla9jkdmj"),
-			exttokens.FieldKind:           []byte(exttokens.IsLogin),
+			exttokens.FieldKind:           []byte(exttokens.KindSession),
 			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
 			exttokens.FieldPrincipal:      localPrincipalBytes,
 			exttokens.FieldTTL:            []byte("4000"),
