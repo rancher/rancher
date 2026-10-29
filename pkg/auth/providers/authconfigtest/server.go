@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -117,6 +118,45 @@ func newServer(t *testing.T, configs ...map[string]any) string {
 	t.Cleanup(srv.Close)
 
 	return srv.URL
+}
+
+// NewRecordingClient returns an AuthConfig client backed by a fake API server
+// that serves a Get for any name with an enabled AuthConfig of that name and
+// no other fields. The returned func reports the names of the AuthConfigs
+// fetched, in order.
+func NewRecordingClient(t *testing.T) (normanv3.AuthConfigInterface, func() []string) {
+	t.Helper()
+
+	var (
+		mu      sync.Mutex
+		fetched []string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, authConfigsPath+"/") {
+			t.Errorf("unexpected AuthConfig API request: %s %s", r.Method, r.URL.Path)
+			writeStatus(w, http.StatusMethodNotAllowed, "MethodNotAllowed", "")
+			return
+		}
+
+		name := strings.TrimPrefix(r.URL.Path, authConfigsPath+"/")
+		mu.Lock()
+		fetched = append(fetched, name)
+		mu.Unlock()
+		writeJSON(w, http.StatusOK, withTypeMeta(map[string]any{
+			"metadata": map[string]any{"name": name},
+			"enabled":  true,
+		}))
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := normanv3.NewForConfig(rest.Config{Host: srv.URL})
+	require.NoError(t, err)
+
+	return client.AuthConfigs(""), func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(fetched)
+	}
 }
 
 // NewLister returns an AuthConfig lister that serves Get and List for the

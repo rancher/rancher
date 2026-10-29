@@ -6,25 +6,19 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/json"
 	"encoding/pem"
 	"math/big"
-	"net/http"
-	"net/http/httptest"
-	"path"
 	"reflect"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
@@ -33,10 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/rest"
 )
 
 var (
@@ -481,29 +473,10 @@ func TestLdapProviderGetPrincipalUsesTokenConfig(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			var fetched []string
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				configName := path.Base(r.URL.Path)
-				fetched = append(fetched, configName)
-
-				// No servers are configured, so any LDAP lookup fails after
-				// the config has been loaded.
-				w.Header().Set("Content-Type", "application/json")
-				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-					"apiVersion": "management.cattle.io/v3",
-					"kind":       "AuthConfig",
-					"metadata":   map[string]any{"name": configName},
-					"enabled":    true,
-				}))
-			}))
-			t.Cleanup(srv.Close)
-
-			objectClient := newTestAuthConfigObjectClient(t, srv.URL)
+			authConfigs, fetched := authconfigtest.NewRecordingClient(t)
 			p := &ldapProvider{
 				providerName: tt.providerName,
-				authConfigs: &fakes.AuthConfigInterfaceMock{
-					ObjectClientFunc: func() *objectclient.ObjectClient { return objectClient },
-				},
+				authConfigs:  authConfigs,
 			}
 			token := &v3.Token{
 				UserPrincipal: v3.Principal{
@@ -518,28 +491,7 @@ func TestLdapProviderGetPrincipalUsesTokenConfig(t *testing.T) {
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
 			}
-			assert.Equal(t, tt.wantFetched, fetched)
+			assert.Equal(t, tt.wantFetched, fetched())
 		})
 	}
-}
-
-func newTestAuthConfigObjectClient(t *testing.T, host string) *objectclient.ObjectClient {
-	t.Helper()
-
-	scheme := runtime.NewScheme()
-	require.NoError(t, v3.AddToScheme(scheme))
-	gv := mgmtv3.AuthConfigGroupVersionKind.GroupVersion()
-	restClient, err := rest.RESTClientFor(&rest.Config{
-		Host:    host,
-		APIPath: "/apis",
-		ContentConfig: rest.ContentConfig{
-			GroupVersion:         &gv,
-			NegotiatedSerializer: serializer.NewCodecFactory(scheme).WithoutConversion(),
-		},
-	})
-	require.NoError(t, err)
-
-	gvr := gv.WithResource(mgmtv3.AuthConfigResource.Name)
-	return objectclient.NewObjectClient("", client.NewClient(gvr, mgmtv3.AuthConfigGroupVersionKind.Kind, false, restClient, time.Minute),
-		&mgmtv3.AuthConfigResource, mgmtv3.AuthConfigGroupVersionKind, &objectclient.UnstructuredObjectFactory{})
 }

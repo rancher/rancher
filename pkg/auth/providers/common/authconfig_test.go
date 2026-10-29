@@ -110,6 +110,32 @@ func TestUpdateAuthConfig(t *testing.T) {
 		assert.Equal(t, client.GithubConfigType, srv.Stored()["type"])
 	})
 
+	t.Run("overwrites fields other than the metadata written concurrently", func(t *testing.T) {
+		srv := authconfigtest.NewUpdateServer(t, map[string]any{"metadata": map[string]any{"name": "github"}, "enabled": true})
+		storedConfig, err := srv.Client().Get("github", metav1.GetOptions{})
+		require.NoError(t, err)
+		config := newConfig(storedConfig.ResourceVersion)
+		config.Enabled = true
+
+		// Something else disables the AuthConfig after it was read.
+		disabled := storedConfig.DeepCopy()
+		disabled.Enabled = false
+		_, err = srv.Client().Update(disabled)
+		require.NoError(t, err)
+
+		err = UpdateAuthConfig(srv.Client(), config, &config.ObjectMeta, func() (metav1.ObjectMeta, error) {
+			storedConfig, err := srv.Client().Get("github", metav1.GetOptions{})
+			if err != nil {
+				return metav1.ObjectMeta{}, err
+			}
+			return storedConfig.ObjectMeta, nil
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, 3, srv.Updates(), "the conflicting update should be retried once")
+		assert.Equal(t, true, srv.Stored()["enabled"], "the update should overwrite the concurrent write")
+	})
+
 	t.Run("returns an error reading the AuthConfig", func(t *testing.T) {
 		srv := authconfigtest.NewUpdateServer(t, map[string]any{"metadata": map[string]any{"name": "github"}})
 		config := newConfig("0")
