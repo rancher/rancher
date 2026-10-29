@@ -73,7 +73,7 @@ RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.27.3 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/rancher/appco-go:1.27.3 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
@@ -368,7 +368,7 @@ ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
+RUN --mount=type=cache,target=/root/.cache,id=rancher go build -o export-images ./...
 RUN ./export-images -arch ${TARGETARCH} -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
 # Output just k3s images
