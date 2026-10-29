@@ -74,6 +74,7 @@ type TokenSpec struct {
 	// Kind describes the nature of the token. The value "session" indicates
 	// a login/session token. Any other value, including the empty string,
 	// which is the default, stands for some kind of derived token.
+	// The value "session" is reserved for Rancher and is rejected on create.
 	// +optional
 	Kind string `json:"kind"`
 	// Human readable free-form description of the token. For example, its purpose.
@@ -87,6 +88,8 @@ type TokenSpec struct {
 	// That is, both the ttl here and the default are subject to the
 	// `auth-token-max-ttl-minutes` setting, i.e. will be clamped to it if they
 	// represent a larger value than that.
+	// For tokens of kind "session" the `auth-user-session-ttl-minutes` setting provides both the
+	// default and the max instead.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an
