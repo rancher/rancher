@@ -97,13 +97,12 @@ jobs:
         if: steps.generate.outputs.any-failures == 'true'
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
-          # none of this is setup yet, just a placeholder.
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/slack/nightly-provisioning-tests/credentials webhookUrl | WEBHOOK_URL 
+            secret/data/github/repo/${{ github.repository }}/slack/provisioning-test-failures/credentials webhook_url | SLACK_WEBHOOK_URL;
 
       - name: Post failures to Slack
         if: steps.generate.outputs.any-failures == 'true'
         env:
           SLACK_PAYLOAD: ${{ steps.generate.outputs.slack-payload }}
         run: |
-          curl -sf -X POST -H 'Content-type: application/json' --data "$SLACK_PAYLOAD" "$WEBHOOK_URL"
+          curl -sf -X POST -H 'Content-type: application/json' --data "$SLACK_PAYLOAD" "SLACK_WEBHOOK_URL"
