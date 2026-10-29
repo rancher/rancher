@@ -129,7 +129,7 @@ func newHandler(p *proxy) http.Handler {
 	rp := &httputil.ReverseProxy{
 		Director:       func(*http.Request) {},
 		ModifyResponse: setModifiedHeaders,
-		Transport:      &perRouteTLSTransport{proxy: &p},
+		Transport:      &perRouteTLSTransport{proxy: p},
 	}
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -187,7 +187,8 @@ func (p *proxy) proxy(req *http.Request) error {
 	cAuth := req.Header.Get(CattleAuth)
 
 	for key, value := range req.Header {
-		if isBadHeader(key) {
+		// APICookie matches the x-api prefix but replaceCookies below needs it.
+		if isBadHeader(key) && !strings.EqualFold(key, APICookie) {
 			continue
 		}
 
