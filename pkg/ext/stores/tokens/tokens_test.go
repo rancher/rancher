@@ -1271,7 +1271,7 @@ func TestStoreCreate(t *testing.T) {
 		{
 			name: "session kind",
 			err:  createSessionKind,
-			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: IsLogin}},
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
 			opts: &metav1.CreateOptions{},
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
@@ -1291,7 +1291,7 @@ func TestStoreCreate(t *testing.T) {
 		{
 			name: "session kind, dry run",
 			err:  createSessionKind,
-			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: IsLogin}},
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
 			opts: &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
@@ -1311,7 +1311,7 @@ func TestStoreCreate(t *testing.T) {
 		{
 			name: "session kind, full access",
 			err:  createSessionKind,
-			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: IsLogin}},
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
 			opts: &metav1.CreateOptions{},
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
@@ -2067,9 +2067,8 @@ func TestStoreCreate(t *testing.T) {
 			}(),
 		},
 		{
-			name:       "created secret ok, kind other than session",
-			err:        nil,
-			defaultmin: "112933",
+			name: "created secret ok, kind other than session",
+			err:  nil,
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -2139,7 +2138,7 @@ func TestStoreCreate(t *testing.T) {
 								FieldLastUpdateTime:   "this is a fake now",
 								FieldLastUsedAt:       "",
 								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
-								FieldTTL:              "6775980000",
+								FieldTTL:              "2592000000", // the kubeconfig default, 30 days
 								FieldUID:              have.StringData[FieldUID],
 								FieldUserID:           "world",
 							},
