@@ -6,6 +6,7 @@ echo "-- chart/build --"
 
 cd $(dirname $0)/..
 . ./version
+. ./chart/images-annotation
 
 cd ..
 mkdir -p build/chart
@@ -14,6 +15,7 @@ cp -rf ${1} build/chart/rancher
 
 sed -i -e "s/%VERSION%/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
 sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" build/chart/rancher/Chart.yaml
+render_images_annotation build/chart/rancher/Chart.yaml
 
 # Note: Image versions (auditLog, postDelete, preUpgrade) are now managed by
 # `go generate` from build.yaml. They are kept in sync automatically in chart/values.yaml.
