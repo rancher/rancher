@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Source this file after scripts/version, then call
+# render_images_annotation <Chart.yaml> to replace the image tag placeholders
+# in the helm.sh/images annotation. Tags are read from the same files that feed
+# rancher-images.txt.
+
+render_images_annotation() (
+  set -e
+
+  chart_yaml=$1
+  root=$(git rev-parse --show-toplevel)
+
+  # provides AGENT_TAG, SYSTEM_AGENT_UPGRADE_TAG, WINS_AGENT_UPGRADE_TAG and CLUSTER_API_CONTROLLER_TAG
+  source "${root}/scripts/package-env"
+
+  build_yaml_tag() {
+    grep -m1 "^$1:" "${root}/build.yaml" | cut -d ' ' -f2 | cut -d ':' -f2
+  }
+
+  ASSETS_TAG=$(build_yaml_tag defaultAssetsImage)
+  SHELL_TAG=$(build_yaml_tag defaultShellVersion)
+  SCC_OPERATOR_TAG=$(build_yaml_tag defaultSccOperatorImage)
+  AUDIT_LOG_TAG=$(build_yaml_tag chartAuditLogImage)
+  MACHINE_TAG=$(grep "ENV CATTLE_MACHINE_VERSION=" "${root}/package/Dockerfile" | awk -F'=' '{ print $NF }')
+  KUBE_API_AUTH_TAG=$(grep -o 'rancher/kube-api-auth:[^"]*' "${root}/pkg/apis/management.cattle.io/v3/tools_system_images.go" | cut -d ':' -f2)
+
+  tags="AGENT_TAG SYSTEM_AGENT_UPGRADE_TAG WINS_AGENT_UPGRADE_TAG CLUSTER_API_CONTROLLER_TAG ASSETS_TAG SHELL_TAG SCC_OPERATOR_TAG AUDIT_LOG_TAG MACHINE_TAG KUBE_API_AUTH_TAG"
+  sed_args=()
+  for tag in ${tags}; do
+    if [[ -z "${!tag}" ]]; then
+      echo "images-annotation: ${tag} is empty" >&2
+      exit 1
+    fi
+    sed_args+=(-e "s/%${tag}%/${!tag}/g")
+  done
+
+  sed "${sed_args[@]}" "${chart_yaml}" > "${chart_yaml}.tmp"
+  mv "${chart_yaml}.tmp" "${chart_yaml}"
+)
