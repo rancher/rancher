@@ -25,7 +25,6 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
 	"github.com/rancher/rancher/pkg/oidc/provider"
@@ -65,7 +64,7 @@ type fakeProvider struct {
 	name                       string
 	disabled                   bool
 	disabledErr                error
-	getUserExtraAttributesFunc func(v3.Principal) map[string][]string
+	getUserExtraAttributesFunc func(apiv3.Principal) map[string][]string
 }
 
 func (p *fakeProvider) IsDisabledProvider(string) (bool, error) {
@@ -88,11 +87,11 @@ func (p *fakeProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any)
 	panic("not implemented")
 }
 
-func (p *fakeProvider) SearchPrincipals(string, string, accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *fakeProvider) SearchPrincipals(string, string, accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) GetPrincipal(string, accessor.TokenAccessor) (v3.Principal, error) {
+func (p *fakeProvider) GetPrincipal(string, accessor.TokenAccessor) (apiv3.Principal, error) {
 	panic("not implemented")
 }
 
@@ -107,15 +106,15 @@ func (p *fakeProvider) TransformToAuthProvider(map[string]interface{}) (map[stri
 func (p *fakeProvider) UsesUserSecrets() bool      { return false }
 func (p *fakeProvider) CanRefreshPrincipals() bool { return true }
 
-func (p *fakeProvider) RefetchGroupPrincipals(_, _ string) ([]v3.Principal, error) {
+func (p *fakeProvider) RefetchGroupPrincipals(_, _ string) ([]apiv3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) CanAccessWithGroupProviders(_ string, _ []v3.Principal) (bool, error) {
+func (p *fakeProvider) CanAccessWithGroupProviders(_ string, _ []apiv3.Principal) (bool, error) {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (p *fakeProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	if p.getUserExtraAttributesFunc != nil {
 		return p.getUserExtraAttributesFunc(userPrincipal)
 	}
@@ -126,7 +125,7 @@ func (p *fakeProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 	}
 }
 
-func (p *fakeProvider) CleanupResources(*v3.AuthConfig) error {
+func (p *fakeProvider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
 }
 
@@ -145,7 +144,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	userID := "u-abcdef"
 	userPrincipalID := fakeProvider.name + "_user://12345"
 
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -153,7 +152,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		PrincipalIDs: []string{userPrincipalID},
 	}
 
-	token := &v3.Token{
+	token := &apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-v2rcx",
 			CreationTimestamp: metav1.NewTime(now),
@@ -161,7 +160,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
 		TTLMillis: 57600000,
 		UserID:    userID,
-		UserPrincipal: v3.Principal{
+		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userPrincipalID,
 			},
@@ -185,7 +184,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		return nil, nil
 	}).AnyTimes()
 
-	userAttribute := &v3.UserAttribute{
+	userAttribute := &apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -217,13 +216,13 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		},
 	}
 	userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-		GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+		GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 			return userAttribute, nil
 		},
 	}
 
 	userLister := &mgmtFakes.UserListerMock{
-		GetFunc: func(_, _ string) (*v3.User, error) {
+		GetFunc: func(_, _ string) (*apiv3.User, error) {
 			return user, nil
 		},
 	}
@@ -372,7 +371,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		token.UserPrincipal.Name = "invalid-principal"
 		token.UserPrincipal.Provider = "other-provider"
 		user.PrincipalIDs = []string{"system://test"}
-		token.GroupPrincipals = []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "legacy://system-group"}}}
+		token.GroupPrincipals = []apiv3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "legacy://system-group"}}}
 		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
 			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
 			"local": {
@@ -439,7 +438,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 					user.PrincipalIDs = oldUserPrincipalIDs
 				})
 
-				token.UserPrincipal = v3.Principal{}
+				token.UserPrincipal = apiv3.Principal{}
 				token.IsDerived = true
 				user.PrincipalIDs = tt.principalIDs
 
@@ -454,20 +453,27 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		}
 	})
 
-	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+	t.Run("lastUsedAt less than a minute from now is not updated", func(t *testing.T) {
 		oldTokenLastUsedAt := token.LastUsedAt
 		defer func() {
 			token.LastUsedAt = oldTokenLastUsedAt
 		}()
-		lastUsedAt := metav1.NewTime(now.Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Empty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Truncate(time.Second),
+			now.Add(-59 * time.Second).Truncate(time.Second),
+			now.Add(59 * time.Second).Truncate(time.Second),
+		} {
+			lastUsedAt := metav1.NewTime(stored)
+			token.LastUsedAt = &lastUsedAt
+			patchData = nil
+			userRefresher.reset()
+
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, patchData, "stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
@@ -475,24 +481,32 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		defer func() {
 			token.LastUsedAt = oldTokenLastUsedAt
 		}()
-		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Add(-time.Minute).Truncate(time.Second),
+			now.Add(time.Minute).Truncate(time.Second),
+			time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC),
+		} {
+			lastUsedAt := metav1.NewTime(stored)
+			token.LastUsedAt = &lastUsedAt
+			patchData = nil
+			userRefresher.reset()
 
-		lastUsedAt = metav1.NewTime(now.Add(time.Second).Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotEmpty(t, patchData, "stored lastUsedAt %s", stored)
 
-		resp, err = authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+			var patch []struct {
+				Path  string      `json:"path"`
+				Value metav1.Time `json:"value"`
+			}
+			require.NoError(t, json.Unmarshal(patchData, &patch))
+			require.Len(t, patch, 1)
+			assert.Equal(t, "/lastUsedAt", patch[0].Path)
+			assert.True(t, patch[0].Value.Time.Equal(now.Truncate(time.Second)),
+				"stored lastUsedAt %s: patched %s, want %s", stored, patch[0].Value, now.Truncate(time.Second))
+		}
 	})
 
 	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
@@ -501,19 +515,17 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			token.LastUsedAt = oldTokenLastUsedAt
 			authenticator.tokenClient = tokenClient
 		}()
-		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](gomock.NewController(t))
 		client.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("some error")).Times(1)
 		authenticator.tokenClient = client
 
-		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
+		lastUsedAt := metav1.NewTime(now.Add(-time.Minute).Truncate(time.Second))
 		token.LastUsedAt = &lastUsedAt
-		patchData = nil
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		require.Empty(t, patchData)
 	})
 
 	t.Run("token fetched with token client", func(t *testing.T) {
@@ -550,7 +562,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("authenticate if userattribute doesn't exist", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, name string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, name string) (*apiv3.UserAttribute, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -589,7 +601,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
 		}()
 		userAttribute.ExtraByProvider = nil
-		fakeProvider.getUserExtraAttributesFunc = func(v3.Principal) map[string][]string { return map[string][]string{} }
+		fakeProvider.getUserExtraAttributesFunc = func(apiv3.Principal) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -628,7 +640,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		t.Cleanup(func() { providers.SetAuthConfigLister(nil) })
 		userAttribute.ExtraByProvider = nil
 		var gotPrincipal string
-		fakeProvider.getUserExtraAttributesFunc = func(principal v3.Principal) map[string][]string {
+		fakeProvider.getUserExtraAttributesFunc = func(principal apiv3.Principal) map[string][]string {
 			gotPrincipal = principal.Name
 			return map[string][]string{
 				common.UserAttributePrincipalID: {"from-provider"},
@@ -661,8 +673,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("provider refresh is not called for system users", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -689,7 +701,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			token.GroupPrincipals = oldTokenGroupPrincipals
 			fakeProvider.disabled = oldIsDisabled
 		})
-		token.GroupPrincipals = []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "legacy://providerless-group"}}}
+		token.GroupPrincipals = []apiv3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "legacy://providerless-group"}}}
 
 		userRefresher.reset()
 
@@ -775,7 +787,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("user doesn't exist", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, name string) (*v3.User, error) {
+		userLister.GetFunc = func(_, name string) (*apiv3.User, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -790,8 +802,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("user is disabled", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -810,7 +822,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("error getting userattribute", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, _ string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, _ string) (*apiv3.UserAttribute, error) {
 			return nil, fmt.Errorf("some error")
 		}
 
@@ -975,7 +987,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	userID := "u-abcdef"
 	userPrincipalID := fakeProvider.name + "_user://12345"
 
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1036,7 +1048,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	var patchData []byte
 	ctrl := gomock.NewController(t)
 
-	userAttribute := &v3.UserAttribute{
+	userAttribute := &apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1068,13 +1080,13 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		},
 	}
 	userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-		GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+		GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 			return userAttribute, nil
 		},
 	}
 
 	userLister := &mgmtFakes.UserListerMock{
-		GetFunc: func(_, _ string) (*v3.User, error) {
+		GetFunc: func(_, _ string) (*apiv3.User, error) {
 			return user, nil
 		},
 	}
@@ -1136,21 +1148,26 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		require.NotEmpty(t, patchData)
 	})
 
-	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+	t.Run("lastUsedAt less than a minute from now is not updated", func(t *testing.T) {
 		oldTokenLastUsedAt := tokenSecret.Data["last-used-at"]
 		defer func() {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 		}()
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Empty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Truncate(time.Second),
+			now.Add(-59 * time.Second).Truncate(time.Second),
+			now.Add(59 * time.Second).Truncate(time.Second),
+		} {
+			tokenSecret.Data["last-used-at"] = []byte(stored.Format(time.RFC3339))
+			patchData = nil
+			userRefresher.reset()
+
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, patchData, "stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
@@ -1158,28 +1175,31 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		defer func() {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 		}()
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(-time.Second).
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Add(-time.Minute).Truncate(time.Second),
+			now.Add(time.Minute).Truncate(time.Second),
+			time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC),
+		} {
+			tokenSecret.Data["last-used-at"] = []byte(stored.Format(time.RFC3339))
+			patchData = nil
+			userRefresher.reset()
 
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(time.Second).
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotEmpty(t, patchData, "stored lastUsedAt %s", stored)
 
-		resp, err = authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+			var patch []struct {
+				Path  string `json:"path"`
+				Value []byte `json:"value"`
+			}
+			require.NoError(t, json.Unmarshal(patchData, &patch))
+			require.Len(t, patch, 1)
+			assert.Equal(t, "/data/last-used-at", patch[0].Path)
+			assert.Equal(t, now.Truncate(time.Second).Format(time.RFC3339), string(patch[0].Value),
+				"stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
@@ -1188,8 +1208,9 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 			authenticator.extTokenStore = store
 		}()
-		newSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		newSCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		subCtrl := gomock.NewController(t)
+		newSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](subCtrl)
+		newSCache := fake.NewMockCacheInterface[*corev1.Secret](subCtrl)
 		newSecrets.EXPECT().Cache().Return(newSCache)
 
 		newSCache.EXPECT().
@@ -1201,16 +1222,14 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil, nil)
 
 		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(-time.Second).
+			Add(-time.Minute).
 			Truncate(time.Second).
 			Format(time.RFC3339))
-		patchData = nil
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		require.Empty(t, patchData)
 	})
 
 	t.Run("token fetched with token client", func(t *testing.T) {
@@ -1226,7 +1245,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("authenticate if userattribute doesn't exist", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, name string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, name string) (*apiv3.UserAttribute, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -1266,7 +1285,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
 		}()
 		userAttribute.ExtraByProvider = nil
-		fakeProvider.getUserExtraAttributesFunc = func(v3.Principal) map[string][]string { return map[string][]string{} }
+		fakeProvider.getUserExtraAttributesFunc = func(apiv3.Principal) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -1298,8 +1317,8 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("provider refresh is not called for system users", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -1395,7 +1414,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("user doesn't exist", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, name string) (*v3.User, error) {
+		userLister.GetFunc = func(_, name string) (*apiv3.User, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -1410,8 +1429,8 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("user is disabled", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -1430,7 +1449,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("error getting userattribute", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, _ string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, _ string) (*apiv3.UserAttribute, error) {
 			return nil, fmt.Errorf("some error")
 		}
 
@@ -1547,7 +1566,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 
 	userID := "u-abcdef"
 	userPrincipalID := "fake_user://12345"
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1557,7 +1576,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	now := time.Now()
 
 	t.Run("with invalid access token", func(t *testing.T) {
-		token := &v3.Token{
+		token := &apiv3.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "token-55rl6",
 				CreationTimestamp: metav1.NewTime(now),
@@ -1565,7 +1584,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 			Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
 			TTLMillis: 57600000,
 			UserID:    userID,
-			UserPrincipal: v3.Principal{
+			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userPrincipalID,
 				},
@@ -1601,7 +1620,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		signingKeyGetter := mocks.NewMocksigningKeyGetter(ctrl)
 		signingKeyGetter.EXPECT().GetPublicKey("unknown").Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "unknown"))
 
-		userAttribute := &v3.UserAttribute{
+		userAttribute := &apiv3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
@@ -1633,12 +1652,12 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 			},
 		}
 		userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-			GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+			GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 				return userAttribute, nil
 			},
 		}
 		userLister := &mgmtFakes.UserListerMock{
-			GetFunc: func(_, _ string) (*v3.User, error) {
+			GetFunc: func(_, _ string) (*apiv3.User, error) {
 				return user, nil
 			},
 		}
@@ -1661,7 +1680,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 				return now
 			},
 			keyGetter:       signingKeyGetter,
-			oidcClientCache: fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl),
+			oidcClientCache: fake.NewMockNonNamespacedCacheInterface[*apiv3.OIDCClient](ctrl),
 		}
 
 		resp, err := authenticator.Authenticate(req)
@@ -1672,7 +1691,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	})
 
 	t.Run("with valid access token", func(t *testing.T) {
-		token := &v3.Token{
+		token := &apiv3.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "token-55rl6",
 				CreationTimestamp: metav1.NewTime(now),
@@ -1680,7 +1699,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 			Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
 			TTLMillis: 57600000,
 			UserID:    userID,
-			UserPrincipal: v3.Principal{
+			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userPrincipalID,
 				},
@@ -1716,8 +1735,8 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 			},
 		}
 
-		oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl)
-		oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", testOIDCClient.Status.ClientID).Return([]*v3.OIDCClient{testOIDCClient}, nil)
+		oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.OIDCClient](ctrl)
+		oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", testOIDCClient.Status.ClientID).Return([]*apiv3.OIDCClient{testOIDCClient}, nil)
 		accessToken := provider.CreateAccessToken(testOIDCClient, token, []string{"openid"}, "kid", now)
 		privateKey := testGeneratePrivateKey(t)
 		signedToken, err := accessToken.SignedString(privateKey)
@@ -1726,7 +1745,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		signingKeyGetter := mocks.NewMocksigningKeyGetter(ctrl)
 		signingKeyGetter.EXPECT().GetPublicKey("kid").Return(&privateKey.PublicKey, nil)
 
-		userAttribute := &v3.UserAttribute{
+		userAttribute := &apiv3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
@@ -1758,12 +1777,12 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 			},
 		}
 		userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-			GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+			GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 				return userAttribute, nil
 			},
 		}
 		userLister := &mgmtFakes.UserListerMock{
-			GetFunc: func(_, _ string) (*v3.User, error) {
+			GetFunc: func(_, _ string) (*apiv3.User, error) {
 				return user, nil
 			},
 		}
@@ -1832,7 +1851,7 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 
 	userID := "u-abcdef"
 	userPrincipalID := "fake_user://12345"
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1841,7 +1860,7 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	}
 	now := time.Now()
 
-	token := &v3.Token{
+	token := &apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-55rl6",
 			CreationTimestamp: metav1.NewTime(now),
@@ -1849,7 +1868,7 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 		Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
 		TTLMillis: 57600000,
 		UserID:    userID,
-		UserPrincipal: v3.Principal{
+		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userPrincipalID,
 			},
@@ -1885,7 +1904,7 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	signedToken, err := accessToken.SignedString(privateKey)
 	require.NoError(t, err)
 
-	userAttribute := &v3.UserAttribute{
+	userAttribute := &apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1917,12 +1936,12 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 		},
 	}
 	userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-		GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+		GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 			return userAttribute, nil
 		},
 	}
 	userLister := &mgmtFakes.UserListerMock{
-		GetFunc: func(_, _ string) (*v3.User, error) {
+		GetFunc: func(_, _ string) (*apiv3.User, error) {
 			return user, nil
 		},
 	}
@@ -2100,14 +2119,14 @@ func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
 func TestSessionIdentity(t *testing.T) {
 	t.Parallel()
 
-	user := &v3.User{Username: "local-user"}
-	token := func(principalID, loginName string) *v3.Token {
-		return &v3.Token{UserPrincipal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}, LoginName: loginName}}
+	user := &apiv3.User{Username: "local-user"}
+	token := func(principalID, loginName string) *apiv3.Token {
+		return &apiv3.Token{UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}, LoginName: loginName}}
 	}
 
 	tests := []struct {
 		name  string
-		token *v3.Token
+		token *apiv3.Token
 		want  audit.Identity
 	}{
 		{
@@ -2138,7 +2157,7 @@ func TestSessionIdentity(t *testing.T) {
 		{
 			name: "token without a principal is a local user whatever its auth provider",
 			// The deprecated auth provider is ignored.
-			token: &v3.Token{AuthProvider: "github"},
+			token: &apiv3.Token{AuthProvider: "github"},
 			want:  audit.Identity{Username: "local-user", Provider: "local"},
 		},
 		{
@@ -2163,7 +2182,7 @@ func TestGetUserExtraInfoFromProviderOfNamedConfig(t *testing.T) {
 	var requested []string
 	githubProvider := &fakeProvider{
 		name: "github",
-		getUserExtraAttributesFunc: func(p v3.Principal) map[string][]string {
+		getUserExtraAttributesFunc: func(p apiv3.Principal) map[string][]string {
 			requested = append(requested, p.Name)
 			return map[string][]string{
 				common.UserAttributePrincipalID: {p.Name},
@@ -2176,7 +2195,7 @@ func TestGetUserExtraInfoFromProviderOfNamedConfig(t *testing.T) {
 		// A provider registered under the config name must not be asked.
 		configName: &fakeProvider{
 			name: configName,
-			getUserExtraAttributesFunc: func(v3.Principal) map[string][]string {
+			getUserExtraAttributesFunc: func(apiv3.Principal) map[string][]string {
 				t.Errorf("extras requested from a provider named after the config")
 				return nil
 			},
