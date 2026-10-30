@@ -7,7 +7,7 @@ toolchain go1.26.10
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.36 // CVE-2024-40635
 	github.com/docker/docker => github.com/moby/moby v28.5.2+incompatible // CVE-2025-54388
-	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.4 // CVE-2025-27144
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.6 // CVE-2025-27144
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.3.6 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.15 // CVE-2025-58058
 	golang.org/x/crypto => golang.org/x/crypto v0.56.0
@@ -49,7 +49,7 @@ require (
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
