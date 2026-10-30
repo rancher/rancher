@@ -10,4 +10,11 @@ if [ -z "$(type -p helm)" ]; then
     exit 1
 fi
 
+chart_yaml=$(dirname $0)/../../build/chart/rancher/Chart.yaml
+if grep -q '%[A-Z_]*%' "${chart_yaml}"; then
+    echo "unreplaced placeholders in ${chart_yaml}:"
+    grep '%[A-Z_]*%' "${chart_yaml}"
+    exit 1
+fi
+
 helm lint $(dirname $0)/../../build/chart/rancher

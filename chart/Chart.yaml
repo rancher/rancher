@@ -13,3 +13,30 @@ sources:
 maintainers:
   - name: Rancher Labs
     email: charts@rancher.com
+annotations:
+  # Images deployed by this chart and by Rancher, see HIP-0015. Tag placeholders
+  # are replaced by scripts/chart/images-annotation.
+  helm.sh/images: |
+    - name: rancher
+      image: rancher/rancher:%APP_VERSION%
+    - name: rancher-assets
+      image: rancher/rancher-assets:%ASSETS_TAG%
+    - name: rancher-agent
+      image: rancher/rancher-agent:%AGENT_TAG%
+    - name: system-agent
+      image: rancher/system-agent:%SYSTEM_AGENT_UPGRADE_TAG%
+    - name: shell
+      image: rancher/shell:%SHELL_TAG%
+    - name: machine
+      image: rancher/machine:%MACHINE_TAG%
+    - name: kube-api-auth
+      image: rancher/kube-api-auth:%KUBE_API_AUTH_TAG%
+    - name: cluster-api-controller
+      image: rancher/cluster-api-controller:%CLUSTER_API_CONTROLLER_TAG%
+    - name: scc-operator
+      image: rancher/scc-operator:%SCC_OPERATOR_TAG%
+    - name: mirrored-bci-micro
+      image: rancher/mirrored-bci-micro:%AUDIT_LOG_TAG%
+    - name: wins
+      image: rancher/wins:%WINS_AGENT_UPGRADE_TAG%
+      os: windows
