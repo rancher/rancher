@@ -33,7 +33,7 @@ const (
 i=0
 
 while [ $i -lt 30 ]; do
-	if $@ >/dev/null 2>&1; then
+	if "$@" >/dev/null 2>&1; then
 		exit 0
 	fi
 	sleep 10
@@ -67,13 +67,13 @@ TMPSAVENODES=$(mktemp)
 
 cat "$NODENAMESFILE" > "$TMPSAVENODES"
 
-if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
+if ! "$KUBECTL" get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
         echo "Error listing all nodes"
         exit 1
 fi
 
 while IFS='' read -r IDENTIFIER; do
-        if NODENAME=$(${KUBECTL} get node --no-headers -o=jsonpath='{.items[0].metadata.name}' -l rke.cattle.io/machine="$IDENTIFIER"); then
+        if NODENAME=$("$KUBECTL" get node --no-headers -o=jsonpath='{.items[0].metadata.name}' -l rke.cattle.io/machine="$IDENTIFIER"); then
                 echo "$NODENAME" >> "$TMPSAVENODES"
         fi
 done < "$MACHINEIDSFILE"
@@ -94,7 +94,7 @@ while IFS='' read -r NODE; do
         done < "$TMPSAVENODES"
         if [ "${FOUND}" != "true" ]; then
                 echo "Deleting node ${NODE}"
-                ${KUBECTL} delete node "${NODE}" --wait=false
+                "$KUBECTL" delete node "${NODE}" --wait=false
         fi
 done < "$TMPALLNODES"
 rm "$TMPALLNODES"
@@ -131,7 +131,7 @@ while ! $DESIREDNODESREADY; do
                 if [ "$MID" = "" ]; then
                         exit
                 fi
-                if NODEREADY=$(${KUBECTL} get node --no-headers -o=custom-columns=STATUS:status.conditions\[\?\(\@.type==\"Ready\"\)\].status -l rke.cattle.io/machine="$MID"); then
+                if NODEREADY=$("$KUBECTL" get node --no-headers -o=custom-columns=STATUS:status.conditions\[\?\(\@.type==\"Ready\"\)\].status -l rke.cattle.io/machine="$MID"); then
                         if [ "$NODEREADY" != "True" ]; then
                                 DESIREDNODESREADY=false
                                 sleep 5
@@ -151,7 +151,7 @@ ITERCOUNT=0
 while [ "$ITERCOUNT" != 60 ]; do
         ACTUALREADYCOUNT=0
         ITERCOUNT=$((ITERCOUNT+1))
-        if ! ${KUBECTL} get nodes --no-headers -o=custom-columns=STATUS:status.conditions\[\?\(\@.type==\"Ready\"\)\].status > "$TMPALLREADY"; then
+        if ! "$KUBECTL" get nodes --no-headers -o=custom-columns=STATUS:status.conditions\[\?\(\@.type==\"Ready\"\)\].status > "$TMPALLREADY"; then
                 sleep 5
                 continue
         fi

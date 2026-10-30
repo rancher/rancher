@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/rancher/rancher/pkg/capr"
 )
 
 // distroTokenHash mirrors k3s's util.ShortHash(password, 12): the first 12 characters of the
@@ -256,4 +258,50 @@ func TestTokenHashCommandFailsLoudlyWithoutAToken(t *testing.T) {
 			t.Errorf("command printed sha256 of the empty string (%q), which preflight would read as a token mismatch", got)
 		}
 	})
+}
+
+// TestTokenHashCommandQuotedDataDir checks the call site in buildPreflightPlan: the data directory goes
+// through capr.ShellQuote, so a path with shell syntax stays one word and runs no second command.
+func TestTokenHashCommandQuotedDataDir(t *testing.T) {
+	t.Parallel()
+	requireShellTools(t)
+
+	base := t.TempDir()
+	canary := filepath.Join(base, "canary")
+	password := "3f8a1c9e5b2d7f04a6c8e1b3d5f7092a"
+
+	for _, tt := range []struct {
+		name    string
+		dirName string
+	}{
+		{name: "normal", dirName: "rke2"},
+		{name: "space", dirName: "with space"},
+		{name: "newline", dirName: "new\nline"},
+		{name: "single quote", dirName: "it's"},
+		{name: "backslash", dirName: `back\slash`},
+		{name: "substitution", dirName: "$(touch " + canary + ")"},
+		{name: "semicolon", dirName: "x;touch " + canary},
+		{name: "quote escape", dirName: "x'; touch " + canary + "; echo '"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := filepath.Join(base, strings.ReplaceAll(tt.name, " ", "-"), tt.dirName)
+			if err := os.MkdirAll(filepath.Join(dir, "server"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "server", "token"), []byte(canonicalTokenFile(password)), 0600); err != nil {
+				t.Fatal(err)
+			}
+
+			out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf(TokenHashCommandFormat, capr.ShellQuote(dir))).Output()
+			if err != nil {
+				t.Fatalf("command failed: %v", err)
+			}
+			if got, want := strings.TrimSpace(string(out)), distroTokenHash(password); got != want {
+				t.Errorf("hash = %q, want %q", got, want)
+			}
+			if _, err := os.Stat(canary); !os.IsNotExist(err) {
+				t.Errorf("the command ran a second command, err = %v", err)
+			}
+		})
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"path"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,7 +136,7 @@ const (
 i=0
 
 while [ $i -lt 30 ]; do
-	if $@ >/dev/null 2>&1; then
+	if "$@" >/dev/null 2>&1; then
 		exit 0
 	fi
 	sleep 10
@@ -170,7 +171,7 @@ fi
 
 TMPALLNODES=$(mktemp)
 
-if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
+if ! "$KUBECTL" get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
         echo "Error listing all nodes"
         rm "$TMPALLNODES"
         exit 1
@@ -192,7 +193,7 @@ while IFS='' read -r NODE; do
         done < "$NODENAMESFILE"
         if [ "${FOUND}" != "true" ]; then
                 echo "Deleting node ${NODE}"
-                ${KUBECTL} delete node "${NODE}" --wait=false
+                "$KUBECTL" delete node "${NODE}" --wait=false
         fi
 done < "$TMPALLNODES"
 
@@ -2038,7 +2039,7 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 				Command:    "/bin/sh",
 				Args: []string{
 					"-c",
-					fmt.Sprintf(TokenHashCommandFormat, dataDir),
+					fmt.Sprintf(TokenHashCommandFormat, capr.ShellQuote(dataDir)),
 				},
 			},
 		},
@@ -2191,7 +2192,8 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	if rejoining {
 		arg := fmt.Sprintf("server: %q\n", supervisorURL(serverURL, s.adapter.GetSupervisorPort(secret)))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
-			arg = fmt.Sprintf("%stoken-file: \"%s\"\n", arg, path.Join(dataDir, "server/token"))
+			// strconv.Quote writes a YAML double-quoted string, and escapes the quote and the backslash.
+			arg = fmt.Sprintf("%stoken-file: %s\n", arg, strconv.Quote(path.Join(dataDir, "server/token")))
 		}
 		nodePlan.Files = append(nodePlan.Files, plan.File{
 			Content: base64.StdEncoding.EncodeToString(
