@@ -58,8 +58,10 @@ func ConfigRefs(lister v3.AuthConfigLister) ([]ConfigRef, error) {
 //
 // The AuthConfig can be written by something else after it was read, so if
 // the update conflicts, meta is replaced with the latest metadata from
-// getStoredMeta and the update is retried. Anything in obj derived from the
-// stored AuthConfig other than its metadata is not refreshed.
+// getStoredMeta and the update is retried. getStoredMeta can apply changes of
+// its own to the latest metadata, e.g. annotations that must be kept. Anything
+// in obj derived from the stored AuthConfig other than its metadata is not
+// refreshed.
 func UpdateAuthConfig(authConfigs v3.AuthConfigInterface, obj runtime.Object, meta *metav1.ObjectMeta, getStoredMeta func() (metav1.ObjectMeta, error)) error {
 	refresh := false
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -400,8 +401,9 @@ func (s *Provider) getSamlConfigFromUnstructured(configName string) (*apiv3.Saml
 func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	var configType string
 
-	// Copy the annotations.
-	annotations := config.Annotations
+	// The annotations passed in are applied over the stored metadata, including
+	// on retry, so they win over any written to the AuthConfig since it was read.
+	annotations := maps.Clone(config.Annotations)
 	getStoredMeta := func() (metav1.ObjectMeta, error) {
 		storedSamlConfig, err := s.getSamlConfig(config.Name)
 		if err != nil {

@@ -4,6 +4,7 @@ package azure
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -438,8 +439,9 @@ func (ap *Provider) newAzureClient(cfg *apiv3.AzureADConfig) (clients.AzureClien
 }
 
 func (ap *Provider) saveAzureConfigK8s(config *apiv3.AzureADConfig) error {
-	// Copy the annotations.
-	annotations := config.Annotations
+	// The annotations passed in are applied over the stored metadata, including
+	// on retry, so they win over any written to the AuthConfig since it was read.
+	annotations := maps.Clone(config.Annotations)
 	getStoredMeta := func() (metav1.ObjectMeta, error) {
 		storedAzureConfig, err := ap.GetAzureConfigK8s(config.GetName())
 		if err != nil {
