@@ -1,6 +1,11 @@
 package main
 
-import "io"
+import (
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+)
 
 // DockerfileEnvMapping ties a Dockerfile `ENV` variable to the build.yaml key
 // holding its value.
@@ -20,8 +25,42 @@ type DockerfileWriter struct {
 }
 
 // Run reads the Dockerfile, rewrites the mapped ENV lines and writes the result
-// to Output.
+// to Output. Nothing is written to Output if any mapping cannot be applied.
 func (w *DockerfileWriter) Run() error {
-	// TODO: not implemented yet, writes nothing.
-	return nil
+	if w.Config == nil {
+		return errors.New("nil config")
+	}
+	if w.Dockerfile == nil {
+		return errors.New("nil dockerfile input")
+	}
+	if w.Output == nil {
+		return errors.New("nil output")
+	}
+
+	content, err := io.ReadAll(w.Dockerfile)
+	if err != nil {
+		return fmt.Errorf("failed to read dockerfile: %w", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, m := range w.Mappings {
+		value := w.Config[m.Key]
+		if value == "" {
+			return fmt.Errorf("%q is missing or empty in build config", m.Key)
+		}
+		prefix := "ENV " + m.Env + "="
+		found := false
+		for i, line := range lines {
+			if strings.HasPrefix(line, prefix) {
+				lines[i] = prefix + value
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("no %q line found in dockerfile", prefix)
+		}
+	}
+
+	_, err = io.WriteString(w.Output, strings.Join(lines, "\n"))
+	return err
 }
