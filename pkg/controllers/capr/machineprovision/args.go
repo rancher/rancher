@@ -4,9 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -30,7 +27,6 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
 
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
@@ -93,7 +89,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 	} else if err != nil {
 		return driverArgs{}, err
 	} else if !strings.HasPrefix(nd.Spec.URL, "local://") {
-		url, hash, err = getDriverDownloadURL(nd)
+		url, hash, err = drivers.GetDriverDownloadURL(nd)
 		if err != nil {
 			return driverArgs{}, err
 		}
@@ -350,49 +346,9 @@ func getNodeDriverName(typeMeta meta.Type) string {
 	return strings.ToLower(strings.TrimSuffix(typeMeta.GetKind(), "Machine"))
 }
 
-// getDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
-// If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
-func getDriverDownloadURL(nd *mgmtv3.NodeDriver) (string, string, error) {
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
-		return nd.Spec.URL, nd.Spec.Checksum, nil
-	}
-
-	driverName := nd.Name
-	if !strings.HasPrefix(driverName, drivers.DockerMachineDriverPrefix) {
-		driverName = drivers.DockerMachineDriverPrefix + driverName
-	}
-
-	path := filepath.Join(settings.UIDashboardPath.Get(), "assets", driverName)
-	if _, err := os.Stat(path); err != nil {
-		return nd.Spec.URL, nd.Spec.Checksum, nil
-	}
-
-	hash, err := hashFile(path)
-	if err != nil {
-		return "", "", err
-	}
-
-	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName), hash, nil
-}
-
 func hashName(name string) string {
 	b := sha256.Sum256([]byte(name))
 	return hex.EncodeToString(b[:16])
-}
-
-func hashFile(path string) (string, error) {
-	hasher := sha256.New()
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(hasher, f); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func getWhitelistedEnvVars() map[string][]byte {

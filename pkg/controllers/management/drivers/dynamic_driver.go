@@ -1,43 +1,45 @@
 package drivers
 
 import (
-	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/jailer"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
 type DynamicDriver struct {
 	BaseDriver
+	AssetDir string
 }
 
 var DockerMachineDriverPrefix = "docker-machine-driver-"
 
-const ExecutionTimeout = time.Second * 5
-
-func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
+func NewDynamicDriver(builtin bool, name, url, hash string) (*DynamicDriver, error) {
 	d := &DynamicDriver{
-		BaseDriver{
+		BaseDriver: BaseDriver{
 			Builtin:      builtin,
 			DriverName:   name,
 			URL:          url,
 			DriverHash:   hash,
 			BinaryPrefix: DockerMachineDriverPrefix,
+			DevMode:      os.Getenv("CATTLE_DEV_MODE") != "",
 		},
 	}
 	if !strings.HasPrefix(d.DriverName, DockerMachineDriverPrefix) {
 		d.DriverName = DockerMachineDriverPrefix + d.DriverName
 	}
-	return d
+	if len(hash) > 0 && d.getHasher() == nil {
+		return nil, fmt.Errorf("invalid hash format: %s", hash)
+	}
+	return d, nil
 }
 
 func (d *DynamicDriver) Install() error {
@@ -49,11 +51,45 @@ func (d *DynamicDriver) Install() error {
 		return err
 	}
 
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
+	if d.DevMode {
 		return nil
 	}
 
-	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIDashboardPath.Get(), d.DriverName))
+	return d.copyTo(d.assetPath())
+}
+
+func (d *DynamicDriver) assetPath() string {
+	if d.AssetDir != "" {
+		return filepath.Join(d.AssetDir, d.DriverName)
+	}
+	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
+}
+
+// Valid returns whether the driver binary is correctly downloaded and installed
+func (d *DynamicDriver) Valid() bool {
+	if !d.Exists() {
+		return false
+	} else if d.Builtin {
+		return true
+	}
+
+	expectedHash, err := os.ReadFile(d.srcBinHashFile())
+	if err != nil {
+		return false
+	}
+	hasher := sha256.New()
+
+	f, err := os.Open(d.assetPath())
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return false
+	}
+	_, matches := compare(hasher, string(expectedHash))
+	return matches
 }
 
 func (d *BaseDriver) copyTo(dest string) error {
@@ -85,58 +121,45 @@ func (d *BaseDriver) copyTo(dest string) error {
 	return nil
 }
 
-// Executable is will return nil if the driver can be executed
-func (d *BaseDriver) Executable() error {
-	if d.DriverName == "" {
-		return fmt.Errorf("empty driver name")
+// GetDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
+// If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
+func GetDriverDownloadURL(nd *v3.NodeDriver) (string, string, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
 	}
 
-	if d.Builtin {
-		return nil
+	driverName := nd.Spec.DisplayName
+	if driverName == "" {
+		driverName = nd.Name
 	}
-	logrus.Debugf("Checking if driver %s is executable", d.DriverName)
-	binaryPath := d.binName()
-	info, err := os.Lstat(binaryPath)
+	if !strings.HasPrefix(driverName, DockerMachineDriverPrefix) {
+		driverName = DockerMachineDriverPrefix + driverName
+	}
+
+	path := filepath.Join(settings.UIDashboardPath.Get(), "assets", driverName)
+	if _, err := os.Stat(path); err != nil {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	hash, err := sha256sum(path)
 	if err != nil {
-		return fmt.Errorf("driver %s not found", binaryPath)
-	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("driver %s is not a regular file", binaryPath)
+		return "", "", err
 	}
 
-	// prepare a jail
-	jailName := fmt.Sprintf("exec-jail-%s", d.DriverName)
-	jailPath := path.Join(jailer.BaseJailPath, jailName)
-	err = jailer.CreateJail(jailName)
+	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName), hash, nil
+}
+
+func sha256sum(path string) (string, error) {
+	hasher := sha256.New()
+	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("couldn't create exec-jail: %w", err)
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return "", err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ExecutionTimeout)
-	defer cancel()
-
-	binaryPathInJail := path.Join("/var/lib/rancher/management-state/bin", d.DriverName)
-	cmd, err := jailer.JailCommand(exec.CommandContext(ctx, binaryPathInJail), jailPath)
-	if err != nil {
-		return fmt.Errorf("error jailing command: %w", err)
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return errors.Wrapf(err, "driver binary %s couldn't execute", binaryPathInJail)
-	}
-
-	// We don't care about the exit code, just want to make sure we can execute the binary
-	_ = cmd.Wait()
-
-	// Remove the jail to ensure it is rebuilt each time,
-	// as the hard link still points to the old driver after downloading a new version
-	info, err = os.Lstat(jailPath)
-	if err == nil && info.IsDir() {
-		if err := os.RemoveAll(jailPath); err != nil {
-			return fmt.Errorf("couldn't remove exec-jail: %w", err)
-		}
-	}
-
-	return nil
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
