@@ -443,14 +443,22 @@ func (g *Provider) getGithubAppConfigCR(configName string) (*apiv3.GithubAppConf
 }
 
 func (g *Provider) saveGithubAppConfig(config *apiv3.GithubAppConfig) error {
-	storedGithubAppConfig, err := g.getGithubAppConfigCR(config.GetName())
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedGithubAppConfig, err := g.getGithubAppConfigCR(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		return storedGithubAppConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.GithubAppConfigType
-	config.ObjectMeta = storedGithubAppConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	secretInfo := convert.ToString(config.ClientSecret)
 	field := strings.ToLower(client.GithubAppConfigFieldClientSecret)
@@ -469,12 +477,7 @@ func (g *Provider) saveGithubAppConfig(config *apiv3.GithubAppConfig) error {
 
 	config.PrivateKey = privateKeyName
 
-	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return common.UpdateAuthConfig(g.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 func getAppDataWithConfig(ctx context.Context, config *apiv3.GithubAppConfig) (*gitHubAppData, error) {

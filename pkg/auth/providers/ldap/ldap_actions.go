@@ -16,6 +16,7 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -197,7 +198,15 @@ func (p *ldapProvider) testAndApplyConfigName(input *v3.LdapTestAndApplyInput) s
 }
 
 func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
-	storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), config.Name)
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), config.Name)
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		return storedConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
@@ -209,7 +218,7 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 		config.Type = client.FreeIpaConfigType
 	}
 
-	config.ObjectMeta = storedConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	field := strings.ToLower(client.LdapConfigFieldServiceAccountPassword)
 	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
@@ -221,11 +230,7 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 	config.ServiceAccountPassword = name
 
 	logrus.Debugf("updating %s config", p.providerName)
-	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return common.UpdateAuthConfig(p.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 // validateIDAttributesUnchanged rejects changes to the principal identifier attributes of an enabled provider.

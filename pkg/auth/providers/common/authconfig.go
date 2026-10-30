@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 // localConfigName is the name of the local AuthConfig, and of its provider.
@@ -48,4 +51,30 @@ func ConfigRefs(lister v3.AuthConfigLister) ([]ConfigRef, error) {
 	}
 
 	return refs, nil
+}
+
+// UpdateAuthConfig updates the AuthConfig with obj, where meta is the metadata
+// of obj, and is expected to be the metadata of the stored AuthConfig.
+//
+// The AuthConfig can be written by something else after it was read, so if
+// the update conflicts, meta is replaced with the latest metadata from
+// getStoredMeta and the update is retried. getStoredMeta can apply changes of
+// its own to the latest metadata, e.g. annotations that must be kept. Anything
+// in obj derived from the stored AuthConfig other than its metadata is not
+// refreshed.
+func UpdateAuthConfig(authConfigs v3.AuthConfigInterface, obj runtime.Object, meta *metav1.ObjectMeta, getStoredMeta func() (metav1.ObjectMeta, error)) error {
+	refresh := false
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if refresh {
+			storedMeta, err := getStoredMeta()
+			if err != nil {
+				return err
+			}
+			*meta = storedMeta
+		}
+		refresh = true
+
+		_, err := authConfigs.ObjectClient().Update(meta.Name, obj)
+		return err
+	})
 }

@@ -382,14 +382,22 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR(configName string) (*apiv3.
 }
 
 func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *apiv3.GoogleOauthConfig) error {
-	storedGoogleOAuthConfig, err := g.getGoogleOAuthConfigCR(config.GetName())
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedGoogleOAuthConfig, err := g.getGoogleOAuthConfigCR(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		return storedGoogleOAuthConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.GoogleOauthConfigType
-	config.ObjectMeta = storedGoogleOAuthConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	secretInfo := convert.ToString(config.OauthCredential)
 	field := strings.ToLower(client.GoogleOauthConfigFieldOauthCredential)
@@ -409,11 +417,7 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *apiv3.GoogleOauthC
 		config.ServiceAccountCredential = name
 	}
 
-	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return common.UpdateAuthConfig(g.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, configName string, token accessor.TokenAccessor) apiv3.Principal {
