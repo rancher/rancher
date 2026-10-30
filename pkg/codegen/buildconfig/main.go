@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"strings"
 	"syscall"
 	"text/template"
 
@@ -34,6 +36,63 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if err := updateDockerfiles(cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+// dockerfileTargets lists the Dockerfiles that carry build.yaml-managed ENV lines.
+var dockerfileTargets = []struct {
+	path     string
+	mappings []DockerfileEnvMapping
+}{
+	{
+		path: "package/Dockerfile",
+		mappings: []DockerfileEnvMapping{
+			{Env: "CATTLE_MACHINE_VERSION", Key: "machineVersion"},
+			{Env: "CATTLE_SYSTEM_AGENT_VERSION", Key: "systemAgentVersion"},
+			{Env: "CATTLE_WINS_AGENT_VERSION", Key: "winsAgentVersion"},
+		},
+	},
+	{
+		path: "Dockerfile.runtime",
+		mappings: []DockerfileEnvMapping{
+			{Env: "CATTLE_MACHINE_VERSION", Key: "machineVersion"},
+		},
+	},
+}
+
+func updateDockerfiles(cfg map[string]string) error {
+	// The Dockerfiles carry the machine version, which is the tag of machineProvisionImage.
+	_, machineVersion, ok := strings.Cut(cfg["machineProvisionImage"], ":")
+	if !ok || machineVersion == "" {
+		return fmt.Errorf("machineProvisionImage %q has no image tag", cfg["machineProvisionImage"])
+	}
+	cfg = maps.Clone(cfg)
+	cfg["machineVersion"] = machineVersion
+
+	for _, target := range dockerfileTargets {
+		in, err := os.ReadFile(target.path)
+		if err != nil {
+			return err
+		}
+		// Render in memory first so a failure never truncates the existing file.
+		buf := new(bytes.Buffer)
+		writer := DockerfileWriter{
+			Config:     cfg,
+			Mappings:   target.mappings,
+			Dockerfile: bytes.NewReader(in),
+			Output:     buf,
+		}
+		if err := writer.Run(); err != nil {
+			return fmt.Errorf("%s: %w", target.path, err)
+		}
+		if err := os.WriteFile(target.path, buf.Bytes(), 0644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 const toolsSystemImagesPath = "pkg/apis/management.cattle.io/v3/tools_system_images.go"

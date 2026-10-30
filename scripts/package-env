@@ -6,15 +6,16 @@ ARCH=${ARCH:-"amd64"}
 CHART_REPO_DIR=build/charts
 
 build_file="$(git rev-parse --show-toplevel)/build.yaml"
-CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-$(grep -m1 'chartDefaultBranch' "$build_file" | cut -d ' ' -f2)}
+# Print the value of a top-level key in build.yaml.
+build_yaml_get() {
+  grep -m1 "^$1:" "$build_file" | cut -d ' ' -f2
+}
+CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-$(build_yaml_get chartDefaultBranch)}
 
 # Empty when REGISTRY is unset, otherwise REGISTRY with exactly one trailing slash.
 REGISTRY_PREFIX=${REGISTRY:+${REGISTRY%/}/}
 IMAGE=${REGISTRY_PREFIX}${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
-SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" "${SCRIPT_DIR}/../package/Dockerfile" | awk -F'=' '{ print $NF }')-suc
-SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" "${SCRIPT_DIR}/../package/Dockerfile" | awk -F'=' '{ print $NF }')
-WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
-CLUSTER_API_CONTROLLER_TAG=v1.14.3
-CLUSTER_API_CONTROLLER_IMAGE=rancher/cluster-api-controller:${CLUSTER_API_CONTROLLER_TAG}
+SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:$(build_yaml_get systemAgentVersion)-suc
+WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:$(build_yaml_get winsAgentVersion)
+CLUSTER_API_CONTROLLER_IMAGE=$(build_yaml_get clusterApiControllerImage)

@@ -5,14 +5,18 @@ package buildconfig
 const (
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-15.11"
 	ChartDefaultBranch        = "dev-v2.16"
+	ClusterApiControllerImage = "rancher/cluster-api-controller:v1.14.3"
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261027T2136Z-dev"
 	DefaultKubeApiAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.3"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.3"
 	DefaultShellVersion       = "rancher/shell:v0.9.0-rc.1"
 	FleetVersion              = "111.0.0+up0.17.0-beta.2"
+	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.7"
 	PartnerChartDefaultBranch = "main"
 	RemoteDialerProxyVersion  = "111.0.0+up0.9.0-rc.3"
 	Rke2ChartDefaultBranch    = "main"
+	SystemAgentVersion        = "v0.16.0-rc.5"
 	TurtlesVersion            = "111.0.0+up0.28.0-rc.3"
 	WebhookVersion            = "111.0.0+up0.12.1-rc.14"
+	WinsAgentVersion          = "v0.16.0-rc.9"
 )
