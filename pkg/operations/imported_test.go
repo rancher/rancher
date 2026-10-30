@@ -918,6 +918,38 @@ func TestImportedAdapter_DistroDataDirectory(t *testing.T) {
 	}
 }
 
+// --- GetServerURL ------------------------------------------------------
+
+func TestPrimaryNodeAddress(t *testing.T) {
+	t.Parallel()
+
+	internal := func(a string) corev1.NodeAddress { return corev1.NodeAddress{Type: corev1.NodeInternalIP, Address: a} }
+	external := func(a string) corev1.NodeAddress { return corev1.NodeAddress{Type: corev1.NodeExternalIP, Address: a} }
+	hostname := corev1.NodeAddress{Type: corev1.NodeHostName, Address: "node-a"}
+
+	tests := []struct {
+		name      string
+		addresses []corev1.NodeAddress
+		want      string
+	}{
+		{"IPv4 only", []corev1.NodeAddress{internal("10.0.0.1"), hostname}, "10.0.0.1"},
+		{"IPv6 only", []corev1.NodeAddress{internal("fd00::1"), hostname}, "fd00::1"},
+		// The kubelet lists addresses primary family first: the family the node runs on.
+		{"dual-stack IPv4 primary", []corev1.NodeAddress{internal("10.0.0.1"), internal("fd00::1"), hostname}, "10.0.0.1"},
+		{"dual-stack IPv6 primary", []corev1.NodeAddress{internal("fd00::1"), internal("10.0.0.1"), hostname}, "fd00::1"},
+		{"InternalIP preferred over ExternalIP", []corev1.NodeAddress{external("203.0.113.1"), internal("10.0.0.1")}, "10.0.0.1"},
+		{"first ExternalIP when no InternalIP", []corev1.NodeAddress{external("2001:db8::1"), external("203.0.113.1")}, "2001:db8::1"},
+		{"no IP addresses", []corev1.NodeAddress{hostname}, ""},
+		{"no addresses", nil, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, primaryNodeAddress(tt.addresses))
+		})
+	}
+}
+
 // --- RenderProbes ------------------------------------------------------
 
 func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *testing.T) {
@@ -979,12 +1011,21 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 	assert.NotContains(t, probes, CalicoProbeName)
 
 	kcm := probes[KubeControllerManagerProbeName]
-	assert.Equal(t, "https://127.0.0.1:10261/healthz", kcm.HTTPGetAction.URL)
+	assert.Equal(t, "https://localhost:10261/healthz", kcm.HTTPGetAction.URL)
 	assert.Equal(t, "/custom/kcm.crt", kcm.HTTPGetAction.CACert)
 
 	scheduler := probes[KubeSchedulerProbeName]
-	assert.Equal(t, "https://127.0.0.1:10262/healthz", scheduler.HTTPGetAction.URL)
+	assert.Equal(t, "https://localhost:10262/healthz", scheduler.HTTPGetAction.URL)
 	assert.Equal(t, "/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt", scheduler.HTTPGetAction.CACert)
+}
+
+// TestImportedAdapter_LoopbackAddress pins the imported adapter to localhost: the node-local
+// endpoints it probes and points etcd at listen on the loopback of the node's primary address
+// family, which Rancher cannot know for an imported cluster, and localhost resolves to both.
+func TestImportedAdapter_LoopbackAddress(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "localhost", (&ImportedAdapter{}).LoopbackAddress(nil))
 }
 
 // calicoTestSecret builds a machine-plan secret with lifecycle labels pointing at machineName,

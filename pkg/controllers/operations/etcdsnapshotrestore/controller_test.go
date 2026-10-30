@@ -21,7 +21,11 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/restoremode"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +63,8 @@ type stubAdapter struct {
 	kubeconfigPath    string
 	serverUnit        string
 	waitForRegisterOK bool
+	// pauseCalls records every PauseCluster call, in order.
+	pauseCalls []bool
 
 	// restoreTargets are the objects RestoreTarget serves, keyed by resource key. A key that is
 	// absent yields (nil, nil), i.e. this cluster type has no counterpart for it.
@@ -100,8 +106,11 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 
 func (a *stubAdapter) BeaconRef() (string, string)    { return "test-namespace", "test-cluster" }
 func (a *stubAdapter) WaitForRegister() (bool, error) { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(_ bool) error      { return nil }
-func (a *stubAdapter) RuntimeCommand() string         { return a.runtimeCommand }
+func (a *stubAdapter) PauseCluster(paused bool) error {
+	a.pauseCalls = append(a.pauseCalls, paused)
+	return nil
+}
+func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 	return a.dataDir, a.dataDirErr
 }
@@ -526,14 +535,14 @@ func TestBuildShutdownPlan(t *testing.T) {
 		for _, instr := range plan.OneTimeInstructions {
 			names = append(names, instr.Name)
 		}
-		// The install is ordered ahead of the killall, so anything it starts is torn down again.
-		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory"}
+		// The install comes last, once the distro is stopped and its etcd and TLS state cleared.
+		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory", "install"}
 		if strings.Join(names, ",") != strings.Join(want, ",") {
 			t.Errorf("instructions = %v, want %v", names, want)
 		}
 
-		// The killall script reads the data directory out of the environment.
-		// The install now sits between the tracking cleanup and the killall, so the shutdown is third.
+		// The killall script reads the data directory out of the environment. It directly follows the
+		// tracking cleanup.
 		shutdown := plan.OneTimeInstructions[1]
 		dataDir, err := adapter.DistroDataDirectory(secret)
 		if err != nil {
@@ -559,14 +568,56 @@ func TestBuildShutdownPlan(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// No etcd data or TLS material to clear on a worker, but it is still installed and stopped:
+		// No etcd data or TLS material to clear on a worker, but it is still stopped and installed:
 		// it has to come back on the same version as the control plane it rejoins.
-		if len(plan.OneTimeInstructions) != 2 {
-			t.Fatalf("expected 2 instructions, got %d", len(plan.OneTimeInstructions))
-		}
+		var names []string
 		for _, instr := range plan.OneTimeInstructions {
-			if instr.Name == "create-etcd-tombstone" || instr.Name == "remove-tls-directory" {
-				t.Errorf("unexpected instruction %q for a worker node", instr.Name)
+			names = append(names, instr.Name)
+		}
+		want := []string{"remove idempotency tracking", "shutdown", "install"}
+		if strings.Join(names, ",") != strings.Join(want, ",") {
+			t.Errorf("instructions = %v, want %v", names, want)
+		}
+	})
+
+	t.Run("the install lays down the configured version without starting it", func(t *testing.T) {
+		// This is the operation's only install: it runs here, on every node, while nothing is
+		// running. The reset in the Restore step and the restarts afterwards both depend on it, so it
+		// has to carry the version being restored to. Nothing follows it in the plan, so it must also
+		// leave the service alone: were it to start the distro, the node would stay up into the reset.
+		secret := makePlanSecret("init", "node-init", map[string]string{capr.EtcdRoleLabel: "true"})
+
+		plan, err := buildShutdownPlan(s, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		install := plan.OneTimeInstructions[len(plan.OneTimeInstructions)-1]
+
+		if install.Name != "install" {
+			t.Fatalf("last instruction = %q, want the install", install.Name)
+		}
+		if !strings.HasSuffix(install.Image, ":v1.33.0-rke2r1") {
+			t.Errorf("image = %q, want it tagged with the configured version", install.Image)
+		}
+		if !slices.Contains(install.Env, "INSTALL_RKE2_SKIP_START=true") {
+			t.Errorf("env = %v, want the distro start suppressed", install.Env)
+		}
+	})
+
+	t.Run("a cluster type that does not manage its version shuts down without installing", func(t *testing.T) {
+		// An imported cluster whose version Rancher does not choose: there is no version to lay down,
+		// so the plan is the shutdown alone.
+		noVersion := newTestScope(defaultAdapter(), "restore-uid")
+		secret := makePlanSecret("init", "node-init", map[string]string{capr.EtcdRoleLabel: "true"})
+
+		plan, err := buildShutdownPlan(noVersion, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, instr := range plan.OneTimeInstructions {
+			if instr.Name == "install" {
+				t.Error("expected no install instruction when the cluster has no configured version")
 			}
 		}
 	})
@@ -1555,6 +1606,7 @@ func TestStepHookPrefixForCoversEveryStep(t *testing.T) {
 		opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster,
 		opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup,
 		opv1alpha1.ETCDSnapshotRestoreStepRestartCluster,
+		opv1alpha1.ETCDSnapshotRestoreStepPostflight,
 	}
 
 	seen := map[string]opv1alpha1.ETCDSnapshotRestoreStep{}
@@ -1568,6 +1620,145 @@ func TestStepHookPrefixForCoversEveryStep(t *testing.T) {
 			t.Errorf("steps %q and %q share hook prefix %q", step, other, prefix)
 		}
 		seen[prefix] = step
+	}
+}
+
+func TestBuildPostflightPlan(t *testing.T) {
+	t.Parallel()
+
+	s := newTestScope(defaultAdapter(), types.UID("uid-1"))
+	secret := makePlanSecret("etcd-2", "node-etcd-2", map[string]string{capr.EtcdRoleLabel: "true"})
+
+	nodePlan, err := buildPostflightPlan(s, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodePlan.OneTimeInstructions) != 1 {
+		t.Fatalf("instructions = %d, want the single membership check", len(nodePlan.OneTimeInstructions))
+	}
+	inst := nodePlan.OneTimeInstructions[0]
+	if inst.Name != postflightInstructionName || !inst.SaveOutput {
+		t.Errorf("instruction %q (SaveOutput=%t), want %q saving its output, which is where the check reads it back", inst.Name, inst.SaveOutput, postflightInstructionName)
+	}
+	script := inst.Args[len(inst.Args)-1]
+	// The node is asked about its own etcd, through its own supervisor, whatever it joins through.
+	for _, want := range []string{
+		"https://127.0.0.1:9345/db/info",
+		"/var/lib/rancher/rke2/server/token",
+		"/var/lib/rancher/rke2/server/tls/server-ca.crt",
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("postflight script does not reference %s:\n%s", want, script)
+		}
+	}
+	if strings.Contains(script, "idempotent") {
+		t.Error("postflight check must not go through the idempotent script, whose already-reconciled message would land in the saved output")
+	}
+}
+
+func TestParsePostflightOutput(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name        string
+		raw         string
+		members     int
+		err         bool
+		unavailable bool
+	}{
+		{name: "member list", raw: `{"members":[{"ID":1,"name":"a-1"},{"ID":2,"name":"b-2","isLearner":true}]}` + "\n", members: 2},
+		{name: "error", raw: "ERROR: curl: (7) Failed to connect\n", err: true},
+		{name: "unavailable", raw: "UNAVAILABLE: curl not found\n", unavailable: true},
+		{name: "empty", raw: "", err: true},
+		{name: "garbage", raw: "not json", err: true},
+		{name: "no members", raw: `{"members":[]}`, err: true},
+	} {
+		view := parsePostflightOutput([]byte(tc.raw))
+		if len(view.members) != tc.members || (view.err != "") != tc.err || (view.unavailable != "") != tc.unavailable {
+			t.Errorf("%s: parsed %+v", tc.name, view)
+		}
+	}
+}
+
+func TestEvaluatePostflight(t *testing.T) {
+	t.Parallel()
+
+	view := func(node, raw string) postflightView {
+		v := parsePostflightOutput([]byte(raw))
+		v.node, v.display = node, node
+		return v
+	}
+
+	// The restored cluster on node-1 and node-2, and node init-0 split off into a cluster of its own:
+	// the /db/info output read off the three servers of a restore that did exactly that.
+	restored := `{"members":[{"ID":2802892032093791374,"name":"imported-node-1-52dc9da3","peerURLs":["https://10.42.0.71:2380"]},{"ID":4060211614952743381,"name":"imported-node-2-f6574f6c","peerURLs":["https://10.42.0.72:2380"]}]}`
+	forked := `{"members":[{"ID":8181481089066986192,"name":"imported-init-0-2a21fca4","peerURLs":["https://10.42.0.70:2380"]}]}`
+	whole := `{"members":[{"ID":2802892032093791374,"name":"imported-node-1-52dc9da3"},{"ID":4060211614952743381,"name":"imported-node-2-f6574f6c"},{"ID":8181481089066986192,"name":"imported-init-0-2a21fca4"}]}`
+
+	leaderWhole := view("imported-node-1", whole)
+
+	for _, tc := range []struct {
+		name    string
+		leader  postflightView
+		views   []postflightView
+		problem string // substring of the expected problem, or "" for a whole cluster
+		skipped int
+	}{
+		{
+			name:   "every node in the restored cluster",
+			leader: leaderWhole,
+			views:  []postflightView{view("imported-init-0", whole), leaderWhole, view("imported-node-2", whole)},
+		},
+		{
+			name:    "split brain",
+			leader:  view("imported-node-1", restored),
+			views:   []postflightView{view("imported-init-0", forked), view("imported-node-1", restored), view("imported-node-2", restored)},
+			problem: "imported-init-0 is not in the cluster restored on imported-node-1 (split brain)",
+		},
+		{
+			name:   "learner",
+			leader: leaderWhole,
+			views: []postflightView{leaderWhole, view("imported-node-2",
+				`{"members":[{"ID":2802892032093791374,"name":"imported-node-1-52dc9da3"},{"ID":4060211614952743381,"name":"imported-node-2-f6574f6c","isLearner":true},{"ID":8181481089066986192,"name":"imported-init-0-2a21fca4"}]}`)},
+			problem: "is still a learner",
+		},
+		{
+			name:    "node could not read its membership",
+			leader:  leaderWhole,
+			views:   []postflightView{leaderWhole, view("imported-node-2", "ERROR: curl: (7) Failed to connect")},
+			problem: "could not read etcd membership on imported-node-2",
+		},
+		{
+			name:    "leader could not read its membership",
+			leader:  view("imported-node-1", "ERROR: no server token password found"),
+			views:   []postflightView{view("imported-node-1", "ERROR: no server token password found")},
+			problem: "on restore leader imported-node-1",
+		},
+		{
+			// Every node agrees, but the cluster carries a member for a node that is not one of
+			// its etcd nodes — left behind by a node that was wiped and rejoined, say.
+			name:    "stale member",
+			leader:  view("imported-node-1", whole),
+			views:   []postflightView{view("imported-node-1", whole), view("imported-node-2", whole)},
+			problem: "etcd member imported-init-0-2a21fca4 of the cluster restored on imported-node-1 belongs to none of its etcd nodes",
+		},
+		{
+			name:    "node missing from a cluster that otherwise agrees",
+			leader:  view("imported-node-1", restored),
+			views:   []postflightView{view("imported-init-0", restored), view("imported-node-1", restored), view("imported-node-2", restored)},
+			problem: "imported-init-0 is not a member of the cluster restored on imported-node-1",
+		},
+	} {
+		err := evaluatePostflight(tc.leader, tc.views)
+		if tc.problem == "" && err != nil {
+			t.Errorf("%s: unexpected problem %q", tc.name, err.Error())
+		} else if tc.problem != "" {
+			if err == nil {
+				t.Errorf("%s: expected problem %q", tc.name, tc.problem)
+			} else if !strings.Contains(err.Error(), tc.problem) {
+				t.Errorf("%s: problem %q, want it to mention %q", tc.name, err.Error(), tc.problem)
+			}
+		}
 	}
 }
 
@@ -1701,7 +1892,16 @@ func TestBuildRestartPlan(t *testing.T) {
 		// The version was installed during the Shutdown step, on every node at once, so a restart is
 		// all that is left to do. The adapter still offers an install, so this pins that the restart
 		// leaves it alone rather than there being nothing to install.
-		for _, secret := range []*corev1.Secret{initSecret, otherEtcd, worker} {
+		for _, tc := range []struct {
+			secret  *corev1.Secret
+			initial []string
+		}{
+			{secret: initSecret, initial: []string{idempotencyKey + "/restart"}},
+			// A rejoining etcd node is wiped first; see the dedicated subtest.
+			{secret: otherEtcd, initial: []string{idempotencyKey + "/rejoin-clean-etcd-dir", idempotencyKey + "/restart"}},
+			{secret: worker, initial: []string{idempotencyKey + "/restart"}},
+		} {
+			secret := tc.secret
 			adapter := defaultAdapter()
 			adapter.installVersion = restartTestVersion
 			s := newTestScope(adapter, types.UID("uid-1"))
@@ -1710,7 +1910,7 @@ func TestBuildRestartPlan(t *testing.T) {
 			if err != nil {
 				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
 			}
-			assertInstructionOrder(t, initial, []string{idempotencyKey + "/restart"})
+			assertInstructionOrder(t, initial, tc.initial)
 
 			final, err := buildRestartPlan(s, secret, initSecret, serverURL, finalValue, false)
 			if err != nil {
@@ -1799,6 +1999,111 @@ func TestBuildRestartPlan(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("a rejoining etcd node starts without etcd data, and the leader keeps its data", func(t *testing.T) {
+		t.Parallel()
+
+		s := newTestScope(defaultAdapter(), types.UID("uid-1"))
+
+		// Started with its old data still on disk, the node would count as initialized and ignore a
+		// join URL it cannot validate, then come back as a cluster of its own.
+		nodePlan, err := buildRestartPlan(s, otherEtcd, initSecret, serverURL, initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		wipe := nodePlan.OneTimeInstructions[0]
+		if instructionIdentifier(wipe) != idempotencyKey+"/rejoin-clean-etcd-dir" {
+			t.Fatalf("first instruction = %q, want the etcd data wipe ahead of the restart", instructionIdentifier(wipe))
+		}
+		script := wipe.Args[len(wipe.Args)-1]
+		if want := "systemctl stop rke2-server; rm -rf /var/lib/rancher/rke2/server/db/etcd"; script != want {
+			// Stopping first keeps a later pass from removing data under a running etcd; removing only
+			// server/db/etcd keeps the local snapshots in server/db/snapshots.
+			t.Errorf("wipe = %q, want %q", script, want)
+		}
+
+		// The leader holds the restored etcd, non-etcd nodes have none, and the final pass only
+		// restarts nodes that are already members.
+		for _, tc := range []struct {
+			name    string
+			secret  *corev1.Secret
+			initial bool
+		}{
+			{"leader, initial pass", initSecret, true},
+			{"worker, initial pass", worker, true},
+			{"rejoined etcd node, final pass", otherEtcd, false},
+			{"leader, final pass", initSecret, false},
+		} {
+			nodePlan, err := buildRestartPlan(s, tc.secret, initSecret, serverURL, initialValue, tc.initial)
+			if err != nil {
+				t.Fatalf("%s: buildRestartPlan: %v", tc.name, err)
+			}
+			for _, inst := range nodePlan.OneTimeInstructions {
+				if instructionIdentifier(inst) == idempotencyKey+"/rejoin-clean-etcd-dir" {
+					t.Errorf("%s: plan wipes etcd data, want it left alone", tc.name)
+				}
+			}
+		}
+	})
+
+	t.Run("a changed server URL restarts a rejoining node again", func(t *testing.T) {
+		t.Parallel()
+
+		s := newTestScope(defaultAdapter(), types.UID("uid-1"))
+
+		identifiers := func(secret *corev1.Secret, url string) []string {
+			t.Helper()
+			nodePlan, err := buildRestartPlan(s, secret, initSecret, url, initialValue, true)
+			if err != nil {
+				t.Fatalf("buildRestartPlan: %v", err)
+			}
+			var names []string
+			for _, inst := range nodePlan.OneTimeInstructions {
+				names = append(names, inst.Name)
+			}
+			return names
+		}
+
+		// The idempotency value is part of each instruction's name, so equal names mean the second
+		// plan's restart would be skipped as already reconciled.
+		first, same, changed := identifiers(otherEtcd, "fd00::1"), identifiers(otherEtcd, "fd00::1"), identifiers(otherEtcd, "10.0.0.1")
+		if !slices.Equal(first, same) {
+			t.Errorf("the same server URL rendered different instructions %v and %v; a re-render must not restart the node again", first, same)
+		}
+		for i := range first {
+			if first[i] == changed[i] {
+				t.Errorf("instruction %d is %q for both server URLs; a changed join target must wipe and restart the node again", i, first[i])
+			}
+		}
+
+		// Workers rejoin through the drop-in too, so they restart again as well; the leader has no
+		// drop-in, so its restart does not depend on the URL.
+		if w1, w2 := identifiers(worker, "fd00::1"), identifiers(worker, "10.0.0.1"); slices.Equal(w1, w2) {
+			t.Errorf("worker restart %v did not change with the server URL", w1)
+		}
+		if l1, l2 := identifiers(initSecret, "fd00::1"), identifiers(initSecret, "10.0.0.1"); !slices.Equal(l1, l2) {
+			t.Errorf("leader restart changed with the server URL: %v vs %v", l1, l2)
+		}
+	})
+
+	t.Run("an IPv6 leader address is bracketed in the server drop-in", func(t *testing.T) {
+		t.Parallel()
+
+		s := newTestScope(defaultAdapter(), types.UID("uid-1"))
+
+		// Unbracketed, the port would read as part of the address and the URL would not parse.
+		nodePlan, err := buildRestartPlan(s, otherEtcd, initSecret, "fd00::1", initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		content, err := base64.StdEncoding.DecodeString(nodePlan.Files[1].Content)
+		if err != nil {
+			t.Fatalf("decoding drop-in: %v", err)
+		}
+		if want := "server: \"https://[fd00::1]:9345\"\ntoken-file: \"/var/lib/rancher/rke2/server/token\"\n"; string(content) != want {
+			t.Errorf("drop-in = %q, want %q", string(content), want)
+		}
+	})
 }
 
 // restartInstructionArgs returns the arguments of the plan's restart instruction. It is wrapped by
@@ -1813,4 +2118,86 @@ func restartInstructionArgs(t *testing.T, nodePlan *planapi.Plan) []string {
 	}
 	t.Fatalf("plan has no restart instruction: %v", nodePlan.OneTimeInstructions)
 	return nil
+}
+
+type fakeBeaconClient struct {
+	plancontrollers.BeaconClient
+
+	statusUpdates []*planv1alpha1.Beacon
+}
+
+func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
+	f.statusUpdates = append(f.statusUpdates, beacon.DeepCopy())
+	return beacon, nil
+}
+
+func terminalScope(ownerKey string, adapter *stubAdapter) *scope {
+	return &scope{
+		ownerKey: ownerKey,
+		op:       newOp(),
+		beacon: &planv1alpha1.Beacon{
+			Status: planv1alpha1.BeaconStatus{Active: true, Owner: ownerKey},
+		},
+		adapter: adapter,
+	}
+}
+
+// The cluster is paused from the end of Preflight until the operation is terminal, so a CAPI
+// control plane provider cannot replace machines mid-restore. The owner is the one that unpauses it.
+// Succeeded is not covered here because its owner path also enqueues through a concrete
+// dynamic.Controller.
+func TestTerminalHandler_OwningOperationUnpausesAndReleasesBeacon(t *testing.T) {
+	t.Parallel()
+
+	for _, terminal := range []struct {
+		name    string
+		handler func(*handler, *scope, opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error)
+	}{
+		{"canceled", (*handler).handleCanceled},
+		{"failed", (*handler).handleFailed},
+	} {
+		t.Run(terminal.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter := &stubAdapter{}
+			beacons := &fakeBeaconClient{}
+			h := &handler{beacons: beacons}
+			s := terminalScope("etcd-snapshot-restore/test-namespace/test-restore", adapter)
+
+			_, err := terminal.handler(h, s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+			require.NoError(t, err)
+			assert.Equal(t, []bool{false}, adapter.pauseCalls)
+			require.Len(t, beacons.statusUpdates, 1)
+			assert.Empty(t, beacons.statusUpdates[0].Status.Owner)
+			assert.False(t, beacons.statusUpdates[0].Status.Active)
+		})
+	}
+}
+
+func TestTerminalHandler_NonOwnerDoesNotUnpauseOrReleaseBeacon(t *testing.T) {
+	t.Parallel()
+
+	for _, terminal := range []struct {
+		name    string
+		handler func(*handler, *scope, opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error)
+	}{
+		{"canceled", (*handler).handleCanceled},
+		{"failed", (*handler).handleFailed},
+		{"succeeded", (*handler).handleSucceeded},
+	} {
+		t.Run(terminal.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter := &stubAdapter{}
+			beacons := &fakeBeaconClient{}
+			h := &handler{beacons: beacons}
+			s := terminalScope("etcd-snapshot-restore/test-namespace/test-restore", adapter)
+			s.beacon.Status.Owner = "etcd-snapshot-restore/test-namespace/newer-restore"
+
+			_, err := terminal.handler(h, s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+			require.NoError(t, err)
+			assert.Empty(t, adapter.pauseCalls)
+			assert.Empty(t, beacons.statusUpdates)
+		})
+	}
 }

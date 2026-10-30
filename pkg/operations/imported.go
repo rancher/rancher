@@ -234,8 +234,19 @@ func (a *ImportedAdapter) kubernetesVersion() string {
 	return ""
 }
 
+// LoopbackAddress returns "localhost" rather than a literal loopback address, so that it works
+// whichever address family the node runs on.
+//
+// RKE2/K3s bind node-local endpoints (the controller-manager, scheduler and kubelet health
+// endpoints, and etcd's client and metrics listeners) to the loopback of the node's primary family:
+// 127.0.0.1 on an IPv4-primary node, but only ::1 on an IPv6-primary one. An imported cluster has no
+// stack preference Rancher could read that from — unlike CAPR's, see capr.GetLoopbackAddress — and
+// the management Node may be stale or, on a restore from nothing, missing. localhost resolves to both
+// loopbacks, and the node's own resolver and Go's dialer fall through to whichever is listening when
+// the probe or command runs. The distro's serving certificates all list localhost, so certificate
+// verification against it holds.
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
-	return "127.0.0.1"
+	return "localhost"
 }
 
 func (a *ImportedAdapter) ConfigFile(_ *corev1.Secret) string {
@@ -246,6 +257,9 @@ func (a *ImportedAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return fmt.Sprintf("/etc/rancher/%s/config.yaml.d", a.RuntimeCommand())
 }
 
+// GetServerURL returns the address of the node behind the machine-plan secret that other nodes should
+// join through — see primaryNodeAddress. It is a bare host, which may be an IPv6 address; callers
+// building a URL from it must bracket it, e.g. with net.JoinHostPort.
 func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 	if secret == nil {
 		return ""
@@ -271,17 +285,29 @@ func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 		return ""
 	}
 
-	var address string
+	return primaryNodeAddress(machine.Status.InternalNodeStatus.Addresses)
+}
 
-	for _, addr := range machine.Status.InternalNodeStatus.Addresses {
-		if addr.Type == corev1.NodeExternalIP && address == "" {
-			address = addr.Address
-		} else if addr.Type == corev1.NodeInternalIP {
-			address = addr.Address
+// primaryNodeAddress returns the address other nodes should use to reach a node: its first
+// InternalIP, or failing that its first ExternalIP.
+//
+// The first InternalIP is the node's primary address. The kubelet lists a node's addresses in its
+// node-ip order, so on a dual-stack node the first InternalIP is in the family the node — and its
+// etcd, which advertises peers on it — actually runs on. Taking any other one would point rejoining
+// nodes at the cluster's secondary family.
+func primaryNodeAddress(addresses []corev1.NodeAddress) string {
+	var external string
+	for _, addr := range addresses {
+		switch addr.Type {
+		case corev1.NodeInternalIP:
+			return addr.Address
+		case corev1.NodeExternalIP:
+			if external == "" {
+				external = addr.Address
+			}
 		}
 	}
-
-	return address
+	return external
 }
 
 func (a *ImportedAdapter) GetSupervisorPort(_ *corev1.Secret) string {
@@ -791,8 +817,7 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		return nil, err
 	}
 
-	// only support ipv4, need to implement per-node extraction mechanism
-	loopbackAddress := "127.0.0.1"
+	loopbackAddress := a.LoopbackAddress(secret)
 
 	// render this probe separately because it has a specific format
 	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {

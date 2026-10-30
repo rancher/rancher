@@ -70,6 +70,17 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool, k8sVersion string, opts ...cluster.ImportedClusterOptions) *importedClusterFixture {
 	t.Helper()
 
+	return setUpImportedClusterWithHook(t, clients, displayName, pools, k8sVersion, nil, opts...)
+}
+
+// setUpImportedClusterWithHook is setUpImportedClusterAtVersion with beforeImport, when non-nil,
+// called once the downstream API server is serving and before the cluster is imported. The fixture
+// it receives has everything but mgmtCluster's final, Ready state. It is for setup the import itself
+// depends on — with cluster.ImportedClusterOptions.ExternalCloudProvider, for instance, nodes stay
+// tainted until their addresses are published, and the cluster agent cannot schedule until then.
+func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool, k8sVersion string, beforeImport func(fx *importedClusterFixture), opts ...cluster.ImportedClusterOptions) *importedClusterFixture {
+	t.Helper()
+
 	ns, err := namespace.Random(clients)
 	if err != nil {
 		t.Fatal(err)
@@ -143,17 +154,7 @@ func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displ
 		time.Sleep(5 * time.Second)
 	}
 
-	if out, err := execKubectl(t, importCmd); err != nil {
-		t.Fatalf("import command failed: %v\noutput: %s", err, out)
-	}
-
-	err = wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
-		mgmtCluster = obj.(*v3.Cluster)
-		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
-	})
-	handleError(t, clients, mgmtCluster.Name, err)
-
-	return &importedClusterFixture{
+	fx := &importedClusterFixture{
 		ns:          ns,
 		pods:        pods,
 		mgmtCluster: mgmtCluster,
@@ -165,6 +166,22 @@ func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displ
 		execKubectl: execKubectl,
 		kubectlEnv:  kubectlEnv,
 	}
+	if beforeImport != nil {
+		beforeImport(fx)
+	}
+
+	if out, err := execKubectl(t, importCmd); err != nil {
+		t.Fatalf("import command failed: %v\noutput: %s", err, out)
+	}
+
+	err = wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
+		mgmtCluster = obj.(*v3.Cluster)
+		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
+	})
+	handleError(t, clients, mgmtCluster.Name, err)
+
+	fx.mgmtCluster = mgmtCluster
+	return fx
 }
 
 // initNodeDataDirFromPools returns the configured data directory of the bootstrap etcd pool (the

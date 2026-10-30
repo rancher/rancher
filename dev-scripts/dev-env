@@ -22,7 +22,7 @@
 set -eo pipefail
 
 cluster="${CAPRKE2_DEV_CLUSTER:-local-caprke2}"
-k3s_version="${K3S_VERSION:-v1.33.5-k3s1}"
+k3s_version="${K3S_VERSION:-v1.35.7-k3s1}"
 
 for bin in docker k3d jq kubectl; do
   if ! command -v "$bin" >/dev/null 2>&1; then
