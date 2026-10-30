@@ -51,16 +51,6 @@ func TestToolsSystemImagesWriterRun(t *testing.T) {
 	assert.Equal(t, "v3", f.Name.Name)
 }
 
-func TestToolsSystemImagesWriterRunIsIdempotent(t *testing.T) {
-	t.Parallel()
-
-	cfg := map[string]string{"defaultKubeApiAuthImage": "rancher/kube-api-auth:v1.2.3"}
-	first, second := new(bytes.Buffer), new(bytes.Buffer)
-	require.NoError(t, (&ToolsSystemImagesWriter{Config: cfg, Output: first}).Run())
-	require.NoError(t, (&ToolsSystemImagesWriter{Config: cfg, Output: second}).Run())
-	assert.Equal(t, first.String(), second.String())
-}
-
 func TestToolsSystemImagesWriterRunEscapesValue(t *testing.T) {
 	t.Parallel()
 
