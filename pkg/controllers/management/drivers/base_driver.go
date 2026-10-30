@@ -28,17 +28,13 @@ type BaseDriver struct {
 	DriverHash   string
 	DriverName   string
 	BinaryPrefix string
+	DevMode      bool
+
+	BinDir   string
+	CacheDir string
 }
 
 func (d *BaseDriver) Name() string {
-	return d.DriverName
-}
-
-func (d *BaseDriver) Hash() string {
-	return d.DriverHash
-}
-
-func (d *BaseDriver) Checksum() string {
 	return d.DriverName
 }
 
@@ -57,10 +53,11 @@ func (d *BaseDriver) Remove() error {
 		return err
 	}
 
-	dest := path.Join(binDir(), string(content))
+	dest := path.Join(d.binDir(), string(content))
 	_ = os.Remove(dest)
 	_ = os.Remove(cacheFilePrefix + "-" + string(content))
 	_ = os.Remove(cacheFilePrefix)
+	_ = os.Remove(cacheFilePrefix + "-" + string(content) + ".hash")
 
 	return nil
 }
@@ -120,11 +117,10 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	hasher, err := d.getHasher()
-	if err != nil {
-		return err
+	hasher := d.getHasher()
+	if len(d.DriverHash) > 0 && hasher == nil {
+		return fmt.Errorf("invalid hash format: %s", d.DriverHash)
 	}
-
 	downloadDest := io.Writer(tempFile)
 	if hasher != nil {
 		downloadDest = io.MultiWriter(tempFile, hasher)
@@ -145,6 +141,14 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 	driverName, err = d.copyBinary(cacheFilePrefix, tempFile.Name())
 	if err != nil {
 		return err
+	}
+
+	binHash, err := sha256sum(d.srcBinName())
+	if err != nil {
+		return fmt.Errorf("failed to hash driver binary: %w", err)
+	}
+	if err := os.WriteFile(d.srcBinHashFile(), []byte(binHash), 0644); err != nil {
+		return fmt.Errorf("failed to write hash file: %w", err)
 	}
 
 	d.DriverName = driverName
@@ -279,7 +283,7 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 // binName is the full path to the binary executable. This does not take in
 // account the version of the binary
 func (d *BaseDriver) binName() string {
-	return path.Join(binDir(), d.DriverName)
+	return path.Join(d.binDir(), d.DriverName)
 }
 
 // srcBinName is the full path of the cached/hashed binary executable. This takes
@@ -288,8 +292,17 @@ func (d *BaseDriver) srcBinName() string {
 	return d.cacheFile() + "-" + d.DriverName
 }
 
-func binDir() string {
-	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
+// srcBinHashFile contains the sha256 hash of the cached/hashed binary executable (srcBinName)
+func (d *BaseDriver) srcBinHashFile() string {
+	return d.cacheFile() + "-" + d.DriverName + ".hash"
+}
+
+func (d *BaseDriver) binDir() string {
+	if d.BinDir != "" {
+		return d.BinDir
+	}
+
+	if d.DevMode {
 		return "./management-state/bin"
 	}
 
@@ -307,22 +320,19 @@ func compare(hash hash.Hash, value string) (string, bool) {
 	return got, got == expected
 }
 
-func (d *BaseDriver) getHasher() (hash.Hash, error) {
+func (d *BaseDriver) getHasher() hash.Hash {
 	switch len(d.DriverHash) {
-	case 0:
-		return nil, nil
 	case 32:
 		logrus.Warnf("[%s] md5 is unsupported and will be removed in a future version of Rancher", d.Name())
-		return md5.New(), nil
+		return md5.New()
 	case 40:
-		return sha1.New(), nil
+		return sha1.New()
 	case 64:
-		return sha256.New(), nil
+		return sha256.New()
 	case 128:
-		return sha512.New(), nil
+		return sha512.New()
 	}
-
-	return nil, fmt.Errorf("invalid hash format: %s", d.DriverHash)
+	return nil
 }
 
 func (d *BaseDriver) download(dest io.Writer) error {
@@ -339,6 +349,10 @@ func (d *BaseDriver) download(dest io.Writer) error {
 
 func (d *BaseDriver) cacheFile() string {
 	key := sha256Bytes([]byte(d.URL + d.DriverHash))
+
+	if d.CacheDir != "" {
+		return path.Join(d.CacheDir, key)
+	}
 
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {
