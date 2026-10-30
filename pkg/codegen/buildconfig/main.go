@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,25 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if err := updateToolsSystemImages(cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+const toolsSystemImagesPath = "pkg/apis/management.cattle.io/v3/tools_system_images.go"
+
+func updateToolsSystemImages(cfg map[string]string) error {
+	// Render in memory first so a failure never truncates the existing file.
+	buf := new(bytes.Buffer)
+	writer := ToolsSystemImagesWriter{
+		Config: cfg,
+		Output: buf,
+	}
+	if err := writer.Run(); err != nil {
+		return err
+	}
+	return os.WriteFile(toolsSystemImagesPath, buf.Bytes(), 0644)
 }
 
 func loadBuildConfig() (map[string]string, error) {

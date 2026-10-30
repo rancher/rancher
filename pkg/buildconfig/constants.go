@@ -6,6 +6,7 @@ const (
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-15.11"
 	ChartDefaultBranch        = "dev-v2.16"
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261027T2136Z-dev"
+	DefaultKubeApiAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.3"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.3"
 	DefaultShellVersion       = "rancher/shell:v0.9.0-rc.1"
 	FleetVersion              = "111.0.0+up0.17.0-beta.2"

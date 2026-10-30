@@ -145,7 +145,7 @@ func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) 
 		// Used by Audit Log feature - sourced from build.yaml
 		addSourceToImage(imagesSet, buildconfig.ChartAuditLogImage, imageSourceCore)
 		// kube-api-auth is required for ACE.
-		addSourceToImage(imagesSet, apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth, imageSourceSystem)
+		addSourceToImage(imagesSet, buildconfig.DefaultKubeApiAuthImage, imageSourceSystem)
 	}
 }
 

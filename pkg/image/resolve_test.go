@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -272,7 +273,7 @@ func TestSetRequiredImages(t *testing.T) {
 		imagesSet := make(map[string]map[string]struct{})
 		setRequiredImages(Linux, imagesSet)
 
-		kubeApiAuth := apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth
+		kubeApiAuth := buildconfig.DefaultKubeApiAuthImage
 		require.Contains(t, imagesSet, kubeApiAuth)
 		assert.Contains(t, imagesSet[kubeApiAuth], imageSourceSystem)
 	})

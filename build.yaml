@@ -4,6 +4,7 @@ defaultShellVersion: rancher/shell:v0.9.0-rc.1
 defaultSccOperatorImage: rancher/scc-operator:v0.5.3
 # Notes: ClusterRepo asset and branch versions
 defaultAssetsImage: rancher/rancher-assets:v2.16-20261027T2136Z-dev
+defaultKubeApiAuthImage: rancher/kube-api-auth:v0.16.0-rc.3
 chartDefaultBranch: dev-v2.16
 partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main
