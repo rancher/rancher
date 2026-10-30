@@ -40,13 +40,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isSecure := r.URL.Scheme == "https"
-
 	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie} {
 		tokenCookie := &http.Cookie{
 			Name:     cookieName,
 			Value:    "",
-			Secure:   isSecure,
+			Secure:   true,
 			Path:     "/",
 			HttpOnly: true,
 			// Lax is the default in most browsers; setting it
