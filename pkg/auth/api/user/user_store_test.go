@@ -65,13 +65,23 @@ func TestUpdateStripsIdentityFields(t *testing.T) {
 			wantPresent: map[string]interface{}{client.UserFieldDescription: "some user"},
 		},
 		{
-			name: "strips both identity fields",
+			name: "strips displayName",
+			data: map[string]interface{}{
+				client.UserFieldName:        "Updated Display Name",
+				client.UserFieldDescription: "some user",
+			},
+			wantAbsent:  []string{client.UserFieldName},
+			wantPresent: map[string]interface{}{client.UserFieldDescription: "some user"},
+		},
+		{
+			name: "strips all identity fields",
 			data: map[string]interface{}{
 				client.UserFieldPrincipalIDs: []interface{}{"local://u-abc"},
 				client.UserFieldUsername:     "admin",
+				client.UserFieldName:         "Updated Display Name",
 				client.UserFieldEnabled:      true,
 			},
-			wantAbsent:  []string{client.UserFieldPrincipalIDs, client.UserFieldUsername},
+			wantAbsent:  []string{client.UserFieldPrincipalIDs, client.UserFieldUsername, client.UserFieldName},
 			wantPresent: map[string]interface{}{client.UserFieldEnabled: true},
 		},
 		{
