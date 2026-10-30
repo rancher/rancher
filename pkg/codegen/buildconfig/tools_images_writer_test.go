@@ -18,7 +18,7 @@ package v3
 var (
 	// ToolsSystemImages holds the default system images used by Rancher.
 	//
-	// Deprecated: use buildconfig.DefaultKubeApiAuthImage from
+	// Deprecated: use buildconfig.DefaultKubeAPIAuthImage from
 	// github.com/rancher/rancher/pkg/buildconfig instead. This var will be removed in
 	// v2.17.
 	ToolsSystemImages = struct {
@@ -37,7 +37,7 @@ func TestToolsSystemImagesWriterRun(t *testing.T) {
 	out := new(bytes.Buffer)
 	w := ToolsSystemImagesWriter{
 		Config: map[string]string{
-			"defaultKubeApiAuthImage": "rancher/kube-api-auth:v0.16.0-rc.3",
+			"defaultKubeAPIAuthImage": "rancher/kube-api-auth:v0.16.0-rc.3",
 			"defaultShellVersion":     "rancher/shell:v0.9.0",
 		},
 		Output: out,
@@ -56,7 +56,7 @@ func TestToolsSystemImagesWriterRunEscapesValue(t *testing.T) {
 
 	out := new(bytes.Buffer)
 	w := ToolsSystemImagesWriter{
-		Config: map[string]string{"defaultKubeApiAuthImage": `weird"image\tag`},
+		Config: map[string]string{"defaultKubeAPIAuthImage": `weird"image\tag`},
 		Output: out,
 	}
 	require.NoError(t, w.Run())
@@ -83,7 +83,7 @@ func TestToolsSystemImagesWriterRunErrors(t *testing.T) {
 		},
 		{
 			name:    "nil output",
-			config:  map[string]string{"defaultKubeApiAuthImage": "rancher/kube-api-auth:v1"},
+			config:  map[string]string{"defaultKubeAPIAuthImage": "rancher/kube-api-auth:v1"},
 			output:  nil,
 			wantErr: "nil output",
 		},
@@ -91,11 +91,11 @@ func TestToolsSystemImagesWriterRunErrors(t *testing.T) {
 			name:    "missing key",
 			config:  map[string]string{"defaultShellVersion": "rancher/shell:v0.9.0"},
 			output:  new(bytes.Buffer),
-			wantErr: "defaultKubeApiAuthImage",
+			wantErr: "defaultKubeAPIAuthImage",
 		},
 		{
 			name:    "empty value",
-			config:  map[string]string{"defaultKubeApiAuthImage": ""},
+			config:  map[string]string{"defaultKubeAPIAuthImage": ""},
 			output:  new(bytes.Buffer),
 			wantErr: "missing or empty",
 		},
@@ -125,7 +125,7 @@ func TestToolsSystemImagesWriterRunOutputError(t *testing.T) {
 	t.Parallel()
 
 	w := ToolsSystemImagesWriter{
-		Config: map[string]string{"defaultKubeApiAuthImage": "rancher/kube-api-auth:v1"},
+		Config: map[string]string{"defaultKubeAPIAuthImage": "rancher/kube-api-auth:v1"},
 		Output: failingWriter{},
 	}
 	require.ErrorContains(t, w.Run(), "disk full")

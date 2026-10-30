@@ -273,7 +273,7 @@ func TestSetRequiredImages(t *testing.T) {
 		imagesSet := make(map[string]map[string]struct{})
 		setRequiredImages(Linux, imagesSet)
 
-		kubeApiAuth := buildconfig.DefaultKubeApiAuthImage
+		kubeApiAuth := buildconfig.DefaultKubeAPIAuthImage
 		require.Contains(t, imagesSet, kubeApiAuth)
 		assert.Contains(t, imagesSet[kubeApiAuth], imageSourceSystem)
 	})

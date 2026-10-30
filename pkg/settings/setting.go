@@ -81,7 +81,7 @@ var (
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
 	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
-	AuthImage                           = NewSetting("auth-image", buildconfig.DefaultKubeApiAuthImage)
+	AuthImage                           = NewSetting("auth-image", buildconfig.DefaultKubeAPIAuthImage)
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	AzureGroupCacheSize                 = NewSetting("azure-group-cache-size", "10000")

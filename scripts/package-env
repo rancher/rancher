@@ -18,4 +18,4 @@ IMAGE=${REGISTRY_PREFIX}${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:$(build_yaml_get systemAgentVersion)-suc
 WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:$(build_yaml_get winsAgentVersion)
-CLUSTER_API_CONTROLLER_IMAGE=$(build_yaml_get clusterApiControllerImage)
+CLUSTER_API_CONTROLLER_IMAGE=$(build_yaml_get clusterAPIControllerImage)
