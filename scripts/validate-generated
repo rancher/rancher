@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo Regenerating files derived from build.yaml
+go generate -run 'pkg/codegen/buildconfig' .
+
+drift="$(git status --porcelain --untracked-files=no)"
+if [ -n "$drift" ]; then
+  echo "Generated files are out of date with build.yaml."
+  echo "Run 'go generate' and commit the result. The files that differ are:"
+  echo "$drift"
+  exit 1
+fi
