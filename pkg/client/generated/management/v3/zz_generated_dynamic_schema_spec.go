@@ -11,6 +11,8 @@ const (
 	DynamicSchemaSpecFieldEmbedType            = "embedType"
 	DynamicSchemaSpecFieldIncludeableLinks     = "includeableLinks"
 	DynamicSchemaSpecFieldPluralName           = "pluralName"
+	DynamicSchemaSpecFieldPrivateFields        = "privateFields"
+	DynamicSchemaSpecFieldPublicFields         = "publicFields"
 	DynamicSchemaSpecFieldResourceActions      = "resourceActions"
 	DynamicSchemaSpecFieldResourceFields       = "resourceFields"
 	DynamicSchemaSpecFieldResourceMethods      = "resourceMethods"
@@ -27,6 +29,8 @@ type DynamicSchemaSpec struct {
 	EmbedType            string            `json:"embedType,omitempty" yaml:"embedType,omitempty"`
 	IncludeableLinks     []string          `json:"includeableLinks,omitempty" yaml:"includeableLinks,omitempty"`
 	PluralName           string            `json:"pluralName,omitempty" yaml:"pluralName,omitempty"`
+	PrivateFields        []string          `json:"privateFields,omitempty" yaml:"privateFields,omitempty"`
+	PublicFields         []string          `json:"publicFields,omitempty" yaml:"publicFields,omitempty"`
 	ResourceActions      map[string]Action `json:"resourceActions,omitempty" yaml:"resourceActions,omitempty"`
 	ResourceFields       map[string]Field  `json:"resourceFields,omitempty" yaml:"resourceFields,omitempty"`
 	ResourceMethods      []string          `json:"resourceMethods,omitempty" yaml:"resourceMethods,omitempty"`
