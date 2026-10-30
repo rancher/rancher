@@ -528,6 +528,10 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 	downstream *k3s.ETCDSnapshotFile,
 	cluster *unstructured.Unstructured,
 ) (*rkev1.ETCDSnapshot, error) {
+	if downstream.Status.CreationTime == nil {
+		return nil, fmt.Errorf("downstream snapshot %q has no creation time", downstream.Name)
+	}
+
 	storage := S3
 	if downstream.Spec.S3 == nil {
 		storage = Local
