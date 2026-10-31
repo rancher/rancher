@@ -185,6 +185,12 @@ func main() {
 				Destination: &config.RancherNamespaceOptions,
 			},
 		},
+		cli.StringFlag{
+			Name:        "registry-override",
+			EnvVar:      "RANCHER_REGISTRY_OVERRIDE",
+			Usage:       "Override the default registry used for system chart installs.",
+			Destination: &config.ClusterRegistry,
+		},
 	}
 
 	app.Action = func(_ context.Context, cmd *cli.Command) error {
