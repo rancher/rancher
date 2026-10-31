@@ -40,5 +40,9 @@ informer_object_cache.db
 informer_object_cache.db-shm
 informer_object_cache.db-wal
 management-state/git-repo/
-# Generated integration test config — contains tokens and host addresses
-tests/v2/integration/config.yaml
+# Generated e2e test config — contains tokens and host addresses
+tests/e2e/config.yaml
+
+# AI Related
+.claude/settings.json
+.claude/settings.local.json
