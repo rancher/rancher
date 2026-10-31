@@ -10,7 +10,7 @@ partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main
 # Component versions (machine: the tag of its image) are synced into package/Dockerfile and Dockerfile.runtime by go generate
 # NOTE: go generate does not update the *_CHECKSUM* ENV lines next to those versions in package/Dockerfile.
-# When bumping machine, system-agent or wins, update their checksums by hand or the image build fails.
+# The updatecli bump pipelines refresh them; when bumping by hand, update them too or the image build fails.
 machineProvisionImage: rancher/machine:v0.15.0-rancher146-rc.7
 systemAgentVersion: v0.16.0-rc.5
 winsAgentVersion: v0.16.0-rc.9
