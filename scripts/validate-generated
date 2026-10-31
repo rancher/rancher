@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo Regenerating files derived from build.yaml
-go generate -run 'pkg/codegen/buildconfig' .
+scripts/generate-buildconfig
 
 drift="$(git status --porcelain --untracked-files=no)"
 if [ -n "$drift" ]; then
