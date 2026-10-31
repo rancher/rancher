@@ -15,6 +15,8 @@ const (
 	NsByProjectIndex        = "authz.cluster.cattle.io/ns-by-project"
 	PrtbByRoleTemplateIndex = "prtb-rt-index"
 	projectIDAnnotation     = "field.cattle.io/projectId"
+	// SystemNamespaceAnnotation marks a resource as belonging to Rancher's system namespaces.
+	SystemNamespaceAnnotation = "management.cattle.io/system-namespace"
 )
 
 // NsByProjectID is an index that selects namespaces based on the projectIDAnnotation
