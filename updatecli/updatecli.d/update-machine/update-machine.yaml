@@ -48,16 +48,16 @@ sources:
     spec:
       environments:
         # pass through the var we need in order to make it available in the shell snippet below
-        - name: 'MACHINE_RELEASE_TAG'
+        - name: 'TAG'
       command: |
-        if [ -n "${MACHINE_RELEASE_TAG}" ]; then
-          if ! git check-ref-format --allow-onelevel "refs/tags/${MACHINE_RELEASE_TAG}"; then
-            echo "Invalid Rancher Machine tag: ${MACHINE_RELEASE_TAG}" >&2
+        if [ -n "${TAG}" ]; then
+          if ! git check-ref-format --allow-onelevel "refs/tags/${TAG}"; then
+            echo "Invalid Rancher Machine tag: ${TAG}" >&2
             exit 1
           fi
-          git ls-remote --exit-code --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git "refs/tags/${MACHINE_RELEASE_TAG}" > /dev/null ||
-            { echo "Rancher Machine tag does not exist: ${MACHINE_RELEASE_TAG}" >&2; exit 1; }
-          printf '%s\n' "${MACHINE_RELEASE_TAG}"
+          git ls-remote --exit-code --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git "refs/tags/${TAG}" > /dev/null ||
+            { echo "Rancher Machine tag does not exist: ${TAG}" >&2; exit 1; }
+          printf '%s\n' "${TAG}"
         else
           git ls-remote --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git | cut -f2 | sed -E "s#refs/tags/##; s/\\^\\{\\}$//" | sort -u | grep -E "^v0.15.0-rancher([0-9]+)+.*$" | sort -V | tail -1
         fi
