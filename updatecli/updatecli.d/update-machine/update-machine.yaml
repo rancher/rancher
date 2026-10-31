@@ -18,7 +18,7 @@ scms:
         type: '{{ .machine.commitmessage.type }}'
         scope: '{{ .machine.commitmessage.scope }}'
         title: 'Bump machine to {{ source "machine-release" }}'
-        body: 'Bumps `github.com/rancher/machine` from `{{ source "machine-current-version" }}` to `{{ source "machine-release" }}`. Updates go.mod/go.sum, Dockerfile.runtime, package/Dockerfile, and pkg/settings/setting.go.'
+        body: 'Bumps `github.com/rancher/machine` from `{{ source "machine-current-version" }}` to `{{ source "machine-release" }}`. Updates go.mod/go.sum, build.yaml and the files generated from it (Dockerfile.runtime, package/Dockerfile, pkg/buildconfig/constants.go), and the package/Dockerfile checksums.'
 
 actions:
   rancher-pr:
@@ -98,6 +98,37 @@ sources:
     spec:
       command: 'GOTOOLCHAIN=auto go mod download -json github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}@{{ source "machine-release" }} | grep ''"GoModSum":'' | sed -E ''s/.*"GoModSum": "([^"]+)".*/\1/'''
 
+conditions:
+  check-build-yaml-machine-version:
+    name: 'Check if machineProvisionImage is set in build.yaml'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'build.yaml'
+      matchpattern: 'machineProvisionImage: \S+'
+
+  check-package-dockerfile-machine-version:
+    name: 'Check if ENV CATTLE_MACHINE_VERSION is set in package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'package/Dockerfile'
+      matchpattern: 'ENV CATTLE_MACHINE_VERSION=\S+'
+
+  check-dockerfile-runtime-machine-version:
+    name: 'Check if ENV CATTLE_MACHINE_VERSION is set in Dockerfile.runtime'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.runtime'
+      matchpattern: 'ENV CATTLE_MACHINE_VERSION=\S+'
+
 targets:
   update-go-mod-machine-version:
     name: 'Update github.com/rancher/machine to {{ source "machine-release" }} in go.mod'
@@ -129,26 +160,6 @@ targets:
       matchpattern: 'github\.com/rancher/machine v\S+/go\.mod h1:\S+'
       replacepattern: 'github.com/rancher/machine {{ source "machine-release" }}/go.mod {{ source "machine-go-mod-sum" }}'
 
-  update-dockerfile-runtime-machine-version:
-    name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in Dockerfile.runtime'
-    kind: file
-    scmid: 'default'
-    sourceid: 'machine-release'
-    spec:
-      file: 'Dockerfile.runtime'
-      matchpattern: 'ENV CATTLE_MACHINE_VERSION=\S+'
-      replacepattern: 'ENV CATTLE_MACHINE_VERSION={{ source "machine-release" }}'
-
-  update-package-dockerfile-machine-version:
-    name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in package/Dockerfile'
-    kind: file
-    scmid: 'default'
-    sourceid: 'machine-release'
-    spec:
-      file: 'package/Dockerfile'
-      matchpattern: 'ENV CATTLE_MACHINE_VERSION=\S+'
-      replacepattern: 'ENV CATTLE_MACHINE_VERSION={{ source "machine-release" }}'
-
   update-package-dockerfile-machine-checksum-amd64:
     name: 'Update ENV CATTLE_MACHINE_CHECKSUM_amd64 in package/Dockerfile'
     kind: file
@@ -169,12 +180,39 @@ targets:
       matchpattern: 'ENV CATTLE_MACHINE_CHECKSUM_arm64=\S+'
       replacepattern: 'ENV CATTLE_MACHINE_CHECKSUM_arm64={{ source "machine-checksum-arm64" }}'
 
-  update-pkg-settings-machine-provision-image:
-    name: 'Update machine provision image to {{ source "machine-release" }} in pkg/settings/setting.go'
+  update-build-yaml-machine-provision-image:
+    name: 'Update machineProvisionImage to {{ source "machine-release" }} in build.yaml'
     kind: file
     scmid: 'default'
     sourceid: 'machine-release'
     spec:
-      file: 'pkg/settings/setting.go'
-      matchpattern: 'rancher/machine:v[^"]+'
-      replacepattern: 'rancher/machine:{{ source "machine-release" }}'
+      file: 'build.yaml'
+      matchpattern: 'machineProvisionImage: \S+'
+      replacepattern: 'machineProvisionImage: rancher/machine:{{ source "machine-release" }}'
+
+  # Runs only the build.yaml step of go generate. It runs after every go.mod,
+  # go.sum, build.yaml and checksum target so `go run` sees a consistent module.
+  # Checksums are separate targets.
+  regenerate-buildconfig:
+    name: 'Run go generate for build.yaml derived files'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    dependson:
+      - 'target#update-go-mod-machine-version'
+      - 'target#update-go-sum-machine-module-hash'
+      - 'target#update-go-sum-machine-go-mod-hash'
+      - 'target#update-build-yaml-machine-provision-image'
+      - 'target#update-package-dockerfile-machine-checksum-amd64'
+      - 'target#update-package-dockerfile-machine-checksum-arm64'
+    spec:
+      command: 'scripts/generate-buildconfig'
+      changedif:
+        kind: 'file/checksum'
+        spec:
+          files:
+            - 'pkg/buildconfig/constants.go'
+            - 'chart/values.yaml'
+            - 'pkg/apis/management.cattle.io/v3/tools_system_images.go'
+            - 'package/Dockerfile'
+            - 'Dockerfile.runtime'

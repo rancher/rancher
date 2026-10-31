@@ -766,6 +766,8 @@ type GenericSAMLConfig struct {
 	SamlConfig `json:",inline" mapstructure:",squash"`
 }
 
+// AuthSystemImages is a list of images used for auth systems
+// Deprecated: Image value now stored as buildconfig.DefaultKubeAPIAuthImage updated via build.yaml
 type AuthSystemImages struct {
 	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
 }

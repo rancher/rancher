@@ -27,6 +27,7 @@ FROM registry.suse.com/bci/golang:1.27.3
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
+# Managed by go generate from build.yaml (machineProvisionImage); do not edit.
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.7
 ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 

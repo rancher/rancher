@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+# Regenerates only the files derived from build.yaml (the first go:generate
+# directive in generate.go). Safe to call from any directory.
+cd "$(dirname "$0")/.."
+
+go run ./pkg/codegen/buildconfig
