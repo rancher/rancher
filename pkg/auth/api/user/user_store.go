@@ -219,6 +219,7 @@ func (s *userStore) Update(apiContext *types.APIContext, schema *types.Schema, d
 
 	delete(data, client.UserFieldPrincipalIDs)
 	delete(data, client.UserFieldUsername)
+	delete(data, client.UserFieldName)
 
 	return s.Store.Update(apiContext, schema, data, id)
 }
