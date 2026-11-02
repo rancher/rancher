@@ -127,14 +127,22 @@ func (g *Provider) getGithubConfigCR(configName string) (*apiv3.GithubConfig, er
 }
 
 func (g *Provider) saveGithubConfig(config *apiv3.GithubConfig) error {
-	storedGithubConfig, err := g.getGithubConfigCR(config.GetName())
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedGithubConfig, err := g.getGithubConfigCR(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		return storedGithubConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.GithubConfigType
-	config.ObjectMeta = storedGithubConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	secretInfo := convert.ToString(config.ClientSecret)
 	field := strings.ToLower(client.GithubConfigFieldClientSecret)
@@ -145,11 +153,7 @@ func (g *Provider) saveGithubConfig(config *apiv3.GithubConfig) error {
 
 	config.ClientSecret = name
 
-	_, err = g.authConfigs.ObjectClient().Update(config.GetName(), config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return common.UpdateAuthConfig(g.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 func (g *Provider) AuthenticateUser(_ http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {

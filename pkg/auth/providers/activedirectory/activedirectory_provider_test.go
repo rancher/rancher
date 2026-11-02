@@ -1,25 +1,13 @@
 package activedirectory
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"path"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/rest"
 )
 
 func TestADProviderGetPrincipalUsesTokenConfig(t *testing.T) {
@@ -44,36 +32,9 @@ func TestADProviderGetPrincipalUsesTokenConfig(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			// The handler runs on the server's goroutines, so access to
-			// fetched is guarded and failures are reported with assert, not
-			// require (FailNow must only be called from the test goroutine).
-			var (
-				mu      sync.Mutex
-				fetched []string
-			)
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				configName := path.Base(r.URL.Path)
-				mu.Lock()
-				fetched = append(fetched, configName)
-				mu.Unlock()
-
-				// No servers are configured, so any LDAP lookup fails after
-				// the config has been loaded.
-				w.Header().Set("Content-Type", "application/json")
-				assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-					"apiVersion": "management.cattle.io/v3",
-					"kind":       "AuthConfig",
-					"metadata":   map[string]any{"name": configName},
-					"enabled":    true,
-				}))
-			}))
-			t.Cleanup(srv.Close)
-
-			objectClient := newTestAuthConfigObjectClient(t, srv.URL)
+			authConfigs, fetched := authconfigtest.NewRecordingClient(t)
 			p := &adProvider{
-				authConfigs: &fakes.AuthConfigInterfaceMock{
-					ObjectClientFunc: func() *objectclient.ObjectClient { return objectClient },
-				},
+				authConfigs: authConfigs,
 			}
 			token := &v3.Token{
 				UserPrincipal: v3.Principal{
@@ -90,30 +51,7 @@ func TestADProviderGetPrincipalUsesTokenConfig(t *testing.T) {
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
 			}
-			mu.Lock()
-			defer mu.Unlock()
-			assert.Equal(t, tt.wantFetched, fetched)
+			assert.Equal(t, tt.wantFetched, fetched())
 		})
 	}
-}
-
-func newTestAuthConfigObjectClient(t *testing.T, host string) *objectclient.ObjectClient {
-	t.Helper()
-
-	scheme := runtime.NewScheme()
-	require.NoError(t, v3.AddToScheme(scheme))
-	gv := mgmtv3.AuthConfigGroupVersionKind.GroupVersion()
-	restClient, err := rest.RESTClientFor(&rest.Config{
-		Host:    host,
-		APIPath: "/apis",
-		ContentConfig: rest.ContentConfig{
-			GroupVersion:         &gv,
-			NegotiatedSerializer: serializer.NewCodecFactory(scheme).WithoutConversion(),
-		},
-	})
-	require.NoError(t, err)
-
-	gvr := gv.WithResource(mgmtv3.AuthConfigResource.Name)
-	return objectclient.NewObjectClient("", client.NewClient(gvr, mgmtv3.AuthConfigGroupVersionKind.Kind, false, restClient, time.Minute),
-		&mgmtv3.AuthConfigResource, mgmtv3.AuthConfigGroupVersionKind, &objectclient.UnstructuredObjectFactory{})
 }

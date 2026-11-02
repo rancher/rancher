@@ -520,22 +520,29 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ apiv3
 }
 
 func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
-	storedOidcConfig, err := o.GetConfig(config.GetName())
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedOidcConfig, err := o.GetConfig(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, fmt.Errorf("getting OIDC Config %s: %w", config.GetName(), err)
+		}
+		return storedOidcConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
-		return fmt.Errorf("getting OIDC Config %s: %w", config.GetName(), err)
+		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = o.Type
-	config.ObjectMeta = storedOidcConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	if err := o.saveOIDCSecrets(config); err != nil {
 		return err
 	}
 
 	logrus.Debugf("OpenIDCProvider: saveOIDCConfig: updating config")
-	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	return err
+	return common.UpdateAuthConfig(o.AuthConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 // saveOIDCSecrets stores the private key and client secret from the config in

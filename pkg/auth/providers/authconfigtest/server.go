@@ -6,7 +6,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,9 +21,14 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/rest"
 )
@@ -112,6 +120,45 @@ func newServer(t *testing.T, configs ...map[string]any) string {
 	return srv.URL
 }
 
+// NewRecordingClient returns an AuthConfig client backed by a fake API server
+// that serves a Get for any name with an enabled AuthConfig of that name and
+// no other fields. The returned func reports the names of the AuthConfigs
+// fetched, in order.
+func NewRecordingClient(t *testing.T) (normanv3.AuthConfigInterface, func() []string) {
+	t.Helper()
+
+	var (
+		mu      sync.Mutex
+		fetched []string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, authConfigsPath+"/") {
+			t.Errorf("unexpected AuthConfig API request: %s %s", r.Method, r.URL.Path)
+			writeStatus(w, http.StatusMethodNotAllowed, "MethodNotAllowed", "")
+			return
+		}
+
+		name := strings.TrimPrefix(r.URL.Path, authConfigsPath+"/")
+		mu.Lock()
+		fetched = append(fetched, name)
+		mu.Unlock()
+		writeJSON(w, http.StatusOK, withTypeMeta(map[string]any{
+			"metadata": map[string]any{"name": name},
+			"enabled":  true,
+		}))
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := normanv3.NewForConfig(rest.Config{Host: srv.URL})
+	require.NoError(t, err)
+
+	return client.AuthConfigs(""), func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(fetched)
+	}
+}
+
 // NewLister returns an AuthConfig lister that serves Get and List for the
 // given AuthConfigs, which take the same form as for NewClient. Get returns a
 // NotFound error for any other name.
@@ -154,6 +201,172 @@ func NewLister(t *testing.T, configs ...map[string]any) normanv3.AuthConfigListe
 func New(t *testing.T, configs ...map[string]any) (normanv3.AuthConfigInterface, normanv3.AuthConfigLister) {
 	t.Helper()
 	return NewClient(t, configs...), NewLister(t, configs...)
+}
+
+// ConcurrentWriteAnnotation is set on the AuthConfig by UpdateServer when it
+// simulates a write by something else.
+const ConcurrentWriteAnnotation = "authconfigtest.cattle.io/concurrent-write"
+
+// UpdateServer is a fake API server for a single AuthConfig that serves Get
+// and Update. Like a real API server, it rejects an Update with a Conflict
+// unless its resourceVersion is the current one, and returns NotFound for any
+// other AuthConfig.
+type UpdateServer struct {
+	client normanv3.AuthConfigInterface
+
+	mu              sync.Mutex
+	stored          map[string]any
+	resourceVersion int
+	writesAfterGets int
+	updates         int
+}
+
+// NewUpdateServer starts an UpdateServer that serves cfg, which must have
+// metadata.name set.
+func NewUpdateServer(t *testing.T, cfg map[string]any) *UpdateServer {
+	t.Helper()
+
+	// Copy cfg, as the server modifies the stored AuthConfig.
+	b, err := json.Marshal(withTypeMeta(cfg))
+	require.NoError(t, err)
+	s := &UpdateServer{resourceVersion: 1}
+	require.NoError(t, json.Unmarshal(b, &s.stored))
+	name, _ := s.stored["metadata"].(map[string]any)["name"].(string)
+	require.NotEmpty(t, name, "AuthConfig fixture must have metadata.name")
+	s.setResourceVersion()
+	path := authConfigsPath + "/" + name
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		if r.URL.Path != path {
+			if !strings.HasPrefix(r.URL.Path, authConfigsPath+"/") {
+				t.Errorf("unexpected AuthConfig API request: %s %s", r.Method, r.URL.Path)
+			}
+			writeStatus(w, http.StatusNotFound, "NotFound", strings.TrimPrefix(r.URL.Path, authConfigsPath+"/"))
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(w, http.StatusOK, s.stored)
+			if s.writesAfterGets > 0 {
+				s.writesAfterGets--
+				s.concurrentWrite()
+			}
+		case http.MethodPut:
+			s.updates++
+			var obj map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+				t.Errorf("decoding AuthConfig update: %v", err)
+				writeStatus(w, http.StatusBadRequest, "BadRequest", name)
+				return
+			}
+			metadata, _ := obj["metadata"].(map[string]any)
+			if metadata["resourceVersion"] != strconv.Itoa(s.resourceVersion) {
+				writeStatus(w, http.StatusConflict, string(metav1.StatusReasonConflict), name)
+				return
+			}
+			s.stored = obj
+			s.resourceVersion++
+			s.setResourceVersion()
+			writeJSON(w, http.StatusOK, s.stored)
+		default:
+			t.Errorf("unexpected AuthConfig API request: %s %s", r.Method, r.URL.Path)
+			writeStatus(w, http.StatusMethodNotAllowed, "MethodNotAllowed", name)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := normanv3.NewForConfig(rest.Config{Host: srv.URL})
+	require.NoError(t, err)
+	s.client = client.AuthConfigs("")
+
+	return s
+}
+
+// Client returns an AuthConfig client for the server.
+func (s *UpdateServer) Client() normanv3.AuthConfigInterface {
+	return s.client
+}
+
+// WriteAfterGets makes the server act as if something else writes the
+// AuthConfig after each of the next n Gets, so that an Update with the
+// resourceVersion from one of those Gets conflicts. The write sets the
+// ConcurrentWriteAnnotation.
+func (s *UpdateServer) WriteAfterGets(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writesAfterGets = n
+}
+
+// Updates returns how many Updates the server has received.
+func (s *UpdateServer) Updates() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.updates
+}
+
+// Stored returns the AuthConfig as currently stored.
+func (s *UpdateServer) Stored() map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stored
+}
+
+func (s *UpdateServer) concurrentWrite() {
+	metadata := s.stored["metadata"].(map[string]any)
+	annotations, _ := metadata["annotations"].(map[string]any)
+	if annotations == nil {
+		annotations = map[string]any{}
+	}
+	annotations[ConcurrentWriteAnnotation] = "true"
+	metadata["annotations"] = annotations
+	s.resourceVersion++
+	s.setResourceVersion()
+}
+
+func (s *UpdateServer) setResourceVersion() {
+	metadata := s.stored["metadata"].(map[string]any)
+	metadata["resourceVersion"] = strconv.Itoa(s.resourceVersion)
+}
+
+// NewSecretController returns a SecretController for which no Secrets exist
+// to begin with. The data of each Secret created with it is recorded by name in
+// the returned map. A Secret can only be created once.
+func NewSecretController(t *testing.T) (wcorev1.SecretController, map[string]map[string]string) {
+	t.Helper()
+
+	created := map[string]map[string]string{}
+	ctrl := gomock.NewController(t)
+	cache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	cache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(_, name string) (*corev1.Secret, error) {
+		return nil, apierrors.NewNotFound(corev1.Resource("secrets"), name)
+	}).AnyTimes()
+	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secrets.EXPECT().Cache().Return(cache).AnyTimes()
+	secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		if _, ok := created[secret.Name]; ok {
+			return nil, apierrors.NewAlreadyExists(corev1.Resource("secrets"), secret.Name)
+		}
+		created[secret.Name] = secret.StringData
+		return secret, nil
+	}).AnyTimes()
+
+	return secrets, created
+}
+
+// RequireUpdatedAfterConflict fails the test unless the AuthConfig was updated
+// after an Update that conflicted with a write set up by WriteAfterGets(1), and
+// the write's annotation was kept.
+func RequireUpdatedAfterConflict(t *testing.T, s *UpdateServer) {
+	t.Helper()
+
+	require.Equal(t, 2, s.Updates(), "the conflicting update should be retried once")
+	metadata := s.Stored()["metadata"].(map[string]any)
+	annotations, _ := metadata["annotations"].(map[string]any)
+	require.Equal(t, "true", annotations[ConcurrentWriteAnnotation], "the update should keep the concurrent write's metadata")
 }
 
 // LDAPServer is a TCP listener that stands in for an LDAP or Active Directory
