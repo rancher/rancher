@@ -39,6 +39,10 @@ import (
 
 const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
+// lastUsedAtInterval is the minimum time between writes of a token's lastUsedAt. It bounds the
+// datastore writes made on authentication; the readers of lastUsedAt need minute precision.
+const lastUsedAtInterval = time.Minute
+
 // ErrMustAuthenticate is returned by the authenticator when the request cannot
 // be authenticated.
 var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
@@ -277,8 +281,11 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	now := a.now().Truncate(time.Second) // Use the second precision.
 	lastUsed := token.GetLastUsedAt()
 	if lastUsed != nil {
-		if now.Equal(lastUsed.Time.Truncate(time.Second)) {
-			// Throttle subsecond updates.
+		// Skip the write when the stored value is less than the interval from now in either
+		// direction, so replicas whose clocks differ slightly don't overwrite each other on every
+		// request. The range check avoids time.Sub, which saturates for values far in the future.
+		stored := lastUsed.Time.Truncate(time.Second)
+		if stored.After(now.Add(-lastUsedAtInterval)) && stored.Before(now.Add(lastUsedAtInterval)) {
 			return authResp, nil
 		}
 	}
@@ -474,8 +481,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 
 	if isExtToken {
 		// Ext token detected. Perform roughly the same process as for legacy tokens, using
-		// a different store.  No indexer/cache in play here.
-
+		// a different store. The store reads the token's backing Secret from the cache.
 		if tokenClaims != nil {
 			if err := a.validateOIDCClientForToken(tokenClaims); err != nil {
 				return nil, err
