@@ -161,7 +161,7 @@ COPY pkg/ pkg/
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
-# Extract server chroot
+# Final server target, extract the bci-nano chroot we prepared
 FROM scratch AS server
 COPY --from=chroot-builder-server /chroot/ /
 
@@ -491,10 +491,8 @@ FROM server AS demo
 # Will iterate later
 
 
-# Main stage using bci-nano as the base image.
-FROM final AS agent
-
-# Copy binaries and configuration files from zypper to micro.
+# Final agent target, extract the bci-nano chroot we prepared
+FROM scratch AS agent
 COPY --from=chroot-builder-agent /chroot/ /
 
 # Test that some of the dependency binaries were copied
