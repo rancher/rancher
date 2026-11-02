@@ -83,6 +83,84 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
+# Enable exporting of the k3s images as part of the build process.
+FROM --platform=$BUILDPLATFORM go-builder AS images
+ARG TARGETARCH
+WORKDIR /src
+ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
+COPY hack/airgap/go.mod hack/airgap/go.sum /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
+COPY hack/airgap/ /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go build -o export-images ./...
+RUN ./export-images -arch ${TARGETARCH} -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
+
+# Output just k3s images
+FROM scratch AS k3s-images
+COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
+
+# rancher-go-builder is an intermediate stage with go mod ready and Rancher
+# dependencies downloaded. Can be used to build both the Rancher server and agent
+# binaries.
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder
+ARG BUILD_WORKDIR
+WORKDIR ${BUILD_WORKDIR}
+ARG GODEP_APISERVER_PATH
+COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
+ARG GODEP_REMOTEDIALER_PATH
+COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
+ARG GODEP_SHEPHERD_PATH
+COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
+ARG GODEP_STEVE_PATH
+COPY --from=godep-steve / ${GODEP_STEVE_PATH}
+ARG GODEP_WRANGLER_PATH
+COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
+# Only invalidate cache if go.mod/go.sum changes.
+COPY go.mod go.sum ./
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
+ARG VERSION
+ARG COMMIT
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY main.go ./
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+
+# Output just the server binary
+FROM scratch AS server-binary
+COPY --from=server-build /app/rancher /bin/rancher
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
+ARG VERSION
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY pkg/ pkg/
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
+
+
 # Main stage using bci-nano as the base image
 FROM final AS base
 # Copy binaries and configuration files from builder to micro
@@ -362,84 +440,6 @@ ENV ETCDCTL_API=3
 
 ENV SSL_CERT_DIR=/etc/rancher/ssl
 ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
-
-
-# Enable exporting of the k3s images as part of the build process.
-FROM --platform=$BUILDPLATFORM go-builder AS images
-ARG TARGETARCH
-WORKDIR /src
-ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
-COPY hack/airgap/go.mod hack/airgap/go.sum /src/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
-COPY hack/airgap/ /src/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go build -o export-images ./...
-RUN ./export-images -arch ${TARGETARCH} -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
-
-# Output just k3s images
-FROM scratch AS k3s-images
-COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
-
-# rancher-go-builder is an intermediate stage with go mod ready and Rancher
-# dependencies downloaded. Can be used to build both the Rancher server and agent
-# binaries.
-FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder
-ARG BUILD_WORKDIR
-WORKDIR ${BUILD_WORKDIR}
-ARG GODEP_APISERVER_PATH
-COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
-ARG GODEP_LASSO_PATH
-COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
-ARG GODEP_NORMAN_PATH
-COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
-ARG GODEP_REMOTEDIALER_PATH
-COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
-ARG GODEP_SHEPHERD_PATH
-COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
-ARG GODEP_STEVE_PATH
-COPY --from=godep-steve / ${GODEP_STEVE_PATH}
-ARG GODEP_WRANGLER_PATH
-COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
-# Only invalidate cache if go.mod/go.sum changes.
-COPY go.mod go.sum ./
-COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
-COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
-COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
-
-
-FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
-ARG VERSION
-ARG COMMIT
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
-ARG GCFLAGS
-ARG TARGETOS
-ARG TARGETARCH
-COPY internal/ internal/
-COPY pkg/ pkg/
-COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
-
-# Output just the server binary
-FROM scratch AS server-binary
-COPY --from=server-build /app/rancher /bin/rancher
-
-
-FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
-ARG VERSION
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
-ARG GCFLAGS
-ARG TARGETOS
-ARG TARGETARCH
-COPY cmd/ cmd/
-COPY internal/ internal/
-COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
 FROM base AS server
