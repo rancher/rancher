@@ -33,16 +33,17 @@ FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
 FROM registry.suse.com/bci/bci-nano:16.0 AS final
+FROM registry.suse.com/bci/bci-base:16.0 AS base-builder
 
-# Temporary build stage image
-FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
+# Extend bci-nano base image by creating a chroot
+FROM base-builder AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
 
 # Assert that builder matches the target OS version
 RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ]
 
-# Install some packages with zypper in the chroot of the final micro image
+# Packages used in both images
 RUN zypper refresh && \
     # Early install coreutils-single (smaller size), otherwise coreutils will be transitively installed
     zypper --installroot /chroot -n in --no-recommends coreutils-single && \
@@ -70,16 +71,13 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 
 
-FROM final AS builder
-COPY --from=chroot-builder-server /chroot/ /
-
 FROM --platform=$BUILDPLATFORM registry.suse.com/rancher/appco-go:1.27.3 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
 ENV GOCACHE=/root/.cache/go/cache
 
-FROM builder AS kdm
+FROM base-builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
