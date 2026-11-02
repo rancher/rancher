@@ -6,6 +6,7 @@ on:
       - "Build Pull Request"
       - "Push to release branches"
       - "Nightly Provisioning Tests"
+      - "FOSSA Scanning"
     types: [completed]
 
 jobs:
