@@ -198,7 +198,7 @@ fi
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
-grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
+grep -m1 '^machineProvisionImage:' build.yaml | cut -d ' ' -f2 >> /var/lib/rancher/$DIST/agent/images/pull.txt
 mkdir -p /usr/share/rancher/ui-dashboard/assets
 curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-amd64
 curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-arm64
