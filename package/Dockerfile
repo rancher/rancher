@@ -161,9 +161,8 @@ COPY pkg/ pkg/
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
-# Main stage using bci-nano as the base image
-FROM final AS base
-# Copy binaries and configuration files from builder to micro
+# Extract server chroot
+FROM scratch AS server
 COPY --from=chroot-builder-server /chroot/ /
 
 # Test that some of the dependency binaries were copied
@@ -442,7 +441,6 @@ ENV SSL_CERT_DIR=/etc/rancher/ssl
 ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 
 
-FROM base AS server
 ARG VERSION
 ARG BASE_REGISTRY
 ARG BASE_UI_BRAND
