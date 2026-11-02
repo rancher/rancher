@@ -267,20 +267,27 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
 	})
 
-	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+	t.Run("lastUsedAt less than a minute from now is not updated", func(t *testing.T) {
 		oldTokenLastUsedAt := token.LastUsedAt
 		defer func() {
 			token.LastUsedAt = oldTokenLastUsedAt
 		}()
-		lastUsedAt := metav1.NewTime(now.Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Empty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Truncate(time.Second),
+			now.Add(-59 * time.Second).Truncate(time.Second),
+			now.Add(59 * time.Second).Truncate(time.Second),
+		} {
+			lastUsedAt := metav1.NewTime(stored)
+			token.LastUsedAt = &lastUsedAt
+			patchData = nil
+			userRefresher.reset()
+
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, patchData, "stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
@@ -288,24 +295,32 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		defer func() {
 			token.LastUsedAt = oldTokenLastUsedAt
 		}()
-		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Add(-time.Minute).Truncate(time.Second),
+			now.Add(time.Minute).Truncate(time.Second),
+			time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC),
+		} {
+			lastUsedAt := metav1.NewTime(stored)
+			token.LastUsedAt = &lastUsedAt
+			patchData = nil
+			userRefresher.reset()
 
-		lastUsedAt = metav1.NewTime(now.Add(time.Second).Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotEmpty(t, patchData, "stored lastUsedAt %s", stored)
 
-		resp, err = authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+			var patch []struct {
+				Path  string      `json:"path"`
+				Value metav1.Time `json:"value"`
+			}
+			require.NoError(t, json.Unmarshal(patchData, &patch))
+			require.Len(t, patch, 1)
+			assert.Equal(t, "/lastUsedAt", patch[0].Path)
+			assert.True(t, patch[0].Value.Time.Equal(now.Truncate(time.Second)),
+				"stored lastUsedAt %s: patched %s, want %s", stored, patch[0].Value, now.Truncate(time.Second))
+		}
 	})
 
 	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
@@ -318,7 +333,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		client.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("some error")).Times(1)
 		authenticator.tokenClient = client
 
-		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
+		lastUsedAt := metav1.NewTime(now.Add(-time.Minute).Truncate(time.Second))
 		token.LastUsedAt = &lastUsedAt
 		patchData = nil
 		userRefresher.reset()
@@ -812,21 +827,26 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		require.NotEmpty(t, patchData)
 	})
 
-	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+	t.Run("lastUsedAt less than a minute from now is not updated", func(t *testing.T) {
 		oldTokenLastUsedAt := tokenSecret.Data["last-used-at"]
 		defer func() {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 		}()
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Empty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Truncate(time.Second),
+			now.Add(-59 * time.Second).Truncate(time.Second),
+			now.Add(59 * time.Second).Truncate(time.Second),
+		} {
+			tokenSecret.Data["last-used-at"] = []byte(stored.Format(time.RFC3339))
+			patchData = nil
+			userRefresher.reset()
+
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, patchData, "stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
@@ -834,28 +854,31 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		defer func() {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 		}()
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(-time.Second).
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Add(-time.Minute).Truncate(time.Second),
+			now.Add(time.Minute).Truncate(time.Second),
+			time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC),
+		} {
+			tokenSecret.Data["last-used-at"] = []byte(stored.Format(time.RFC3339))
+			patchData = nil
+			userRefresher.reset()
 
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(time.Second).
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotEmpty(t, patchData, "stored lastUsedAt %s", stored)
 
-		resp, err = authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+			var patch []struct {
+				Path  string `json:"path"`
+				Value []byte `json:"value"`
+			}
+			require.NoError(t, json.Unmarshal(patchData, &patch))
+			require.Len(t, patch, 1)
+			assert.Equal(t, "/data/last-used-at", patch[0].Path)
+			assert.Equal(t, now.Truncate(time.Second).Format(time.RFC3339), string(patch[0].Value),
+				"stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
@@ -877,7 +900,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil, nil)
 
 		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(-time.Second).
+			Add(-time.Minute).
 			Truncate(time.Second).
 			Format(time.RFC3339))
 		patchData = nil
