@@ -182,18 +182,13 @@ RUN useradd rancher && \
     chgrp jail-accessors /var/lib/rancher /var/lib/cattle /usr/local/bin && \
     chmod 750            /var/lib/rancher /var/lib/cattle /usr/local/bin && \
     chmod g+s            /var/lib/rancher /var/lib/cattle /usr/local/bin
-
-RUN mkdir /root/.kube && \
-    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
-    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config && \
-    ln -s /usr/bin/rancher /usr/bin/reset-password && \
+RUN ln -s /usr/bin/rancher /usr/bin/reset-password && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
 ARG ARCH
-ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG IMAGE_NAME=rancher
+ARG IMAGE_NAME=rancher-server
 ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
@@ -209,9 +204,6 @@ ENV CATTLE_MACHINE_CHECKSUM_amd64=7bccf99b994db92ef3997ea15590666175ced11b948d1e
 ENV CATTLE_MACHINE_CHECKSUM_arm64=b1e04efc1d893ed11c334cfb577b49fa13679272a941195a17db810956192925
 ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION=v3.7.3
-ENV CATTLE_ETCD_CHECKSUM_amd64=5dfa9cc3b3ce3b4b491fbcc2057d3daa166bcc6676f743fcd20f8e5760cb9775
-ENV CATTLE_ETCD_CHECKSUM_arm64=ce4c08f5f43d99f0d1993552ce2906829c0366077a97e5e52529337f151a29fb
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.3.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
@@ -284,82 +276,6 @@ RUN case "${ARCH}" in \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
-
-# Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.37.1-k3s1 \
-    /bin/blkid \
-    /bin/bandwidth \
-    /bin/cni \
-    /bin/conntrack \
-    /bin/containerd \
-    /bin/containerd-shim-runc-v2 \
-    /bin/ethtool \
-    /bin/firewall \
-    /bin/ip \
-    /bin/ipset \
-    /bin/k3s \
-    /bin/losetup \
-    /bin/pigz \
-    /bin/runc \
-    /bin/which \
-    /bin/aux/iptables-apply \
-    /bin/aux/iptables-detect.sh \
-    /bin/aux/nft \
-    /bin/aux/xtables-set-mode.sh \
-    /bin/aux/xtables-legacy-multi \
-    /bin/aux/xtables-nft-multi \
-    /usr/bin/
-
-RUN ln -s /usr/bin/cni /usr/bin/bridge && \
-    ln -s /usr/bin/cni /usr/bin/flannel && \
-    ln -s /usr/bin/cni /usr/bin/host-local && \
-    ln -s /usr/bin/cni /usr/bin/loopback && \
-    ln -s /usr/bin/cni /usr/bin/portmap && \
-    ln -s /usr/bin/k3s /usr/bin/crictl && \
-    ln -s /usr/bin/k3s /usr/bin/ctr && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-    ln -s /usr/bin/k3s /usr/bin/kubectl && \
-    ln -s /usr/bin/pigz /usr/bin/unpigz && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
-    ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-save && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-restore-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-save && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-restore-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
-
-RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    case "${ARCH}" in \
-        amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
-        arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
-    printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
-    sha256sum -c etcd.sha256 && \
-    rm etcd.sha256 && \
-    tar xvzf /tmp/etcd.tar.gz --strip-components=1 --no-same-owner -C /usr/bin/ "etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl" && \
-    mkdir -p /var/lib/rancher-data/driver-metadata && \
-    rm /tmp/etcd.tar.gz
 
 ENV CATTLE_DASHBOARD_UI_VERSION=master
 
@@ -435,11 +351,7 @@ ENV CATTLE_CLI_URL_WINDOWS=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 
-ENV ETCDCTL_API=3
-
 ENV SSL_CERT_DIR=/etc/rancher/ssl
-ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
-
 
 ARG VERSION
 ARG BASE_REGISTRY
@@ -465,16 +377,12 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
-    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
-COPY --chown=root:root --chmod=0755 \
     package/loglevel \
     package/entrypoint.sh \
     package/jailer.sh /usr/bin/
 
 VOLUME /var/lib/rancher-data/local-catalogs
 VOLUME /var/lib/rancher
-VOLUME /var/lib/kubelet
-VOLUME /var/lib/cni
 VOLUME /var/log
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
@@ -483,12 +391,111 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
     "org.opencontainers.image.version"=${VERSION} \
-    "org.opensuse.reference"=rancher/rancher:${VERSION}
+    "org.opensuse.reference"=${IMAGE_REPO}/${IMAGE_NAME}:${VERSION}
 ENTRYPOINT ["entrypoint.sh"]
 
 
 FROM server AS demo
-# Will iterate later
+ARG ETCD_UNSUPPORTED_ARCH
+
+ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/rancher
+ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
+ENV ETCDCTL_API=3
+
+LABEL "org.opensuse.reference"=rancher/rancher:${VERSION}
+
+# Replace entrypoint
+COPY --chown=root:root --chmod=0755 \
+    package/entrypoint-demo.sh /usr/bin/entrypoint.sh
+
+COPY --chown=root:root --chmod=0755 \
+    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+#
+# Set up K3s: copy the necessary binaries from the K3s image.
+COPY --from=rancher/k3s:v1.37.1-k3s1 \
+    /bin/blkid \
+    /bin/bandwidth \
+    /bin/cni \
+    /bin/conntrack \
+    /bin/containerd \
+    /bin/containerd-shim-runc-v2 \
+    /bin/ethtool \
+    /bin/firewall \
+    /bin/ip \
+    /bin/ipset \
+    /bin/k3s \
+    /bin/losetup \
+    /bin/pigz \
+    /bin/runc \
+    /bin/which \
+    /bin/aux/iptables-apply \
+    /bin/aux/iptables-detect.sh \
+    /bin/aux/nft \
+    /bin/aux/xtables-set-mode.sh \
+    /bin/aux/xtables-legacy-multi \
+    /bin/aux/xtables-nft-multi \
+    /usr/bin/
+
+RUN ln -s /usr/bin/cni /usr/bin/bridge && \
+    ln -s /usr/bin/cni /usr/bin/flannel && \
+    ln -s /usr/bin/cni /usr/bin/host-local && \
+    ln -s /usr/bin/cni /usr/bin/loopback && \
+    ln -s /usr/bin/cni /usr/bin/portmap && \
+    ln -s /usr/bin/k3s /usr/bin/crictl && \
+    ln -s /usr/bin/k3s /usr/bin/ctr && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+    ln -s /usr/bin/k3s /usr/bin/kubectl && \
+    ln -s /usr/bin/pigz /usr/bin/unpigz && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
+    ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-save && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-restore-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-save && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-restore-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
+
+RUN mkdir /root/.kube && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config
+
+ENV CATTLE_ETCD_VERSION=v3.7.3
+ENV CATTLE_ETCD_CHECKSUM_amd64=5dfa9cc3b3ce3b4b491fbcc2057d3daa166bcc6676f743fcd20f8e5760cb9775
+ENV CATTLE_ETCD_CHECKSUM_arm64=ce4c08f5f43d99f0d1993552ce2906829c0366077a97e5e52529337f151a29fb
+RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
+    case "${ARCH}" in \
+        amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
+        arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
+    printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
+    sha256sum -c etcd.sha256 && \
+    rm etcd.sha256 && \
+    tar xvzf /tmp/etcd.tar.gz --strip-components=1 --no-same-owner -C /usr/bin/ "etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl" && \
+    mkdir -p /var/lib/rancher-data/driver-metadata && \
+    rm /tmp/etcd.tar.gz
+
+VOLUME /var/lib/kubelet
+VOLUME /var/lib/cni
 
 
 # Final agent target, extract the bci-nano chroot we prepared
