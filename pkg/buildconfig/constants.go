@@ -13,7 +13,7 @@ const (
 	FleetVersion              = "111.0.0+up0.17.0-beta.2"
 	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.7"
 	PartnerChartDefaultBranch = "main"
-	RemoteDialerProxyVersion  = "111.0.0+up0.9.0-rc.3"
+	RemoteDialerProxyVersion  = "111.0.0+up0.9.1-rc.1"
 	Rke2ChartDefaultBranch    = "main"
 	SystemAgentVersion        = "v0.16.0-rc.5"
 	TurtlesVersion            = "111.0.0+up0.28.0-rc.3"
