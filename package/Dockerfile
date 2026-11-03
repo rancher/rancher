@@ -381,7 +381,7 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
     "org.opencontainers.image.version"=${VERSION} \
     "org.opensuse.reference"=${IMAGE_REPO}/${IMAGE_NAME}:${VERSION}
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
 
 FROM server AS demo
@@ -526,4 +526,4 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.version"=${VERSION} \
     "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
 
-ENTRYPOINT ["run.sh"]
+ENTRYPOINT ["/usr/bin/run.sh"]
