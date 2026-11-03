@@ -38,6 +38,12 @@
         },
         "disableHTTP": {
           "type": "boolean"
+        },
+        "nodePort": {
+          "type": ["integer", "null"],
+          "minimum": 30000,
+          "maximum": 32767,
+          "description": "Optional node port for the https service port. Only effective when service.type is NodePort."
         }
       }
     },
