@@ -100,7 +100,7 @@ RUN ./export-images -arch ${TARGETARCH} -k3s-version ${CATTLE_K3S_VERSION} -outp
 FROM scratch AS k3s-images
 COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
 
-# rancher-go-builder is an intermediate target to build Rancher's go binaries.
+# rancher-build is an intermediate target to build Rancher's go binaries.
 # go mod dependencies are early loaded, to optimize caching
 FROM --platform=$BUILDPLATFORM go-builder AS rancher-build
 ARG BUILD_WORKDIR
@@ -474,7 +474,7 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
         arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
         *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
     esac && \
-    # Rancher's SSL_CERT_DIR interfers with curl
+    # Rancher's SSL_CERT_DIR interferes with curl
     SSL_CERT_DIR= curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
     printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
     sha256sum -c etcd.sha256 && \
