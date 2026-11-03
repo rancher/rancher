@@ -122,11 +122,11 @@ jobs:
           push: false
           cache-from: type=gha,scope=pr-build-installer
           cache-to: type=gha,mode=min,scope=pr-build-installer
-  integration-tests:
+  e2e-tests:
     permissions:
       contents: read
     needs: [build-chart, build-server-amd64, build-agent-amd64]
-    uses: $/.github/workflows/integration-tests.yml
+    uses: $/.github/workflows/e2e-tests.yml
   provisioning-tests:
     permissions:
       contents: read

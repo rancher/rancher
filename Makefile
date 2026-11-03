@@ -20,16 +20,16 @@ quick-k3s-images:
 
 # Builds the integration setup binary without starting a container.
 integration-setup:
-	cd tests/v2/integration && ./scripts/build-integration-setup
-	CATTLE_TEST_CONFIG=$(PWD)/tests/v2/integration/config.yaml \
-	  ./tests/v2/integration/bin/integrationsetup
+	cd tests/e2e && ./scripts/build-integration-setup
+	CATTLE_TEST_CONFIG=$(PWD)/tests/e2e/config.yaml \
+	  ./tests/e2e/bin/integrationsetup
 
 # Runs integration tests against an already-running Rancher server.
 # Requires CATTLE_TEST_CONFIG to point at a valid config.yaml, or run
 # 'make integration-setup' first to generate one automatically.
 integration-test-local:
-	CATTLE_TEST_CONFIG=$(PWD)/tests/v2/integration/config.yaml \
-	  CGO_ENABLED=0 go test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/...
+	CATTLE_TEST_CONFIG=$(PWD)/tests/e2e/config.yaml \
+	  CGO_ENABLED=0 go test -v -failfast -timeout 30m -p 1 ./tests/e2e/...
 
 $(DEV_TARGETS):
 	./dev-scripts/$@

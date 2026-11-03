@@ -12,7 +12,7 @@ pkg/api/steve/catalog @rancher/orbs
 pkg/apis/catalog.cattle.io @rancher/orbs
 pkg/controllers/dashboard/helm @rancher/orbs
 pkg/controllers/dashboard/plugin @rancher/orbs
-tests/v2/integration/catalogv2 @rancher/orbs
+tests/e2e/catalogv2 @rancher/orbs
 
 # Release workflows
 .github/workflows @rancher/release-team
