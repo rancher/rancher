@@ -83,14 +83,12 @@ func TestRemoveLegacyObjects(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := fake.NewClientset(tt.objects...)
-			h := &handler{k8s: client}
-
-			require.NoError(t, h.removeLegacyObjects(context.Background()))
+			require.NoError(t, RemoveLegacyObjects(context.Background(), client))
 			assert.Equal(t, tt.wantDeleted, deleteActions(client))
 
 			// Running again is a no-op.
 			client.ClearActions()
-			require.NoError(t, h.removeLegacyObjects(context.Background()))
+			require.NoError(t, RemoveLegacyObjects(context.Background(), client))
 			assert.Empty(t, deleteActions(client))
 		})
 	}
@@ -105,7 +103,7 @@ func TestRemoveLegacyObjectsDeleteErrors(t *testing.T) {
 			return true, nil, apierrors.NewNotFound(schema.GroupResource{Resource: action.GetResource().Resource}, "")
 		})
 
-		require.NoError(t, (&handler{k8s: client}).removeLegacyObjects(context.Background()))
+		require.NoError(t, RemoveLegacyObjects(context.Background(), client))
 	})
 
 	t.Run("other delete errors are returned and stop the cleanup", func(t *testing.T) {
@@ -114,7 +112,7 @@ func TestRemoveLegacyObjectsDeleteErrors(t *testing.T) {
 			return true, nil, errors.New("boom")
 		})
 
-		err := (&handler{k8s: client}).removeLegacyObjects(context.Background())
+		err := RemoveLegacyObjects(context.Background(), client)
 		require.ErrorContains(t, err, "boom")
 		assert.Equal(t, []string{"cronjobs/fleet-default/" + prefix + "-cronjob"}, deleteActions(client))
 	})
@@ -125,6 +123,6 @@ func TestRemoveLegacyObjectsDeleteErrors(t *testing.T) {
 			return true, nil, errors.New("boom")
 		})
 
-		require.ErrorContains(t, (&handler{k8s: client}).removeLegacyObjects(context.Background()), "boom")
+		require.ErrorContains(t, RemoveLegacyObjects(context.Background(), client), "boom")
 	})
 }
