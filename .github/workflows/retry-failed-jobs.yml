@@ -3,7 +3,6 @@ name: Retry failed jobs
 on:
   workflow_run: # zizmor: ignore[dangerous-triggers] -- only calls rerun-failed-jobs API, does not run untrusted code
     workflows:
-      - "Build Pull Request"
       - "Push to release branches"
       - "Nightly Provisioning Tests"
     types: [completed]
