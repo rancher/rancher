@@ -1069,6 +1069,12 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 
 	var createErr error
 	_, createErr = w.Core.Secret().Create(secret)
+	if apierrors.IsNotFound(createErr) {
+		// A Create can only return NotFound when the namespace does not exist.
+		logrus.Warnf("Skipping migration of CRT %s/%s: namespace %s not found",
+			crt.Namespace, crt.Name, crt.Namespace)
+		return nil
+	}
 	if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
 		return fmt.Errorf("failed to create token secret: %w", createErr)
 	}
