@@ -132,3 +132,8 @@ jobs:
       contents: read
     needs: [build-server-amd64, build-agent-amd64]
     uses: $/.github/workflows/provisioning-tests.yml
+  smoke-test:
+    permissions:
+      contents: read
+    needs: [build-chart, build-server-amd64]
+    uses: $/.github/workflows/smoke-test.yml
