@@ -3,10 +3,10 @@ package types
 import (
 	"net"
 
+	"context"
+
 	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"
-	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
@@ -102,7 +102,7 @@ func GetCtx(ctx context.Context) context.Context {
 	if logger == nil {
 		return ctx
 	}
-	return log.SetLogger(ctx, logger)
+	return logstream.SetLogger(ctx, logger)
 }
 
 func (s *GrpcServer) GetCapabilities(ctx context.Context, in *Empty) (*Capabilities, error) {

@@ -2,10 +2,13 @@ package oci
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -17,11 +20,11 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/oci/capturewindowclient"
 	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	helmregistry "helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
+	helmregistry "helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/helm/pkg/provenance"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content"
 	"oras.land/oras-go/v2/content/memory"
@@ -281,13 +284,18 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 // addToIndex adds the given helm chart entry into the helm repo index provided.
 func (o *Client) addToIndex(indexFile *repo.IndexFile, chartTarFilePath string) error {
 	// Load the Chart into chart golang struct.
-	chart, err := loader.Load(chartTarFilePath)
+	chartInt, err := loader.Load(chartTarFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load the chart %s: %w", chartTarFilePath, err)
 	}
 
+	chart, ok := chartInt.(*chartv2.Chart)
+	if !ok {
+		return fmt.Errorf("loaded chart is not of type *chartv2.Chart")
+	}
+
 	// Generate the digest of the chart.
-	digest, err := provenance.DigestFile(chartTarFilePath)
+	digest, err := digestFile(chartTarFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to generate digest for chart %s: %w", chart.Metadata.Name, err)
 	}
@@ -347,4 +355,18 @@ func IsErrorCode(err error, code string) bool {
 func IsErrorMessage(err error, message string) bool {
 	var ec errcode.Error
 	return errors.As(err, &ec) && strings.Contains(ec.Message, message)
+}
+
+func digestFile(filename string) (string, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	hash := crypto.SHA256.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }

@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/sirupsen/logrus"
 )
@@ -61,7 +61,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 				continue
 			}
 
-			versionGTMin, err := nodesyncer.IsNewerVersion(minVersion, rancherVersion)
+			versionGTMin, err := isNewerVersion(minVersion, rancherVersion)
 			if err != nil {
 				continue
 			}
@@ -70,7 +70,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 				continue
 			}
 
-			versionLTMax, err := nodesyncer.IsNewerVersion(rancherVersion, maxVersion)
+			versionLTMax, err := isNewerVersion(rancherVersion, maxVersion)
 			if err != nil {
 				continue
 			}
@@ -88,6 +88,8 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 		logrus.Infof("skipping image generation since no compatible releases were found for version: %s", rancherVersion)
 		return nil, nil
 	}
+
+	compatibleReleases = filterLatestPatchReleases(compatibleReleases)
 
 	for _, release := range compatibleReleases {
 		// Registries don't allow "+", so image names will have these substituted.
@@ -122,6 +124,33 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 	sort.Strings(externalImages)
 	logrus.Infof("finished generating %s image list...", source)
 	return externalImages, nil
+}
+
+// isNewerVersion returns true if updated versions semver is newer and false if its
+// semver is older. If semver is equal then metadata is alphanumerically compared.
+func isNewerVersion(prevVersion, updatedVersion string) (bool, error) {
+	parseErrMsg := "failed to parse version: %v"
+	prevVer, err := semver.NewVersion(strings.TrimPrefix(prevVersion, "v"))
+	if err != nil {
+		return false, fmt.Errorf(parseErrMsg, err)
+	}
+
+	updatedVer, err := semver.NewVersion(strings.TrimPrefix(updatedVersion, "v"))
+	if err != nil {
+		return false, fmt.Errorf(parseErrMsg, err)
+	}
+
+	switch updatedVer.Compare(*prevVer) {
+	case -1:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		// using metadata to determine precedence is against semver standards
+		// this is ignored because because k3s uses it to precedence between
+		// two versions based on same k8s version
+		return updatedVer.Metadata > prevVer.Metadata, nil
+	}
 }
 
 // downloadExternalSupportingImages downloads the list of images used by a Source from GitHub releases.
@@ -172,4 +201,76 @@ func downloadExternalImageListFromURL(url string) (string, error) {
 	}
 
 	return string(body), nil
+}
+
+// filterLatestPatchReleases returns only the latest patch release for each minor version.
+// For example, given [v1.28.1+k3s1, v1.28.2+k3s1, v1.28.3+k3s1, v1.29.0+k3s1] it returns
+// [v1.28.3+k3s1, v1.29.0+k3s1]. Comparison order for same major.minor:
+//  1. RC pre-release versions (e.g. v1.28.3-rc.1+k3s1) are skipped entirely.
+//  2. Higher patch wins (v1.28.3 > v1.28.2).
+//  3. For equal patches, the higher build number wins (k3s2 > k3s1, rke2r2 > rke2r1).
+//
+// Releases whose versions cannot be parsed are logged as warnings and dropped.
+func filterLatestPatchReleases(releases []string) []string {
+	type entry struct {
+		original string
+		sv       *semver.Version
+	}
+
+	latestByMinor := make(map[string]entry)
+
+	for _, release := range releases {
+		trimmed := strings.TrimPrefix(release, "v")
+		sv, err := semver.NewVersion(trimmed)
+		if err != nil {
+			logrus.Warnf("filterLatestPatchReleases: skipping unparseable release %q: %v", release, err)
+			continue
+		}
+
+		if sv.PreRelease != "" {
+			logrus.Debugf("filterLatestPatchReleases: skipping RC release %q", release)
+			continue
+		}
+
+		key := fmt.Sprintf("%d.%d", sv.Major, sv.Minor)
+		existing, ok := latestByMinor[key]
+		if !ok {
+			latestByMinor[key] = entry{original: release, sv: sv}
+			continue
+		}
+
+		if sv.Patch > existing.sv.Patch {
+			latestByMinor[key] = entry{original: release, sv: sv}
+			continue
+		}
+		if sv.Patch < existing.sv.Patch {
+			continue
+		}
+		// Same patch: higher build number wins (k3s2 > k3s1, rke2r2 > rke2r1).
+		if extractBuildNumber(sv.Metadata) > extractBuildNumber(existing.sv.Metadata) {
+			latestByMinor[key] = entry{original: release, sv: sv}
+		}
+	}
+
+	result := make([]string, 0, len(latestByMinor))
+	for _, e := range latestByMinor {
+		result = append(result, e.original)
+	}
+	sort.Strings(result)
+	return result
+}
+
+// extractBuildNumber returns the numeric suffix from a build metadata string.
+// For example: "k3s1" -> 1, "k3s2" -> 2, "rke2r1" -> 1, "rke2r2" -> 2.
+// Returns 0 if no numeric suffix is found.
+func extractBuildNumber(metadata string) int {
+	i := len(metadata) - 1
+	for i >= 0 && metadata[i] >= '0' && metadata[i] <= '9' {
+		i--
+	}
+	if i == len(metadata)-1 {
+		return 0
+	}
+	n, _ := strconv.Atoi(metadata[i+1:])
+	return n
 }

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
 	v1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
@@ -25,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed test/*
@@ -40,6 +40,11 @@ func getMockEksOperatorController(t *testing.T, clusterState string) mockEksOper
 	ctrl := gomock.NewController(t)
 	clusterMock := fake.NewMockNonNamespacedClientInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
 	clusterMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
 		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
 			return c, nil
 		},
@@ -91,7 +96,7 @@ func (m *mockEksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Clust
 
 	cluster = cluster.DeepCopy()
 	cluster.Status.EKSStatus.UpstreamSpec = upstreamSpec
-	return m.ClusterClient.Update(cluster)
+	return m.ClusterClient.UpdateStatus(cluster)
 }
 
 // test generateAndSetServiceAccount with mock sibling func (getAccessToken)
@@ -117,7 +122,7 @@ func (m *mockEksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3
 	cluster = cluster.DeepCopy()
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return m.ClusterClient.Update(cluster)
+	return m.ClusterClient.UpdateStatus(cluster)
 }
 
 // test generateSATokenWithPublicAPI with mock sibling func (getRestConfig)

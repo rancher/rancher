@@ -46,18 +46,18 @@ for DFARG in CHART_DEFAULT_BRANCH CATTLE_KDM_BRANCH; do
    fi
 done
 
-# Dockerfile.dapper
-for DFDENV in CATTLE_KDM_BRANCH; do
-   FOUND_VALUE=$(grep ^"ENV ${DFDENV}" Dockerfile.dapper| awk -F'=' '{ print $2 }')
+# Dockerfile.runtime
+for DFENV in CATTLE_KDM_BRANCH; do
+   FOUND_VALUE=$(grep ^"ENV ${DFENV}" Dockerfile.runtime | awk -F'=' '{ print $2 }')
    if [ -n "${RELEASE_TYPE}" ]; then
-      echo -n "${DFDENV}: ${FOUND_VALUE} in Dockerfile.dapper: "
+      echo -n "${DFENV}: ${FOUND_VALUE} in Dockerfile.runtime: "
       if [ "${FOUND_VALUE}" != "${REQUIRED_VALUE}" ]; then
         echo "INCORRECT (should be ${REQUIRED_VALUE})"
       else
         echo "CORRECT"
       fi
    else
-      echo "* ${DFDENV}: ${FOUND_VALUE} (\`Dockerfile.dapper\`)"
+      echo "* ${DFENV}: ${FOUND_VALUE} (\`Dockerfile.runtime\`)"
    fi
 done
 

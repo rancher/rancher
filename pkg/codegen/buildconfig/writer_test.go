@@ -12,15 +12,16 @@ import (
 
 func TestGoConstantsWriterRun(t *testing.T) {
 	t.Parallel()
-	const contents = `b: 3
-a: foo
-c: 3.14`
-	in := bytes.NewBufferString(contents)
+	cfg := map[string]string{
+		"b": "3",
+		"a": "foo",
+		"c": "3.14",
+	}
 	out := new(bytes.Buffer)
 
 	const rawTemplate = `
 	package buildconfig
-	
+
 	const (
 	{{ . }})
 	`
@@ -28,7 +29,7 @@ c: 3.14`
 	require.NoError(t, err)
 	w := &main.GoConstantsWriter{
 		Tmpl:   tmpl,
-		Input:  in,
+		Config: cfg,
 		Output: out,
 	}
 	require.NoError(t, w.Run())
@@ -44,60 +45,53 @@ const (
 `
 	got := out.String()
 	require.Equal(t, want, got)
-
-	// Running a second time with the same Input source must fail.
-	require.Error(t, w.Run())
 }
 
 func TestGoConstantsWriterFailsWithBadConfiguration(t *testing.T) {
 	t.Parallel()
 	const rawTemplate = `
 	package buildconfig
-	
+
 	const (
 	{{ . }})
 	`
 	tmpl, err := template.New("").Parse(rawTemplate)
 	require.NoError(t, err)
-	const contents = `a: foo
-b: 3
-c: 3.14`
+	cfg := map[string]string{
+		"a": "foo",
+		"b": "3",
+		"c": "3.14",
+	}
 	output := new(bytes.Buffer)
 
 	tests := []struct {
 		name   string
 		tmpl   *template.Template
-		input  io.Reader
+		config map[string]string
 		output io.Writer
 	}{
 		{
 			name:   "nil template",
 			tmpl:   nil,
-			input:  bytes.NewBufferString(contents),
+			config: cfg,
 			output: output,
 		},
 		{
 			name:   "empty template",
 			tmpl:   template.New(""),
-			input:  bytes.NewBufferString(contents),
+			config: cfg,
 			output: output,
 		},
 		{
-			name:   "nil input",
+			name:   "nil config",
 			tmpl:   tmpl,
-			input:  nil,
-			output: output,
-		},
-		{
-			name:   "empty input",
-			tmpl:   tmpl,
-			input:  bytes.NewBufferString(""),
+			config: nil,
 			output: output,
 		},
 		{
 			name:   "nil output",
 			tmpl:   tmpl,
-			input:  bytes.NewBufferString(contents),
+			config: cfg,
 			output: nil,
 		},
 	}
@@ -107,7 +101,7 @@ c: 3.14`
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			w := main.GoConstantsWriter{
-				Input:  test.input,
+				Config: test.config,
 				Output: test.output,
 				Tmpl:   test.tmpl,
 			}

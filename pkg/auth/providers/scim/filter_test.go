@@ -241,6 +241,41 @@ func TestParseFilter(t *testing.T) {
 			wantErr:     true,
 			errContains: "invalid attribute name",
 		},
+
+		// URN-prefixed attributes
+		{
+			name:   "URN-prefixed user attribute",
+			filter: `urn:ietf:params:scim:schemas:core:2.0:User:userName eq "john.doe"`,
+			want: &Filter{
+				Attribute: "userName",
+				Operator:  opEqual,
+				Value:     "john.doe",
+			},
+		},
+		{
+			name:   "URN-prefixed group attribute",
+			filter: `urn:ietf:params:scim:schemas:core:2.0:Group:displayName eq "Engineering"`,
+			want: &Filter{
+				Attribute: "displayName",
+				Operator:  opEqual,
+				Value:     "Engineering",
+			},
+		},
+		{
+			name:   "URN-prefixed attribute with pr operator",
+			filter: `urn:ietf:params:scim:schemas:core:2.0:User:externalId pr`,
+			want: &Filter{
+				Attribute: "externalId",
+				Operator:  opPresent,
+				Value:     "",
+			},
+		},
+		{
+			name:        "unknown URN prefix in filter",
+			filter:      `urn:custom:schema:attr eq "value"`,
+			wantErr:     true,
+			errContains: "unrecognized schema URN",
+		},
 	}
 
 	for _, tt := range tests {
@@ -255,6 +290,117 @@ func TestParseFilter(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestStripSchemaURN(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                 string
+		path                 string
+		expectedResourceType string
+		wantAttrPath         string
+		wantResourceType     string
+		wantErr              bool
+		errContains          string
+	}{
+		{
+			name:         "bare attribute",
+			path:         "userName",
+			wantAttrPath: "userName",
+		},
+		{
+			name:         "bare nested attribute",
+			path:         "name.familyName",
+			wantAttrPath: "name.familyName",
+		},
+		{
+			name:             "user URN prefix",
+			path:             "urn:ietf:params:scim:schemas:core:2.0:User:userName",
+			wantAttrPath:     "userName",
+			wantResourceType: "User",
+		},
+		{
+			name:             "group URN prefix",
+			path:             "urn:ietf:params:scim:schemas:core:2.0:Group:displayName",
+			wantAttrPath:     "displayName",
+			wantResourceType: "Group",
+		},
+		{
+			name:                 "user URN matching resource type",
+			path:                 "urn:ietf:params:scim:schemas:core:2.0:User:active",
+			expectedResourceType: "User",
+			wantAttrPath:         "active",
+			wantResourceType:     "User",
+		},
+		{
+			name:                 "user URN mismatched resource type",
+			path:                 "urn:ietf:params:scim:schemas:core:2.0:User:userName",
+			expectedResourceType: "Group",
+			wantErr:              true,
+			errContains:          "does not match",
+		},
+		{
+			name:                 "group URN mismatched resource type",
+			path:                 "urn:ietf:params:scim:schemas:core:2.0:Group:displayName",
+			expectedResourceType: "User",
+			wantErr:              true,
+			errContains:          "does not match",
+		},
+		{
+			name:        "unknown URN prefix",
+			path:        "urn:ietf:params:scim:schemas:extension:custom:2.0:Foo:bar",
+			wantErr:     true,
+			errContains: "unrecognized schema URN",
+		},
+		{
+			name:             "URN with complex path",
+			path:             "urn:ietf:params:scim:schemas:core:2.0:User:emails[primary eq true].value",
+			wantAttrPath:     "emails[primary eq true].value",
+			wantResourceType: "User",
+		},
+		{
+			name:             "URN with members filter path",
+			path:             `urn:ietf:params:scim:schemas:core:2.0:Group:members[value eq "u-123"]`,
+			wantAttrPath:     `members[value eq "u-123"]`,
+			wantResourceType: "Group",
+		},
+		{
+			name:         "empty path",
+			path:         "",
+			wantAttrPath: "",
+		},
+		{
+			name:        "URN prefix with no attribute",
+			path:        "urn:ietf:params:scim:schemas:core:2.0:User:",
+			wantErr:     true,
+			errContains: "missing attribute name",
+		},
+		{
+			name:        "malformed urn prefix",
+			path:        "urn:bogus",
+			wantErr:     true,
+			errContains: "unrecognized schema URN",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			attrPath, resourceType, err := stripSchemaURN(tt.path, tt.expectedResourceType)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.ErrorContains(t, err, tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAttrPath, attrPath)
+			assert.Equal(t, tt.wantResourceType, resourceType)
 		})
 	}
 }
@@ -389,64 +535,72 @@ func TestFilterMatchesCaseExact(t *testing.T) {
 	}
 }
 
-func TestFilterValidateForAttribute(t *testing.T) {
+func TestFilterValidateForAttributes(t *testing.T) {
 	tests := []struct {
-		name             string
-		filter           *Filter
-		allowedAttribute string
-		allowedOperators []filterOperator
-		wantErr          bool
-		errContains      string
+		name              string
+		filter            *Filter
+		allowedAttributes []string
+		allowedOperators  []filterOperator
+		wantErr           bool
+		errContains       string
 	}{
 		{
-			name:             "nil filter is valid",
-			filter:           nil,
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          false,
+			name:              "nil filter is valid",
+			filter:            nil,
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "valid attribute and operator",
-			filter:           &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          false,
+			name:              "valid attribute and operator",
+			filter:            &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "attribute case insensitive match",
-			filter:           &Filter{Attribute: "USERNAME", Operator: opEqual, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          false,
+			name:              "attribute case insensitive match",
+			filter:            &Filter{Attribute: "USERNAME", Operator: opEqual, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "multiple allowed operators",
-			filter:           &Filter{Attribute: "userName", Operator: opStartsWith, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual, opStartsWith, opContains},
-			wantErr:          false,
+			name:              "multiple allowed operators",
+			filter:            &Filter{Attribute: "userName", Operator: opStartsWith, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual, opStartsWith, opContains},
 		},
 		{
-			name:             "unsupported attribute",
-			filter:           &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          true,
-			errContains:      "unsupported filter attribute",
+			name:              "multiple allowed attributes matches first",
+			filter:            &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
+			allowedAttributes: []string{"userName", "externalId"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "unsupported operator",
-			filter:           &Filter{Attribute: "userName", Operator: opContains, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          true,
-			errContains:      "unsupported filter operator",
+			name:              "multiple allowed attributes matches second",
+			filter:            &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
+			allowedAttributes: []string{"userName", "externalId"},
+			allowedOperators:  []filterOperator{opEqual},
+		},
+		{
+			name:              "unsupported attribute",
+			filter:            &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
+			wantErr:           true,
+			errContains:       "unsupported filter attribute",
+		},
+		{
+			name:              "unsupported operator",
+			filter:            &Filter{Attribute: "userName", Operator: opContains, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
+			wantErr:           true,
+			errContains:       "unsupported filter operator",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.filter.ValidateForAttribute(tt.allowedAttribute, tt.allowedOperators...)
+			err := tt.filter.ValidateForAttributes(tt.allowedAttributes, tt.allowedOperators...)
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {

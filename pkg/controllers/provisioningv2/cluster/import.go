@@ -3,12 +3,14 @@ package cluster
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -59,10 +61,13 @@ func (h *handler) deployAgent(cluster *v1.Cluster, status v1.ClusterStatus) (boo
 		return false, err
 	}
 
-	tokenValue := tokens[0].Status.Token
-	if tokenValue == "" {
+	tokenValue, err := crt.GetTokenFromSecret(h.secretCache, tokens[0])
+	if errors.Is(err, crt.ErrTokenNotReady) {
 		h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, 2*time.Second)
 		return false, nil
+	}
+	if err != nil {
+		return false, err
 	}
 
 	secretName := fmt.Sprintf("%s-kubeconfig", cluster.Spec.ClusterAPIConfig.ClusterName)

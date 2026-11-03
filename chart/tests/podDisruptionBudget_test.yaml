@@ -1,0 +1,214 @@
+suite: Test PodDisruptionBudget
+templates:
+- podDisruptionBudget.yaml
+tests:
+# Disabled by default
+- it: should not render PDB when disabled
+  asserts:
+  - hasDocuments:
+      count: 0
+
+# Basic enablement
+- it: should render PDB when enabled with default fallback maxUnavailable=1
+  set:
+    podDisruptionBudget.enabled: true
+  asserts:
+  - isKind:
+      of: PodDisruptionBudget
+  - equal:
+      path: metadata.name
+      value: RELEASE-NAME-rancher
+  - equal:
+      path: spec.maxUnavailable
+      value: 1
+  - notExists:
+      path: spec.minAvailable
+
+# minAvailable
+- it: should set minAvailable when specified
+  set:
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+  asserts:
+  - equal:
+      path: spec.minAvailable
+      value: 2
+  - notExists:
+      path: spec.maxUnavailable
+
+- it: should allow minAvailable as percentage string
+  set:
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: "50%"
+  asserts:
+  - equal:
+      path: spec.minAvailable
+      value: "50%"
+
+# maxUnavailable
+- it: should set maxUnavailable when specified
+  set:
+    podDisruptionBudget:
+      enabled: true
+      maxUnavailable: 1
+  asserts:
+  - equal:
+      path: spec.maxUnavailable
+      value: 1
+  - notExists:
+      path: spec.minAvailable
+
+- it: should allow maxUnavailable as percentage string
+  set:
+    podDisruptionBudget:
+      enabled: true
+      maxUnavailable: "25%"
+  asserts:
+  - equal:
+      path: spec.maxUnavailable
+      value: "25%"
+
+# Mutual exclusivity
+- it: should fail when both minAvailable and maxUnavailable are set
+  set:
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+      maxUnavailable: 1
+  asserts:
+  - failedTemplate:
+      errorMessage: "Cannot set both podDisruptionBudget.minAvailable and podDisruptionBudget.maxUnavailable"
+
+# unhealthyPodEvictionPolicy
+- it: should set unhealthyPodEvictionPolicy when specified
+  set:
+    podDisruptionBudget:
+      enabled: true
+      unhealthyPodEvictionPolicy: "AlwaysAllow"
+  asserts:
+  - equal:
+      path: spec.unhealthyPodEvictionPolicy
+      value: "AlwaysAllow"
+
+- it: should not set unhealthyPodEvictionPolicy when empty
+  set:
+    podDisruptionBudget:
+      enabled: true
+  asserts:
+  - notExists:
+      path: spec.unhealthyPodEvictionPolicy
+
+# Selector - default behavior
+- it: should use default selectorLabels (app only) when no custom selector
+  set:
+    podDisruptionBudget:
+      enabled: true
+  asserts:
+  - exists:
+      path: spec.selector.matchLabels
+  - equal:
+      path: spec.selector.matchLabels.app
+      value: RELEASE-NAME-rancher
+  - notExists:
+      path: spec.selector.matchExpressions
+
+# Selector - extraMatchLabels
+- it: should merge extraMatchLabels with default selectorLabels
+  set:
+    podDisruptionBudget:
+      enabled: true
+      extraMatchLabels:
+        tier: frontend
+        environment: production
+  asserts:
+  - equal:
+      path: spec.selector.matchLabels.app
+      value: RELEASE-NAME-rancher
+  - equal:
+      path: spec.selector.matchLabels.tier
+      value: frontend
+  - equal:
+      path: spec.selector.matchLabels.environment
+      value: production
+
+# Selector - custom override
+- it: should use custom selector when provided (ignoring extraMatchLabels)
+  set:
+    podDisruptionBudget:
+      enabled: true
+      extraMatchLabels:
+        ignored: label
+      selector:
+        matchLabels:
+          custom-app: my-rancher
+          tier: backend
+  asserts:
+  - equal:
+      path: spec.selector.matchLabels.custom-app
+      value: my-rancher
+  - equal:
+      path: spec.selector.matchLabels.tier
+      value: backend
+  - notExists:
+      path: spec.selector.matchLabels.app
+  - notExists:
+      path: spec.selector.matchLabels.ignored
+
+- it: should support custom selector with matchExpressions
+  set:
+    podDisruptionBudget:
+      enabled: true
+      selector:
+        matchLabels:
+          app: rancher
+        matchExpressions:
+        - key: environment
+          operator: In
+          values:
+          - prod
+          - staging
+  asserts:
+  - equal:
+      path: spec.selector.matchLabels.app
+      value: rancher
+  - isNotEmpty:
+      path: spec.selector.matchExpressions
+  - equal:
+      path: spec.selector.matchExpressions[0].key
+      value: environment
+  - equal:
+      path: spec.selector.matchExpressions[0].operator
+      value: In
+  - contains:
+      path: spec.selector.matchExpressions[0].values
+      content: prod
+  - contains:
+      path: spec.selector.matchExpressions[0].values
+      content: staging
+
+# Labels
+- it: should have standard rancher labels in metadata
+  set:
+    podDisruptionBudget.enabled: true
+  asserts:
+  - exists:
+      path: metadata.labels
+  - exists:
+      path: metadata.labels.app
+  - exists:
+      path: metadata.labels.chart
+  - exists:
+      path: metadata.labels.heritage
+  - exists:
+      path: metadata.labels.release
+
+# API version
+- it: should use policy/v1 API version
+  set:
+    podDisruptionBudget.enabled: true
+  asserts:
+  - equal:
+      path: apiVersion
+      value: policy/v1

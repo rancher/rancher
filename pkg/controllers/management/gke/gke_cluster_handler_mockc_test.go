@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
 	v1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
@@ -24,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed test/*
@@ -39,6 +39,11 @@ func getMockGkeOperatorController(t *testing.T, clusterState string) mockGkeOper
 	ctrl := gomock.NewController(t)
 	clusterMock := fake.NewMockNonNamespacedClientInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
 	clusterMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
 		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
 			return c, nil
 		},

@@ -11,6 +11,7 @@ const (
 	AuthConfigFieldAnnotations         = "annotations"
 	AuthConfigFieldCreated             = "created"
 	AuthConfigFieldCreatorID           = "creatorId"
+	AuthConfigFieldDisplayName         = "displayName"
 	AuthConfigFieldEnabled             = "enabled"
 	AuthConfigFieldLabels              = "labels"
 	AuthConfigFieldLogoutAllSupported  = "logoutAllSupported"
@@ -29,6 +30,7 @@ type AuthConfig struct {
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName         string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`

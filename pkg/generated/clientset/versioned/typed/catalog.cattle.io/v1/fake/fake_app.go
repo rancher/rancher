@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	catalogcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/catalog.cattle.io/v1"
+	typedcatalogcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeApps implements AppInterface
 type fakeApps struct {
-	*gentype.FakeClientWithList[*v1.App, *v1.AppList]
+	*gentype.FakeClientWithListAndApply[*v1.App, *v1.AppList, *catalogcattleiov1.AppApplyConfiguration]
 	Fake *FakeCatalogV1
 }
 
-func newFakeApps(fake *FakeCatalogV1, namespace string) catalogcattleiov1.AppInterface {
+func newFakeApps(fake *FakeCatalogV1, namespace string) typedcatalogcattleiov1.AppInterface {
 	return &fakeApps{
-		gentype.NewFakeClientWithList[*v1.App, *v1.AppList](
+		gentype.NewFakeClientWithListAndApply[*v1.App, *v1.AppList, *catalogcattleiov1.AppApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("apps"),

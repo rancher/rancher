@@ -22,10 +22,11 @@ import (
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/kube"
+	release "helm.sh/helm/v4/pkg/release/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -50,7 +51,6 @@ func (w *UIPluginTest) TearDownSuite() {
 	w.Require().NoError(w.uninstallApp(namespace.UIPluginNamespace, "homepage"))
 	w.Require().NoError(w.catalogClient.ClusterRepos().Delete(context.Background(), "extensions-examples", metav1.DeleteOptions{PropagationPolicy: &propagation}))
 	w.session.Cleanup()
-
 }
 
 func (w *UIPluginTest) SetupSuite() {
@@ -146,7 +146,7 @@ func (w *UIPluginTest) SetupSuite() {
 	}, "extensions-examples"))
 	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "homepage", 0))
 
-	//Waiting for controller cache to update
+	// Waiting for controller cache to update
 	time.Sleep(10 * time.Second)
 }
 
@@ -298,7 +298,7 @@ func (w *UIPluginTest) TestCompressedEndpoint() {
 }
 
 func (w *UIPluginTest) TestExponentialBackoff() {
-	ts, err := StartUIPluginServer()
+	ts, err := StartUIPluginServerWithBackoff()
 	if err != nil {
 		w.T().Fatal(err)
 	}
@@ -345,8 +345,43 @@ func (w *UIPluginTest) TestExponentialBackoff() {
 	w.Require().NoError(err)
 }
 
-func StartUIPluginTgzServer() (*httptest.Server, error) {
+func (w *UIPluginTest) TestUnreachableCompressedEndpoint() {
+	ts, err := StartUIPluginServer()
+	if err != nil {
+		w.T().Fatal(err)
+	}
+	compressedEndpoint := "https://some-unreachable.location.tgz"
+	endpoint := ts.URL
 
+	uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(context.TODO(), "homepage", metav1.GetOptions{})
+	require.NoError(w.T(), err)
+
+	uiplugin.Spec.Plugin.CompressedEndpoint = compressedEndpoint
+	uiplugin.Spec.Plugin.Endpoint = endpoint
+	_, err = w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Update(context.TODO(), uiplugin, metav1.UpdateOptions{})
+	require.NoError(w.T(), err)
+
+	t := 360
+	err = kwait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, time.Duration(t)*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(ctx, "homepage", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if uiplugin.Spec.Plugin.CompressedEndpoint != compressedEndpoint {
+			return false, nil
+		}
+		if uiplugin.Spec.Plugin.Endpoint != endpoint {
+			return false, nil
+		}
+		if uiplugin.Status.Ready {
+			return true, nil
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
+}
+
+func StartUIPluginTgzServer() (*httptest.Server, error) {
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "../../../testdata/uiext/0.4.1.tgz")
 	})
@@ -365,14 +400,33 @@ func StartUIPluginTgzServer() (*httptest.Server, error) {
 }
 
 func StartUIPluginServer() (*httptest.Server, error) {
+	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
+	})
+
+	ts := httptest.NewUnstartedServer(customHandler)
+
+	ip := getOutboundIP()
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
+	if err != nil {
+		return nil, err
+	}
+	ts.Listener = listener
+	ts.Start()
+
+	return ts, nil
+}
+
+func StartUIPluginServerWithBackoff() (*httptest.Server, error) {
 	reqCount := 1
 
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if reqCount <= 2 {
 			reqCount++
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		} else {
+			http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
 		}
-		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
 	})
 
 	ts := httptest.NewUnstartedServer(customHandler)
@@ -411,7 +465,7 @@ func (w *UIPluginTest) waitForChart(status rv1.Status, name string, previousVers
 
 func (w *UIPluginTest) uninstallApp(namespace, chartName string) error {
 	var cfg action.Configuration
-	if err := cfg.Init(w.restClientGetter, namespace, "", logrus.Infof); err != nil {
+	if err := cfg.Init(w.restClientGetter, namespace, ""); err != nil {
 		return err
 	}
 	l := action.NewList(&cfg)
@@ -422,18 +476,20 @@ func (w *UIPluginTest) uninstallApp(namespace, chartName string) error {
 		return fmt.Errorf("failed to fetch all releases in the %s namespace: %w", namespace, err)
 	}
 	for _, r := range releases {
-		if r.Chart.Name() == chartName {
-			err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
-				act := action.NewUninstall(&cfg)
-				act.Wait = true
-				act.Timeout = time.Minute
-				if _, err = act.Run(r.Name); err != nil {
-					return false, nil
-				}
-				return true, nil
-			})
-			w.Require().NoError(err)
+		rel, ok := r.(*release.Release)
+		if !ok || rel.Chart.Name() != chartName {
+			continue
 		}
+		err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
+			act := action.NewUninstall(&cfg)
+			act.WaitStrategy = kube.StatusWatcherStrategy
+			act.Timeout = time.Minute
+			if _, err = act.Run(rel.Name); err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
+		w.Require().NoError(err)
 	}
 	return nil
 }

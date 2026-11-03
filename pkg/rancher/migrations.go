@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
@@ -13,13 +16,17 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	controllerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
@@ -34,40 +41,61 @@ import (
 )
 
 const (
-	cattleNamespace                            = "cattle-system"
-	forceUpgradeLogoutConfig                   = "forceupgradelogout"
-	forceLocalSystemAndDefaultProjectCreation  = "forcelocalprojectcreation"
-	forceSystemNamespacesAssignment            = "forcesystemnamespaceassignment"
-	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
-	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
-	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
-	migrateRKEClusterState                     = "migraterkeclusterstate"
-	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
-	migrateImportedClusterManagedFields        = "migrateimportedclustermanagedfields"
-	rkeCleanupMigration                        = "rkecleanupmigration"
-	managementNodeCleanupMigration             = "managementnodecleanupmigration"
-	rancherVersionKey                          = "rancherVersion"
-	projectsCreatedKey                         = "projectsCreated"
-	namespacesAssignedKey                      = "namespacesAssigned"
-	capiMigratedKey                            = "capiMigrated"
-	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
-	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
-	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
-	importedClusterManagedFieldsMigratedKey    = "importedClusterManagedFieldsMigrated"
-	rkeCleanupCompletedKey                     = "rkecleanupcompleted"
-	managementCleanupCompletedKey              = "managementcleanupcompleted"
+	cattleNamespace                                   = "cattle-system"
+	forceUpgradeLogoutConfig                          = "forceupgradelogout"
+	forceLocalSystemAndDefaultProjectCreation         = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment                   = "forcesystemnamespaceassignment"
+	migrateFromMachineToPlanSecret                    = "migratefrommachinetoplanesecret"
+	migrateEncryptionKeyRotationLeaderToStatus        = "migrateencryptionkeyrotationleadertostatus"
+	migrateDynamicSchemaToMachinePools                = "migratedynamicschematomachinepools"
+	migrateRKEClusterState                            = "migraterkeclusterstate"
+	migrateSystemAgentVarDirToDataDirectory           = "migratesystemagentvardirtodatadirectory"
+	migrateImportedClusterManagedFields               = "migrateimportedclustermanagedfields"
+	rkeCleanupMigration                               = "rkecleanupmigration"
+	managementNodeCleanupMigration                    = "managementnodecleanupmigration"
+	cleanupProvisioningClusterMgmtOnlyConditions      = "cleanupprovisioningclustermgmtonlyconditions"
+	migrateRKE2PrimeAnnotation                        = "migraterke2primeannotation"
+	migrateCRTTokensToSecrets                         = "migratecrtttokenstosecrets"
+	migrateLegacyClusterAutoscalerSettingsConfig      = "migratelegacyclusterautoscalersettings"
+	rancherVersionKey                                 = "rancherVersion"
+	projectsCreatedKey                                = "projectsCreated"
+	namespacesAssignedKey                             = "namespacesAssigned"
+	capiMigratedKey                                   = "capiMigrated"
+	encryptionKeyRotationStatusMigratedKey            = "encryptionKeyRotationStatusMigrated"
+	dynamicSchemaMachinePoolsMigratedKey              = "dynamicSchemaMachinePoolsMigrated"
+	systemAgentVarDirMigratedKey                      = "systemAgentVarDirMigrated"
+	importedClusterManagedFieldsMigratedKey           = "importedClusterManagedFieldsMigrated"
+	rkeCleanupCompletedKey                            = "rkecleanupcompleted"
+	managementCleanupCompletedKey                     = "managementcleanupcompleted"
+	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
+	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
+	crtTokensToSecretsMigratedKey                     = "crtTokensToSecretsMigrated"
+	legacyClusterAutoscalerSettingsMigratedKey        = "legacyClusterAutoscalerSettingsMigrated"
+	clusterAutoscalerChartRepository                  = "cluster-autoscaler-chart-repository"
+	clusterAutoscalerImage                            = "cluster-autoscaler-image"
 )
 
 var (
-	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+	mgmtNameRegexp                               = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+	legacyClusterAutoscalerChartRepositoryRegexp = regexp.MustCompile(`^oci://[^/]+/rancher/charts/appco-kubernetes-cluster-autoscaler$`)
+	legacyClusterAutoscalerImageRegexp           = regexp.MustCompile(`^[^/]+/rancher/appco-kubernetes-cluster-autoscaler$`)
 )
+
+// tokenCollectionDeleter abstracts the interface to bulk deletion for tokens,
+// enabling simpler setup for testing
+type tokenCollectionDeleter interface {
+	DeleteCollection(options *metav1.ListOptions) error
+}
 
 func runMigrations(wranglerContext *wrangler.Context) error {
 	if err := migrateLocalUserPasswords(wranglerContext); err != nil {
 		return err
 	}
 
-	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
+	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(),
+		wranglerContext.Mgmt.Token(),
+		exttokenstore.NewSystemFromWrangler(wranglerContext),
+		"v2.6.0"); err != nil {
 		return err
 	}
 
@@ -88,7 +116,76 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		return err
 	}
 
+	if err := migrateCRTTokensToSecretsFunc(wranglerContext); err != nil {
+		return err
+	}
+
+	if err := migrateLegacyClusterAutoscalerSettings(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Setting()); err != nil {
+		return err
+	}
+
 	return rkeResourcesCleanup(wranglerContext)
+}
+
+func migrateLegacyClusterAutoscalerSettings(configMapController controllerv1.ConfigMapController, settingController v3.SettingController) error {
+	cm, err := getConfigMap(configMapController, migrateLegacyClusterAutoscalerSettingsConfig)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[legacyClusterAutoscalerSettingsMigratedKey] == "true" {
+		return nil
+	}
+
+	settingsToMigrate := []struct {
+		name    string
+		envName string
+		match   func(string) bool
+	}{
+		{
+			name:    clusterAutoscalerChartRepository,
+			envName: "CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY",
+			match:   legacyClusterAutoscalerChartRepositoryRegexp.MatchString,
+		},
+		{
+			name:    clusterAutoscalerImage,
+			envName: "CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE",
+			match:   legacyClusterAutoscalerImageRegexp.MatchString,
+		},
+	}
+
+	for _, setting := range settingsToMigrate {
+		if os.Getenv(setting.envName) != "" {
+			continue
+		}
+
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			obj, err := settingController.Get(setting.name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if !setting.match(obj.Value) {
+				return nil
+			}
+
+			obj = obj.DeepCopy()
+			obj.Value = ""
+			if obj.Source == "env" {
+				obj.Source = ""
+			}
+			_, err = settingController.Update(obj)
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("migrating legacy %s setting: %w", setting.name, err)
+		}
+	}
+
+	cm.Data[legacyClusterAutoscalerSettingsMigratedKey] = "true"
+	return createOrUpdateConfigMap(configMapController, cm)
 }
 
 func migrateLocalUserPasswords(wranglerContext *wrangler.Context) error {
@@ -109,6 +206,12 @@ func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 			return err
 		}
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
+			return err
+		}
+		if err := cleanupMgmtOnlyConditionsFromProvisioningClusters(wranglerContext); err != nil {
+			return err
+		}
+		if err := migrateExistingRKE2ClustersPrimeAnnotation(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -155,7 +258,10 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 // forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
 // upgrade and we want all users to be sent to a central point.  This function will check for the `forceUpgradeLogoutConfig`
 // configuration map and only run if the last migrated version is lower than the given `migrationVersion`.
-func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, tokenController v3.TokenController, migrationVersion string) error {
+func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
+	tokenController v3.TokenController,
+	extTokenDeleter tokenCollectionDeleter,
+	migrationVersion string) error {
 	cm, err := getConfigMap(configMapController, forceUpgradeLogoutConfig)
 	if err != nil || cm == nil {
 		return err
@@ -180,7 +286,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	// list all tokens that were created for the dashboard
 	allTokens, err := tokenController.Cache().List(labels.SelectorFromSet(labels.Set{tokens.TokenKindLabel: "session"}))
 	if err != nil {
-		logrus.Error("Failed to list tokens for upgrade forced logout")
+		logrus.WithError(err).Error("Failed to list tokens for upgrade forced logout")
 		return err
 	}
 
@@ -188,8 +294,17 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	for _, token := range allTokens {
 		err = tokenController.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			logrus.Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
+			logrus.WithError(err).Errorf("Failed to delete legacy session token [%s] for upgrade forced logout", token.Name)
 		}
+	}
+
+	// bulk delete all ext tokens that were created for the dashboard,
+	// forcing their users to be redirected to the login page
+	err = extTokenDeleter.DeleteCollection(&metav1.ListOptions{
+		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.KindSession}.AsSelector().String(),
+	})
+	if err != nil {
+		logrus.WithError(err).Error("Failed to delete ext session tokens for upgrade forced logout")
 	}
 
 	cm.Data[rancherVersionKey] = rancherversion.Version
@@ -221,7 +336,7 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 		v32.ClusterConditionDefaultProjectCreated.Unknown(localCluster)
 		v32.ClusterConditionSystemProjectCreated.Unknown(localCluster)
 
-		_, err = clusterClient.Update(localCluster)
+		_, err = clusterClient.UpdateStatus(localCluster)
 		return err
 	}); err != nil {
 		return err
@@ -713,4 +828,303 @@ func cleanupNodeFinalizers(w *wrangler.Context, nodeNamespace, nodeName string) 
 		}
 		return err
 	})
+}
+
+// cleanupMgmtOnlyConditionsFromProvisioningClusters removes management cluster-specific conditions
+// from provisioning clusters. These conditions were previously copied from management clusters to
+// provisioning clusters but are not relevant to provisioning clusters.
+func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), cleanupProvisioningClusterMgmtOnlyConditions)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[provisioningClusterMgmtOnlyConditionsCleanedUpKey] == "true" {
+		return nil
+	}
+
+	mgmtClusterOnlyConditions := map[string]struct{}{
+		string(v32.ClusterConditionACISecretsMigrated):                   {},
+		string(v32.ClusterConditionAddonDeploy):                          {},
+		string(v32.ClusterConditionAgentDeployed):                        {},
+		string(v32.ClusterConditionAlertingEnabled):                      {},
+		string(v32.ClusterConditionCertsGenerated):                       {},
+		string(v32.ClusterConditionDefaultNamespaceAssigned):             {},
+		string(v32.ClusterConditionDefaultProjectCreated):                {},
+		string(v32.ClusterConditionEtcd):                                 {},
+		string(v32.ClusterConditionGlobalAdminsSynced):                   {},
+		string(v32.ClusterConditionHarvesterCloudProviderConfigMigrated): {},
+		string(v32.ClusterConditionInitialRolesPopulated):                {},
+		string(v32.ClusterConditionNoDiskPressure):                       {},
+		string(v32.ClusterConditionNoMemoryPressure):                     {},
+		string(v32.ClusterConditionPending):                              {},
+		string(v32.ClusterConditionPreBootstrapped):                      {},
+		string(v32.ClusterConditionRKESecretsMigrated):                   {},
+		string(v32.ClusterConditionSecretsMigrated):                      {},
+		string(v32.ClusterConditionServiceAccountMigrated):               {},
+		string(v32.ClusterConditionServiceAccountSecretsMigrated):        {},
+		string(v32.ClusterConditionSystemAccountCreated):                 {},
+		string(v32.ClusterConditionSystemNamespacesAssigned):             {},
+		string(v32.ClusterConditionSystemProjectCreated):                 {},
+		string(v32.ClusterConditionUpgraded):                             {},
+		string(v32.ClusterConditionWaiting):                              {},
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, provCluster := range provClusters.Items {
+		if len(provCluster.Status.Conditions) == 0 {
+			continue
+		}
+
+		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+
+			// Filter out management cluster-only conditions
+			filteredConditions := make([]genericcondition.GenericCondition, 0, len(cluster.Status.Conditions))
+			for _, cond := range cluster.Status.Conditions {
+				if _, shouldRemove := mgmtClusterOnlyConditions[cond.Type]; !shouldRemove {
+					filteredConditions = append(filteredConditions, cond)
+				}
+			}
+
+			// Only update if conditions were actually removed
+			if len(filteredConditions) == len(cluster.Status.Conditions) {
+				return nil
+			}
+
+			cluster = cluster.DeepCopy()
+			cluster.Status.Conditions = filteredConditions
+			_, err = w.Provisioning.Cluster().UpdateStatus(cluster)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[provisioningClusterMgmtOnlyConditionsCleanedUpKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+// migrateCRTTokensToSecretsFunc migrates ClusterRegistrationToken plaintext tokens
+// from Status.Token into secrets.
+func migrateCRTTokensToSecretsFunc(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateCRTTokensToSecrets)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[crtTokensToSecretsMigratedKey] == "true" {
+		return nil
+	}
+
+	allCRTs, err := w.Mgmt.ClusterRegistrationToken().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for i := range allCRTs.Items {
+		if err := migrateSingleCRT(w, &allCRTs.Items[i]); err != nil {
+			logrus.Errorf("Failed to migrate CRT %s/%s: %v", allCRTs.Items[i].Namespace, allCRTs.Items[i].Name, err)
+			return err
+		}
+	}
+
+	cm.Data[crtTokensToSecretsMigratedKey] = "true"
+	if err := createOrUpdateConfigMap(w.Core.ConfigMap(), cm); err != nil {
+		return err
+	}
+	logrus.Infof("Successfully migrated cluster registration tokens to secrets")
+	return nil
+}
+
+// migrateExistingRKE2ClustersPrimeAnnotation sets the provisioning.cattle.io/rke2-prime-enabled=false
+// annotation on all existing RKE2 provisioning clusters that do not already have the annotation.
+// This ensures existing clusters are unaffected when the rke2-provisioning-prime-default setting
+// defaults to true (e.g., in Prime builds).
+func migrateExistingRKE2ClustersPrimeAnnotation(w *wrangler.CAPIContext) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateRKE2PrimeAnnotation)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[rke2PrimeAnnotationMigratedKey] == "true" {
+		return nil
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, provCluster := range provClusters.Items {
+		// Only process RKE2 clusters (those with an RKEConfig and an RKE2 kubernetes version)
+		if provCluster.Spec.RKEConfig == nil {
+			continue
+		}
+		if capr.GetRuntime(provCluster.Spec.KubernetesVersion) != capr.RuntimeRKE2 {
+			continue
+		}
+
+		// Skip if annotation is already set
+		if _, ok := provCluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+			continue
+		}
+
+		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+
+			// Re-check after fresh get
+			if _, ok := cluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+				return nil
+			}
+
+			cluster = cluster.DeepCopy()
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[capr.RKE2PrimeEnabledAnnotation] = "false"
+			_, err = w.Provisioning.Cluster().Update(cluster)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[rke2PrimeAnnotationMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) error {
+	if crt.Status.TokenSecretName != "" {
+		return nil
+	}
+
+	if crt.Status.Token == "" {
+		logrus.Warnf("CRT %s/%s has no token in Status.Token and no TokenSecretName - skipping",
+			crt.Namespace, crt.Name)
+		return nil
+	}
+
+	plaintextToken := crt.Status.Token
+	secretName := fmt.Sprintf("crt-token-%s", crt.Name)
+
+	var expiresAt string
+	if features.CRTTokenTTLRotation.Enabled() {
+		var ttl int64
+		if crt.Spec.TTL == nil {
+			ttl = int64(settings.CRTDefaultTTL.GetInt())
+		} else {
+			ttl = *crt.Spec.TTL
+		}
+
+		// Clamp to minimum TTL using shared validation logic
+		ttl = clusterregistrationtoken.ClampTTL(ttl, crt.Namespace, crt.Name)
+
+		if ttl > 0 {
+			// give all existing tokens a fresh TTL from migration time
+			now := time.Now()
+			ttlDuration := time.Duration(ttl) * time.Minute
+			jitter := computeMigrationJitter(ttlDuration)
+			expiresAt = now.Add(ttlDuration).Add(jitter).UTC().Format(time.RFC3339)
+		}
+	}
+
+	secretData := map[string][]byte{
+		"token": []byte(plaintextToken),
+	}
+	if expiresAt != "" {
+		secretData["expiresAt"] = []byte(expiresAt)
+	}
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: crt.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "ClusterRegistrationToken",
+					Name:       crt.Name,
+					UID:        crt.UID,
+				},
+			},
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: secretData,
+	}
+
+	var createErr error
+	_, createErr = w.Core.Secret().Create(secret)
+	if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
+		return fmt.Errorf("failed to create token secret: %w", createErr)
+	}
+
+	if apierrors.IsAlreadyExists(createErr) {
+		existing, err := w.Core.Secret().Get(crt.Namespace, secretName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get existing secret: %w", err)
+		}
+		if v, ok := existing.Data["expiresAt"]; ok {
+			expiresAt = string(v)
+		}
+	}
+
+	cluster, err := w.Mgmt.Cluster().Get(crt.Spec.ClusterName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := w.Mgmt.ClusterRegistrationToken().Get(crt.Namespace, crt.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		crtCopy := latest.DeepCopy()
+		crtCopy.Status.Token = ""
+		crtCopy.Status.TokenSecretName = secretName
+
+		if cluster != nil {
+			newStatus, err := clusterregistrationtoken.AssignCommands(&crtCopy.Status, cluster)
+			if err != nil {
+				logrus.Warnf("Failed to regenerate commands for CRT %s/%s: %v",
+					crt.Namespace, crt.Name, err)
+			} else {
+				crtCopy.Status = newStatus
+			}
+		}
+
+		if expiresAt != "" {
+			crtCopy.Status.ExpiresAt = expiresAt
+		}
+
+		_, err = w.Mgmt.ClusterRegistrationToken().Update(crtCopy)
+		return err
+	})
+}
+
+func computeMigrationJitter(ttl time.Duration) time.Duration {
+	tenPercent := ttl / 10
+	maxJitter := 24 * time.Hour
+	if tenPercent > maxJitter {
+		tenPercent = maxJitter
+	}
+	if tenPercent <= 0 {
+		return 0
+	}
+	return time.Duration(rand.Int63n(int64(tenPercent)))
 }

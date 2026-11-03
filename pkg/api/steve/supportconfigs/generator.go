@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/managedcharts/cspadapter"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/release"
+	release "helm.sh/helm/v4/pkg/release/v1"
 	authzv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

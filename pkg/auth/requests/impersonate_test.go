@@ -19,7 +19,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -85,7 +87,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
 
 				return mock
 			},
@@ -114,8 +116,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateGroup(req, "user", "impGroup").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateGroup(req, "user", nil, "impGroup").Return(true, nil)
 
 				return mock
 			},
@@ -145,8 +147,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"foo":            {"bar"},
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
@@ -197,8 +199,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"foo":            {"bar"},
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
@@ -209,7 +211,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().
 					Get("kubeconfig-u-user5zfww").
-					Return(nil, errors.New("unexpected error"))
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "kubeconfig-u-user5zfww"))
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -234,7 +236,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							// everything else to satisfy the ext token read checks
 							exttokenstore.FieldEnabled:        []byte("true"),
 							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
 							exttokenstore.FieldPrincipal:      principalBytes,
 							exttokenstore.FieldTTL:            []byte("57600000"),
@@ -271,7 +273,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", nil, "system:serviceaccount:default:test").Return(true, nil)
 
 				return mock
 			},
@@ -294,7 +296,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(false, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(false, nil)
 
 				return mock
 			},
@@ -317,8 +319,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateGroup(req, "user", "impGroup").Return(false, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateGroup(req, "user", nil, "impGroup").Return(false, nil)
 
 				return mock
 			},
@@ -341,8 +343,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{"foo": {"bar"}}).Return(false, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{"foo": {"bar"}}).Return(false, nil)
 
 				return mock
 			},
@@ -365,8 +367,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
 
@@ -406,8 +408,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
 
@@ -417,7 +419,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().
 					Get("kubeconfig-u-user5zfww").
-					Return(nil, errors.New("unexpected error"))
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "kubeconfig-u-user5zfww"))
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 				secrets.EXPECT().Cache().Return(scache)
@@ -440,7 +442,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							// everything else to satisfy the ext token read checks
 							exttokenstore.FieldEnabled:        []byte("true"),
 							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
 							exttokenstore.FieldPrincipal:      principalBytes,
 							exttokenstore.FieldTTL:            []byte("57600000"),
@@ -471,8 +473,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww", "kubeconfig-u-otherxyzab"},
 				}).Return(true, nil)
 
@@ -506,7 +508,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(false, nil)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", nil, "system:serviceaccount:default:test").Return(false, nil)
 
 				return mock
 			},
@@ -528,7 +530,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -551,8 +553,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateGroup(req, "user", "impGroup").Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateGroup(req, "user", nil, "impGroup").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -575,8 +577,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{"foo": {"bar"}}).Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{"foo": {"bar"}}).Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -599,8 +601,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
 
@@ -609,7 +611,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			extTokenStore: func() *exttokenstore.SystemStore {
 				// Note: Have to fail both norman and ext sides of the token fetch
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-				cache.EXPECT().Get("kubeconfig-u-user5zfww").Return(nil, errors.New("unexpected error"))
+				cache.EXPECT().Get("kubeconfig-u-user5zfww").
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "kubeconfig-u-user5zfww"))
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -639,12 +642,54 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", nil, "system:serviceaccount:default:test").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
 			wantErr: "error checking if user can impersonate service account: unexpected error",
 			status:  http.StatusForbidden,
+		},
+		{
+			// Verifies that when the authenticated user has group memberships
+			// like AzureAD/OIDC/LDAP, those groups are forwarded into the SAR
+			// call. Without this case, every other test in this file passes
+			// `nil` for groups, making it impossible to distinguish a correct
+			// `userInfo.GetGroups()` pass-through from a hardcoded `nil`.
+			desc: "impersonate serviceaccount with group memberships",
+			req: func() *http.Request {
+				userInfoWithGroups := &user.DefaultInfo{
+					Name:   "u-tifl6nuj5i",
+					UID:    "u-tifl6nuj5i",
+					Groups: []string{"azuread_group://a1cc05b8-d30b-454c-be77-0830ce1eae94", "system:authenticated"},
+				}
+				ctx := request.WithUser(context.Background(), userInfoWithGroups)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User": {"system:serviceaccount:example-ns:example-test"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sar: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateServiceAccount(
+					req,
+					"u-tifl6nuj5i",
+					[]string{"azuread_group://a1cc05b8-d30b-454c-be77-0830ce1eae94", "system:authenticated"},
+					"system:serviceaccount:example-ns:example-test",
+				).Return(true, nil)
+
+				return mock
+			},
+			wantUserInfo: &user.DefaultInfo{
+				Name:   "u-tifl6nuj5i",
+				UID:    "u-tifl6nuj5i",
+				Groups: []string{"azuread_group://a1cc05b8-d30b-454c-be77-0830ce1eae94", "system:authenticated"},
+			},
+			wantNextHandlerCalled: true,
+			status:                http.StatusOK,
 		},
 	}
 

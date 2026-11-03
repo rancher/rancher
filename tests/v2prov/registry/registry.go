@@ -231,6 +231,17 @@ func createSharedObjects(clients *clients.Clients, podName string, pullThrough b
 	return registrySecret, err
 }
 
+// EnsureRegistryCache ensures the shared registry-cache pod, service, and TLS secret exist
+// and returns the CA certificate bytes. Use this for imported clusters that need the CA cert
+// written to their filesystem via registries.yaml rather than through RKEConfig.
+func EnsureRegistryCache(clients *clients.Clients) ([]byte, error) {
+	secret, err := createSharedObjects(clients, "registry-cache", false)
+	if err != nil {
+		return nil, err
+	}
+	return secret.Data[corev1.TLSCertKey], nil
+}
+
 // CreateOrGetRegistry gets existing registry config, or creates a new one and returns the config. The registry will
 // be created with the given name in the "default" namespace, and its secrets will be created in the given namespace so
 // that pods created in that namespace can rely on images sourced from the new registry. If pullThrough is set to true,

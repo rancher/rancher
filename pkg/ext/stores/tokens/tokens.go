@@ -20,7 +20,6 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	extcommon "github.com/rancher/rancher/pkg/ext/common"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
@@ -49,14 +49,15 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 const (
 	TokenNamespace       = "cattle-tokens"
 	UserIDLabel          = "cattle.io/user-id"
 	KindLabel            = "authn.management.cattle.io/kind"
-	IsLogin              = "session"
+	KindSession          = "session"
+	KindKubeconfig       = "kubeconfig"
 	SecretKindLabel      = "cattle.io/kind"
 	SecretKindLabelValue = "token"
 	GeneratePrefix       = "token-"
@@ -127,6 +128,12 @@ type SystemStore struct {
 	tableConverter  rest.TableConvertor // custom column formatting
 }
 
+type JsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
 // NewFromWrangler is a convenience function for creating a token store.
 // It initializes the returned store from the provided wrangler context.
 func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
@@ -183,7 +190,12 @@ func New(
 
 // NewSystemFromWrangler is a convenience function for creating a system token
 // store. It initializes the returned store from the provided wrangler context.
-func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
+// An optional authorizer can be provided for cluster-scoped token authorization.
+func NewSystemFromWrangler(wranglerContext *wrangler.Context, authz ...authorizer.Authorizer) *SystemStore {
+	var authorizer authorizer.Authorizer
+	if len(authz) > 0 {
+		authorizer = authz[0]
+	}
 	return NewSystem(
 		wranglerContext.Core.Namespace(),
 		wranglerContext.Core.Namespace().Cache(),
@@ -194,6 +206,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 		NewTimeHandler(),
 		NewHashHandler(),
 		NewAuthHandler(),
+		authorizer,
 	)
 }
 
@@ -201,6 +214,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 // accessors to all the other controllers the store requires for proper
 // function. Note that it is recommended to use the NewSystemFromWrangler
 // convenience function instead.
+// An optional authorizer can be provided as the last argument for cluster-scoped token authorization.
 func NewSystem(
 	namespaceClient v1.NamespaceClient,
 	namespaceCache v1.NamespaceCache,
@@ -211,8 +225,14 @@ func NewSystem(
 	timer timeHandler,
 	hasher hashHandler,
 	auth authHandler,
+	authz ...authorizer.Authorizer,
 ) *SystemStore {
+	var authorizer authorizer.Authorizer
+	if len(authz) > 0 {
+		authorizer = authz[0]
+	}
 	tokenStore := SystemStore{
+		authorizer:      authorizer,
 		namespaceClient: namespaceClient,
 		namespaceCache:  namespaceCache,
 		secretClient:    secretClient,
@@ -268,9 +288,8 @@ func (t *Store) Create(
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
 	if createValidation != nil {
-		err := createValidation(ctx, obj)
-		if err != nil {
-			return obj, err
+		if err := createValidation(ctx, obj); err != nil {
+			return nil, validationError(err, "create")
 		}
 	}
 
@@ -327,8 +346,10 @@ func (t *Store) DeleteCollection(
 	for _, secret := range secrets.Items {
 		token, _, err := t.deleteCore(ctx, &secret, deleteValidation, options)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
-				secret.Name, err))
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return nil, apiStatusOrInternalError(err)
 		}
 
 		list.Items = append(list.Items, *token)
@@ -380,9 +401,8 @@ func (t *Store) deleteCore(
 
 	// ensure that deletion is possible
 	if deleteValidation != nil {
-		err := deleteValidation(ctx, token)
-		if err != nil {
-			return nil, false, err
+		if err := deleteValidation(ctx, token); err != nil {
+			return nil, false, validationError(err, "delete")
 		}
 	}
 
@@ -441,6 +461,7 @@ func (t *Store) Get(
 	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
 	token.Status.BearerToken = ""
+	token.Status.Hash = ""
 
 	return token, nil
 }
@@ -540,18 +561,9 @@ func (t *Store) Update(
 		return nil, false, err
 	}
 
-	oldSecret, err := t.secretCache.Get(TokenNamespace, name)
+	oldSecret, err := t.GetSecret(name, nil, true)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Rethrow the NotFound error with the correct group and resource information.
-			return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
-		}
-		return nil, false, fmt.Errorf("error getting secret for token %s: %w", name, err)
-	}
-
-	// validate that secret is indeed holding an ext token
-	if oldSecret.Labels[SecretKindLabel] != SecretKindLabelValue {
-		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
 	oldToken, err := fromSecret(oldSecret)
@@ -562,7 +574,9 @@ func (t *Store) Update(
 
 	newObj, err := objInfo.UpdatedObject(ctx, oldToken)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object: %w", err))
+		// For a PATCH the apiserver applies the patch and runs admission in
+		// here, so the error may already carry a client-facing status code.
+		return nil, false, apiStatusOrInternalError(err)
 	}
 
 	newToken, ok := newObj.(*ext.Token)
@@ -571,9 +585,8 @@ func (t *Store) Update(
 	}
 
 	if updateValidation != nil {
-		err = updateValidation(ctx, newObj, oldToken)
-		if err != nil {
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
+		if err := updateValidation(ctx, newObj, oldToken); err != nil {
+			return nil, false, validationError(err, "update")
 		}
 	}
 
@@ -615,6 +628,11 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 	if !userMatchOrDefault(userInfo.GetName(), token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
+	// Login tokens are created by Rancher only. Rancher treats them differently from derived tokens,
+	// e.g. for user activity and OIDC.
+	if token.Spec.Kind == KindSession {
+		return nil, apierrors.NewBadRequest("unable to create token of kind session")
+	}
 	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options, userInfo)
 }
 
@@ -645,10 +663,16 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
+	// A token without principal name and provider can't be read back, reject
+	// it before anything is written.
+	if rtPrincipal.Name == "" || rtPrincipal.Provider == "" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("authentication token %s has no user principal", authTokenID))
+	}
 	token.Spec.UserPrincipal = ext.TokenPrincipal{
 		Name:           rtPrincipal.ObjectMeta.Name,
 		DisplayName:    rtPrincipal.DisplayName,
@@ -674,7 +698,10 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 				token.Spec.ClusterName, err))
 		}
 
-		// Verify that user is authorized to access cluster
+		if t.authorizer == nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("authorizer is required for cluster-scoped tokens"))
+		}
+
 		decision, _, err := t.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 			User:            userInfo,
 			Verb:            "get",
@@ -709,6 +736,13 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rest.FillObjectMetaSystemFields(token)
 
+	// Converting resolves the TTL, so a dry run returns the TTL that would be stored.
+	secret, err := toSecret(token)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
+			token.Name, err))
+	}
+
 	// Return early as the user does not wish to actually change anything.
 	if dryRun {
 		// enforce our choice of name
@@ -717,13 +751,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		if err != nil {
 			return nil, err
 		}
+		// Users don't care about the hashed value.
+		token.Status.Hash = ""
 		return token, nil
-	}
-
-	secret, err := toSecret(token)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
-			token.Name, err))
 	}
 
 	// enforce our choice of name, without racing create
@@ -736,11 +766,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			// note: should not be possible due to the forced use of generateName
-			return nil, err
-		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token: %w", err))
+		return nil, mapBackingError(err, GeneratePrefix)
 	}
 
 	// Read changes back to return what was truly created, not what we thought we created
@@ -767,16 +793,28 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
+// Delete is the core deletion method to remove a single named token. Any
+// error is an [apierrors.APIStatus] scoped to the Token resource.
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
-	err := t.secretClient.Delete(TokenNamespace, name, options)
-	if err == nil {
-		return nil
-	}
-	if apierrors.IsNotFound(err) {
-		return nil
+	return mapBackingError(t.secretClient.Delete(TokenNamespace, name, options), name)
+}
+
+// DeleteCollection is an internal bulk deletion method for use by other parts of Rancher.
+func (t *SystemStore) DeleteCollection(options *metav1.ListOptions) error {
+	localOptions, err := ListOptionMerge(true, "", options)
+	if err != nil {
+		return apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
 	}
 
-	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
+	// Deliberately using client instead of the cache as the latter may not be yet synced/populated.
+	if err := t.secretClient.DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, localOptions); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", err))
+	}
+
+	return nil
 }
 
 // Get retrieves the named ext token, without permission checking
@@ -803,7 +841,8 @@ func (t *SystemStore) Get(name, authTokenID string, options *metav1.GetOptions) 
 	return token, nil
 }
 
-// GetSecret retrieves the backing secret for an ext token, optionally using the cache.
+// GetSecret retrieves the backing secret for an ext token, optionally using the
+// cache. Any error is an [apierrors.APIStatus] scoped to the Token resource.
 func (t *SystemStore) GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
 	var err error
 	var currentSecret *corev1.Secret
@@ -814,10 +853,7 @@ func (t *SystemStore) GetSecret(name string, options *metav1.GetOptions, useCach
 		currentSecret, err = t.secretClient.Get(TokenNamespace, name, *options)
 	}
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
-		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", name, err))
+		return nil, mapBackingError(err, name)
 	}
 
 	if currentSecret.Labels[SecretKindLabel] != SecretKindLabelValue {
@@ -870,6 +906,39 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
+// ListForConfig returns all ext tokens issued by the named AuthConfig. It is an
+// internal call invoked by other parts of Rancher.
+//
+// Several AuthConfigs can share a provider type, so tokens are selected by the
+// config name prefix of their user principal, not by the principal's provider.
+func (t *SystemStore) ListForConfig(configName string) (*ext.TokenList, error) {
+	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
+		SecretKindLabel: SecretKindLabelValue,
+	}).AsSelector())
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config %s: %w", configName, err))
+	}
+
+	var tokens []ext.Token
+	for _, secret := range secrets {
+		token, err := fromSecret(secret)
+		if err != nil {
+			continue
+		}
+		tokenConfigName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			logrus.Debugf("tokens: failed to parse configName from token %s: %s", secret.Name, err)
+			continue
+		}
+
+		if tokenConfigName == configName {
+			tokens = append(tokens, *token)
+		}
+	}
+
+	return &ext.TokenList{Items: tokens}, nil
+}
+
 func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, options *metav1.ListOptions) (*ext.TokenList, error) {
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
@@ -897,6 +966,7 @@ func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, option
 
 		// Filtering for users is done already, see above where the options are set up and/or merged.
 		token.Status.Current = token.Name == authTokenID
+		token.Status.Hash = ""
 		tokens = append(tokens, *token)
 	}
 
@@ -949,9 +1019,9 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		ttl, err := clampMaxTTL(token.Spec.TTL)
+		ttl, err := IngestTTL(token.Spec.TTL, token.Spec.Kind)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
 		if ttlGreater(ttl, oldToken.Spec.TTL) {
@@ -970,6 +1040,10 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
 
+	// The stored hash was carried through toSecret above; never return it to
+	// the client.
+	token.Status.Hash = ""
+
 	// Abort, user does not wish to actually change anything.
 	if dryRun {
 		return token, nil
@@ -977,7 +1051,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	newSecret, err := t.secretClient.Update(secret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", err))
+		return nil, mapBackingError(err, token.Name)
 	}
 
 	// Read changes back to return what was truly saved, not what we thought we saved
@@ -988,7 +1062,27 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	newToken.Status.Current = newToken.Name == authTokenID
 	newToken.Status.Value = ""
+	newToken.Status.Hash = ""
 	return newToken, nil
+}
+
+// AddLabel adds a custom label to the named ext token. This is done directly on
+// the secret.
+func (t *SystemStore) AddLabel(name, key, value string) error {
+	// Due to the presence of `SecretKindLabel` in the labels we can be
+	// sure that the secret has labels, simplifying patch construction.
+
+	escapedKey := strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
+	patch, err := json.Marshal([]JsonPatch{{
+		Op:    "add",
+		Path:  "/metadata/labels/" + escapedKey,
+		Value: value,
+	}})
+	if err != nil {
+		return err
+	}
+	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
 }
 
 // UpdateLastUsedAt patches the last-used-at information of the token.
@@ -996,11 +1090,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastUsedAt,
 		Value: nowEncoded,
@@ -1018,11 +1108,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.Token, error) {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastActivitySeen,
 		Value: nowEncoded,
@@ -1048,11 +1134,7 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.T
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
 	// Operate directly on the backend secret holding the token
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldEnabled,
 		Value: base64.StdEncoding.EncodeToString([]byte("false")),
@@ -1162,6 +1244,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
 					token.Status.Current = token.Name == authTokenID
+					token.Status.Hash = ""
 					obj = token
 				default: // watch.Error
 					obj = event.Object
@@ -1279,20 +1362,39 @@ func (t *SystemStore) generateName(prefix string) (string, error) {
 // token, and returns a proper interface hiding the differences from the caller.
 // It is public because it is of use to other parts of rancher, not just here.
 func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
+	// Support the possibility of getting a token ID with an `ext/`
+	// prefix. When that happens we can dispatch directly to the proper
+	// fetcher.
+
+	if extTokenID, found := strings.CutPrefix(tokenID, "ext/"); found {
+		ext, err := t.Get(extTokenID, "", &metav1.GetOptions{})
+		if err == nil {
+			return ext, nil
+		}
+		return nil, fmt.Errorf("unable to fetch token %q: %w", tokenID, err)
+	}
+
 	// checking for a v3 Token first, as it is the currently more common
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
-	if v3token, err := t.v3TokenClient.Get(tokenID); err == nil {
+	v3token, errV3 := t.v3TokenClient.Get(tokenID)
+	if errV3 == nil {
 		return v3token, nil
+	}
+	if !apierrors.IsNotFound(errV3) {
+		// report transient/internal v3 errors
+		// as we cannot be sure about resource state
+		return nil, errV3
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, errExt := t.Get(tokenID, "", &metav1.GetOptions{})
+	if errExt == nil {
 		return ext, nil
 	}
 
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	return nil, fmt.Errorf("unable to fetch token %q: %w", tokenID, errExt)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from
@@ -1446,45 +1548,34 @@ func SessionID(ctx context.Context) (string, error) {
 // requests a filter for a different user than itself.
 func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
+	empty := metav1.ListOptions{}
 
 	// for admins we do not impose any additional restrictions over the requested
 	if fullAccess {
+		if options == nil {
+			return empty, nil
+		}
 		return *options, nil
 	}
 
-	// for non-admins we additionally filter the result for their own tokens
-	userIDSelector := labels.Set(map[string]string{
-		UserIDLabel: userName,
-	})
-	empty := metav1.ListOptions{}
-	if options == nil || *options == empty {
-		// No external filter to contend with, just set the internal filter.
-		localOptions = metav1.ListOptions{
-			LabelSelector: userIDSelector.AsSelector().String(),
-		}
-	} else {
-		// We have to contend with an external filter, and merge ours into it.
+	// For non-admins the effective selector always constrains the owner label
+	// to the requesting user. Parse the caller's selector (if any) and AND the
+	// owner requirement onto it. A selector that already pins the owner label to
+	// a different value then holds two conflicting equality requirements and is
+	// unsatisfiable, so it matches nothing.
+	if options != nil {
 		localOptions = *options
-		callerSelector, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
-		if err != nil {
-			return localOptions, err
-		}
-		if callerSelector.Has(UserIDLabel) {
-			// The external filter does filter for a user, possible conflict.
-			if callerSelector[UserIDLabel] != userName {
-				// It asks for a user other than the current.
-				// We can bail now, with an empty result, as
-				// nothing can match.
-				return localOptions, nil
-			}
-			// It asks for the current user, same as the internal
-			// filter would do.  We can pass the options as is.
-		} else {
-			// The external filter has nothing about the user.
-			// We can simply add the internal filter.
-			localOptions.LabelSelector = labels.Merge(callerSelector, userIDSelector).AsSelector().String()
-		}
 	}
+
+	selector, err := labels.Parse(localOptions.LabelSelector)
+	if err != nil {
+		return empty, err
+	}
+	ownerReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userName})
+	if err != nil {
+		return empty, err
+	}
+	localOptions.LabelSelector = selector.Add(*ownerReq).String()
 
 	return localOptions, nil
 }
@@ -1529,7 +1620,7 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	ttl, err := clampMaxTTL(token.Spec.TTL)
+	ttl, err := IngestTTL(token.Spec.TTL, token.Spec.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -1680,51 +1771,115 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-func clampMaxTTL(ttl int64) (int64, error) {
-	max, err := maxTTL()
+// TTLLimits returns the default and the max TTL, in milliseconds, for a token of the given kind. A
+// negative value means no limit, i.e. a token that never expires.
+//
+// Login tokens follow the login session lifetime, as v3 login tokens do. Every other token is
+// limited by auth-token-max-ttl-minutes. Kubeconfig tokens are further limited by
+// kubeconfig-max-token-ttl-minutes. A max setting of 0 is no limit at its level. A default of 0
+// falls back to the max, and a default above the max is capped to it.
+func TTLLimits(kind string) (defaultTTL, maxTTL int64, err error) {
+	var defaultSetting settings.Setting
+	switch kind {
+	case KindSession:
+		defaultSetting = settings.AuthUserSessionTTLMinutes
+		maxTTL, err = parseMaxTTL(settings.AuthUserSessionTTLMinutes)
+	case KindKubeconfig:
+		defaultSetting = settings.KubeconfigDefaultTokenTTLMinutes
+		var kubeconfigMax int64
+		kubeconfigMax, err = parseMaxTTL(settings.KubeconfigMaxTokenTTLMinutes)
+		if err == nil {
+			maxTTL, err = parseMaxTTL(settings.AuthTokenMaxTTLMinutes)
+			maxTTL = ClampToMaxTTL(kubeconfigMax, maxTTL)
+		}
+	default:
+		defaultSetting = settings.AuthTokenDefaultTTLMinutes
+		maxTTL, err = parseMaxTTL(settings.AuthTokenMaxTTLMinutes)
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+
+	defaultTTL, err = ParseTTLToMilliseconds(defaultSetting)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return ClampToMaxTTL(DefaultTTL(defaultTTL, maxTTL), maxTTL), maxTTL, nil
+}
+
+// parseMaxTTL returns a max TTL setting in milliseconds, with -1 for no limit.
+func parseMaxTTL(setting settings.Setting) (int64, error) {
+	maxTTL, err := ParseTTLToMilliseconds(setting)
 	if err != nil {
 		return 0, err
 	}
-
-	// decision table
-	// max | ttl         | note                                        | result
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
-	// < 1 | = 0         | max = +inf = default, ttl default requested | -1 = +inf
-	// < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// > 0 | < 0         | ttl = +inf, clamp to max                    | max
-	// > 0 | = 0         | ttl default requested, this is max          | max
-	// > 0 | > 0, <= max | less than max                               | ttl
-	// > 0 | > max       | clamp to max                                | max
-
-	if max < 1 {
-		if ttl == 0 {
-			return -1, nil
-		}
-		return ttl, nil
+	if maxTTL < 1 {
+		return -1, nil
 	}
-	if ttl > max || ttl <= 0 {
-		return max, nil
-	}
-	return ttl, nil
+	return maxTTL, nil
 }
 
-func maxTTL() (int64, error) {
-	maxTTL, err := tokens.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
-
+// IngestTTL returns the input ttl (milliseconds) with a request for the default (0) resolved and
+// limited to the max, for a token of the given kind. See TTLLimits.
+func IngestTTL(ttl int64, kind string) (int64, error) {
+	defaultTTL, maxTTL, err := TTLLimits(kind)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
+		return 0, err
 	}
+	return ClampToMaxTTL(DefaultTTL(ttl, defaultTTL), maxTTL), nil
+}
 
-	return maxTTL.Milliseconds(), nil
+// ParseTTLToMilliseconds retrieves a ttl setting (in minutes) and returns it as milliseconds
+func ParseTTLToMilliseconds(ttlSetting settings.Setting) (int64, error) {
+	ttl, err := ParseTTLToDuration(ttlSetting.Get())
+	if err != nil {
+		return 0, fmt.Errorf("failed to process setting '%s': %w", ttlSetting.Name, err)
+	}
+	return ttl.Milliseconds(), nil
+}
+
+// ParseTTLToDuration parses an integer representing minutes as a string and returns it as a duration.
+func ParseTTLToDuration(ttl string) (time.Duration, error) {
+	dur, err := time.ParseDuration(fmt.Sprintf("%vm", ttl))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing ttl minutes: %w", err)
+	}
+	return dur, nil
+}
+
+// DefaultTTL returns the default ttl, if such was requested by the input
+// (`value == 0`), or else the input as is.
+func DefaultTTL(ttl, defaultValue int64) int64 {
+	if ttl == 0 {
+		return defaultValue
+	}
+	return ttl
+}
+
+// ClampToMaxTTL ensures that the returned ttl is smaller than the specified
+// maximum. In other words, it returns the minimum of the 2 inputs, taking into
+// account the special encoding of `infinity` (`value < 0`) for both max and
+// ttl. The function assumes that `ttl` is not `0`, i.e. that a request for the
+// default has been resolved already.
+func ClampToMaxTTL(ttl, max int64) int64 {
+	if max < 1 {
+		// maximum is infinity, ttl is always smaller or equal
+		return ttl
+	}
+	if ttl < 0 {
+		// ttl asked for infinity, but max is finite — cap it at max.
+		return max
+	}
+	// for a finite maximum we can do a simple
+	return min(ttl, max)
 }
 
 // ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
 // Important special cases for TTL:
 // Any value < 0 represents +infinity.
 // A value > 0 is that many milliseconds.
-// The default of `0` cannot arrive here. `clampMaxTTL` resolved that already.
+// The default of `0` cannot arrive here. `IngestTTL` resolved that already.
 func ttlGreater(a, b int64) bool {
 	// Decision table
 	//

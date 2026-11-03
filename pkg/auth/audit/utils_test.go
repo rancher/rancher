@@ -27,7 +27,7 @@ func prepareLogEntry(log *logEntry, data *testLogData) {
 	}
 
 	// Attempt req body prep
-	if data.verbosity.Request.Body && data.reqHeaders.Get("Content-Type") == contentTypeJSON && len(data.rawReqBody) > 0 {
+	if data.verbosity.Request.Body && isLoggableJSON(data.reqHeaders.Get("Content-Type"), log.scim) && len(data.rawReqBody) > 0 {
 		if err := json.Unmarshal(data.rawReqBody, &log.RequestBody); err != nil {
 			log.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),

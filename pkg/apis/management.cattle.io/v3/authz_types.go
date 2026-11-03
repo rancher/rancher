@@ -179,6 +179,13 @@ type GlobalRole struct {
 	// +optional
 	NamespacedRules map[string][]rbacv1.PolicyRule `json:"namespacedRules,omitempty"`
 
+	// InheritedNamespacedRules are the rules that are active in each namespace of every cluster besides
+	// the local cluster. If the namespace does not exist in a downstream cluster, the rules will not be applied.
+	// * has no special meaning in the keys - these keys are read as raw strings
+	// and must exactly match with one existing namespace.
+	// +optional
+	InheritedNamespacedRules map[string][]rbacv1.PolicyRule `json:"inheritedNamespacedRules,omitempty"`
+
 	// InheritedFleetWorkspacePermissions are the permissions granted by this GlobalRole in every fleet workspace besides
 	// the local one.
 	// +optional
@@ -313,6 +320,12 @@ type RoleTemplate struct {
 	// Rules hold all the PolicyRules for this RoleTemplate.
 	// +optional
 	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
+
+	// ClusterScopedRules holds all the PolicyRules that are scoped to the cluster for this RoleTemplate.
+	// Unlike Rules, which are confined to the project's namespaces, these rules are granted cluster-wide.
+	// Only applies to RoleTemplates with a context set to "project".
+	// +optional
+	ClusterScopedRules []rbacv1.PolicyRule `json:"clusterScopedRules,omitempty"`
 
 	// Builtin if true specifies that this RoleTemplate was created by Rancher and is immutable.
 	// Default to false.

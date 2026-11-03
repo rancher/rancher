@@ -18,8 +18,8 @@ auditLog:
   #   3: Log metadata, request header, response heaeders, request body, and response body
   level: 0
 
-  # destination may be one of "sidecar" or "hostpath". When set to "sidecar" logs will be sent and output to a sidecar
-  # container called "rancher-audit-log". When "hostpath" logs are written to a hostpath volume called "audit-log" to
+  # destination may be one of "sidecar" or "hostPath". When set to "sidecar" logs will be sent and output to a sidecar
+  # container called "rancher-audit-log". When "hostPath" logs are written to a hostpath volume called "audit-log" to
   # a directory configured by auditLog.hostPath.
   destination: sidecar
   hostPath: /var/log/rancher/audit/
@@ -32,12 +32,12 @@ auditLog:
   resources: {}
 
   # Image for collecting rancher audit logs.
-  # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
+  # Important: update build.yaml when this default image needs to be changed, then run `go generate`.
   image:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/mirrored-bci-micro"
-    tag: 15.6.24.2
+    tag: 16.0-15.11
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
@@ -112,6 +112,7 @@ gateway:
     ports: # Must match the GatewayClass's configured entrypoints
       http: 8000  # k3s Traefik defaults to web entrypoint to 8000
       https: 8443 # k3s Traefik defaults to websecure entrypoint to 8443
+    annotations: {}
     additionalListeners: [] # Additional listener configs
     #  - name: http
     #    protocol: HTTP
@@ -150,6 +151,7 @@ letsEncrypt:
   ingress:
     # options: traefik, nginx
     class: ""
+
 # If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
 # in the 'cattle-system' namespace. See the README.md for details
 privateCA: false
@@ -204,8 +206,26 @@ tls: ingress
 # Set a custom image registry mirror to pull Rancher images from; useful in air-gapped environments.
 systemDefaultRegistry: ""
 
+# Controls whether the configured 'imagePullSecrets' are propagated to the local
+# cluster and any downstream clusters which rely on the global 'systemDefaultRegistry' setting.
+# - If true: The 'system-default-registry-pull-secrets' setting is automatically populated
+#   with a comma-separated list of imagePullSecret names as its default value.
+# - New Installs: Set this to 'true' if you are pointing to an authenticated system registry.
+# - Upgrades: Defaults to 'false' to prevent unintended mass downstream updates. Changing this to 'true'
+#   will automatically update all dependent downstream clusters with these secrets.
+# Alternatively, existing installs may directly modify the 'system-default-registry-pull-secrets' setting
+# after an upgrade to better time the propagation of these secrets to downstream clusters, or define
+# pull secrets not used by this chart.
+systemRegistryInheritsPullSecrets: false
+
 # Set to use the packaged system charts
 useBundledSystemChart: false
+
+# Charts image used for bundled Helm charts
+# Important: update build.yaml when this default image needs to be changed, then run `go generate`.
+assetsImage:
+  repository: rancher/rancher-assets
+  tag: v2.16-20261027T2136Z-dev
 
 # Certmanager version compatibility
 certmanager:
@@ -228,31 +248,36 @@ customLogos:
   size: 1Gi
 
 # Rancher post-delete hook
+# Important: update build.yaml when this default image needs to be changed, then run `go generate`.
 postDelete:
   enabled: true
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %POST_DELETE_IMAGE_NAME%
-    tag: %POST_DELETE_IMAGE_TAG%
+    repository: "rancher/shell"
+    tag: "v0.9.0-rc.1"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
   namespaceList:
+    - cattle-fleet-local-system
     - cattle-fleet-system
     - cattle-system
+    - cattle-turtles-system
     - rancher-operator-system
   # Number of seconds to wait for an app to be uninstalled
   timeout: 120
   # by default, the job will fail if it fail to uninstall any of the apps
   ignoreTimeoutError: false
 
+# Rancher pre-upgrade hook
+# Important: update build.yaml when this default image needs to be changed, then run `go generate`.
 preUpgrade:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %PRE_UPGRADE_IMAGE_NAME%
-    tag: %PRE_UPGRADE_IMAGE_TAG%
+    repository: "rancher/shell"
+    tag: "v0.9.0-rc.1"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 
@@ -275,6 +300,30 @@ extraTolerations: {}
 #    values:
 #      - us-north-42
 extraNodeSelectorTerms: {}
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: ""
+  maxUnavailable: ""
+  unhealthyPodEvictionPolicy: ""
+
+  # Optional: Add extra labels to the default selector
+  # These are merged with the standard selectorLabels (app: rancher)
+  extraMatchLabels: {}
+  #   tier: frontend
+  #   environment: production
+
+  # Advanced: Completely override the selector with custom logic
+  # When set, this replaces the default selector entirely (extraMatchLabels ignored)
+  # Use this for complex selectors with matchExpressions
+  selector: {}
+  #   matchLabels:
+  #     app: rancher
+  #     custom-label: value
+  #   matchExpressions:
+  #     - key: environment
+  #       operator: In
+  #       values: [prod, staging]
 
 livenessProbe:
   timeoutSeconds: 5
@@ -331,14 +380,14 @@ extraObjects: []
 
 # Control additional labels and annotations on namespaces create by Rancher.
 rancherNamespaces:
-
-  # If enabled is true, the "cattle.io/managed-namespace" annotation will be applied to any new namespaces. 
+  # If enabled is true, the "cattle.io/managed-namespace" annotation will be applied to any new namespaces.
   enabled: false
 
+  # If strict is true, project namespaces (except for the system project) will not receive the configured labels and annotations.
+  strict: false
+
   # Additional labels to be added to new namespaces.
-  # labels:
-  #   foo: bar
+  labels: {}
 
   # Additional annotaitons to be added to new namespaces. Will be appied along with the "cattle.io/managed-namespace" annotation.  
-  # annotations:
-  #   foo: bar
+  annotations: {}

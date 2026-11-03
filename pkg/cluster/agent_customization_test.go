@@ -786,6 +786,93 @@ func TestAgentCustomization_agentSchedulingPodDisruptionBudgetChanged(t *testing
 				},
 			},
 		},
+		{
+			name:           "PC definition in spec and status",
+			updateExpected: false,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 123,
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 123,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "add PDB definition to existing PC definition",
+			updateExpected: true,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 123,
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 123,
+								},
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "delete PDB definition and keep PC definition",
+			updateExpected: true,
+			deleteExpected: true,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 123,
+							},
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 123,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	t.Parallel()
@@ -926,6 +1013,96 @@ func TestAgentCustomization_agentSchedulingPriorityClassChanged(t *testing.T) {
 				},
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{},
+				},
+			},
+		},
+		{
+			name:           "PDB definition in spec and status",
+			createExpected: false,
+			updateExpected: false,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "add PC definition to existing PDB definition",
+			createExpected: true,
+			updateExpected: false,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 12345,
+								},
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "delete PC definition and keep PDB definition",
+			createExpected: false,
+			updateExpected: true,
+			deleteExpected: true,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 12345,
+							},
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -1365,6 +1542,137 @@ func TestAgentCustomization_getAgentCustomization(t *testing.T) {
 				assert.Equal(t, testFleetAgentAffinity, fleetAgentAffinity)
 				assert.Nil(t, fleetErr)
 			}
+		})
+	}
+}
+
+func TestWebhookCustomization_UpdateApplied(t *testing.T) {
+	rc := int32(3)
+	toleration := corev1.Toleration{Key: "cattle.io/node", Operator: corev1.TolerationOpExists}
+	resources := &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)},
+	}
+
+	tests := []struct {
+		name           string
+		cluster        *v3.Cluster
+		expectedStatus *v3.WebhookDeploymentCustomization
+	}{
+		{
+			name:           "nil cluster is a no-op",
+			cluster:        nil,
+			expectedStatus: nil,
+		},
+		{
+			name: "nil spec clears status",
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedWebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{ReplicaCount: &rc},
+				},
+			},
+			expectedStatus: nil,
+		},
+		{
+			name: "empty spec struct clears status",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{},
+					},
+				},
+			},
+			expectedStatus: nil,
+		},
+		{
+			name: "full spec copied to status",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
+							ReplicaCount:                 &rc,
+							AppendTolerations:            []corev1.Toleration{toleration},
+							OverrideResourceRequirements: resources,
+							PodDisruptionBudget:          &v3.PodDisruptionBudgetSpec{MinAvailable: "1"},
+						},
+					},
+				},
+			},
+			expectedStatus: &v3.WebhookDeploymentCustomization{
+				ReplicaCount:                 &rc,
+				AppendTolerations:            []corev1.Toleration{toleration},
+				OverrideResourceRequirements: resources,
+				PodDisruptionBudget:          &v3.PodDisruptionBudgetSpec{MinAvailable: "1"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			UpdateAppliedWebhookDeploymentCustomization(tt.cluster)
+			if tt.cluster == nil {
+				return
+			}
+			assert.Equal(t, tt.expectedStatus, tt.cluster.Status.AppliedWebhookDeploymentCustomization)
+		})
+	}
+}
+
+func TestWebhookCustomization_Changed(t *testing.T) {
+	rc := int32(2)
+	tests := []struct {
+		name     string
+		cluster  *v3.Cluster
+		expected bool
+	}{
+		{
+			name:     "nil cluster returns false",
+			cluster:  nil,
+			expected: false,
+		},
+		{
+			name:     "both nil — no change",
+			cluster:  &v3.Cluster{},
+			expected: false,
+		},
+		{
+			name: "spec set, status nil — changed",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{ReplicaCount: &rc},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "spec and status equal — not changed",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{ReplicaCount: &rc},
+					},
+				},
+				Status: v3.ClusterStatus{
+					AppliedWebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{ReplicaCount: &rc},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "spec nil, status set — changed",
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedWebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{ReplicaCount: &rc},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, WebhookDeploymentCustomizationChanged(tt.cluster))
 		})
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/management/settings"
+	"github.com/rancher/rancher/pkg/controllers/management/systemagent"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -48,6 +49,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	secretmigrator.Register(ctx, management)
 	settings.Register(ctx, management)
 	managementlegacy.Register(ctx, management, manager)
+	systemagent.Register(ctx, wrangler, manager)
 
 	// Register last
 	auth.RegisterLate(ctx, management)

@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -17,9 +17,35 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
+const (
+	autoscalerHelmSecretResourceName   = "autoscaler-helm-secret"
+	autoscalerChartImagePullSecretName = "autoscaler-chart-image-pull-secret"
+
+	// autoscalerTokenKind is the value of the tokens.TokenKindLabel label on
+	// tokens created for the cluster autoscaler.
+	autoscalerTokenKind = "autoscaler"
+)
+
+func helmOpSecretName(clusterName string) string {
+	return name.SafeConcatName(autoscalerHelmSecretResourceName, clusterName)
+}
+
+func autoscalerClusterScopedImagePullSecretName(clusterName string) string {
+	return name.SafeConcatName(autoscalerChartImagePullSecretName, clusterName)
+}
+
 // autoscalerUserName generates the autoscaler-specific name for a cluster
 func autoscalerUserName(cluster *capi.Cluster) string {
 	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler")
+}
+
+func autoscalerUserPrincipal(username string) v3.Principal {
+	return v3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: "local://" + username},
+		LoginName:     username,
+		Provider:      "local",
+		PrincipalType: "user",
+	}
 }
 
 // globalRoleName generates the global role name for a cluster
@@ -39,6 +65,16 @@ func kubeconfigSecretName(cluster *capi.Cluster) string {
 
 func helmOpName(cluster *capi.Cluster) string {
 	return name.SafeConcatName("autoscaler", cluster.Namespace, cluster.Name)
+}
+
+func chartRepositoryHost(repository string) string {
+	host := repository
+	_, hostWithoutProto, found := strings.Cut(host, "://")
+	if !found {
+		hostWithoutProto = host
+	}
+	hostWithoutPath, _, _ := strings.Cut(hostWithoutProto, "/")
+	return hostWithoutPath
 }
 
 // ownerReference creates an owner reference from a cluster
@@ -85,6 +121,14 @@ func generateKubeconfig(token string) ([]byte, error) {
 	return data, nil
 }
 
+// autoscalerTokenNeedsPrincipal reports whether t is an autoscaler token
+// created before autoscaler tokens were issued with a UserPrincipal.
+// Such tokens are identified by the autoscaler token kind label, which
+// generateToken has always set, and an empty UserPrincipal.Name.
+func autoscalerTokenNeedsPrincipal(t *v3.Token) bool {
+	return t.Labels[tokens.TokenKindLabel] == autoscalerTokenKind && t.UserPrincipal.Name == ""
+}
+
 // generateToken generates a v3.Token for a user in a specified cluster with given ownership references.
 func generateToken(username, clusterName string, owner []metav1.OwnerReference) (*v3.Token, error) {
 	// Generate new token value
@@ -98,17 +142,18 @@ func generateToken(username, clusterName string, owner []metav1.OwnerReference) 
 			Name: username,
 			Labels: map[string]string{
 				tokens.UserIDLabel:    username,
-				tokens.TokenKindLabel: "autoscaler",
+				tokens.TokenKindLabel: autoscalerTokenKind,
 				capi.ClusterNameLabel: clusterName,
 			},
 			Annotations:     map[string]string{},
 			OwnerReferences: owner,
 		},
-		UserID:       username,
-		AuthProvider: "local",
-		IsDerived:    true,
-		Token:        tokenValue,
-		TTLMillis:    autoscalerTokenTTL.Milliseconds(),
+		UserID:        username,
+		AuthProvider:  "local",
+		UserPrincipal: autoscalerUserPrincipal(username),
+		IsDerived:     true,
+		Token:         tokenValue,
+		TTLMillis:     autoscalerTokenTTL.Milliseconds(),
 	}
 
 	if features.TokenHashing.Enabled() {

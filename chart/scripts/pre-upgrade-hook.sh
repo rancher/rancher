@@ -120,14 +120,6 @@ main() {
     '{range .items[?(@.spec.rancherKubernetesEngineConfig)]}{.metadata.name}{"\t"}{.spec.displayName}{"\n"}{end}' \
     "NAME" "DISPLAY NAME"
 
-  detect_resource "nodetemplates.management.cattle.io" "NodeTemplate" \
-    '{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.spec.displayName}{"\n"}{end}' \
-    "NAMESPACE" "NAME" "DISPLAY NAME"
-
-  detect_resource "clustertemplates.management.cattle.io" "ClusterTemplate" \
-    '{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.spec.displayName}{"\n"}{end}' \
-    "NAMESPACE" "NAME" "DISPLAY NAME"
-
   print_summary
 }
 

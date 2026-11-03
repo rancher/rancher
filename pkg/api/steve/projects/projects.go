@@ -4,26 +4,21 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/schema"
 	steveserver "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/steve/pkg/stores/proxy"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 )
 
 type projectServer struct {
-	ctx            context.Context
-	asl            accesscontrol.AccessSetLookup
-	cf             *client.Factory
-	clusterLinks   []string
-	namespaceCache corecontrollers.NamespaceCache
+	ctx           context.Context
+	asl           accesscontrol.AccessSetLookup
+	schemaFactory schema.Factory
+	clusterLinks  []string
 }
 
 func Projects(ctx context.Context, config *wrangler.Context, server *steveserver.Server) (func(http.Handler) http.Handler, error) {
@@ -37,8 +32,7 @@ func Projects(ctx context.Context, config *wrangler.Context, server *steveserver
 func (s *projectServer) Setup(ctx context.Context, config *wrangler.Context, server *steveserver.Server) error {
 	s.ctx = ctx
 	s.asl = server.AccessSetLookup
-	s.cf = server.ClientFactory
-	s.namespaceCache = config.Core.Namespace().Cache()
+	s.schemaFactory = server.SchemaFactory
 
 	server.SchemaFactory.AddTemplate(schema.Template{
 		ID: "management.cattle.io.cluster",
@@ -53,7 +47,7 @@ func (s *projectServer) Setup(ctx context.Context, config *wrangler.Context, ser
 }
 
 func (s *projectServer) newSchemas() *types.APISchemas {
-	store := proxy.NewProxyStore(s.cf, nil, s.asl, s.namespaceCache)
+	store := newSteveStore(s.schemaFactory)
 	schemas := types.EmptyAPISchemas()
 
 	schemas.MustImportAndCustomize(v3.Project{}, func(schema *types.APISchema) {
@@ -91,26 +85,33 @@ func (s *projectServer) middleware() func(http.Handler) http.Handler {
 	server := s.newAPIHandler()
 	server = prefix(server)
 
-	router := mux.NewRouter()
-	router.UseEncodedPath()
-	router.Path("/v1/management.cattle.io.clusters/{namespace}").Queries("link", "{type:projects?}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
-
 	return func(next http.Handler) http.Handler {
-		router.NotFoundHandler = next
+		router := http.NewServeMux()
+		router.HandleFunc("/v1/management.cattle.io.clusters/{namespace}", func(w http.ResponseWriter, r *http.Request) {
+			link := r.URL.Query().Get("link")
+			if link == "projects" || link == "project" {
+				server.ServeHTTP(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		})
+		router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}", server)
+		router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}", server)
+		router.Handle("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}", server)
+		router.Handle("/", next)
 		return router
 	}
 }
 
 func prefix(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		vars := mux.Vars(req)
-		if vars["clusterID"] != "" {
-			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["clusterID"]
-		} else {
-			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["namespace"]
+		clusterID := req.PathValue("clusterID")
+		namespace := req.PathValue("namespace")
+
+		if clusterID != "" {
+			req.SetPathValue("prefix", "/v1/management.cattle.io.clusters/"+clusterID)
+		} else if namespace != "" {
+			req.SetPathValue("prefix", "/v1/management.cattle.io.clusters/"+namespace)
 		}
 		next.ServeHTTP(rw, req)
 	})

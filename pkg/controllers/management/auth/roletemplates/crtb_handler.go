@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/features"
@@ -77,7 +79,16 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	var err error
+	// Delete duplicate CRTBs (same subject + roleTemplateName + clusterName).
+	// If this CRTB is itself the duplicate that got deleted, stop processing.
+	isDup, err := c.deleteDuplicateCRTBs(crtb)
+	if err != nil {
+		return crtb, err
+	}
+	if isDup {
+		return nil, nil
+	}
+
 	crtb, err = c.handleMigration(crtb)
 	if err != nil {
 		return crtb, err
@@ -98,6 +109,67 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	return crtb, errors.Join(c.reconcileBindings(crtb, &localConditions), c.updateStatus(crtb, localConditions))
+}
+
+// deleteDuplicateCRTBs checks for other CRTBs in the same namespace that have the same content
+// (subject + roleTemplateName + clusterName). If duplicates are found, only the oldest one (by
+// CreationTimestamp, then by Name as tiebreaker) is kept. All others are deleted.
+// It returns true if the current CRTB was itself a duplicate that was deleted.
+func (c *crtbHandler) deleteDuplicateCRTBs(crtb *v3.ClusterRoleTemplateBinding) (bool, error) {
+	allCRTBs, err := c.crtbCache.List(crtb.Namespace, labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("failed to list CRTBs in namespace %s: %w", crtb.Namespace, err)
+	}
+
+	currentKey := rtbContentKey(crtb.UserPrincipalName, crtb.UserName, crtb.GroupPrincipalName, crtb.GroupName,
+		crtb.RoleTemplateName, crtb.ClusterName)
+
+	// Collect all non-deleting CRTBs with the same content key.
+	var duplicates []*v3.ClusterRoleTemplateBinding
+	for _, crtb := range allCRTBs {
+		if crtb.DeletionTimestamp != nil {
+			continue
+		}
+		if rtbContentKey(crtb.UserPrincipalName,
+			crtb.UserName,
+			crtb.GroupPrincipalName,
+			crtb.GroupName,
+			crtb.RoleTemplateName,
+			crtb.ClusterName) == currentKey {
+			duplicates = append(duplicates, crtb)
+		}
+	}
+
+	if len(duplicates) <= 1 {
+		return false, nil
+	}
+
+	// Sort: oldest CreationTimestamp first, then lexicographically by Name as tiebreaker.
+	sort.Slice(duplicates, func(i, j int) bool {
+		ti := duplicates[i].CreationTimestamp.Time
+		tj := duplicates[j].CreationTimestamp.Time
+		if !ti.Equal(tj) {
+			return ti.Before(tj)
+		}
+		return duplicates[i].Name < duplicates[j].Name
+	})
+
+	// The first element is the "winner" that we keep.
+	keeper := duplicates[0]
+	currentIsDuplicate := crtb.Name != keeper.Name
+
+	logrus.Infof("[mgmt-crtb-change-handler] found %d duplicate CRTBs for content key %q in namespace %s, keeping %s",
+		len(duplicates), currentKey, crtb.Namespace, keeper.Name)
+
+	var returnErr error
+	for _, dup := range duplicates[1:] {
+		logrus.Infof("[mgmt-crtb-change-handler] deleting duplicate CRTB %s/%s", dup.Namespace, dup.Name)
+		if err := c.crtbClient.Delete(dup.Namespace, dup.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			returnErr = errors.Join(returnErr, fmt.Errorf("failed to delete duplicate CRTB %s/%s: %w", dup.Namespace, dup.Name, err))
+		}
+	}
+
+	return currentIsDuplicate, returnErr
 }
 
 // handleMigration handles the migration of CRTBs when toggling the AggregatedRoleTemplates feature flag.
@@ -133,6 +205,8 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		return binding, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
 	}
 
+	needsUpdate := false
+
 	if binding.UserName == "" {
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := c.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
@@ -142,7 +216,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		}
 
 		binding.UserName = user.Name
-		c.s.AddCondition(localConditions, condition, subjectExists, nil)
+		needsUpdate = true
 	}
 
 	if binding.UserPrincipalName == "" {
@@ -154,10 +228,19 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
 				binding.UserPrincipalName = p
+				needsUpdate = true
 				break
 			}
 		}
-		c.s.AddCondition(localConditions, condition, subjectExists, nil)
+	}
+
+	if needsUpdate {
+		updated, err := c.crtbClient.Update(binding)
+		if err != nil {
+			c.s.AddCondition(localConditions, condition, failedToCreateUser, err)
+			return binding, err
+		}
+		binding = updated
 	}
 
 	c.s.AddCondition(localConditions, condition, subjectExists, nil)
@@ -281,11 +364,79 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 			return nil, err
 		}
 		desiredRBs[rb.Name] = rb
+
+		// If the cluster management role grants CRT access, also create a RoleBinding to crt-token-reader
+		if grantsCRTAccess(cr) {
+			crtTokenRB, err := c.buildCRTTokenReaderRoleBinding(crtb)
+			if err != nil {
+				return nil, err
+			}
+			desiredRBs[crtTokenRB.Name] = crtTokenRB
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
 	return desiredRBs, nil
+}
+
+// grantsCRTAccess checks if a ClusterRole has rules that grant read or create access to
+// clusterregistrationtokens. Read verbs (get, list, watch) and create are included because
+// those principals legitimately need to read the token value. Pure write/delete verbs
+// (update, patch, delete, deletecollection) do not warrant Secret read access.
+func grantsCRTAccess(cr *rbacv1.ClusterRole) bool {
+	readOrCreateVerbs := map[string]bool{
+		"get":    true,
+		"list":   true,
+		"watch":  true,
+		"create": true,
+		"*":      true,
+	}
+	for _, rule := range cr.Rules {
+		for _, resource := range rule.Resources {
+			if resource != "clusterregistrationtokens" && resource != "*" {
+				continue
+			}
+			for _, apiGroup := range rule.APIGroups {
+				if apiGroup != "management.cattle.io" && apiGroup != "*" {
+					continue
+				}
+				for _, verb := range rule.Verbs {
+					if readOrCreateVerbs[verb] {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// buildCRTTokenReaderRoleBinding creates a RoleBinding to the crt-token-reader Role
+func (c *crtbHandler) buildCRTTokenReaderRoleBinding(crtb *v3.ClusterRoleTemplateBinding) (*rbacv1.RoleBinding, error) {
+	subject, err := rbac.BuildSubjectFromRTB(crtb)
+	if err != nil {
+		return nil, err
+	}
+
+	rb := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbac.NameForRoleBinding(crtb.Namespace, rbacv1.RoleRef{Kind: "Role", Name: "crt-token-reader"}, subject),
+			Namespace: crtb.Namespace,
+			Labels: map[string]string{
+				rbac.GetCRTBOwnerLabel(crtb.Name):      "true",
+				rbac.AggregationManagementFeatureLabel: "true",
+			},
+		},
+		Subjects: []rbacv1.Subject{subject},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     "crt-token-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	return rb, nil
 }
 
 // deleteLegacyRoleBindings deletes any management plane RoleBindings that were created for this CRTB before the aggregation feature was enabled.
@@ -376,6 +527,12 @@ func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBind
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
+	}
+	if cluster.DeletionTimestamp != nil {
+		if skip, why := util.SkipDownstreamCleanupOnRemoval(cluster); skip {
+			logrus.Infof("Cluster %s is being removed and %s: not deleting downstream resources for CRTB %s.", clusterName, why, crtb.Name)
+			return nil
+		}
 	}
 
 	userContext, err := c.clusterManager.UserContext(cluster.Name)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v73/github"
+	"github.com/google/go-github/v93/github"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"golang.org/x/oauth2"
 	"k8s.io/utils/ptr"
@@ -119,9 +119,13 @@ func (g *gitHubAppData) listOrgs() []common.GitHubAccount {
 func (g *gitHubAppData) listTeamsForUser(username string) []common.GitHubAccount {
 	var accounts []common.GitHubAccount
 
-	for orgName := range g.members[username].orgs {
+	for orgName, teamNames := range g.members[username].orgs {
 		org := g.orgs[orgName]
-		for teamName, team := range org.teams {
+		for _, teamName := range teamNames {
+			team, ok := org.teams[teamName]
+			if !ok {
+				continue
+			}
 			accounts = append(accounts, common.GitHubAccount{Name: teamName, Login: team.login, AvatarURL: org.avatarURL, ID: team.id, HTMLURL: team.htmlURL})
 		}
 	}
@@ -239,18 +243,12 @@ func newGitHubAppData() *gitHubAppData {
 	}
 }
 
-func newGitHubClient(c *http.Client, endpoint string) (*github.Client, error) {
-	client := github.NewClient(c)
+func newGitHubClient(httpClient *http.Client, endpoint string) (*github.Client, error) {
+	opts := []github.ClientOptionsFunc{github.WithHTTPClient(httpClient)}
 	if endpoint != "" {
-		c, err := client.WithEnterpriseURLs(endpoint, endpoint)
-		if err != nil {
-			// TODO: Improve error message
-			return nil, err
-		}
-		client = c
+		opts = append(opts, github.WithEnterpriseURLs(endpoint, endpoint))
 	}
-
-	return client, nil
+	return github.NewClient(opts...)
 }
 
 // Create an installation specific token and return a client configured to use the
@@ -358,19 +356,10 @@ func getDataForApp(ctx context.Context, appID int64, privateKey []byte, installa
 		return nil, fmt.Errorf("creating transport to access GitHub: %w", err)
 	}
 
-	client := github.NewClient(
-		&http.Client{
-			Transport: itr,
-			Timeout:   time.Second * 30,
-		},
-	)
-
-	if endpoint != "" {
-		c, err := client.WithEnterpriseURLs(endpoint, endpoint)
-		if err != nil {
-			return nil, fmt.Errorf("creating a github client: %w", err)
-		}
-		client = c
+	httpClient := &http.Client{Transport: itr, Timeout: 30 * time.Second}
+	client, err := newGitHubClient(httpClient, endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("creating a github client: %w", err)
 	}
 
 	appClient, err := newClientForApp(ctx, appID, privateKey, endpoint)
@@ -423,19 +412,10 @@ func getInstallationClient(ctx context.Context, appID int64, privateKey []byte, 
 		return nil, fmt.Errorf("creating transport to access GitHub: %w", err)
 	}
 
-	client := github.NewClient(
-		&http.Client{
-			Transport: itr,
-			Timeout:   time.Second * 30,
-		},
-	)
-
-	if endpoint != "" {
-		c, err := client.WithEnterpriseURLs(endpoint, endpoint)
-		if err != nil {
-			return nil, fmt.Errorf("creating a github client: %w", err)
-		}
-		client = c
+	httpClient := &http.Client{Transport: itr, Timeout: 30 * time.Second}
+	client, err := newGitHubClient(httpClient, endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("creating a github client: %w", err)
 	}
 
 	appClient, err := newClientForApp(ctx, appID, privateKey, endpoint)

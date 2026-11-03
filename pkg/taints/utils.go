@@ -2,11 +2,50 @@ package taints
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
+
+// transientTaintPrefixes are the node lifecycle taints managed by kubelet, the
+// node lifecycle controller or a cloud-controller-manager. They are added and
+// removed automatically while a node comes up, goes down or loses its cloud
+// provider initialization, so they must never be baked into a long lived pod
+// spec: doing so makes the spec change every time a node blinks.
+var transientTaintPrefixes = []string{
+	// not-ready, unreachable, memory-pressure, disk-pressure, pid-pressure,
+	// network-unavailable, unschedulable
+	"node.kubernetes.io/",
+	// uninitialized, shutdown
+	"node.cloudprovider.kubernetes.io/",
+}
+
+// IsTransient returns true when the taint is a node lifecycle taint that a
+// controller adds and removes on its own, rather than a durable taint set by an
+// administrator or by the cluster's role configuration.
+func IsTransient(taint v1.Taint) bool {
+	for _, prefix := range transientTaintPrefixes {
+		if strings.HasPrefix(taint.Key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// Sort orders taints in place by key, then effect, then value.
+func Sort(taints []v1.Taint) {
+	sort.Slice(taints, func(i, j int) bool {
+		if taints[i].Key != taints[j].Key {
+			return taints[i].Key < taints[j].Key
+		}
+		if taints[i].Effect != taints[j].Effect {
+			return taints[i].Effect < taints[j].Effect
+		}
+		return taints[i].Value < taints[j].Value
+	})
+}
 
 func GetTaintsString(taint v1.Taint) string {
 	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)

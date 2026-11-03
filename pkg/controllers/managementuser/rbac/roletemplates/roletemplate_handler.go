@@ -7,8 +7,10 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,11 +24,13 @@ const (
 func newRoleTemplateHandler(uc *config.UserContext) *roleTemplateHandler {
 	return &roleTemplateHandler{
 		crController: uc.RBACw.ClusterRole(),
+		clusterName:  uc.ClusterName,
 	}
 }
 
 type roleTemplateHandler struct {
 	crController crbacv1.ClusterRoleController
+	clusterName  string
 }
 
 // OnChange ensures that the following Cluster Roles exist:
@@ -83,6 +87,8 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 	for _, currentCR := range currentCRs.Items {
 		if _, ok := desiredCRNames[currentCR.Name]; !ok {
 			// This ClusterRole is not part of the desired Cluster Role list, delete it
+			logrus.Tracef("[cluster-roletemplate-change-handler] installUUID=%s cluster=%s: clusterRole %q no longer desired for roleTemplate %q, deleting",
+				settings.InstallUUID.Get(), rth.clusterName, currentCR.Name, rt.Name)
 			if err := rbac.DeleteResource(currentCR.Name, rth.crController); err != nil {
 				return fmt.Errorf("failed to delete cluster role %s: %w", currentCR.Name, err)
 			}
@@ -91,6 +97,8 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 
 	// Make sure the desired Cluster Roles exist and have the right contents
 	for _, cr := range desiredCRs {
+		logrus.Tracef("[cluster-roletemplate-change-handler] installUUID=%s cluster=%s: ensuring clusterRole %q exists for roleTemplate %q",
+			settings.InstallUUID.Get(), rth.clusterName, cr.Name, rt.Name)
 		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
 			return fmt.Errorf("failed to create or update cluster role %s: %w", cr.Name, err)
 		}
@@ -105,14 +113,17 @@ func (rth *roleTemplateHandler) clusterRolesForRoleTemplate(rt *v3.RoleTemplate)
 	rtCopy := rt.DeepCopy()
 
 	if rtCopy.Context == projectContext {
-		// ClusterRoles for promoted rules
-		var promotedClusterRoles []*rbacv1.ClusterRole
-		var err error
-		promotedClusterRoles, err = rth.buildPromotedClusterRoles(rt)
+		promotedClusterRoles, err := rth.buildAdditionalClusterRoles(rtCopy, ExtractPromotedRules(rtCopy.Rules), rbac.PromotedClusterRoleNameFor)
 		if err != nil {
 			return nil, err
 		}
 
+		clusterScopedClusterRoles, err := rth.buildAdditionalClusterRoles(rtCopy, rtCopy.ClusterScopedRules, rbac.ClusterScopedClusterRoleNameFor)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, clusterScopedClusterRoles...)
 		res = append(res, promotedClusterRoles...)
 	}
 
@@ -125,38 +136,33 @@ func (rth *roleTemplateHandler) clusterRolesForRoleTemplate(rt *v3.RoleTemplate)
 	return res, nil
 }
 
-// buildPromotedClusterRoles looks for promoted rules in a project role template and creates required promoted cluster roles.
-// It also returns the role template rules with the promoted rules removed.
-func (rth *roleTemplateHandler) buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, error) {
+// buildAdditionalClusterRoles builds the cluster role plus its aggregating cluster role for a set of rules that are
+// applied at cluster scope (either promoted or cluster scoped rules), keyed by clusterRoleNameFunc. It returns an empty
+// slice when there are no such rules and no inherited RoleTemplate contributes any.
+func (rth *roleTemplateHandler) buildAdditionalClusterRoles(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule, clusterRoleNameFunc func(string) string) ([]*rbacv1.ClusterRole, error) {
 	clusterRoles := []*rbacv1.ClusterRole{}
-
-	promotedRules := ExtractPromotedRules(rt.Rules)
-
-	inheritedPromotedRules, err := rth.areThereInheritedPromotedRules(rt.RoleTemplateNames)
+	inheritedRules, err := rth.areThereInheritedRules(rt.RoleTemplateNames, clusterRoleNameFunc)
 	if err != nil {
 		return nil, err
 	}
 
-	// If there are no promoted rules and no inherited RoleTemplates with promoted rules, no need for additional cluster roles
-	if len(promotedRules) == 0 && !inheritedPromotedRules {
+	if len(rules) == 0 && !inheritedRules {
 		return clusterRoles, nil
 	}
-
-	if len(promotedRules) != 0 {
-		// Create a promoted cluster role
-		clusterRoles = append(clusterRoles, rbac.BuildClusterRole(rbac.PromotedClusterRoleNameFor(rt.Name), rt.Name, promotedRules))
+	if len(rules) != 0 {
+		clusterRoles = append(clusterRoles, rbac.BuildClusterRole(clusterRoleNameFunc(rt.Name), rt.Name, rules))
 	}
-
-	// If there are promoted rules or inherited promoted rules, an aggregating cluster role will be what PRTBs bind to.
-	clusterRoles = append(clusterRoles, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
+	clusterRoles = append(clusterRoles, rbac.BuildAggregatingClusterRole(rt, clusterRoleNameFunc))
 
 	return clusterRoles, nil
 }
 
-// areThereInheritedPromotedRules checks if any of the inherited RoleTemplates contain promoted rules. If none do, return false.
-func (rth *roleTemplateHandler) areThereInheritedPromotedRules(inheritedRoleTemplates []string) (bool, error) {
+// areThereInheritedRules checks if any of the inherited RoleTemplates have the cluster role specified by clusterRoleNameFunc.
+// That indicates that one of the inherited RoleTemplates contains the specified cluster role in its rules.
+// It returns true if at least one inherited RoleTemplate has the cluster role, otherwise false.
+func (rth *roleTemplateHandler) areThereInheritedRules(inheritedRoleTemplates []string, clusterRoleNameFunc func(string) string) (bool, error) {
 	for _, rt := range inheritedRoleTemplates {
-		_, err := rth.crController.Get(rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt)), metav1.GetOptions{})
+		_, err := rth.crController.Get(rbac.AggregatedClusterRoleNameFor(clusterRoleNameFunc(rt)), metav1.GetOptions{})
 		if err == nil {
 			return true, nil
 		} else if !apierrors.IsNotFound(err) {

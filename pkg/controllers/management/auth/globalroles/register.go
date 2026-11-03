@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 )
@@ -13,8 +15,18 @@ const (
 	grbController = "mgmt-auth-grb-controller"
 )
 
+// RegisterWranglerIndexers registers the indexers that are also read outside of the leader
+// replica. The controllers for a downstream cluster run on the replica that owns the cluster,
+// which is not necessarily the leader, so indexers they depend on cannot be registered in
+// Register.
+func RegisterWranglerIndexers(grbCache mgmtv3.GlobalRoleBindingCache) {
+	grbCache.AddIndexer(pkgrbac.GRBGlobalRoleIndex, grbGrIndexer)
+}
+
+// Register wires the GlobalRole and GlobalRoleBinding controllers, which run on the leader replica.
+// RegisterWranglerIndexers has to be called first, since the enqueuers registered here read the
+// indexers it adds.
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
-	management.Wrangler.Mgmt.GlobalRoleBinding().Cache().AddIndexer(grbGrIndex, grbGrIndexer)
 	management.Wrangler.Mgmt.GlobalRoleBinding().Cache().AddIndexer(grbSafeConcatIndex, grbSafeConcatIndexer)
 	management.Wrangler.Mgmt.GlobalRole().Cache().AddIndexer(grNsIndex, grNsIndexer)
 	management.Wrangler.Mgmt.GlobalRole().Cache().AddIndexer(grSafeConcatIndex, grSafeConcatIndexer)

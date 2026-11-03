@@ -44,17 +44,21 @@ type handler struct {
 	projectRoleTemplateBindingController mgmtcontrollers.ProjectRoleTemplateBindingController
 	projectRoleTemplateBindings          mgmtcontrollers.ProjectRoleTemplateBindingCache
 	roleTemplatesCache                   mgmtcontrollers.RoleTemplateCache
+	clusterController                    provisioningcontrollers.ClusterController
 	clusters                             provisioningcontrollers.ClusterCache
 	mgmtClusters                         mgmtcontrollers.ClusterCache
 	crdCache                             apiextcontrollers.CustomResourceDefinitionCache
 	dynamic                              *dynamic.Controller
-	resources                            map[schema.GroupVersionKind]resourceMatch
-	knownResources                       map[schema.GroupVersionKind]bool
-	resourcesList                        []resourceMatch
-	resourcesLock                        sync.RWMutex
-	apply                                apply.Apply
-	roleBindingApply                     apply.Apply
-	provisioningClusterGVK               schema.GroupVersionKind
+	// indexGetter reads the clusterIndexed index. It is normally the same object as
+	// dynamic, held behind an interface so tests can substitute a fake.
+	indexGetter            indexGetter
+	resources              map[schema.GroupVersionKind]resourceMatch
+	knownResources         map[schema.GroupVersionKind]bool
+	resourcesList          []resourceMatch
+	resourcesLock          sync.RWMutex
+	apply                  apply.Apply
+	roleBindingApply       apply.Apply
+	provisioningClusterGVK schema.GroupVersionKind
 }
 
 func Register(ctx context.Context, clients *wrangler.Context, management *config.ManagementContext) error {
@@ -78,10 +82,12 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
 		projectRoleTemplateBindings:          clients.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		roleTemplatesCache:                   clients.Mgmt.RoleTemplate().Cache(),
+		clusterController:                    clients.Provisioning.Cluster(),
 		clusters:                             clients.Provisioning.Cluster().Cache(),
 		mgmtClusters:                         clients.Mgmt.Cluster().Cache(),
 		crdCache:                             clients.CRD.CustomResourceDefinition().Cache(),
 		dynamic:                              clients.Dynamic,
+		indexGetter:                          clients.Dynamic,
 		apply: clients.Apply.WithCacheTypes(
 			clients.Mgmt.RoleTemplate(),
 			clients.RBAC.Role()),

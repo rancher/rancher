@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
+	typedrkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeRKEBootstraps implements RKEBootstrapInterface
 type fakeRKEBootstraps struct {
-	*gentype.FakeClientWithList[*v1.RKEBootstrap, *v1.RKEBootstrapList]
+	*gentype.FakeClientWithListAndApply[*v1.RKEBootstrap, *v1.RKEBootstrapList, *rkecattleiov1.RKEBootstrapApplyConfiguration]
 	Fake *FakeRkeV1
 }
 
-func newFakeRKEBootstraps(fake *FakeRkeV1, namespace string) rkecattleiov1.RKEBootstrapInterface {
+func newFakeRKEBootstraps(fake *FakeRkeV1, namespace string) typedrkecattleiov1.RKEBootstrapInterface {
 	return &fakeRKEBootstraps{
-		gentype.NewFakeClientWithList[*v1.RKEBootstrap, *v1.RKEBootstrapList](
+		gentype.NewFakeClientWithListAndApply[*v1.RKEBootstrap, *v1.RKEBootstrapList, *rkecattleiov1.RKEBootstrapApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("rkebootstraps"),

@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
+	typedrkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeRKEClusters implements RKEClusterInterface
 type fakeRKEClusters struct {
-	*gentype.FakeClientWithList[*v1.RKECluster, *v1.RKEClusterList]
+	*gentype.FakeClientWithListAndApply[*v1.RKECluster, *v1.RKEClusterList, *rkecattleiov1.RKEClusterApplyConfiguration]
 	Fake *FakeRkeV1
 }
 
-func newFakeRKEClusters(fake *FakeRkeV1, namespace string) rkecattleiov1.RKEClusterInterface {
+func newFakeRKEClusters(fake *FakeRkeV1, namespace string) typedrkecattleiov1.RKEClusterInterface {
 	return &fakeRKEClusters{
-		gentype.NewFakeClientWithList[*v1.RKECluster, *v1.RKEClusterList](
+		gentype.NewFakeClientWithListAndApply[*v1.RKECluster, *v1.RKEClusterList, *rkecattleiov1.RKEClusterApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("rkeclusters"),

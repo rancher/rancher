@@ -23,18 +23,49 @@ type userKey string
 
 var userKeyValue userKey = "audit_user"
 
-func NewAuditLogMiddleware(writer *Writer) auth.Middleware {
-	return GetAuditLoggerMiddleware(&LoggingHandler{
+// UserResolver looks up a Rancher user by ID. It returns the user's username and display name,
+// and false if the user does not exist.
+type UserResolver func(userID string) (username, displayName string, ok bool)
+
+// Option configures the audit log middleware.
+type Option func(*LoggingHandler)
+
+// WithUserResolver sets the resolver used to fill in the username of audit entries that have none.
+func WithUserResolver(resolve UserResolver) Option {
+	return func(lh *LoggingHandler) {
+		lh.resolveUser = resolve
+	}
+}
+
+// WithIncludeUsername sets the function that tells whether the entries get the username of the user and
+// of the impersonator. It is called for every entry, so it can follow a feature flag. Without this
+// option the entries do not get them, so that the entry format only grows for those who opted in, as
+// log consumers may parse entries strictly.
+func WithIncludeUsername(enabled func() bool) Option {
+	return func(lh *LoggingHandler) {
+		lh.includeUsername = enabled
+	}
+}
+
+func NewAuditLogMiddleware(writer *Writer, opts ...Option) auth.Middleware {
+	lh := &LoggingHandler{
 		level:   writer.DefaultPolicyLevel,
 		writer:  writer,
 		errMap:  make(map[string]time.Time),
 		errLock: &sync.Mutex{},
-	})
+	}
+	for _, opt := range opts {
+		opt(lh)
+	}
+	return GetAuditLoggerMiddleware(lh)
 }
 
 type LoggingHandler struct {
 	level  auditlogv1.Level
 	writer *Writer
+
+	resolveUser     UserResolver
+	includeUsername func() bool
 
 	errMap  map[string]time.Time
 	errLock *sync.Mutex

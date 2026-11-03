@@ -6,17 +6,19 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
 	"github.com/rancher/rancher/pkg/oidc/randomstring"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -47,7 +49,7 @@ func OIDCClientIDIndexFunc(obj interface{}) ([]string, error) {
 	return []string{o.Status.ClientID}, nil
 }
 
-func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
+func NewProvider(ctx context.Context, extTokenStore *exttokenstore.SystemStore, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
 	sessionStorage := session.NewSecretSessionStore(ctx, secretCache, secretClient, maxTime)
 	jwks, err := newJWKSHandler(secretCache, secretClient)
 	if err != nil {
@@ -63,30 +65,37 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 	}
 
 	// create necessary namespaces
-	if _, err := namespaceClient.Create(&v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretsNamespace,
-		},
-	}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureNamespaceWithRetry(ctx, namespaceClient, secretsNamespace); err != nil {
 		return Provider{}, err
 	}
-	if _, err := namespaceClient.Create(&v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: codesNamespace,
-		},
-	}); err != nil && !apierrors.IsAlreadyExists(err) {
+
+	if err := ensureNamespaceWithRetry(ctx, namespaceClient, codesNamespace); err != nil {
 		return Provider{}, err
 	}
 
 	return Provider{
 		jwksHandler:     jwks,
-		authHandler:     newAuthorizeHandler(tokenCache, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
-		tokenHandler:    newTokenHandler(tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
-		userInfoHandler: newUserInfoHandler(userLister, userAttributeLister, jwks),
+		authHandler:     newAuthorizeHandler(extTokenStore, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
+		tokenHandler:    newTokenHandler(extTokenStore, tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
+		userInfoHandler: newUserInfoHandler(userLister, userAttributeLister, jwks, extTokenStore),
 	}, nil
 }
 
-// middleware adds security headers, and returns not found if there aren't any OIDCClients
+func ensureNamespaceWithRetry(ctx context.Context, namespaceClient corecontrollers.NamespaceClient, name string) error {
+	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 3*time.Minute, true, func(context.Context) (bool, error) {
+		_, err := namespaceClient.Create(&v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+		})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			logrus.WithError(err).Warnf("creating namespace %s failed; retrying", name)
+			return false, nil
+		}
+
+		return true, nil
+	})
+}
+
+// middleware adds security and CORS headers.
 func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -94,16 +103,12 @@ func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+
 		oidcClients, err := p.authHandler.oidcClientCache.List(labels.Everything())
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to list OIDCCLients", http.StatusInternalServerError, w)
 			return
 		}
-		if len(oidcClients) == 0 {
-			oidcerror.WriteError(oidcerror.ServerError, "no OIDCClients configured", http.StatusInternalServerError, w)
-			return
-		}
-
 		for _, oidcClient := range oidcClients {
 			for _, redirectURI := range oidcClient.Spec.RedirectURIs {
 				url, err := url.Parse(redirectURI)
@@ -122,7 +127,7 @@ func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // RegisterOIDCProviderHandles register all Handlers for the OIDC provider.
-func (p *Provider) RegisterOIDCProviderHandles(mux *mux.Router) {
+func (p *Provider) RegisterOIDCProviderHandles(mux *http.ServeMux) {
 	mux.HandleFunc("/oidc/.well-known/openid-configuration", p.middleware(openIDConfigurationEndpoint))
 	mux.HandleFunc("/oidc/.well-known/jwks.json", p.middleware(p.jwksHandler.jwksEndpoint))
 	mux.HandleFunc("/oidc/authorize", p.middleware(p.authHandler.authEndpoint))

@@ -11,8 +11,14 @@ import (
 // `pkg/apis/management.cattle.io/v3/authn_types.go`, and imperative in file
 // `pkg/apis/ext.cattle.io/v1/types.go`
 type TokenAccessor interface {
+	// GetLabels returns the resource labels
+	GetLabels() map[string]string
 	// GetName returns the resource name of the token.
 	GetName() string
+	// GetFullName returns the extended resource name of the token, i.e. any applicable prefixes
+	GetFullName() string
+	// GetKind returns the type of the token
+	GetKind() string
 	// GetIsEnabled returns a boolean flag indicating if the token is
 	// enabled or not.
 	GetIsEnabled() bool
@@ -20,9 +26,12 @@ type TokenAccessor interface {
 	// derived (non-session) token, or not (session token).
 	GetIsDerived() bool
 	// GetAuthProvider returns the name of the auth provider controlling the
-	// token. This is separate from `GetUserPrincipal().Provider` (A)
-	// because v3 Tokens have a separate field, which is used everywhere,
-	// and we cannot be sure that it is always in sync with (A).
+	// token. For v3 Tokens this is the deprecated AuthProvider field, which
+	// is still written for compatibility; for ext Tokens it is
+	// `GetUserPrincipal().Provider`.
+	//
+	// Deprecated: GetAuthProvider is deprecated in favour of parsing the
+	// AuthConfig name from the Principal's ID and using that AuthConfig's type.
 	GetAuthProvider() string
 	// GetUserID returns the id of the user owning the token.
 	GetUserID() string

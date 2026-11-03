@@ -567,12 +567,9 @@ func TestAreClusterRolesSame(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, updated := AreClusterRolesSame(tt.args.current, tt.args.modified)
+			got := AreClusterRolesSame(tt.args.current, tt.args.modified)
 			if got != tt.wantSame {
 				t.Errorf("AreClusterRolesSame() got = %v, wantSame %v", got, tt.wantSame)
-			}
-			if !got && !reflect.DeepEqual(updated, tt.wantUpdated) {
-				t.Errorf("AreClusterRolesSame() got = %+v, want = %+v", updated, tt.wantUpdated)
 			}
 		})
 	}

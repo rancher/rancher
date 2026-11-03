@@ -25,6 +25,11 @@ import (
 
 const (
 	userByUsernameIndex = "auth.management.cattle.io/user-by-username"
+
+	// principalIDRetries and defaultPrincipalIDRetryDelay bound the wait for the local principal
+	// ID to be populated on a newly created user. The delay grows with every attempt.
+	principalIDRetries           = 5
+	defaultPrincipalIDRetryDelay = 100 * time.Millisecond
 )
 
 type PasswordCreator interface {
@@ -39,6 +44,9 @@ type userStore struct {
 	secretLister wranglerv1.SecretCache
 	secretClient wranglerv1.SecretClient
 	pwdCreator   PasswordCreator
+	// principalIDRetryDelay is the base delay between attempts to read the principal IDs
+	// of a newly created user. Zero means defaultPrincipalIDRetryDelay.
+	principalIDRetryDelay time.Duration
 }
 
 func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -123,46 +131,6 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, err
 	}
 
-Tries:
-	for x := 0; x < 3; x++ {
-		if id, ok := created[types.ResourceFieldID].(string); ok {
-			time.Sleep(time.Duration((x+1)*100) * time.Millisecond)
-
-			created, err = s.ByID(apiContext, schema, id)
-			if err != nil {
-				logrus.Warnf("error while getting user: %v", err)
-				continue
-			}
-
-			var principalIDs []interface{}
-			if pids, ok := created[client.UserFieldPrincipalIDs].([]interface{}); ok {
-				principalIDs = pids
-			}
-
-			for _, pid := range principalIDs {
-				if pidString, ok := pid.(string); ok {
-					if strings.HasPrefix(pidString, "local://") {
-						break Tries
-					}
-				}
-			}
-
-			created[client.UserFieldPrincipalIDs] = append(principalIDs, "local://"+id)
-			created, err = s.Update(apiContext, schema, created, id)
-			if err != nil {
-				if httperror.IsConflict(err) {
-					continue
-				}
-
-				logrus.Warnf("error while updating user: %v", err)
-				break
-			}
-			break
-		}
-	}
-
-	delete(created, client.UserFieldPassword)
-
 	userId, ok := created[types.ResourceFieldID].(string)
 	if !ok {
 		return nil, errors.New("failed to get userId")
@@ -182,7 +150,36 @@ Tries:
 		return nil, fmt.Errorf("failed to create secret password: %w", err)
 	}
 
-	return created, nil
+	return s.withPrincipalIDs(apiContext, schema, created, userId), nil
+}
+
+// withPrincipalIDs waits for the local principal ID to be populated on the created user and
+// returns the refreshed user. A user is created without principal IDs and they are filled in
+// asynchronously, but callers need them in the response to reference the user in role template
+// bindings. The user as created is returned if the principal IDs don't show up in time.
+func (s *userStore) withPrincipalIDs(apiContext *types.APIContext, schema *types.Schema, created map[string]interface{}, id string) map[string]interface{} {
+	delay := s.principalIDRetryDelay
+	if delay == 0 {
+		delay = defaultPrincipalIDRetryDelay
+	}
+
+	for i := range principalIDRetries {
+		time.Sleep(time.Duration(i+1) * delay)
+
+		refreshed, err := s.ByID(apiContext, schema, id)
+		if err != nil {
+			logrus.Warnf("Failed to get user %s to read its principal IDs: %v", id, err)
+			continue
+		}
+
+		if principalIDs, ok := refreshed[client.UserFieldPrincipalIDs].([]interface{}); ok && len(principalIDs) > 0 {
+			return refreshed
+		}
+	}
+
+	logrus.Warnf("Principal IDs of user %s were not populated in time, returning the user without them", id)
+
+	return created
 }
 
 func (s *userStore) create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -219,6 +216,9 @@ func (s *userStore) Update(apiContext *types.APIContext, schema *types.Schema, d
 	if currentUser == id && willBeInactive {
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot deactivate yourself")
 	}
+
+	delete(data, client.UserFieldPrincipalIDs)
+	delete(data, client.UserFieldUsername)
 
 	return s.Store.Update(apiContext, schema, data, id)
 }

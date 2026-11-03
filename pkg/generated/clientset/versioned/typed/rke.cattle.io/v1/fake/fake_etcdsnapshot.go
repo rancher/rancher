@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
+	typedrkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeETCDSnapshots implements ETCDSnapshotInterface
 type fakeETCDSnapshots struct {
-	*gentype.FakeClientWithList[*v1.ETCDSnapshot, *v1.ETCDSnapshotList]
+	*gentype.FakeClientWithListAndApply[*v1.ETCDSnapshot, *v1.ETCDSnapshotList, *rkecattleiov1.ETCDSnapshotApplyConfiguration]
 	Fake *FakeRkeV1
 }
 
-func newFakeETCDSnapshots(fake *FakeRkeV1, namespace string) rkecattleiov1.ETCDSnapshotInterface {
+func newFakeETCDSnapshots(fake *FakeRkeV1, namespace string) typedrkecattleiov1.ETCDSnapshotInterface {
 	return &fakeETCDSnapshots{
-		gentype.NewFakeClientWithList[*v1.ETCDSnapshot, *v1.ETCDSnapshotList](
+		gentype.NewFakeClientWithListAndApply[*v1.ETCDSnapshot, *v1.ETCDSnapshotList, *rkecattleiov1.ETCDSnapshotApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("etcdsnapshots"),

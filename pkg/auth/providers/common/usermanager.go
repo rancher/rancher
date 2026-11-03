@@ -15,9 +15,12 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
+	"github.com/rancher/rancher/pkg/controllers"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrangrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
@@ -59,10 +62,11 @@ func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, 
 		userAttributeCache: wranglerContext.Mgmt.UserAttribute().Cache(),
 		userIndexer:        userInformer.GetIndexer(),
 		rbacClient:         wranglerContext.RBAC,
+		configMapCache:     wranglerContext.Core.ConfigMap().Cache(),
 	}, nil
 }
 
-// NewUserManagerNoBindings creates an instance of userManager.
+// NewUserManager creates an instance of userManager.
 func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 	userInformer := wranglerContext.Mgmt.User().Informer()
 	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple
@@ -115,6 +119,7 @@ func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 		clusterRoleLister:        wranglerContext.RBAC.ClusterRole().Cache(),
 		clusterRoleBindingLister: wranglerContext.RBAC.ClusterRoleBinding().Cache(),
 		rbacClient:               wranglerContext.RBAC,
+		configMapCache:           wranglerContext.Core.ConfigMap().Cache(),
 	}, nil
 }
 
@@ -134,6 +139,7 @@ type userManager struct {
 	clusterRoleLister        wrangrbacv1.ClusterRoleCache
 	clusterRoleBindingLister wrangrbacv1.ClusterRoleBindingCache
 	rbacClient               wrangrbacv1.Interface
+	configMapCache           wcorev1.ConfigMapCache
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error) {
@@ -145,6 +151,9 @@ func (m *userManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Pr
 	return m.SetPrincipalOnCurrentUserByUserID(userID, principal)
 }
 
+// SetPrincipalOnCurrentUserByUserID sets the specified principal on the user identified by the given userID.
+//
+// It ensures that the principal is unique to this user and updates the user's principal IDs accordingly.
 func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error) {
 	user, err := m.users.Get(userID, metav1.GetOptions{})
 	if err != nil {
@@ -159,10 +168,15 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 		return user, errors.New("refusing to set principal on user that is already bound to another user")
 	}
 
-	if providerExists(user.PrincipalIDs, principal.Provider) {
+	configName, _, _, err := SplitPrincipalID(principal.Name)
+	if err != nil {
+		return nil, fmt.Errorf("parsing principal name: %w", err)
+	}
+
+	if providerExists(user.PrincipalIDs, configName) {
 		var principalIDs []string
 		for _, id := range user.PrincipalIDs {
-			if !strings.Contains(id, principal.Provider) {
+			if idConfigName, _, _, err := SplitPrincipalID(id); err != nil || idConfigName != configName {
 				principalIDs = append(principalIDs, id)
 			}
 		}
@@ -172,7 +186,11 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
 		logrus.Infof("Updating user %v. Adding principal", user.Name)
-		return m.users.Update(user)
+		impClient, err := m.users.WithImpersonation(controllers.WebhookImpersonation())
+		if err != nil {
+			return nil, fmt.Errorf("impersonating webhook to update principal: %w", err)
+		}
+		return impClient.Update(user)
 	}
 	return user, nil
 }
@@ -361,6 +379,16 @@ func (m *userManager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribut
 }
 
 func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, true, userExtraInfo, loginTime...)
+}
+
+// UserAttributeCreateOrUpdateNoGroups creates or updates the user's attributes for a write that carries no group memberships.
+// With SCIM enabled for the provider, the stored groups are kept. Otherwise they are replaced with an empty list.
+func (m *userManager) UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return m.userAttributeCreateOrUpdate(userID, provider, nil, false, userExtraInfo, loginTime...)
+}
+
+func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, withGroups bool, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
@@ -376,8 +404,23 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 	if userExtraInfo == nil {
 		userExtraInfo = make(map[string][]string)
 	}
+	scimEnabled := scimconfig.Enabled(m.configMapCache, provider)
+	if scimEnabled {
+		// Keep the stored keys this write doesn't set, such as SCIM's externalid and email.
+		userExtraInfo = MergeUserExtraAttributes(attribs.ExtraByProvider[provider], userExtraInfo)
+	}
+	replaceGroups := withGroups || !scimEnabled
 
-	shouldUpdate := m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals)
+	var shouldUpdate bool
+
+	if _, ok := attribs.Annotations[ProviderRefreshErrorAnnotation]; ok {
+		delete(attribs.Annotations, ProviderRefreshErrorAnnotation)
+		shouldUpdate = true
+	}
+
+	if m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals, replaceGroups) {
+		shouldUpdate = true
+	}
 	if len(loginTime) > 0 && !loginTime[0].IsZero() {
 		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
 		lastLogin := metav1.NewTime(loginTime[0].Truncate(time.Second))
@@ -385,7 +428,15 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 		shouldUpdate = true
 	}
 
-	attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	_, stored := attribs.GroupPrincipals[provider]
+	switch {
+	case replaceGroups:
+		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	case stored:
+		// Keep the stored groups.
+	default:
+		attribs.GroupPrincipals[provider] = v3.Principals{}
+	}
 	attribs.ExtraByProvider[provider] = userExtraInfo
 
 	if needCreate {
@@ -407,23 +458,17 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 	return nil
 }
 
-func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal) bool {
-	if len(attribs.GroupPrincipals[provider].Items) != len(groupPrincipals) {
-		return true
-	}
-
-	var oldSet, newSet []string
-	for _, principal := range attribs.GroupPrincipals[provider].Items {
-		oldSet = append(oldSet, principal.ObjectMeta.Name)
-	}
-	for _, principal := range groupPrincipals {
-		newSet = append(newSet, principal.ObjectMeta.Name)
-	}
-
-	slices.Sort(oldSet)
-	slices.Sort(newSet)
-
-	if !slices.Equal(oldSet, newSet) {
+func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal, replaceGroups bool) bool {
+	_, stored := attribs.GroupPrincipals[provider]
+	switch {
+	case replaceGroups:
+		if groupPrincipalsChanged(attribs.GroupPrincipals[provider].Items, groupPrincipals) {
+			return true
+		}
+	case stored:
+		// Kept groups don't change.
+	default:
+		// A missing entry is written as an empty one.
 		return true
 	}
 
@@ -434,7 +479,33 @@ func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider s
 	return !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo)
 }
 
+func groupPrincipalsChanged(stored, groupPrincipals []v3.Principal) bool {
+	if len(stored) != len(groupPrincipals) {
+		return true
+	}
+
+	var oldSet, newSet []string
+	for _, principal := range stored {
+		oldSet = append(oldSet, principal.ObjectMeta.Name)
+	}
+	for _, principal := range groupPrincipals {
+		newSet = append(newSet, principal.ObjectMeta.Name)
+	}
+
+	slices.Sort(oldSet)
+	slices.Sort(newSet)
+
+	return !slices.Equal(oldSet, newSet)
+}
+
 func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
+	configName, err := ConfigNameOrLocalFromToken(token)
+	if err != nil {
+		logrus.Warnf("Problem determining group membership for %v in %v (%v): %v",
+			token.GetUserID(), group.Name, group.DisplayName, err)
+		return false
+	}
+
 	attribs, err := m.userAttributeCache.Get(token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v",
@@ -454,7 +525,7 @@ func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principa
 	}
 
 	// fallback to legacy token groupPrincipals
-	if _, ok := hitProviders[token.GetAuthProvider()]; !ok {
+	if _, ok := hitProviders[configName]; !ok {
 		for _, principal := range token.GetGroupPrincipals() {
 			groups[principal.Name] = true
 		}
@@ -466,6 +537,12 @@ func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principa
 func (m *userManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
 	var groups []v3.Principal
 
+	tokenProvider, err := ConfigNameOrLocalFromToken(token)
+	if err != nil {
+		logrus.Warnf("Problem getting groups for %v: %v", token.GetUserID(), err)
+		return nil
+	}
+
 	attribs, err := m.userAttributeCache.Get(token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.GetUserID(), err)
@@ -474,7 +551,6 @@ func (m *userManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor
 
 	hitProvider := false
 	if attribs != nil {
-		tokenProvider := token.GetAuthProvider()
 		for provider, y := range attribs.GroupPrincipals {
 			if provider == tokenProvider {
 				hitProvider = true
@@ -833,8 +909,13 @@ func grbByUser(obj any) ([]string, error) {
 
 func providerExists(principalIDs []string, provider string) bool {
 	for _, id := range principalIDs {
-		splitID := strings.Split(id, ":")[0]
-		if strings.Contains(splitID, provider) {
+		configName, _, _, err := SplitPrincipalID(id)
+		if err != nil {
+			logrus.Debugf("checking for existing provider %s: %s", provider, err)
+			continue
+		}
+
+		if provider == configName {
 			return true
 		}
 	}

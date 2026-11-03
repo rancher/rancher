@@ -19,6 +19,7 @@ const (
 	JobFieldDNSPolicy                     = "dnsPolicy"
 	JobFieldEnableServiceLinks            = "enableServiceLinks"
 	JobFieldEphemeralContainers           = "ephemeralContainers"
+	JobFieldEvictionResponders            = "evictionResponders"
 	JobFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	JobFieldFsgid                         = "fsgid"
 	JobFieldGids                          = "gids"
@@ -57,6 +58,7 @@ const (
 	JobFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	JobFieldScheduling                    = "scheduling"
 	JobFieldSchedulingGates               = "schedulingGates"
+	JobFieldSchedulingGroup               = "schedulingGroup"
 	JobFieldSeccompProfile                = "seccompProfile"
 	JobFieldSelector                      = "selector"
 	JobFieldServiceAccountName            = "serviceAccountName"
@@ -80,7 +82,6 @@ const (
 	JobFieldWorkloadAnnotations           = "workloadAnnotations"
 	JobFieldWorkloadLabels                = "workloadLabels"
 	JobFieldWorkloadMetrics               = "workloadMetrics"
-	JobFieldWorkloadRef                   = "workloadRef"
 )
 
 type Job struct {
@@ -98,6 +99,7 @@ type Job struct {
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -136,6 +138,7 @@ type Job struct {
 	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -159,7 +162,6 @@ type Job struct {
 	WorkloadAnnotations           map[string]string              `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string              `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type JobCollection struct {

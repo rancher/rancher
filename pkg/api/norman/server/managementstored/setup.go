@@ -39,8 +39,9 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/rancher/pkg/encryptedstore"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -67,8 +68,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.GroupType,
 		client.KontainerDriverType,
 		client.NodeDriverType,
-		client.NodePoolType,
 		client.NodeType,
+		client.OIDCClientType,
 		client.PodSecurityAdmissionConfigurationTemplateType,
 		client.PreferenceType,
 		client.ProjectNetworkPolicyType,
@@ -104,11 +105,13 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Project(schemas, apiContext)
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	PodSecurityAdmissionConfigurationTemplate(schemas, apiContext)
+	OIDCClients(schemas, apiContext)
 	GlobalRole(schemas, apiContext)
 	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
 	KontainerDriver(schemas, apiContext)
 	RancherUserNotifications(schemas, apiContext)
+	AuthConfigs(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -164,6 +167,7 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 		TokenMgr:       tokens.NewManager(managementContext.Wrangler),
 		ClusterManager: clusterManager,
 		AuthToken:      authToken,
+		ExtTokenStore:  exttokenstore.NewSystemFromWrangler(managementContext.Wrangler),
 	}
 
 	clusterValidator := ccluster.Validator{
@@ -172,6 +176,7 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 		Users:         managementContext.Management.Users(""),
 		GrbLister:     managementContext.Management.GlobalRoleBindings("").Controller().Lister(),
 		GrLister:      managementContext.Management.GlobalRoles("").Controller().Lister(),
+		SecretLister:  managementContext.Core.Secrets("").Controller().Lister(),
 	}
 
 	schema.ActionHandler = handler.ClusterActionHandler
@@ -181,7 +186,8 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterRegistrationTokenType)
 	schema.Store = &cluster.RegistrationTokenStore{
-		Store: schema.Store,
+		Store:       schema.Store,
+		SecretCache: management.Wrangler.Core.Secret().Cache(),
 	}
 }
 
@@ -244,7 +250,7 @@ func Preference(schemas *types.Schemas, management *config.ScaledContext) {
 }
 
 func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
-	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
+	secretStore, err := encryptedstore.NewGenericEncryptedStore("mc-", "", management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		return err
 	}
@@ -267,7 +273,6 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	actionWrapper := node.ActionWrapper{}
 	schema.ActionHandler = actionWrapper.ActionHandler
 
-	_ = schemas.Schema(&managementschema.Version, client.NodePoolType)
 	return nil
 }
 
@@ -366,4 +371,12 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 
 func RancherUserNotifications(schemas *types.Schemas, management *config.ScaledContext) {
 	schemas.Schema(&managementschema.Version, client.RancherUserNotificationType)
+}
+
+func OIDCClients(schemas *types.Schemas, management *config.ScaledContext) {
+	schemas.Schema(&managementschema.Version, client.OIDCClientType)
+}
+
+func AuthConfigs(schemas *types.Schemas, management *config.ScaledContext) {
+	schemas.Schema(&managementschema.Version, client.AuthConfigType)
 }

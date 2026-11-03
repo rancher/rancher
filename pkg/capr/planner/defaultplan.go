@@ -5,12 +5,14 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/cluster"
 )
 
 // commonNodePlan returns a "default" node plan with the corresponding registry configuration.
 // It will append to the node plan passed in through options.
 func (p *Planner) commonNodePlan(controlPlane *rkev1.RKEControlPlane, np plan.NodePlan) (plan.NodePlan, registries, error) {
-	if controlPlane.Spec.Registries == nil {
+	globalRegistry, _ := cluster.GetPrivateRegistry(nil)
+	if controlPlane.Spec.Registries == nil && globalRegistry == nil {
 		return np, registries{}, nil
 	}
 

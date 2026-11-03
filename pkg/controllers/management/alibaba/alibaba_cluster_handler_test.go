@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	test "github.com/rancher/rancher/pkg/controllers/management/alibaba/mocks"
@@ -23,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed test/*
@@ -335,6 +335,11 @@ func getMockAliOperatorController(t *testing.T, dynamicClient dynamic.Namespacea
 	ctrl := gomock.NewController(t)
 	clusterMock := wranglerfake.NewMockNonNamespacedClientInterface[*apimgmtv3.Cluster, *apimgmtv3.ClusterList](ctrl)
 	clusterMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(c *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
 		func(c *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 			return c, nil
 		},

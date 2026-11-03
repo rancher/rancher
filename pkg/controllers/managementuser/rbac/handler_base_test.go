@@ -2,10 +2,12 @@ package rbac
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -313,6 +315,180 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 			}
 			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestCreateClusterRole(t *testing.T) {
+	assert.NoError(t, settings.InstallUUID.Set("test-install-uuid"))
+
+	rules := []v1.PolicyRule{
+		{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+	}
+	rt := &v3.RoleTemplate{ObjectMeta: metav1.ObjectMeta{Name: "rt-test"}, Rules: rules}
+	alreadyExists := errors.NewAlreadyExists(v1.Resource("clusterroles"), "rt-test")
+	clusterRoleWith := func(labels map[string]string) *v1.ClusterRole {
+		return &v1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "rt-test",
+				Annotations: map[string]string{clusterRoleOwner: "rt-test"},
+				Labels:      labels,
+			},
+			Rules: rules,
+		}
+	}
+	ownLabels := map[string]string{clusterRoleOwnerInstallUUIDLabel: "test-install-uuid"}
+	foreignLabels := map[string]string{clusterRoleOwnerInstallUUIDLabel: "foreign-install-uuid"}
+
+	tests := map[string]struct {
+		setup   func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList])
+		wantErr bool
+	}{
+		"created": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(clusterRoleWith(ownLabels))
+			},
+		},
+		"already exists, owned without install-uuid: backfilled": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(clusterRoleWith(nil), nil)
+				mock.EXPECT().Update(clusterRoleWith(ownLabels))
+			},
+		},
+		"already exists, foreign install-uuid: not updated": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(clusterRoleWith(foreignLabels), nil)
+			},
+		},
+		"already exists, foreign install-uuid, different rules: not updated": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				foreign := clusterRoleWith(foreignLabels)
+				foreign.Rules = []v1.PolicyRule{{Verbs: []string{"*"}, APIGroups: []string{"*"}, Resources: []string{"*"}}}
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(foreign, nil)
+			},
+		},
+		"already exists, get fails: error": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(nil, fmt.Errorf("boom"))
+			},
+			wantErr: true,
+		},
+		"create fails: error": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("boom"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			test.setup(mock)
+
+			m := manager{clusterRoles: mock}
+			err := m.createClusterRole(rt)
+			if test.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCompareAndUpdateClusterRoleInstallUUIDBackfill(t *testing.T) {
+	assert.NoError(t, settings.InstallUUID.Set("own-install-uuid"))
+
+	rules := []v1.PolicyRule{
+		{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+	}
+	otherRules := []v1.PolicyRule{
+		{Verbs: []string{"*"}, APIGroups: []string{"*"}, Resources: []string{"*"}},
+	}
+	rt := &v3.RoleTemplate{ObjectMeta: metav1.ObjectMeta{Name: "rt-test"}, Rules: rules}
+	owned := map[string]string{clusterRoleOwner: "rt-test"}
+	ownLabels := map[string]string{clusterRoleOwnerInstallUUIDLabel: "own-install-uuid"}
+	foreignLabels := map[string]string{clusterRoleOwnerInstallUUIDLabel: "foreign-install-uuid"}
+
+	tests := map[string]struct {
+		annotations    map[string]string
+		labels         map[string]string
+		crRules        []v1.PolicyRule
+		expectUpdate   bool
+		expectedLabels map[string]string
+	}{
+		"owned, no install-uuid: backfilled": {
+			annotations:    owned,
+			expectUpdate:   true,
+			expectedLabels: ownLabels,
+		},
+		"owned, no install-uuid, other labels kept: backfilled": {
+			annotations:  owned,
+			labels:       map[string]string{"foo": "bar"},
+			expectUpdate: true,
+			expectedLabels: map[string]string{
+				"foo":                            "bar",
+				clusterRoleOwnerInstallUUIDLabel: "own-install-uuid",
+			},
+		},
+		"owned, own install-uuid: no update": {
+			annotations: owned,
+			labels:      ownLabels,
+		},
+		"owned, foreign install-uuid: not overwritten": {
+			annotations: owned,
+			labels:      foreignLabels,
+		},
+		"owned, foreign install-uuid, different rules: not updated": {
+			annotations: owned,
+			labels:      foreignLabels,
+			crRules:     otherRules,
+		},
+		"owned, own install-uuid, different rules: rules updated": {
+			annotations:    owned,
+			labels:         ownLabels,
+			crRules:        otherRules,
+			expectUpdate:   true,
+			expectedLabels: ownLabels,
+		},
+		"not owned: not stamped": {
+			annotations: map[string]string{},
+		},
+		"not owned: not stamped, nil map": {
+			annotations: nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			if test.expectUpdate {
+				mock.EXPECT().Update(&v1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: "rt-test", Annotations: test.annotations, Labels: test.expectedLabels},
+					Rules:      rules,
+				})
+			}
+
+			crRules := rules
+			if test.crRules != nil {
+				crRules = test.crRules
+			}
+			cr := &v1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: "rt-test", Annotations: test.annotations, Labels: test.labels},
+				Rules:      crRules,
+			}
+			labelsBefore := maps.Clone(test.labels)
+			m := manager{clusterRoles: mock}
+			assert.NoError(t, m.compareAndUpdateClusterRole(cr, rt))
+			assert.Equal(t, labelsBefore, cr.Labels, "input must not be mutated")
+			assert.Equal(t, crRules, cr.Rules, "input must not be mutated")
 		})
 	}
 }

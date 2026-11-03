@@ -22,3 +22,15 @@
 {{ printf "[WARNING] Deprecated: %s is deprecated. Please use %s instead.\n" $old $new | indent 0 }}
 {{ end -}}
 {{ end -}}
+
+{{ define "tpl.chart.ignored" -}}
+{{ $val := index . 0 -}}
+{{ $name := index . 1 -}}
+{{ $msg := "" -}}
+{{ if ge (len .) 3 -}}
+  {{ $msg = index . 2 -}}
+{{ end -}}
+{{ if $val -}}
+{{ printf "[WARNING] %s is set but no longer has any effect. %s\n" $name $msg | indent 0 }}
+{{ end -}}
+{{ end -}}

@@ -107,6 +107,61 @@ func TestCopy(t *testing.T) {
 	}
 }
 
+func TestSetMutator(t *testing.T) {
+	tests := []struct {
+		name      string
+		mutator   Mutator
+		wantError bool
+	}{
+		{
+			name: "accepts non Rancher metadata",
+			mutator: Mutator{
+				Labels:      map[string]string{"example.com/team": "platform"},
+				Annotations: map[string]string{"example.com/owner": "platform"},
+			},
+		},
+		{
+			name: "accepts managed namespace annotation",
+			mutator: Mutator{
+				Annotations: map[string]string{AnnotationManagedNamespace: AnnotationManagedNamespaceTrue},
+			},
+		},
+		{
+			name: "rejects Rancher label",
+			mutator: Mutator{
+				Labels: map[string]string{"management.cattle.io/system-namespace": "true"},
+			},
+			wantError: true,
+		},
+		{
+			name: "rejects Rancher annotation",
+			mutator: Mutator{
+				Annotations: map[string]string{"field.cattle.io/projectId": "p-local"},
+			},
+			wantError: true,
+		},
+		{
+			name: "rejects Fleet metadata",
+			mutator: Mutator{
+				Labels: map[string]string{"fleet.cattle.io/managed": "true"},
+			},
+			wantError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := SetMutator(test.mutator)
+			if test.wantError {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.mutator, GetMutator())
+		})
+	}
+}
+
 func TestMutator(t *testing.T) {
 	cases := []struct {
 		name string

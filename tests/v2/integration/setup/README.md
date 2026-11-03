@@ -24,10 +24,9 @@ curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.8.
 
 If you are developing Rancher, you should build your own `rancher/rancher` and `rancher/rancher-agent` images.
 
-To get the correct versions for dependencies, you can source the `export-config` script. You will also need the git commit hash.
+You will need the git commit hash.
 ```bash
 # From the root of the rancher/rancher repository
-source ./scripts/export-config
 export COMMIT=$(git rev-parse --short HEAD)
 export DEV_TAG=dev # or any other tag for your development images
 export ARCH=amd64 # or arm64
@@ -76,12 +75,14 @@ Wait a few minutes for Rancher to start up. You can check the logs with `docker 
 
 ### 3. Build the Setup Binary
 
-Navigate to this directory and build the program.
+Use the provided build script from the repo root. The script sets the required build tags (the bare `go build` command
+will fail without them due to C library dependencies in `github.com/containers/image`).
 
 ```bash
 # From the root of the rancher/rancher repository
-cd tests/v2/integration/setup
-go build -o setup .
+cd tests/v2/integration
+./scripts/build-integration-setup
+# Produces: tests/v2/integration/bin/integrationsetup
 ```
 
 ### 4. Run the Setup Program
@@ -89,11 +90,25 @@ go build -o setup .
 With the Rancher server running, execute the setup binary. Make sure to set the required environment variables.
 
 ```bash
-# From the tests/v2/integration/setup directory
+# From the root of the rancher/rancher repository
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_AGENT_IMAGE="rancher/rancher-agent:stable" # or your custom tag
+export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
 
-./setup
+# Optional: override the auto-detected host (useful when Rancher is not on the local machine,
+# or when the outbound IP detection returns the wrong interface)
+# export CATTLE_RANCHER_HOST="192.168.1.100:443"
+
+./tests/v2/integration/bin/integrationsetup
 ```
 
-The program will output the progress of creating and importing the k3d cluster, and finally list the deployments found in the new cluster.
+By default the binary auto-detects the host by opening a UDP socket to 8.8.8.8 and reading the local address. Set
+`CATTLE_RANCHER_HOST` to override this (e.g. `localhost:8443` or a remote IP). The value is written directly into
+`config.yaml`, so it is the address the tests will use to reach Rancher.
+
+The generated `config.yaml` is gitignored and written to `tests/v2/integration/config.yaml`. You can then run the
+integration tests with:
+
+```bash
+go test -v -timeout 30m -failfast -p 1 ./tests/v2/integration/...
+```

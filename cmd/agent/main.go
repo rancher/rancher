@@ -19,10 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
+	"github.com/moby/moby/client"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -41,10 +39,25 @@ var (
 )
 
 const (
-	Token          = "X-API-Tunnel-Token"
-	Params         = "X-API-Tunnel-Params"
-	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
+	Token  = "X-API-Tunnel-Token"
+	Params = "X-API-Tunnel-Params"
 )
+
+func shouldRunPrestart() bool {
+	for _, arg := range []string{
+		// Explicit entrypoint logic bypass
+		"CATTLE_ENTRYPOINT_BYPASS",
+		// Special modes used in main():
+		"CLUSTER_CLEANUP",
+		"BINDING_CLEANUP",
+		"AD_GUID_CLEANUP",
+	} {
+		if os.Getenv(arg) == "true" {
+			return false
+		}
+	}
+	return true
+}
 
 func main() {
 	var err error
@@ -52,16 +65,17 @@ func main() {
 
 	configureLogrus()
 
+	if shouldRunPrestart() {
+		if err := preStart(ctx); err != nil {
+			logrus.Fatal(err)
+		}
+	}
+
 	logserver.StartServerWithDefaults()
 
 	initFeatures()
 
-	// The cleanup is only performed by the cattle-cluster-agent,
-	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
-	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
-		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
-		go clean.UnusedCattleCredentials()
-	}
+	runCleanup(ctx)
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {
 		err = clean.Cluster()
@@ -93,6 +107,17 @@ func getParams() (map[string]interface{}, error) {
 
 func getTokenAndURL() (string, string, error) {
 	return cluster.TokenAndURL()
+}
+
+func runCleanup(ctx context.Context) {
+	// The cleanup is only performed by the cattle-cluster-agent,
+	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
+	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
+		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
+		go clean.UnusedCattleCredentials()
+		// Run once on startup to make sure that there are no lingering pull secrets in the cattle-system namespace
+		go clean.UnusedPullSecrets(ctx)
+	}
 }
 
 func isConnect() bool {
@@ -142,10 +167,8 @@ func run(ctx context.Context) error {
 	topContext = context.WithValue(topContext, cavalidator.CACertsValidKey, false)
 
 	// Perform root CA verification
-	var transport *http.Transport
 	systemStoreConnectionCheckRequired := true
-	transport = rootCATransport()
-	if transport != nil {
+	if transport := rootCATransport(caFileLocation); transport != nil {
 		logrus.Infof("Testing connection to %s using trusted certificate authorities within: %s", server, caFileLocation)
 		var httpClient = &http.Client{
 			Timeout:   time.Second * 5,
@@ -160,6 +183,7 @@ func run(ctx context.Context) error {
 			topContext = context.WithValue(topContext, cavalidator.CACertsValidKey, true)
 			systemStoreConnectionCheckRequired = false
 		}
+		transport.CloseIdleConnections()
 	} else if cluster.CAStrictVerify() {
 		logrus.Errorf("Strict CA verification is enabled but encountered error finding root CA")
 		os.Exit(1)
@@ -277,7 +301,9 @@ func run(ctx context.Context) error {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	for {
+	// Resolved before every attempt: the agent registers on its first
+	// connection and uses the plain path for each reconnect after that.
+	wsURLFor := func() string {
 		safeHost := serverURL.Host
 		if utils.IsPlainIPV6(safeHost) {
 			safeHost = fmt.Sprintf("[%s]", safeHost)
@@ -286,21 +312,54 @@ func run(ctx context.Context) error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
-
-		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
-		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
-			switch proto {
-			case "tcp":
-				return true
-			case "unix":
-				return address == "/var/run/docker.sock"
-			case "npipe":
-				return address == "//./pipe/docker_engine"
-			}
-			return false
-		}, onConnect)
-		time.Sleep(5 * time.Second)
+		return wsURL
 	}
+
+	logrus.Infof("Connecting to %s with token starting with %s", wsURLFor(), token[:len(token)/2])
+	// Reconnects internally, so it only returns once the context is cancelled.
+	return remotedialer.ClientConnectWithOpts(ctx, "", headers, nil, func(proto, address string) bool {
+		switch proto {
+		case "tcp":
+			return true
+		case "unix":
+			return address == "/var/run/docker.sock"
+		case "npipe":
+			return address == "//./pipe/docker_engine"
+		}
+		return false
+	}, onConnect, &remotedialer.ConnectOpts{
+		URL:     wsURLFor,
+		Backoff: connectBackoff(),
+	})
+}
+
+// connectBackoff reads the reconnect backoff from the environment. A maximum
+// below the minimum would otherwise be ignored, holding every delay at the
+// larger minimum, so it is clamped to keep the configured ceiling.
+func connectBackoff() remotedialer.Backoff {
+	retryMin := retryDurationFromEnv("CATTLE_CONNECT_RETRY_MIN", 10*time.Second)
+	retryMax := retryDurationFromEnv("CATTLE_CONNECT_RETRY_MAX", 0)
+
+	if retryMax > 0 && retryMax < retryMin {
+		logrus.Warnf("CATTLE_CONNECT_RETRY_MAX (%s) is below CATTLE_CONNECT_RETRY_MIN (%s), using %s for both",
+			retryMax, retryMin, retryMax)
+		retryMin = retryMax
+	}
+
+	return remotedialer.Backoff{Min: retryMin, Max: retryMax}
+}
+
+// retryDurationFromEnv parses a duration; unset or invalid values yield def.
+func retryDurationFromEnv(key string, def time.Duration) time.Duration {
+	v := os.Getenv(key)
+	d, err := time.ParseDuration(v)
+	if v != "" && err != nil {
+		logrus.Warnf("Ignoring %s=%q, want a duration like 30s or 5m", key, v)
+	}
+	if d <= 0 {
+		return def
+	}
+	return d
 }
 
 func exitCertWriter(ctx context.Context) {
@@ -321,10 +380,8 @@ func exitCertWriter(ctx context.Context) {
 		logrus.Error(err)
 		os.Exit(0)
 	}
-
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=share-mnt")
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+	args := client.Filters{}.Add("label", "io.rancher.rke.container.name=share-mnt")
+	containers, err := c.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: args,
 	})
@@ -333,9 +390,9 @@ func exitCertWriter(ctx context.Context) {
 		os.Exit(0)
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		if len(container.Names) > 0 && strings.Contains(container.Names[0], "share-mnt") {
-			err := c.ContainerKill(ctx, container.ID, "SIGTERM")
+			_, err := c.ContainerKill(ctx, container.ID, client.ContainerKillOptions{Signal: "SIGTERM"})
 			if err != nil {
 				logrus.Error(err)
 				os.Exit(0) // only need to write certs so exit cleanly
@@ -376,21 +433,21 @@ func configureLogrus() {
 	}
 }
 
-// rootCATransport generates a http.Transport that contains the contents of the CA file as the Root CA for strict validation.
-func rootCATransport() *http.Transport {
-	caFile, err := os.ReadFile(caFileLocation)
+// rootCATransport returns a clone of http.DefaultTransport with a custom root CA for strict TLS validation.
+func rootCATransport(caFilePath string) *http.Transport {
+	caFile, err := os.ReadFile(caFilePath)
 	if err != nil {
-		logrus.Errorf("unable to read CA file from %s: %v", caFileLocation, err)
+		logrus.Errorf("unable to read CA file from %s: %v", caFilePath, err)
 		return nil
 	}
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(caFile); !ok {
-		logrus.Errorf("unable to parse CA file %s", caFileLocation)
+		logrus.Errorf("unable to parse CA file %s", caFilePath)
 		return nil
 	}
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
-		},
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: certPool,
 	}
+	return transport
 }

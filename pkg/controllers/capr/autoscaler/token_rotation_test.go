@@ -6,11 +6,14 @@ import (
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -143,6 +146,10 @@ func (s *autoscalerSuite) TestRenewToken_HappyPath_SuccessfulTokenRenewal() {
 		s.Equal("user-123", token.UserID)
 		s.Equal("test-cluster", token.Labels[capi.ClusterNameLabel])
 		s.Equal("autoscaler", token.Labels[tokens.TokenKindLabel])
+		s.Equal(autoscalerUserPrincipal("user-123"), token.UserPrincipal)
+		configName, err := common.ConfigNameFromToken(token)
+		s.Require().NoError(err)
+		s.Equal("local", configName)
 		return token, nil
 	})
 
@@ -161,6 +168,7 @@ func (s *autoscalerSuite) TestRenewToken_HappyPath_SuccessfulTokenRenewal() {
 		secret.Data["token"] = []byte("new-token-value")
 		return secret, nil
 	})
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.helmOpCache.EXPECT().Get("default", gomock.Any()).Return(nil, errors.NewNotFound(corev1.Resource("helmops"), ""))
 	s.helmOp.EXPECT().Create(gomock.Any()).Return(&fleet.HelmOp{}, nil)
 
@@ -397,6 +405,7 @@ func (s *autoscalerSuite) TestRenewToken_Error_FailedToCreateHelmOp() {
 		},
 	}, nil)
 	s.secretClient.EXPECT().Update(gomock.Any()).Return(&corev1.Secret{}, nil)
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.helmOpCache.EXPECT().Get("default", gomock.Any()).Return(nil, errors.NewNotFound(corev1.Resource("helmops"), ""))
 	s.helmOp.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("failed to create helm op"))
 
@@ -733,6 +742,7 @@ func (s *autoscalerSuite) TestCheckAndRenewTokens_SingleTokenExpiringSuccessfull
 		secret.Data["token"] = []byte("new-token-value")
 		return secret, nil
 	})
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.helmOpCache.EXPECT().Get("default", gomock.Any()).Return(nil, errors.NewNotFound(corev1.Resource("helmops"), ""))
 	s.helmOp.EXPECT().Create(gomock.Any()).Return(&fleet.HelmOp{}, nil)
 
@@ -813,6 +823,7 @@ func (s *autoscalerSuite) TestCheckAndRenewTokens_MultipleTokensOnlyOneExpiring(
 		secret.Data["token"] = []byte("new-token-value")
 		return secret, nil
 	})
+	s.expectManageHelmOpSecrets("cluster-2", "default")
 	s.helmOpCache.EXPECT().Get("default", gomock.Any()).Return(nil, errors.NewNotFound(corev1.Resource("helmops"), ""))
 	s.helmOp.EXPECT().Create(gomock.Any()).Return(&fleet.HelmOp{}, nil)
 
@@ -898,6 +909,14 @@ func (s *autoscalerSuite) TestCheckAndRenewTokens_MultipleTokensOnlyOneNotExpiri
 		secret.Data["token"] = []byte("new-token-value")
 		return secret, nil
 	}).Times(2)
+	s.clusterCache.EXPECT().Get("default", "cluster-1").Return(
+		&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster-1", Namespace: "default"}}, nil,
+	).Times(2)
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	s.secretClient.EXPECT().Delete("default", helmOpSecretName("cluster-1"), gomock.Any()).Return(notFound).Times(2)
+	s.secretClient.EXPECT().Delete("default", autoscalerClusterScopedImagePullSecretName("cluster-1"), gomock.Any()).Return(notFound).Times(2)
+	s.secretClient.EXPECT().Delete("fleet-default", autoscalerHelmSecretResourceName, gomock.Any()).Return(notFound).Times(2)
+	s.secretClient.EXPECT().Delete("fleet-default", autoscalerChartImagePullSecretName, gomock.Any()).Return(notFound).Times(2)
 	s.helmOpCache.EXPECT().Get("default", gomock.Any()).Return(nil, errors.NewNotFound(corev1.Resource("helmops"), "")).Times(2)
 	s.helmOp.EXPECT().Create(gomock.Any()).Return(&fleet.HelmOp{}, nil).Times(2)
 

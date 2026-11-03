@@ -12,14 +12,15 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
-	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -27,7 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/apply"
-	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -60,16 +61,18 @@ var (
 )
 
 type handler struct {
-	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
+	mgmtClusterCache          managementcontrollers.ClusterCache
+	clusterRegistrationTokens managementcontrollers.ClusterRegistrationTokenCache
 	bundles                   fleetcontrollers.BundleController
 	cluster                   provisioningcontrollers.ClusterController
-	rkeControlPlanes          v1.RKEControlPlaneController
-	managedCharts             v3.ManagedChartController
-	secrets                   corev1controllers.SecretController
+	rkeControlPlanes          rkecontrollers.RKEControlPlaneController
+	managedCharts             managementcontrollers.ManagedChartController
+	secrets                   corecontrollers.SecretController
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
+		mgmtClusterCache:          clients.Mgmt.Cluster().Cache(),
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
 		cluster:                   clients.Provisioning.Cluster(),
@@ -80,13 +83,12 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.Provisioning.Cluster().OnChange(ctx, "uninstall-fleet-managed-suc-and-system-agent", h.UninstallFleetBasedApps)
 	clients.Provisioning.Cluster().OnChange(ctx, "install-system-agent-upgrader", h.InstallSystemAgentUpgrader)
-
 }
 
 // InstallSystemAgentUpgrader ensures that the resources required to upgrade the system-agent in the target cluster
 // are deployed and kept up to date. It uses Wrangler's Apply mechanism to manage the resources and leverages
 // the hash of the rendered templates to avoid redundant calls to the downstream cluster's API server.
-func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluster) (*rancherv1.Cluster, error) {
+func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *provv1.Cluster) (*provv1.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
@@ -96,16 +98,30 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	}
 	if settings.SystemAgentUpgradeImage.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set", cluster.Namespace, cluster.Name)
+		return cluster, nil
 	}
 	if settings.SystemUpgradeControllerChartVersion.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
-	}
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
 		return cluster, nil
 	}
+
+	// Skip if Rancher does not have a connection to the cluster.
+	// The Connected condition lives on the management cluster object, not the provisioning cluster.
+	if cluster.Status.ClusterName == "" {
+		return cluster, nil
+	}
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return cluster, nil
+		}
+		return cluster, err
+	}
+
+	if !apimgmtv3.ClusterConditionConnected.IsTrue(mgmtCluster) {
+		return cluster, nil
+	}
+
 	// Skip if the cluster's kubeconfig is not populated
 	if cluster.Status.ClientSecretName == "" {
 		return cluster, nil
@@ -146,25 +162,27 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 		if err != nil {
 			return cluster, err
 		}
-		if token.Status.Token == "" {
+		tokenValue, err := clusterregistrationtoken.GetTokenFromSecret(h.secrets.Cache(), token)
+		if err != nil {
+			return cluster, err
+		}
+		if tokenValue == "" {
 			return cluster, fmt.Errorf("token not yet generated for %s/%s", token.Namespace, token.Name)
 		}
 
 		digest := sha256.New()
 		digest.Write([]byte(settings.InternalServerURL.Get()))
-		digest.Write([]byte(token.Status.Token))
+		digest.Write([]byte(tokenValue))
 		digest.Write([]byte(systemtemplate.InternalCAChecksum()))
 		d := digest.Sum(nil)
 		secretName += hex.EncodeToString(d[:])[:12]
 
 		result = append(result, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: namespaces.System,
-			},
+			Name:      secretName,
+			Namespace: namespaces.System,
 			Data: map[string][]byte{
 				"CATTLE_SERVER":      []byte(settings.InternalServerURL.Get()),
-				"CATTLE_TOKEN":       []byte(token.Status.Token),
+				"CATTLE_TOKEN":       []byte(tokenValue),
 				"CATTLE_CA_CHECKSUM": []byte(systemtemplate.InternalCAChecksum()),
 			},
 		})
@@ -183,7 +201,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	val, ok := cp.Annotations[AppliedSystemAgentUpgraderHashAnnotation]
 	if ok && hash == val {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: applied templates for system-agent-upgrader is up to date. "+
-			"To trigger a force redeployment, remove the %s annotation from the conresponding rkeControlPlane object",
+			"To trigger a force redeployment, remove the %s annotation from the corresponding rkeControlPlane object",
 			cluster.Namespace, cluster.Name, AppliedSystemAgentUpgraderHashAnnotation)
 		return cluster, nil
 	}
@@ -234,7 +252,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 
 // installer generates the Plans and corresponding Kubernetes resources required for
 // deploying and running the system-agent-upgrader
-func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
+func installer(cluster *provv1.Cluster, secretName string) []runtime.Object {
 	upgradeImage := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := SystemAgentUpgraderVersion()
 
@@ -283,16 +301,12 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 	var plans []runtime.Object
 
 	plan := &upgradev1.Plan{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Plan",
-			APIVersion: upgradeAPIVersion,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      SystemAgentUpgrader,
-			Namespace: namespaces.System,
-			Annotations: map[string]string{
-				upgradeDigestAnnotation: "spec.upgrade.envs,spec.upgrade.envFrom",
-			},
+		Kind:       "Plan",
+		APIVersion: upgradeAPIVersion,
+		Name:       SystemAgentUpgrader,
+		Namespace:  namespaces.System,
+		Annotations: map[string]string{
+			upgradeDigestAnnotation: "spec.upgrade.envs,spec.upgrade.envFrom",
 		},
 		Spec: upgradev1.PlanSpec{
 			Concurrency: 10,
@@ -324,9 +338,7 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 				Env:   env,
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
+						Name: secretName,
 					},
 				}},
 			},
@@ -344,15 +356,11 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 
 	objs := []runtime.Object{
 		&corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      SystemAgentUpgrader,
-				Namespace: namespaces.System,
-			},
+			Name:      SystemAgentUpgrader,
+			Namespace: namespaces.System,
 		},
 		&rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: SystemAgentUpgrader,
-			},
+			Name: SystemAgentUpgrader,
 			Rules: []rbacv1.PolicyRule{{
 				Verbs:     []string{"get"},
 				APIGroups: []string{""},
@@ -360,9 +368,7 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 			}},
 		},
 		&rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: SystemAgentUpgrader,
-			},
+			Name: SystemAgentUpgrader,
 			Subjects: []rbacv1.Subject{{
 				Kind:      "ServiceAccount",
 				Name:      SystemAgentUpgrader,
@@ -385,10 +391,8 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 		})
 
 		objs = append(objs, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      generationSecretName,
-				Namespace: namespaces.System,
-			},
+			Name:      generationSecretName,
+			Namespace: namespaces.System,
 			StringData: map[string]string{
 				"cluster-uid": string(cluster.UID),
 				"generation":  strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration)),
@@ -399,7 +403,7 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 	return append(plans, objs...)
 }
 
-func winsUpgradePlan(cluster *rancherv1.Cluster, env []corev1.EnvVar, secretName string) *upgradev1.Plan {
+func winsUpgradePlan(cluster *provv1.Cluster, env []corev1.EnvVar, secretName string) *upgradev1.Plan {
 	winsUpgradeImage := strings.SplitN(settings.WinsAgentUpgradeImage.Get(), ":", 2)
 	winsVersion := "latest"
 	if len(winsUpgradeImage) == 2 {
@@ -407,16 +411,12 @@ func winsUpgradePlan(cluster *rancherv1.Cluster, env []corev1.EnvVar, secretName
 	}
 
 	return &upgradev1.Plan{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Plan",
-			APIVersion: upgradeAPIVersion,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "system-agent-upgrader-windows",
-			Namespace: namespaces.System,
-			Annotations: map[string]string{
-				upgradeDigestAnnotation: "spec.upgrade.envs,spec.upgrade.envFrom",
-			},
+		Kind:       "Plan",
+		APIVersion: upgradeAPIVersion,
+		Name:       "system-agent-upgrader-windows",
+		Namespace:  namespaces.System,
+		Annotations: map[string]string{
+			upgradeDigestAnnotation: "spec.upgrade.envs,spec.upgrade.envFrom",
 		},
 		Spec: upgradev1.PlanSpec{
 			Concurrency: 10,
@@ -443,15 +443,13 @@ func winsUpgradePlan(cluster *rancherv1.Cluster, env []corev1.EnvVar, secretName
 				Env:   env,
 				SecurityContext: &corev1.SecurityContext{
 					WindowsOptions: &corev1.WindowsSecurityContextOptions{
-						HostProcess:   toBoolPointer(true),
-						RunAsUserName: toStringPointer("NT AUTHORITY\\SYSTEM"),
+						HostProcess:   new(true),
+						RunAsUserName: new("NT AUTHORITY\\SYSTEM"),
 					},
 				},
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
+						Name: secretName,
 					},
 				}},
 			},
@@ -459,18 +457,10 @@ func winsUpgradePlan(cluster *rancherv1.Cluster, env []corev1.EnvVar, secretName
 	}
 }
 
-func toBoolPointer(x bool) *bool {
-	return &x
-}
-
-func toStringPointer(x string) *string {
-	return &x
-}
-
 // UninstallFleetBasedApps handles the removal of Fleet Bundles for both the managed-system-agent and
 // managed-system-upgrade-controller, and also takes care of removing the AppliedSystemAgentUpgraderHashAnnotation
 // annotation in a specific scenario.
-func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) (*rancherv1.Cluster, error) {
+func (h *handler) UninstallFleetBasedApps(_ string, cluster *provv1.Cluster) (*provv1.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
@@ -482,8 +472,19 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		return cluster, nil
 	}
 
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
+	// Skip if Rancher does not have a connection to the cluster.
+	// The Connected condition lives on the management cluster object, not the provisioning cluster.
+	if cluster.Status.ClusterName == "" {
+		return cluster, nil
+	}
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return cluster, nil
+		}
+		return cluster, err
+	}
+	if !apimgmtv3.ClusterConditionConnected.IsTrue(mgmtCluster) {
 		return cluster, nil
 	}
 
@@ -494,11 +495,11 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 
 	if settings.SystemAgentUpgradeImage.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set, skip uninstalling Fleet-based apps", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set", cluster.Namespace, cluster.Name)
+		return cluster, nil
 	}
 	if settings.SystemUpgradeControllerChartVersion.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set, skip uninstalling Fleet-based apps", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
+		return cluster, nil
 	}
 
 	dropAnnotation := false

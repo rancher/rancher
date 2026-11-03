@@ -560,6 +560,8 @@ func Test_OnRancherClusterChange(t *testing.T) {
 					Return(buildMgmtCluster("cluster-none"), nil).AnyTimes()
 				mgmtClient.EXPECT().Update(gomock.Any()).
 					Return(&v3.Cluster{}, nil).AnyTimes()
+				mgmtClient.EXPECT().UpdateStatus(gomock.Any()).
+					Return(&v3.Cluster{}, nil).AnyTimes()
 
 				// No provisioning update expected for restore mode "none"
 				provController.EXPECT().Update(gomock.Any()).Times(0)
@@ -601,6 +603,8 @@ func Test_OnRancherClusterChange(t *testing.T) {
 				mgmtCache.EXPECT().Get("cluster-kversion").
 					Return(buildMgmtCluster("cluster-kversion"), nil).AnyTimes()
 				mgmtClient.EXPECT().Update(gomock.Any()).
+					Return(&v3.Cluster{}, nil).AnyTimes()
+				mgmtClient.EXPECT().UpdateStatus(gomock.Any()).
 					Return(&v3.Cluster{}, nil).AnyTimes()
 
 				snap := buildSnapshotWithClusterSpec(t, "ns", "snap-kv",
@@ -663,6 +667,10 @@ func Test_OnRancherClusterChange(t *testing.T) {
 					AnyTimes()
 				mgmtClient.EXPECT().
 					Update(gomock.Any()).
+					Return(&v3.Cluster{}, nil).
+					AnyTimes()
+				mgmtClient.EXPECT().
+					UpdateStatus(gomock.Any()).
 					Return(&v3.Cluster{}, nil).
 					AnyTimes()
 
@@ -732,6 +740,8 @@ func Test_OnRancherClusterChange(t *testing.T) {
 				mgmtCache.EXPECT().Get("cluster-fail").
 					Return(buildMgmtCluster("cluster-fail"), nil).AnyTimes()
 				mgmtClient.EXPECT().Update(gomock.Any()).
+					Return(&v3.Cluster{}, nil).AnyTimes()
+				mgmtClient.EXPECT().UpdateStatus(gomock.Any()).
 					Return(&v3.Cluster{}, nil).AnyTimes()
 
 				etcdSnapshotCache.EXPECT().Get("ns", "snap-missing").
@@ -1098,6 +1108,44 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 				assert.NotNil(t, c.Spec.FleetAgentDeploymentCustomization)
 				assert.Equal(t, "bar", c.Spec.FleetAgentDeploymentCustomization.AppendTolerations[0].Key)
 			},
+		},
+		{
+			name: "update WebhookDeploymentCustomization",
+			current: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					RKEConfig: &provv1.RKEConfig{},
+				},
+			},
+			desired: provv1.ClusterSpec{
+				WebhookDeploymentCustomization: &provv1.WebhookDeploymentCustomization{
+					AppendTolerations: []corev1.Toleration{{Key: "webhook-node", Operator: "Exists"}},
+				},
+				RKEConfig: &provv1.RKEConfig{},
+			},
+			expectedChange: true,
+			assertState: func(t *testing.T, c *provv1.Cluster) {
+				assert.NotNil(t, c.Spec.WebhookDeploymentCustomization)
+				assert.Equal(t, "webhook-node", c.Spec.WebhookDeploymentCustomization.AppendTolerations[0].Key)
+			},
+		},
+		{
+			name: "no change when WebhookDeploymentCustomization is unchanged",
+			current: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					WebhookDeploymentCustomization: &provv1.WebhookDeploymentCustomization{
+						AppendTolerations: []corev1.Toleration{{Key: "webhook-node", Operator: "Exists"}},
+					},
+					RKEConfig: &provv1.RKEConfig{},
+				},
+			},
+			desired: provv1.ClusterSpec{
+				WebhookDeploymentCustomization: &provv1.WebhookDeploymentCustomization{
+					AppendTolerations: []corev1.Toleration{{Key: "webhook-node", Operator: "Exists"}},
+				},
+				RKEConfig: &provv1.RKEConfig{},
+			},
+			expectedChange: false,
+			assertState:    func(t *testing.T, c *provv1.Cluster) {},
 		},
 	}
 

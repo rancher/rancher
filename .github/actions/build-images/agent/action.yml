@@ -11,33 +11,31 @@ runs:
         fi
     - id: env 
       name: Setup Dependencies Env Variables
-      uses: ./.github/actions/setup-build-env
+      uses: $/.github/actions/setup-build-env
     - name: Setup TAG Variables
-      uses: ./.github/actions/setup-tag-env
+      uses: $/.github/actions/setup-tag-env
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
       with:
         images: ${{ github.repository_owner }}/rancher
         flavor: |
           latest=false
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       with:
         driver-opts: network=host
     - name: Build agent
       id: build
-      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
       with:
         push: false
         build-args: |
           "VERSION=${{ env.TAG }}"
           "ARCH=${{ env.ARCH }}"
           "RANCHER_REPO=${{ github.repository_owner }}"
-          "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-          "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}"
         tags: ${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
         context: .
         platforms: "${{ env.OS }}/${{ env.ARCH }}"
@@ -47,7 +45,7 @@ runs:
         no-cache: true
         target: "agent"
     - name: Upload image
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: "rancher-agent-${{ env.OS }}-${{ env.ARCH }}"
         path: /tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar

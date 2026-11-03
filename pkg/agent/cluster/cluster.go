@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/wrangler/v3/pkg/kubeconfig"
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,19 +22,10 @@ const (
 	rancherCredentialsFolder = "/cattle-credentials"
 	urlFilename              = "url"
 	tokenFilename            = "token"
-	namespaceFilename        = "namespace"
 
 	kubernetesServiceHostKey = "KUBERNETES_SERVICE_HOST"
 	kubernetesServicePortKey = "KUBERNETES_SERVICE_PORT"
 )
-
-func Namespace() (string, error) {
-	ns, err := readKey(namespaceFilename)
-	if os.IsNotExist(err) {
-		return "", nil
-	}
-	return ns, err
-}
 
 func TokenAndURL() (string, string, error) {
 	url, err := readKey(urlFilename)
@@ -97,6 +89,10 @@ func Params() (map[string]interface{}, error) {
 	kubernetesServicePort, err := getenv(kubernetesServicePortKey)
 	if err != nil {
 		return nil, err
+	}
+
+	if utils.IsPlainIPV6(kubernetesServiceHost) {
+		kubernetesServiceHost = "[" + kubernetesServiceHost + "]"
 	}
 
 	return map[string]interface{}{

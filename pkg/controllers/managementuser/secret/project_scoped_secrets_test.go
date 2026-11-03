@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -293,8 +294,9 @@ var (
 			Name:      "s1",
 			Namespace: backingNS,
 			Labels: map[string]string{
-				"otherLabel":             "val",
-				ProjectScopedSecretLabel: projectName,
+				"otherLabel":                    "val",
+				ProjectScopedSecretLabel:        projectName,
+				ProjectScopedSecretClusterLabel: clusterName,
 			},
 			Annotations: map[string]string{
 				"otherAnno": "val",
@@ -402,7 +404,146 @@ func Test_namespaceHandler_migrateExistingProjectScopedSecrets(t *testing.T) {
 				managementSecretClient: managementSecretClientMock,
 			}
 
-			err := n.migrateExistingProjectScopedSecrets(tt.project)
+			err := n.migrateExistingNormanProjectScopedSecrets(tt.project)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_namespaceHandler_ensureProjectScopeSecretClusterLabel(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	validSelectorReq, _ := labels.NewRequirement(ProjectScopedSecretLabel, selection.Exists, nil)
+	validSelector := labels.NewSelector().Add(*validSelectorReq)
+
+	secretWithoutClusterLabel := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "s1",
+			Namespace: backingNS,
+			Labels: map[string]string{
+				ProjectScopedSecretLabel: projectName,
+			},
+		},
+	}
+
+	secretWithClusterLabel := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "s1",
+			Namespace: backingNS,
+			Labels: map[string]string{
+				ProjectScopedSecretLabel:        projectName,
+				ProjectScopedSecretClusterLabel: clusterName,
+			},
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		project               *v3.Project
+		setupManagementCache  func(m *fake.MockCacheInterface[*corev1.Secret])
+		setupManagementClient func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList])
+		wantErr               bool
+	}{
+		{
+			name:    "no secrets found with project scoped secret label",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "error listing secrets from cache",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name:    "secret already has cluster label",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretWithClusterLabel}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "secret missing cluster label, add it",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretWithoutClusterLabel}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				m.EXPECT().Update(secretWithClusterLabel).Return(nil, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "multiple secrets, some needing cluster label",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{
+					secretWithoutClusterLabel,
+					secretWithClusterLabel,
+					secretWithoutClusterLabel,
+				}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				m.EXPECT().Update(secretWithClusterLabel).Return(nil, nil).Times(2)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "error updating secret",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretWithoutClusterLabel}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				m.EXPECT().Update(secretWithClusterLabel).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name:    "multiple secrets with update failures",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{
+					secretWithoutClusterLabel,
+					secretWithoutClusterLabel,
+				}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				m.EXPECT().Update(secretWithClusterLabel).Return(nil, errDefault).Times(2)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			managementSecretCacheMock := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			managementSecretClientMock := fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+
+			if tt.setupManagementCache != nil {
+				tt.setupManagementCache(managementSecretCacheMock)
+			}
+			if tt.setupManagementClient != nil {
+				tt.setupManagementClient(managementSecretClientMock)
+			}
+
+			n := &namespaceHandler{
+				managementSecretCache:  managementSecretCacheMock,
+				managementSecretClient: managementSecretClientMock,
+			}
+
+			err := n.ensureProjectScopeSecretClusterLabel(tt.project)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -503,6 +644,7 @@ func Test_namespaceHandler_getProjectFromNamespace(t *testing.T) {
 				tt.setupProjectCache(projectCache)
 			}
 			n := &namespaceHandler{
+				clusterName:  "c-abc123",
 				projectCache: projectCache,
 			}
 			got, err := n.getProjectFromNamespace(tt.namespace)
@@ -529,7 +671,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 		wantErr           bool
 	}{
 		{
-			name: "error getting secrets",
+			name: "error listing pss secrets",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{
@@ -545,7 +687,21 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "desired secrets match existing secrets, no deletion",
+			name: "error listing global pull secrets",
+			args: args{
+				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{},
+				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "desired pss secrets match existing, no deletion",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{
@@ -572,10 +728,11 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 						},
 					},
 				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 			},
 		},
 		{
-			name: "no undesired secrets",
+			name: "no downstream secrets",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{
@@ -587,10 +744,11 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{},
 				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 			},
 		},
 		{
-			name: "remove undesired secrets",
+			name: "remove undesired pss copy",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{
@@ -616,11 +774,12 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 						},
 					},
 				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 				f.EXPECT().Delete("ns1", "secret2", &metav1.DeleteOptions{}).Return(nil)
 			},
 		},
 		{
-			name: "remove multiple secrets",
+			name: "remove multiple pss copies",
 			args: args{
 				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{},
@@ -644,12 +803,13 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 						},
 					},
 				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 				f.EXPECT().Delete("ns1", "secret1", &metav1.DeleteOptions{}).Return(nil)
 				f.EXPECT().Delete("ns1", "secret2", &metav1.DeleteOptions{}).Return(nil)
 			},
 		},
 		{
-			name: "error deleting secrets",
+			name: "error deleting pss copy",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{
@@ -675,11 +835,175 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 						},
 					},
 				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 				f.EXPECT().Delete("ns1", "secret2", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			wantErr: true,
 		},
+		{
+			name: "pss secret without copy annotation is not tracked for deletion",
+			args: args{
+				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "no-annotation-secret",
+								Namespace: "ns1",
+								// no pssCopyAnnotation — not a managed copy
+							},
+						},
+					},
+				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
+				// Delete should NOT be called for the secret without the copy annotation.
+			},
+		},
+		{
+			name: "remove both undesired pss and global pull secret copies",
+			args: args{
+				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "secret1", Namespace: "ns1"}:     {},
+					{Name: "pullsecret1", Namespace: "ns1"}: {},
+				},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret1",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret2",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
+						},
+					},
+				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pullsecret1",
+							Namespace: "ns1",
+							Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pullsecret2",
+							Namespace: "ns1",
+							Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
+						},
+					},
+				}}, nil)
+				f.EXPECT().Delete("ns1", "secret2", &metav1.DeleteOptions{}).Return(nil)
+				f.EXPECT().Delete("ns1", "pullsecret2", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+		{
+			name: "global pull secret not in desired set is deleted",
+			args: args{
+				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: "ns1"},
+						},
+					},
+				}, nil)
+				f.EXPECT().Delete("ns1", "global-pull-secret", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+		{
+			name: "multiple global pull secrets not in desired set are deleted",
+			args: args{
+				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "secret1",
+							Namespace: "ns1",
+							Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "secret2",
+							Namespace: "ns1",
+							Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
+						},
+					},
+				}}, nil)
+				f.EXPECT().Delete("ns1", "secret1", &metav1.DeleteOptions{}).Return(nil)
+				f.EXPECT().Delete("ns1", "secret2", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+		{
+			name: "global pull secret in desired set is not deleted",
+			args: args{
+				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "global-pull-secret", Namespace: "ns1"}: {},
+				},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: "ns1"},
+						},
+					},
+				}, nil)
+				// Delete should NOT be called — global-pull-secret is desired.
+			},
+		},
+		{
+			name: "mix of pss and global pull secrets, only undesired deleted",
+			args: args{
+				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "pss1", Namespace: "ns1"}:               {},
+					{Name: "global-pull-secret", Namespace: "ns1"}: {},
+				},
+			},
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{
+						{ObjectMeta: metav1.ObjectMeta{Name: "pss1", Namespace: "ns1", Annotations: map[string]string{pssCopyAnnotation: "true"}}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "pss2", Namespace: "ns1", Annotations: map[string]string{pssCopyAnnotation: "true"}}},
+					},
+				}, nil)
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
+					Items: []corev1.Secret{
+						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: "ns1"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret-3", Namespace: "ns1"}},
+					},
+				}, nil)
+				f.EXPECT().Delete("ns1", "pss2", &metav1.DeleteOptions{}).Return(nil)
+				f.EXPECT().Delete("ns1", "global-pull-secret-3", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
 	}
+
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -695,4 +1019,112 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_areSecretsSame(t *testing.T) {
+	baseData := map[string][]byte{"key": []byte("value")}
+
+	tests := []struct {
+		name string
+		s1   *corev1.Secret
+		s2   *corev1.Secret
+		want bool
+	}{
+		{
+			name: "identical secrets",
+			s1: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{pssCopyAnnotation: "true"},
+				},
+				Data: baseData,
+			},
+			s2: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{pssCopyAnnotation: "true"},
+				},
+				Data: baseData,
+			},
+			want: true,
+		},
+		{
+			name: "different data",
+			s1: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{pssCopyAnnotation: "true"},
+				},
+				Data: map[string][]byte{"key": []byte("value1")},
+			},
+			s2: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{pssCopyAnnotation: "true"},
+				},
+				Data: map[string][]byte{"key": []byte("value2")},
+			},
+			want: false,
+		},
+		{
+			name: "different pssCopyAnnotation",
+			s1: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{pssCopyAnnotation: "true"},
+				},
+				Data: baseData,
+			},
+			s2: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{pssCopyAnnotation: "false"},
+				},
+				Data: baseData,
+			},
+			want: false,
+		},
+		{
+			name: "nil data on both",
+			s1:   &corev1.Secret{},
+			s2:   &corev1.Secret{},
+			want: true,
+		},
+		{
+			name: "nil annotations are handled safely",
+			s1:   &corev1.Secret{Data: baseData},
+			s2:   &corev1.Secret{Data: baseData},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := areSecretsSame(tt.s1, tt.s2)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_getNamespacedSecret(t *testing.T) {
+	src := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-secret",
+			Namespace: "src-namespace",
+			Labels:    map[string]string{"lkey": "lval"},
+			Annotations: map[string]string{
+				"akey":               "aval",
+				userSecretAnnotation: "old-value", // should be overridden
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{"data-key": []byte("data-val")},
+	}
+
+	got := getNamespacedSecret(src, "target-namespace")
+
+	assert.Equal(t, src.Name, got.Name)
+	assert.Equal(t, "target-namespace", got.Namespace)
+	assert.Equal(t, src.Type, got.Type)
+	assert.Equal(t, src.Data, got.Data)
+	assert.Equal(t, "lval", got.Labels["lkey"])
+	assert.Equal(t, "aval", got.Annotations["akey"])
+	assert.Equal(t, "true", got.Annotations[userSecretAnnotation])
+	assert.Equal(t, "true", got.Annotations[pssCopyAnnotation])
+	// Verify the source is not mutated.
+	assert.Equal(t, "old-value", src.Annotations[userSecretAnnotation])
+	assert.Equal(t, "src-namespace", src.Namespace)
 }

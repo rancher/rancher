@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	planapi "github.com/rancher/rancher/pkg/plan"
 )
 
 const (
@@ -208,10 +209,12 @@ var (
 		Minor:   true,
 	}
 	setPermissionsWindowsScriptInstruction = plan.OneTimeInstruction{
-		Name:    "Set permissions for RKE2 installation files on Windows",
-		Command: "powershell.exe",
-		Args: []string{"-File", fmt.Sprintf(setPermissionsWindowsScriptPath,
-			"c:\\var\\lib\\rancher\\capr")},
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "Set permissions for RKE2 installation files on Windows",
+			Command: "powershell.exe",
+			Args: []string{"-File", fmt.Sprintf(setPermissionsWindowsScriptPath,
+				"c:\\var\\lib\\rancher\\capr")},
+		},
 	}
 )
 
@@ -245,22 +248,24 @@ func windowsIdempotentRestartInstructions(identifier, value, service string) []p
 // care must be taken to ensure that certain escape characters (such as ') do not interfere with how arguments are built and passed to InvokeExpression.
 // Reference windowsIdempotentActionScript for more information as to how command arguments are crafted and passed to InvokeExpression.
 func windowsIdempotentInstruction(identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
-	hashedCommand := PlanHash([]byte(command))
-	hashedValue := PlanHash([]byte(value))
+	hashedCommand := planapi.PlanHash([]byte(command))
+	hashedValue := planapi.PlanHash([]byte(value))
 
 	return plan.OneTimeInstruction{
-		Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
-		Command: "powershell.exe",
-		Args: append([]string{
-			windowsIdempotentActionScriptPath(),
-			strings.ToLower(identifier),
-			hashedValue,
-			hashedCommand,
-			command,
-			// note: custom data directory paths are not currently respected by Windows nodes
-			"c:\\var\\lib\\rancher\\capr",
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
+			Command: "powershell.exe",
+			Args: append([]string{
+				windowsIdempotentActionScriptPath(),
+				strings.ToLower(identifier),
+				hashedValue,
+				hashedCommand,
+				command,
+				// note: custom data directory paths are not currently respected by Windows nodes
+				"c:\\var\\lib\\rancher\\capr",
+			},
+				args...),
+			Env: env,
 		},
-			args...),
-		Env: env,
 	}
 }

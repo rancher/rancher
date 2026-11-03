@@ -9,9 +9,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const chartsSmallForkURL = "https://github.com/rancher/charts-small-fork"
-const mainBranch = "main"
-const lastBranch = "test-1"
+const (
+	chartsSmallForkURL = "https://github.com/rancher/charts-small-fork"
+	mainBranch         = "main"
+	lastBranch         = "test-1"
+)
 
 func TestMain(m *testing.M) {
 	// Run all the tests
@@ -171,7 +173,7 @@ func Test_Update(t *testing.T) {
 			branch:            "invalidbranch",
 			systemCatalogMode: "",
 			expectedCommit:    "226d544def39de56db210e96d2b0b535badf9bdd",
-			expectedError:     "Remote branch invalidbranch not found in upstream origin",
+			expectedError:     "couldn't find remote ref",
 			dir:               fmt.Sprintf("%s/%s", localDir, "cattle-test/small-fork-test/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"),
 		},
 	}
@@ -179,7 +181,7 @@ func Test_Update(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.dir != "" {
-				err := os.MkdirAll(tc.dir, 0755)
+				err := os.MkdirAll(tc.dir, 0o755)
 				assert.NoError(t, err)
 			}
 

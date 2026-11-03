@@ -74,6 +74,7 @@ type TokenSpec struct {
 	// Kind describes the nature of the token. The value "session" indicates
 	// a login/session token. Any other value, including the empty string,
 	// which is the default, stands for some kind of derived token.
+	// The value "session" is reserved for Rancher and is rejected on create.
 	// +optional
 	Kind string `json:"kind"`
 	// Human readable free-form description of the token. For example, its purpose.
@@ -82,9 +83,16 @@ type TokenSpec struct {
 	// TTL is the time-to-live of the token, in milliseconds.
 	// Setting a value < 0 represents +infinity, i.e. a token which does not expire.
 	// The default is indicated by the value `0`.
-	// This default is provided by the `auth-token-max-ttl-minutes` setting.
-	// Note that this default is also the maximum specifiable TTL.
-	// A value <= 0 there enables non-expiring tokens.
+	// This default is provided by the `auth-token-default-ttl-minutes` setting.
+	// A value < 0 there enables non-expiring tokens, if not disallowed by the max.
+	// That is, both the ttl here and the default are subject to the
+	// `auth-token-max-ttl-minutes` setting, i.e. will be clamped to it if they
+	// represent a larger value than that.
+	// For tokens of kind "session" the `auth-user-session-ttl-minutes` setting provides both the
+	// default and the max instead. For tokens of kind "kubeconfig" the default comes from the
+	// `kubeconfig-default-token-ttl-minutes` setting, and the max is the smaller of the
+	// `kubeconfig-max-token-ttl-minutes` and `auth-token-max-ttl-minutes` settings, where `0` is no
+	// limit.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an
@@ -149,8 +157,20 @@ type TokenStatus struct {
 
 // Implement the TokenAccessor interface
 
+func (t *Token) GetLabels() map[string]string {
+	return t.ObjectMeta.Labels
+}
+
 func (t *Token) GetName() string {
 	return t.Name
+}
+
+func (t *Token) GetFullName() string {
+	return "ext/" + t.Name
+}
+
+func (t *Token) GetKind() string {
+	return "ext"
 }
 
 func (t *Token) GetIsEnabled() bool {
@@ -170,6 +190,8 @@ func (t *Token) ObjClusterName() string {
 	return ""
 }
 
+// Deprecated: GetAuthProvider is deprecated in favour of parsing the
+// AuthConfig name from the Principal's ID and using that AuthConfig's type.
 func (t *Token) GetAuthProvider() string {
 	return t.Spec.UserPrincipal.Provider
 }
@@ -224,6 +246,19 @@ func (t *Token) GetIsExpired() bool {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Kubeconfig allows creating v1.Config kubeconfig files for interacting with Rancher and clusters managed by Rancher.
+//
+// Name generation: the server always assigns a name with the "kubeconfig-" prefix. Any
+// metadata.name or metadata.generateName supplied by the client is silently ignored — it
+// is not rejected, but it has no effect.
+//
+// Token requirement: Create must be called by a Rancher user authenticated with a Rancher
+// token — a UI session token or a user-created API token both work; the derived kubeconfig
+// tokens are minted against the authenticating token. Requests authenticated by other
+// means (for example, a service account) return Forbidden (403).
+//
+// Value availability: status.value is populated only in the Create response. It is empty
+// on all subsequent Get or List reads. Clients must capture the value from the Create
+// response; it cannot be retrieved again.
 type Kubeconfig struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -243,7 +278,7 @@ type KubeconfigSpec struct {
 	// Clusters is a list of cluster names.
 	// +listType=set
 	// +optional
-	Clusters []string `json:"clusters"`
+	Clusters []string `json:"clusters,omitempty"`
 	// CurrentContext is the cluster ID default context for which will be set as the current context.
 	// If omitted, the first cluster in the list is considered for setting the current context.
 	// +optional
@@ -254,6 +289,24 @@ type KubeconfigSpec struct {
 	// TTL is the time-to-live of the kubeconfig tokens, in seconds.
 	// +optional
 	TTL int64 `json:"ttl,omitempty"`
+	// IncludeDefaultEntry controls whether the default "rancher" cluster/user/context entry
+	// pointing directly to the Rancher server URL is included in the generated kubeconfig.
+	// When nil or true (the default), the entry is included for backward compatibility.
+	// When false, the entry is omitted.
+	// It can't be changed after create. If omitted on update, the stored value is kept.
+	// +optional
+	IncludeDefaultEntry *bool `json:"includeDefaultEntry,omitempty"`
+	// PreferRancherProxy controls the current-context of the generated kubeconfig when the cluster
+	// selected by CurrentContext has the Authorized Cluster Endpoint (ACE) enabled.
+	// When true, the current-context is the context that points to the cluster through the Rancher
+	// server proxy. When false, it's the ACE context: the FQDN if set, otherwise the first ready
+	// control plane node, or the Rancher proxy context if no control plane node is ready.
+	// It has no effect for clusters without ACE, which always use the Rancher proxy context.
+	// If omitted on create, the value of the kubeconfig-prefer-rancher-proxy setting is used and
+	// stored. It's not set for kubeconfigs created before this field was added; those use the ACE
+	// context. It can't be changed after create. If omitted on update, the stored value is kept.
+	// +optional
+	PreferRancherProxy *bool `json:"preferRancherProxy,omitempty"`
 }
 
 // KubeconfigStatus defines the most recently observed status of the Kubeconfig.
@@ -265,10 +318,11 @@ type KubeconfigStatus struct {
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
-	// Summary of the Kubeconfig status. Can be "Complete" or "Error".
+	// Summary of the Kubeconfig status. Can be "Pending", "Complete", or "Error".
 	// +optional
 	Summary string `json:"summary,omitempty"`
 	// Tokens is a list of Kubeconfig tokens.
+	// +listType=atomic
 	// +optional
 	Tokens []string `json:"tokens,omitempty"`
 	// Value contains the generated content of the kubeconfig.

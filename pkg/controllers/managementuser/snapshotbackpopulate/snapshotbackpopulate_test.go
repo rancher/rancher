@@ -1,7 +1,10 @@
 package snapshotbackpopulate
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
 	"regexp"
 	"strings"
 	"testing"
@@ -13,17 +16,59 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+// testRESTMapper returns a RESTMapper that resolves the handful of GroupKinds these tests need.
+// Namespaced by default; management.cattle.io/v3 Cluster is registered as cluster-scoped so the
+// cluster-lifecycle tests can assert the scope-based namespace override.
+func testRESTMapper() meta.RESTMapper {
+	m := meta.NewDefaultRESTMapper([]schema.GroupVersion{
+		{Group: "cluster.x-k8s.io", Version: "v1beta2"},
+		{Group: "provisioning.cattle.io", Version: "v1"},
+		{Group: "management.cattle.io", Version: "v3"},
+	})
+	m.Add(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Node"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, meta.RESTScopeRoot)
+	return m
+}
+
+type dynamicClientFake struct {
+	obj runtime.Object
+	err error
+}
+
+func (d *dynamicClientFake) Get(_ schema.GroupVersionKind, _, _ string) (runtime.Object, error) {
+	return d.obj, d.err
+}
+
+func newUnstructuredCluster(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetAPIVersion(apiVersion)
+	obj.SetKind(kind)
+	obj.SetNamespace(namespace)
+	obj.SetName(name)
+	return obj
+}
+
+func newProvisioningClusterUnstructured(namespace, name string) *unstructured.Unstructured {
+	return newUnstructuredCluster("provisioning.cattle.io/v1", "Cluster", namespace, name)
+}
 
 func TestOnUpstreamChange(t *testing.T) {
 	t.Parallel()
@@ -47,14 +92,16 @@ func TestOnUpstreamChange(t *testing.T) {
 		{
 			name:     "failed to get cluster",
 			snapshot: &rkev1.ETCDSnapshot{},
-			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, "test-cluster").Return(nil, errors.New("failed to get cluster"))
-				h := handler{
-					clusterName:  "test-cluster",
-					clusterCache: clusterCache,
+			handlerFunc: func(_ *gomock.Controller) handler {
+				return handler{
+					dynamic: &dynamicClientFake{err: errors.New("failed to get cluster")},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
+					},
 				}
-				return h
 			},
 			expectErr: true,
 		},
@@ -62,22 +109,25 @@ func TestOnUpstreamChange(t *testing.T) {
 			name:     "snapshot from different namespace",
 			snapshot: rkev1.NewETCDSnapshot("other-namespace", "test-snapshot", rkev1.ETCDSnapshot{}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
+				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "test-namespace",
 						Name:      "test-cluster",
 					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
+				return handler{
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
 					},
 				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, "test-mgmt-cluster").Return([]*provv1.Cluster{cluster}, nil)
-				h := handler{
-					clusterName:  cluster.Status.ClusterName,
-					clusterCache: clusterCache,
-				}
-				return h
 			},
 			expectErr: false,
 		},
@@ -85,22 +135,25 @@ func TestOnUpstreamChange(t *testing.T) {
 			name:     "snapshot has no labels",
 			snapshot: rkev1.NewETCDSnapshot("test-namespace", "test-snapshot", rkev1.ETCDSnapshot{}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
+				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "test-namespace",
 						Name:      "test-cluster",
 					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
+				return handler{
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
 					},
 				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, "test-mgmt-cluster").Return([]*provv1.Cluster{cluster}, nil)
-				h := handler{
-					clusterName:  cluster.Status.ClusterName,
-					clusterCache: clusterCache,
-				}
-				return h
 			},
 			expectErr: false,
 		},
@@ -114,105 +167,25 @@ func TestOnUpstreamChange(t *testing.T) {
 				},
 			}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
+				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "test-namespace",
 						Name:      "test-cluster",
 					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
+				return handler{
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
 					},
 				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, "test-mgmt-cluster").Return([]*provv1.Cluster{cluster}, nil)
-				h := handler{
-					clusterName:  cluster.Status.ClusterName,
-					clusterCache: clusterCache,
-				}
-				return h
-			},
-			expectErr: false,
-		},
-		{
-			name: "no matching controlplane",
-			snapshot: rkev1.NewETCDSnapshot("test-namespace", "test-snapshot", rkev1.ETCDSnapshot{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						capr.ClusterNameLabel: "test-cluster",
-					},
-				},
-			}),
-			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
-					},
-				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, cluster.Status.ClusterName).Return([]*provv1.Cluster{cluster}, nil)
-				controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
-				controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(nil, errors.New("not found"))
-				h := handler{
-					clusterName:       cluster.Status.ClusterName,
-					clusterCache:      clusterCache,
-					controlPlaneCache: controlPlaneCache,
-				}
-				return h
-			},
-			expectErr: true,
-		},
-		{
-			name: "controlplane mid restore",
-			snapshot: rkev1.NewETCDSnapshot("test-namespace", "test-snapshot", rkev1.ETCDSnapshot{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						capr.ClusterNameLabel: "test-cluster",
-					},
-				},
-			}),
-			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
-					},
-				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, cluster.Status.ClusterName).Return([]*provv1.Cluster{cluster}, nil)
-				controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
-				controlPlane := &rkev1.RKEControlPlane{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-					Spec: rkev1.RKEControlPlaneSpec{
-						ETCDSnapshotRestore: &rkev1.ETCDSnapshotRestore{
-							Generation: 1,
-						},
-					},
-					Status: rkev1.RKEControlPlaneStatus{
-						ETCDSnapshotRestore: &rkev1.ETCDSnapshotRestore{
-							Generation: 0,
-						},
-					},
-				}
-				controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(controlPlane, nil)
-				etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
-				etcdSnapshotController.EXPECT().EnqueueAfter(cluster.Namespace, "test-snapshot", gomock.Any())
-				h := handler{
-					clusterName:            cluster.Status.ClusterName,
-					clusterCache:           clusterCache,
-					controlPlaneCache:      controlPlaneCache,
-					etcdSnapshotController: etcdSnapshotController,
-				}
-				return h
 			},
 			expectErr: false,
 		},
@@ -226,31 +199,25 @@ func TestOnUpstreamChange(t *testing.T) {
 				},
 			}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
-					},
-				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, cluster.Status.ClusterName).Return([]*provv1.Cluster{cluster}, nil)
-				controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
-				controlPlane := &rkev1.RKEControlPlane{
+				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "test-namespace",
 						Name:      "test-cluster",
 					},
 				}
-				controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(controlPlane, nil)
-				h := handler{
-					clusterName:       cluster.Status.ClusterName,
-					clusterCache:      clusterCache,
-					controlPlaneCache: controlPlaneCache,
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
+				return handler{
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
+					},
 				}
-				return h
 			},
 			expectErr: false,
 		},
@@ -267,34 +234,29 @@ func TestOnUpstreamChange(t *testing.T) {
 				},
 			}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
-					},
-				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, cluster.Status.ClusterName).Return([]*provv1.Cluster{cluster}, nil)
-				controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
-				controlPlane := &rkev1.RKEControlPlane{
+				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "test-namespace",
 						Name:      "test-cluster",
 					},
 				}
-				controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(controlPlane, nil)
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
 				etcdSnapshotFileController.EXPECT().Get("test-snapshot-downstream", gomock.Any()).Return(&k3s.ETCDSnapshotFile{}, nil)
-				h := handler{
-					clusterName:                cluster.Status.ClusterName,
-					clusterCache:               clusterCache,
-					controlPlaneCache:          controlPlaneCache,
+				return handler{
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
+					},
+					snapshotNamespace:          "test-namespace",
 					etcdSnapshotFileController: etcdSnapshotFileController,
 				}
-				return h
 			},
 			expectErr: false,
 		},
@@ -311,45 +273,41 @@ func TestOnUpstreamChange(t *testing.T) {
 				},
 			}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
-				clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-				cluster := &provv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-					Status: provv1.ClusterStatus{
-						ClusterName: "test-mgmt-cluster",
-					},
-				}
-				clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, cluster.Status.ClusterName).Return([]*provv1.Cluster{cluster}, nil)
-				controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
-				controlPlane := &rkev1.RKEControlPlane{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "test-namespace",
-						Name:      "test-cluster",
-					},
-				}
-				controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(controlPlane, nil)
+				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
 				etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
 				etcdSnapshotFileController.EXPECT().Get("test-snapshot-downstream", gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "test-snapshot-downstream"))
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
-				etcdSnapshotController.EXPECT().Delete(cluster.Namespace, "test-snapshot", gomock.Any()).Return(nil)
-				h := handler{
-					clusterName:                cluster.Status.ClusterName,
-					clusterCache:               clusterCache,
-					controlPlaneCache:          controlPlaneCache,
+				etcdSnapshotController.EXPECT().Delete("test-namespace", "test-snapshot", gomock.Any()).Return(nil)
+				return handler{
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
+					clusterRef: corev1.ObjectReference{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Namespace:  "test-namespace",
+						Name:       "test-cluster",
+					},
+					snapshotNamespace:          "test-namespace",
 					etcdSnapshotFileController: etcdSnapshotFileController,
 					etcdSnapshotController:     etcdSnapshotController,
 				}
-				return h
 			},
 			expectErr: false,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			ctrl := gomock.NewController(t)
 			h := tt.handlerFunc(ctrl)
 			snapshotCopy := tt.snapshot.DeepCopy()
@@ -368,58 +326,48 @@ func TestOnUpstreamChange(t *testing.T) {
 }
 
 func TestOnDownstreamChange(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
-	clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-	controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
 	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
 	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
+	beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
 	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
-	machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)
-	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](ctrl)
+	nodeCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Node](ctrl)
+
+	cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+	deletedCluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+	deletedCluster.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
+
+	dynamicSuccess := &dynamicClientFake{obj: cluster}
+	dynamicDeleted := &dynamicClientFake{obj: deletedCluster}
+	dynamicError := &dynamicClientFake{err: errors.New("not found")}
 
 	h := handler{
-		clusterName:                "test-mgmt-cluster",
-		clusterCache:               clusterCache,
-		controlPlaneCache:          controlPlaneCache,
+		clusterRef: corev1.ObjectReference{
+			APIVersion: "provisioning.cattle.io/v1",
+			Kind:       "Cluster",
+			Namespace:  "test-namespace",
+			Name:       "test-cluster",
+		},
+		snapshotNamespace:          "test-namespace",
+		dynamic:                    dynamicSuccess,
+		restMapper:                 testRESTMapper(),
 		etcdSnapshotCache:          etcdSnapshotCache,
 		etcdSnapshotController:     etcdSnapshotController,
-		machineCache:               machineCache,
-		capiClusterCache:           capiClusterCache,
+		beaconCache:                beaconCache,
+		nodeCache:                  nodeCache,
 		etcdSnapshotFileController: etcdSnapshotFileController,
 	}
-	var snapshot *k3s.ETCDSnapshotFile
 
-	cluster := &provv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "test-namespace",
-			Name:              "test-cluster",
-			DeletionTimestamp: &metav1.Time{Time: time.Now()},
-		},
-	}
-	controlPlane := &rkev1.RKEControlPlane{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test-namespace",
-			Name:      "test-cluster",
-		},
-	}
-	capiCluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test-namespace",
-			Name:      "test-cluster",
-		},
-	}
-	capiMachine := &capi.Machine{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test-namespace",
-			Name:      "test-machine",
-		},
-	}
 	upstreamSnapshot := &rkev1.ETCDSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "test-namespace",
 			Name:      "test-snapshot-upstream",
 		},
 	}
+
+	var snapshot *k3s.ETCDSnapshotFile
 
 	// Nil snapshot
 
@@ -428,12 +376,11 @@ func TestOnDownstreamChange(t *testing.T) {
 
 	// Provisioning cluster not found
 
-	clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, h.clusterName).Return(nil, errors.New("not found")).Times(1)
+	h.dynamic = dynamicError
 
 	snapshot = &k3s.ETCDSnapshotFile{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test-namespace",
-			Name:      "test-snapshot-downstream",
+			Name: "test-snapshot-downstream",
 		},
 		Status: k3s.ETCDSnapshotStatus{
 			CreationTime: &metav1.Time{Time: time.Now()},
@@ -441,19 +388,26 @@ func TestOnDownstreamChange(t *testing.T) {
 		},
 	}
 
+	beacon := &planv1alpha1.Beacon{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+	}
+
 	_, err = h.OnDownstreamChange("", snapshot)
-	assert.Error(t, err, "An error is expected if the provisioning cluster cannot be found")
+	assert.Error(t, err, "An error is expected if the cluster cannot be found")
 
-	// Provisioning cluster being deleted
+	// Cluster being deleted
 
-	clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, h.clusterName).Return([]*provv1.Cluster{cluster}, nil).AnyTimes()
+	h.dynamic = dynamicDeleted
 
 	_, err = h.OnDownstreamChange("", snapshot)
-	assert.NoError(t, err, "It should return early if the provisioning cluster is being deleted")
+	assert.NoError(t, err, "It should return early if the cluster is being deleted")
 
-	// No matching snapshots
+	// Downstream snapshot deleted, no matching upstream snapshots
 
-	cluster.DeletionTimestamp = nil
+	h.dynamic = dynamicSuccess
 	snapshot.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{}, nil).Times(1)
@@ -461,7 +415,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should not return an error if the snapshot is being deleted and there are no upstream snapshots")
 
-	// One matching snapshot
+	// Downstream snapshot deleted, one matching upstream snapshot
 
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{
 		{
@@ -471,12 +425,12 @@ func TestOnDownstreamChange(t *testing.T) {
 			},
 		},
 	}, nil).Times(1)
-	etcdSnapshotController.EXPECT().Delete(cluster.Namespace, "test-snapshot-upstream", gomock.Any()).Return(nil).Times(1)
+	etcdSnapshotController.EXPECT().Delete(cluster.GetNamespace(), "test-snapshot-upstream", gomock.Any()).Return(nil).Times(1)
 
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should not return an error if the snapshot is being deleted and there is 1 upstream snapshot")
 
-	// Multiple matching snapshots
+	// Downstream snapshot deleted, multiple matching upstream snapshots
 
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{
 		{
@@ -492,71 +446,47 @@ func TestOnDownstreamChange(t *testing.T) {
 			},
 		},
 	}, nil).Times(1)
-	etcdSnapshotController.EXPECT().Delete(cluster.Namespace, "test-snapshot-upstream-0", gomock.Any()).Return(nil).Times(1)
-	etcdSnapshotController.EXPECT().Delete(cluster.Namespace, "test-snapshot-upstream-1", gomock.Any()).Return(nil).Times(1)
+	etcdSnapshotController.EXPECT().Delete(cluster.GetNamespace(), "test-snapshot-upstream-0", gomock.Any()).Return(nil).Times(1)
+	etcdSnapshotController.EXPECT().Delete(cluster.GetNamespace(), "test-snapshot-upstream-1", gomock.Any()).Return(nil).Times(1)
 
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should not return an error if the snapshot is being deleted and there are 2 upstream snapshots")
 
-	// Controlplane not found
-
-	snapshot.DeletionTimestamp = nil
-	controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(nil, errors.New("not found")).Times(1)
-
-	_, err = h.OnDownstreamChange("", snapshot)
-	assert.Error(t, err, "It should return an error if the controlplane cannot be found")
-
-	// Mid ETCD Restore
-
-	controlPlane.Spec.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
-		Generation: 1,
-	}
-	controlPlane.Status.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
-		Generation: 0,
-	}
-	controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(controlPlane, nil).AnyTimes()
-	etcdSnapshotFileController.EXPECT().EnqueueAfter(snapshot.Name, gomock.Any()).Times(1)
-
-	_, err = h.OnDownstreamChange("", snapshot)
-	assert.NoError(t, err, "It should return early if the controlplane is mid restore")
-
 	// Error getting snapshots from index
 
-	controlPlane.Labels = map[string]string{
-		capi.ClusterNameLabel: cluster.Name,
-	}
-	controlPlane.Spec = rkev1.RKEControlPlaneSpec{}
-	controlPlane.Status = rkev1.RKEControlPlaneStatus{}
-	capiClusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(capiCluster, nil).AnyTimes()
+	snapshot.DeletionTimestamp = nil
+
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return(nil, errors.New("error")).Times(1)
+	beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.Error(t, err, "It should return an error if getting snapshots from the index fails")
 
-	// no snapshots and no machines
+	// No upstream snapshots, create new - node has lifecycle labels
 
-	machineCache.EXPECT().List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name})).Return(nil, nil)
-	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{}, nil).Times(2)
-
-	_, err = h.OnDownstreamChange("", snapshot)
-	assert.Error(t, err, "It should return an error if no machine match the node")
-
-	// create upstream snapshot
-
-	machineCache.EXPECT().List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name})).Return([]*capi.Machine{capiMachine}, nil).AnyTimes()
-	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
-
-	snapshot.Spec.NodeName = "test-node"
-	capiMachine.Status.NodeRef = capi.MachineNodeReference{
-		Name: "test-node",
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "test-machine",
+			},
+		},
 	}
 
-	_, err = h.OnDownstreamChange("", snapshot)
-	assert.NoError(t, err, "It should not return an error when creating the machine")
+	snapshot.Spec.NodeName = "test-node"
+	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{}, nil).Times(1)
+	nodeCache.EXPECT().Get("test-node").Return(node, nil).Times(1)
+	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
 
-	// No matching snapshots but exists upstream
+	_, err = h.OnDownstreamChange("", snapshot)
+	assert.NoError(t, err, "It should not return an error when creating the snapshot")
+
+	// No matching snapshots from index but already exists upstream (AlreadyExists)
 
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{}, nil).Times(1)
+	nodeCache.EXPECT().Get("test-node").Return(node, nil).Times(1)
 
 	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "error")).Times(1)
 
@@ -564,6 +494,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	existingSnapshot.ResourceVersion = "1"
 
 	etcdSnapshotCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(existingSnapshot, nil).Times(1)
+	nodeCache.EXPECT().Get("test-node").Return(node, nil).Times(1)
 	etcdSnapshotController.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
 		assert.Equal(t, "1", s.ResourceVersion)
 		s.ResourceVersion = "2"
@@ -573,9 +504,10 @@ func TestOnDownstreamChange(t *testing.T) {
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should update the snapshot if one exists but could not be found by the indexer")
 
-	// No matching snapshots but does not exist upstream
+	// No matching snapshots, create succeeds
 
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{}, nil).Times(1)
+	nodeCache.EXPECT().Get("test-node").Return(node, nil).Times(1)
 
 	etcdSnapshotController.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
 		assert.Equal(t, "", s.ResourceVersion)
@@ -586,7 +518,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should create the snapshot if one does not exist")
 
-	// delete multiple snapshots
+	// Delete multiple duplicate upstream snapshots and re-enqueue
 
 	toDelete := []*rkev1.ETCDSnapshot{
 		{
@@ -612,17 +544,20 @@ func TestOnDownstreamChange(t *testing.T) {
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should not return an error when deleting the snapshot")
 
-	// update existing snapshots
+	// Update existing snapshot
+
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{upstreamSnapshot}, nil).AnyTimes()
+	nodeCache.EXPECT().Get("test-node").Return(node, nil).AnyTimes()
 
 	etcdSnapshotController.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(upstreamSnapshot, nil).Times(1)
 
 	_, err = h.OnDownstreamChange("", snapshot)
-	assert.NoError(t, err, "It should not return an error when update the snapshot")
+	assert.NoError(t, err, "It should not return an error when updating the snapshot")
 }
 
 func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
-	// Helper to create a valid, compressed spec payload
+	t.Parallel()
+
 	compressSpec := func(t *testing.T, spec *provv1.ClusterSpec) string {
 		payload, err := snapshotutil.CompressInterface(spec)
 		require.NoError(t, err)
@@ -635,11 +570,9 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 	}
 	validSpecNoRKEConfig := &provv1.ClusterSpec{
 		KubernetesVersion: "v1.34.1+rke2r1",
-		// RKEConfig is nil
 	}
 	validSpecNoK8sVersion := &provv1.ClusterSpec{
 		RKEConfig: &provv1.RKEConfig{},
-		// KubernetesVersion is empty
 	}
 
 	testCases := []struct {
@@ -687,73 +620,53 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 		},
 	}
 
-	mockController := gomock.NewController(t)
+	ctrl := gomock.NewController(t)
 
-	clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](mockController)
-	controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](mockController)
-	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](mockController)
-	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](mockController)
-	machineCache := fake.NewMockCacheInterface[*capi.Machine](mockController)
-	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](mockController)
-	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](mockController)
+	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
+	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
+	beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
+	nodeCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Node](ctrl)
+
+	cluster := newProvisioningClusterUnstructured("fleet-default", "example")
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cp-0",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "machine-0",
+			},
+		},
+	}
 
 	handlerUnderTest := handler{
-		clusterName:                "test-management-cluster",
-		clusterCache:               clusterCache,
-		controlPlaneCache:          controlPlaneCache,
+		clusterRef: corev1.ObjectReference{
+			APIVersion: "provisioning.cattle.io/v1",
+			Kind:       "Cluster",
+			Namespace:  "fleet-default",
+			Name:       "example",
+		},
+		snapshotNamespace:          "fleet-default",
+		dynamic:                    &dynamicClientFake{obj: cluster},
+		restMapper:                 testRESTMapper(),
 		etcdSnapshotCache:          etcdSnapshotCache,
 		etcdSnapshotController:     etcdSnapshotController,
-		machineCache:               machineCache,
-		capiClusterCache:           capiClusterCache,
+		beaconCache:                beaconCache,
+		nodeCache:                  nodeCache,
 		etcdSnapshotFileController: etcdSnapshotFileController,
 	}
 
-	// Cluster state
-	provisioningCluster := &provv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
-		Status:     provv1.ClusterStatus{ClusterName: "test-management-cluster"},
-	}
-	controlPlane := &rkev1.RKEControlPlane{
+	beacon := &planv1alpha1.Beacon{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fleet-default",
 			Name:      "example",
-			Labels:    map[string]string{capi.ClusterNameLabel: "example"},
 		},
 	}
-	capiCluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
-	}
-	capiMachine := &capi.Machine{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "fleet-default",
-			Name:      "machine-0",
-			Labels:    map[string]string{capi.ClusterNameLabel: "example", capr.MachineIDLabel: "machine-id-0"},
-		},
-		Status: capi.MachineStatus{NodeRef: capi.MachineNodeReference{Name: "cp-0"}},
-	}
 
-	clusterCache.EXPECT().
-		GetByIndex(cluster2.ByCluster, handlerUnderTest.clusterName).
-		Return([]*provv1.Cluster{provisioningCluster}, nil).
-		AnyTimes()
+	beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 
-	controlPlaneCache.EXPECT().
-		Get(provisioningCluster.Namespace, provisioningCluster.Name).
-		Return(controlPlane, nil).
-		AnyTimes()
-
-	capiClusterCache.EXPECT().
-		Get(provisioningCluster.Namespace, provisioningCluster.Name).
-		Return(capiCluster, nil).
-		AnyTimes()
-
-	selectorForCluster := labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: provisioningCluster.Name})
-	machineCache.EXPECT().
-		List(provisioningCluster.Namespace, selectorForCluster).
-		Return([]*capi.Machine{capiMachine}, nil).
-		AnyTimes()
-
-	// Factory for downstream snapshot files
 	makeDownstream := func(isS3Storage bool, metadata map[string]string, name string) *k3s.ETCDSnapshotFile {
 		ds := &k3s.ETCDSnapshotFile{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -801,12 +714,16 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 					Return([]*rkev1.ETCDSnapshot{}, nil).
 					Times(1)
 
+				if !storage.isS3Storage {
+					nodeCache.EXPECT().Get("cp-0").Return(node, nil).Times(1)
+				}
+
 				etcdSnapshotController.EXPECT().
 					Create(gomock.Any()).
 					DoAndReturn(func(created *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
 						annotations := created.GetAnnotations()
 						require.NotNil(t, annotations)
-						assert.Equal(t, tc.expectedAnnotation, annotations[RestoreModeOptionsAnnotation], "Annotation should be set correctly")
+						assert.Equal(t, tc.expectedAnnotation, annotations[capr.RestoreModeOptionsAnnotation], "Annotation should be set correctly")
 
 						assert.Equal(t, "successful", created.SnapshotFile.Status, "Status should be successful because ReadyToUse is true")
 
@@ -827,98 +744,69 @@ func TestGetCluster(t *testing.T) {
 	tests := []struct {
 		name string
 
-		clusterName string
+		clusterRef corev1.ObjectReference
+		dynamicObj runtime.Object
+		dynamicErr error
 
-		cacheFunc func(cache *fake.MockCacheInterface[*provv1.Cluster])
-
-		expectedCluster *provv1.Cluster
+		expectNamespace string
+		expectName      string
 		expectErr       bool
 	}{
 		{
-			name:        "nil result",
-			clusterName: "test-cluster",
-			cacheFunc: func(cache *fake.MockCacheInterface[*provv1.Cluster]) {
-				cache.EXPECT().GetByIndex(cluster2.ByCluster, "test-cluster").Return(nil, nil)
+			name: "dynamic returns error",
+			clusterRef: corev1.ObjectReference{
+				APIVersion: "provisioning.cattle.io/v1",
+				Kind:       "Cluster",
+				Namespace:  "test-namespace",
+				Name:       "test-cluster",
 			},
-			expectedCluster: nil,
-			expectErr:       true,
+			dynamicErr: errors.New("not found"),
+			expectErr:  true,
 		},
 		{
-			name:        "empty result",
-			clusterName: "test-cluster",
-			cacheFunc: func(cache *fake.MockCacheInterface[*provv1.Cluster]) {
-				cache.EXPECT().GetByIndex(cluster2.ByCluster, "test-cluster").Return([]*provv1.Cluster{}, nil)
+			name: "success",
+			clusterRef: corev1.ObjectReference{
+				APIVersion: "provisioning.cattle.io/v1",
+				Kind:       "Cluster",
+				Namespace:  "test-namespace",
+				Name:       "test-cluster",
 			},
-			expectedCluster: nil,
-			expectErr:       true,
+			dynamicObj:      newProvisioningClusterUnstructured("test-namespace", "test-cluster"),
+			expectNamespace: "test-namespace",
+			expectName:      "test-cluster",
+			expectErr:       false,
 		},
 		{
-			name:        "error from index",
-			clusterName: "test-cluster",
-			cacheFunc: func(cache *fake.MockCacheInterface[*provv1.Cluster]) {
-				cache.EXPECT().GetByIndex(cluster2.ByCluster, "test-cluster").Return(nil, errors.New("error from index"))
+			name: "cluster-scoped resource",
+			clusterRef: corev1.ObjectReference{
+				APIVersion: "management.cattle.io/v3",
+				Kind:       "Cluster",
+				Name:       "c-m-12345",
 			},
-			expectedCluster: nil,
-			expectErr:       true,
-		},
-		{
-			name:        "match from index",
-			clusterName: "test-cluster",
-			cacheFunc: func(cache *fake.MockCacheInterface[*provv1.Cluster]) {
-				cache.EXPECT().GetByIndex(cluster2.ByCluster, "test-cluster").Return([]*provv1.Cluster{
-					{
-						Status: provv1.ClusterStatus{
-							ClusterName: "test-cluster",
-						},
-					},
-				}, nil)
-			},
-			expectedCluster: &provv1.Cluster{
-				Status: provv1.ClusterStatus{
-					ClusterName: "test-cluster",
-				},
-			},
-			expectErr: false,
-		},
-		{
-			name:        "multiple matches from index",
-			clusterName: "test-cluster",
-			cacheFunc: func(cache *fake.MockCacheInterface[*provv1.Cluster]) {
-				cache.EXPECT().GetByIndex(cluster2.ByCluster, "test-cluster").Return([]*provv1.Cluster{
-					{
-						Status: provv1.ClusterStatus{
-							ClusterName: "test-cluster",
-						},
-					},
-					{
-						Status: provv1.ClusterStatus{
-							ClusterName: "test-cluster",
-						},
-					},
-				}, nil)
-			},
-			expectedCluster: nil,
-			expectErr:       true,
+			dynamicObj:      newUnstructuredCluster("management.cattle.io/v3", "Cluster", "", "c-m-12345"),
+			expectNamespace: "",
+			expectName:      "c-m-12345",
+			expectErr:       false,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			cache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
-			tt.cacheFunc(cache)
+			t.Parallel()
+
 			h := handler{
-				clusterName: tt.clusterName,
+				clusterRef: tt.clusterRef,
+				dynamic:    &dynamicClientFake{obj: tt.dynamicObj, err: tt.dynamicErr},
 			}
-			h.clusterCache = cache
 			cluster, err := h.getCluster()
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, cluster)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedCluster, cluster)
+				require.NotNil(t, cluster)
+				assert.Equal(t, tt.expectNamespace, cluster.GetNamespace())
+				assert.Equal(t, tt.expectName, cluster.GetName())
 			}
 		})
 	}
@@ -930,7 +818,7 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 	tests := []struct {
 		name string
 
-		cluster      *provv1.Cluster
+		cluster      *unstructured.Unstructured
 		snapshotFile *k3s.ETCDSnapshotFile
 
 		cacheFunc func(cache *fake.MockCacheInterface[*rkev1.ETCDSnapshot])
@@ -941,7 +829,7 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 		{
 			name:         "nil result",
 			snapshotFile: k3s.NewETCDSnapshotFile("", "test-snapshot", k3s.ETCDSnapshotFile{}),
-			cluster:      provv1.NewCluster("test-namespace", "test-cluster", provv1.Cluster{}),
+			cluster:      newProvisioningClusterUnstructured("test-namespace", "test-cluster"),
 			cacheFunc: func(cache *fake.MockCacheInterface[*rkev1.ETCDSnapshot]) {
 				cache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot").Return(nil, nil)
 			},
@@ -951,7 +839,7 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 		{
 			name:         "empty result",
 			snapshotFile: k3s.NewETCDSnapshotFile("", "test-snapshot", k3s.ETCDSnapshotFile{}),
-			cluster:      provv1.NewCluster("test-namespace", "test-cluster", provv1.Cluster{}),
+			cluster:      newProvisioningClusterUnstructured("test-namespace", "test-cluster"),
 			cacheFunc: func(cache *fake.MockCacheInterface[*rkev1.ETCDSnapshot]) {
 				cache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot").Return([]*rkev1.ETCDSnapshot{}, nil)
 			},
@@ -961,7 +849,7 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 		{
 			name:         "error from index",
 			snapshotFile: k3s.NewETCDSnapshotFile("", "test-snapshot", k3s.ETCDSnapshotFile{}),
-			cluster:      provv1.NewCluster("test-namespace", "test-cluster", provv1.Cluster{}),
+			cluster:      newProvisioningClusterUnstructured("test-namespace", "test-cluster"),
 			cacheFunc: func(cache *fake.MockCacheInterface[*rkev1.ETCDSnapshot]) {
 				cache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot").Return(nil, errors.New("error from index"))
 			},
@@ -971,7 +859,7 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 		{
 			name:         "match from index",
 			snapshotFile: k3s.NewETCDSnapshotFile("", "test-snapshot", k3s.ETCDSnapshotFile{}),
-			cluster:      provv1.NewCluster("test-namespace", "test-cluster", provv1.Cluster{}),
+			cluster:      newProvisioningClusterUnstructured("test-namespace", "test-cluster"),
 			cacheFunc: func(cache *fake.MockCacheInterface[*rkev1.ETCDSnapshot]) {
 				cache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot").Return([]*rkev1.ETCDSnapshot{{}}, nil)
 			},
@@ -979,10 +867,9 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 			expectErr:         false,
 		},
 		{
-			// it's valid for multiple objects to be returned from the index if a user creates them, although the controller will delete any duplicates and recreate a single one.
 			name:         "multiple matches from index",
 			snapshotFile: k3s.NewETCDSnapshotFile("", "test-snapshot", k3s.ETCDSnapshotFile{}),
-			cluster:      provv1.NewCluster("test-namespace", "test-cluster", provv1.Cluster{}),
+			cluster:      newProvisioningClusterUnstructured("test-namespace", "test-cluster"),
 			cacheFunc: func(cache *fake.MockCacheInterface[*rkev1.ETCDSnapshot]) {
 				cache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot").Return([]*rkev1.ETCDSnapshot{{}, {}}, nil)
 			},
@@ -992,12 +879,16 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			ctrl := gomock.NewController(t)
 			cache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
 			tt.cacheFunc(cache)
-			h := handler{}
+			// snapshotNamespace mirrors the namespace snapshots are written to. All fixtures use
+			// "test-namespace" for the cluster's own ns, and for the non-CAPRKE2 paths in this
+			// test file that ns equals h.snapshotNamespace.
+			h := handler{snapshotNamespace: tt.cluster.GetNamespace()}
 			h.etcdSnapshotCache = cache
 			snapshots, err := h.getSnapshotsFromSnapshotFile(tt.cluster, tt.snapshotFile)
 			if tt.expectErr {
@@ -1011,223 +902,119 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 	}
 }
 
-func TestGetMachineFromNode(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-
-		nodeName         string
-		clusterName      string
-		clusterNamespace string
-
-		cacheFunc func(cache *fake.MockCacheInterface[*capi.Machine])
-
-		expectedMachine *capi.Machine
-		expectErr       bool
-	}{
-		{
-			name:             "no machines",
-			nodeName:         "test-node",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{}, nil)
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "error from list",
-			nodeName:         "test-node",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, errors.New("list error"))
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "nil node ref",
-			nodeName:         "test-node",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
-					{},
-				}, nil)
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "no matching node ref",
-			nodeName:         "test-node",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
-					{
-						Status: capi.MachineStatus{
-							NodeRef: capi.MachineNodeReference{
-								Name: "not-test-node",
-							},
-						},
-					},
-				}, nil)
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "matching node ref",
-			nodeName:         "test-node",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
-					{
-						Status: capi.MachineStatus{
-							NodeRef: capi.MachineNodeReference{
-								Name: "test-node",
-							},
-						},
-					},
-				}, nil)
-			},
-			expectedMachine: &capi.Machine{
-				Status: capi.MachineStatus{
-					NodeRef: capi.MachineNodeReference{
-						Name: "test-node",
-					},
-				},
-			},
-			expectErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)
-			tt.cacheFunc(machineCache)
-			h := handler{}
-			h.machineCache = machineCache
-			machine, err := h.getMachineFromNode(tt.nodeName, tt.clusterName, tt.clusterNamespace)
-			if tt.expectErr {
-				assert.Error(t, err)
-				assert.Nil(t, machine)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedMachine, machine)
-			}
-		})
-	}
-}
-
-func TestGetMachineByID(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-
-		machineID        string
-		clusterName      string
-		clusterNamespace string
-
-		cacheFunc func(cache *fake.MockCacheInterface[*capi.Machine])
-
-		expectedMachine *capi.Machine
-		expectErr       bool
-	}{
-		{
-			name:             "no machines",
-			machineID:        "abcdefg",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{}, nil)
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "multiple matching machines",
-			machineID:        "abcdefg",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{{}, {}}, nil)
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "error from list",
-			machineID:        "abcdefg",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, errors.New("list error"))
-			},
-			expectedMachine: nil,
-			expectErr:       true,
-		},
-		{
-			name:             "matching machine",
-			machineID:        "abcdefg",
-			clusterName:      "test-cluster",
-			clusterNamespace: "test-namespace",
-			cacheFunc: func(cache *fake.MockCacheInterface[*capi.Machine]) {
-				cache.EXPECT().List("test-namespace", labels.SelectorFromSet(labels.Set{
-					capr.ClusterNameLabel: "test-cluster",
-					capr.MachineIDLabel:   "abcdefg",
-				})).Return([]*capi.Machine{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Namespace: "test-namespace",
-							Name:      "test-machine",
-						},
-					},
-				}, nil)
-			},
-			expectedMachine: &capi.Machine{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-machine",
-				},
-			},
-			expectErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)
-			tt.cacheFunc(machineCache)
-			h := handler{}
-			h.machineCache = machineCache
-			machine, err := h.getMachineByID(tt.machineID, tt.clusterName, tt.clusterNamespace)
-			if tt.expectErr {
-				assert.Error(t, err)
-				assert.Nil(t, machine)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedMachine, machine)
-			}
-		})
-	}
-}
-
 func TestGetLogPrefix(t *testing.T) {
-	assert.Equal(t, "[snapshotbackpopulate] rkecluster test-namespace/test-cluster:", getLogPrefix(&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "test-namespace", Name: "test-cluster"}}))
+	t.Parallel()
+
+	cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+	expected := fmt.Sprintf("[snapshotbackpopulate] %s/test-namespace/test-cluster:",
+		schema.FromAPIVersionAndKind("provisioning.cattle.io/v1", "Cluster").String())
+	assert.Equal(t, expected, getLogPrefix(cluster))
+}
+
+func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
+	t.Parallel()
+
+	allLabels := map[string]string{
+		planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+		planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+		planv1alpha1.MachineLifecycleNameLabel:  "test-machine",
+	}
+
+	drop := func(key string) map[string]string {
+		l := make(map[string]string, len(allLabels))
+		maps.Copy(l, allLabels)
+		delete(l, key)
+		return l
+	}
+
+	tests := []struct {
+		name             string
+		labels           map[string]string
+		contextNamespace string
+		expectRef        *corev1.ObjectReference
+		expectErr        bool
+	}{
+		{
+			name:      "no labels",
+			labels:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "missing kind",
+			labels:    drop(planv1alpha1.MachineLifecycleKindLabel),
+			expectErr: true,
+		},
+		{
+			name:      "missing name",
+			labels:    drop(planv1alpha1.MachineLifecycleNameLabel),
+			expectErr: true,
+		},
+		{
+			name: "unknown group",
+			labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "not.a.real.group",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "test-machine",
+			},
+			contextNamespace: "fleet-default",
+			expectErr:        true,
+		},
+		{
+			name:             "namespace comes from context, not label",
+			labels:           allLabels,
+			contextNamespace: "fleet-default",
+			expectRef: &corev1.ObjectReference{
+				APIVersion: "cluster.x-k8s.io/v1beta2",
+				Kind:       "Machine",
+				Name:       "test-machine",
+				Namespace:  "fleet-default",
+			},
+		},
+		{
+			name: "stale namespace label is ignored (spoofing check)",
+			labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel:                   "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:                    "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:                    "test-machine",
+				"plan.cattle.io/machine-namespace-legacy-ignored-by-code": "other-tenant-ns",
+			},
+			contextNamespace: "fleet-default",
+			expectRef: &corev1.ObjectReference{
+				APIVersion: "cluster.x-k8s.io/v1beta2",
+				Kind:       "Machine",
+				Name:       "test-machine",
+				Namespace:  "fleet-default",
+			},
+		},
+	}
+
+	mapper := testRESTMapper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			obj := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-node",
+					Labels: tt.labels,
+				},
+			}
+
+			ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(obj, tt.contextNamespace, mapper)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.Nil(t, ref)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectRef, ref)
+			}
+		})
+	}
 }
 
 func TestGenerateSafeSnapshotName(t *testing.T) {
+	t.Parallel()
+
 	callTime := time.Unix(1_700_000_000, 0)
 
 	newSpec := func(name, node, loc string, s3 bool) k3s.ETCDSnapshotSpec {
@@ -1274,8 +1061,9 @@ func TestGenerateSafeSnapshotName(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := generateSafeSnapshotName(tc.spec, callTime)
 			require.Equal(t, strings.ToLower(got), got)
 			require.True(t, strings.HasPrefix(got, tc.wantPrefix), got)
@@ -1291,6 +1079,8 @@ func TestGenerateSafeSnapshotName(t *testing.T) {
 	}
 
 	t.Run("Digest changes when location changes", func(t *testing.T) {
+		t.Parallel()
+
 		a := newSpec("ok", "cp-0", "s3://bucket/prefix/A", true)
 		b := newSpec("ok", "cp-0", "s3://bucket/prefix/B", true)
 
@@ -1301,4 +1091,322 @@ func TestGenerateSafeSnapshotName(t *testing.T) {
 		require.True(t, strings.HasPrefix(gb, "s3-ok-"))
 		require.NotEqual(t, ga, gb, "digest suffix must differ when location differs")
 	})
+}
+
+func TestGetSnapshotHash(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		snapshot *k3s.ETCDSnapshotFile
+		want     string
+	}{
+		{
+			name:     "nil snapshot",
+			snapshot: nil,
+			want:     "",
+		},
+		{
+			name: "empty snapshot",
+			snapshot: &k3s.ETCDSnapshotFile{
+				Spec: k3s.ETCDSnapshotSpec{},
+			},
+			want: "",
+		},
+		{
+			name: "empty annotations",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "empty rke2",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.rke2.cattle.io/snapshot-token-hash": "",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "empty k3s",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.k3s.cattle.io/snapshot-token-hash": "",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "unrelated",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.testing.cattle.io/snapshot-token-hash": "abc123",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "rke2",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.rke2.cattle.io/snapshot-token-hash": "abc123",
+					},
+				},
+			},
+			want: "abc123",
+		},
+		{
+			name: "k3s",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.k3s.cattle.io/snapshot-token-hash": "abc123",
+					},
+				},
+			},
+			want: "abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := getSnapshotHash(tt.snapshot)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// provClusterResourceKey is the resource key the snapshotextrametadata controller publishes a
+// v2prov cluster under. Hardcoded rather than imported because it is a wire format shared with the
+// downstream payload, not a Go constant this package owns.
+const provClusterResourceKey = "cluster.provisioning.cattle.io"
+
+// compressResources renders a resources payload the way snapshotextrametadata does.
+func compressResources(t *testing.T, resources map[string]any) string {
+	t.Helper()
+
+	payload, err := snapshotutil.CompressInterface(resources)
+	require.NoError(t, err)
+	return payload
+}
+
+// marshalRestoreModes renders a restoreModes payload the way snapshotextrametadata does.
+func marshalRestoreModes(t *testing.T, modes map[string]string) string {
+	t.Helper()
+
+	payload, err := json.Marshal(modes)
+	require.NoError(t, err)
+	return string(payload)
+}
+
+func TestGetRestoreModesAnnotationFromExtraMetadata(t *testing.T) {
+	t.Parallel()
+
+	cluster := newProvisioningClusterUnstructured("fleet-default", "example")
+
+	kubernetesVersionSelector := "$['" + provClusterResourceKey + "']['spec']['kubernetesVersion']"
+
+	// populatedResources is what snapshotextrametadata publishes for a healthy v2prov cluster.
+	populatedResources := map[string]any{
+		provClusterResourceKey: map[string]any{
+			"metadata": map[string]any{"name": "example"},
+			"spec": map[string]any{
+				"kubernetesVersion": "v1.34.1+rke2r1",
+				"rkeConfig":         map[string]any{"additionalManifest": "# manifest"},
+			},
+		},
+	}
+
+	allModes := map[string]string{
+		rkev1.RestoreRKEConfigAll:               rkev1.RestoreModeSelectorWildcard,
+		rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector,
+		rkev1.RestoreRKEConfigNone:              "",
+	}
+
+	tests := []struct {
+		name     string
+		metadata map[string]string
+		expected string
+	}{
+		{
+			name: "every mode resolves",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey:    compressResources(t, populatedResources),
+			},
+			expected: "none,kubernetesVersion,all",
+		},
+		{
+			// Nothing restorable was captured, so neither kubernetesVersion nor the wildcard "all"
+			// resolves: restoremode.Resolve expands the wildcard over restoremode.WritablePaths, so
+			// "all" is offered only when a field it would actually write was captured.
+			name: "nothing restorable was captured",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{"rkeConfig": map[string]any{}},
+					},
+				}),
+			},
+			expected: "none",
+		},
+		{
+			name: "kubernetesVersion selector resolves to an empty value",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{"kubernetesVersion": ""},
+					},
+				}),
+			},
+			expected: "none",
+		},
+		{
+			// kubernetesVersion was not captured but another writable field was, so "all" stands on
+			// its own.
+			name: "only a field other than kubernetesVersion was captured",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{
+							"rkeConfig": map[string]any{"additionalManifest": "# manifest"},
+						},
+					},
+				}),
+			},
+			expected: "none,all",
+		},
+		{
+			name: "no resources were published",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+			},
+			expected: "none",
+		},
+		{
+			name: "resources payload is corrupt",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey:    "not-base64-or-gzip-corrupt-data",
+			},
+			expected: "none",
+		},
+		{
+			name: "restoreModes payload is not JSON",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: "{not json",
+				rkev1.SnapshotMetadataResourcesKey:    compressResources(t, populatedResources),
+			},
+			expected: "none",
+		},
+		{
+			name: "restoreModes payload declares no modes",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: "{}",
+				rkev1.SnapshotMetadataResourcesKey:    compressResources(t, populatedResources),
+			},
+			expected: "none",
+		},
+		{
+			name: "restoreModes payload omits none",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector,
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+			},
+			expected: "none,kubernetesVersion",
+		},
+		{
+			name: "a mode with an unparsable selector is dropped",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigNone:              "",
+					rkev1.RestoreRKEConfigKubernetesVersion: "spec.kubernetesVersion",
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+			},
+			expected: "none",
+		},
+		{
+			name: "modes this rancher does not know about are emitted last",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigAll:               rkev1.RestoreModeSelectorWildcard,
+					rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector,
+					rkev1.RestoreRKEConfigNone:              "",
+					"additionalManifest":                    "$['" + provClusterResourceKey + "']['spec']['rkeConfig']['additionalManifest']",
+					"aardvark":                              rkev1.RestoreModeSelectorWildcard,
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+			},
+			expected: "none,kubernetesVersion,all,aardvark,additionalManifest",
+		},
+		{
+			name: "restoreModes takes precedence over the legacy cluster spec",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, map[string]string{
+					rkev1.RestoreRKEConfigNone: "",
+				}),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, populatedResources),
+				rkev1.SnapshotMetadataClusterSpecKey: func() string {
+					payload, err := snapshotutil.CompressInterface(&provv1.ClusterSpec{
+						KubernetesVersion: "v1.34.1+rke2r1",
+						RKEConfig:         &provv1.RKEConfig{},
+					})
+					require.NoError(t, err)
+					return payload
+				}(),
+			},
+			expected: "none",
+		},
+		{
+			name: "an empty restoreModes key falls back to the legacy cluster spec",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: "",
+				rkev1.SnapshotMetadataClusterSpecKey: func() string {
+					payload, err := snapshotutil.CompressInterface(&provv1.ClusterSpec{
+						KubernetesVersion: "v1.34.1+rke2r1",
+						RKEConfig:         &provv1.RKEConfig{},
+					})
+					require.NoError(t, err)
+					return payload
+				}(),
+			},
+			expected: "none,kubernetesVersion,all",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			downstream := &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1"},
+				Spec:       k3s.ETCDSnapshotSpec{Metadata: tt.metadata},
+			}
+
+			// The modes come out of a map, so assert the value is stable: an unstable annotation
+			// would make populateUpstreamSnapshotFromDownstream patch on every reconcile.
+			for range 10 {
+				assert.Equal(t, tt.expected, getRestoreModesAnnotation(downstream, cluster))
+			}
+		})
+	}
 }

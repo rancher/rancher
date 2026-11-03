@@ -55,15 +55,13 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2}')"
 
-export CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
-
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
 # Previously this would use channels, but channels no longer reflect the latest version since
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.14/data/data.json | jq -r ".$DIST.releases[-1].version")
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.16/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
@@ -77,11 +75,11 @@ touch /tmp/rancher.log
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
-grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
-mkdir -p /usr/share/rancher/ui/assets
-curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
-curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
-curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
+grep -m1 '^machineProvisionImage:' build.yaml | cut -d ' ' -f2 >> /var/lib/rancher/$DIST/agent/images/pull.txt
+mkdir -p /usr/share/rancher/ui-dashboard/assets
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-amd64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-arm64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui-dashboard/assets/system-agent-uninstall.sh
 
 build_and_run_rancher()
 {
@@ -177,22 +175,16 @@ echo Running build-integration-setup
 ./tests/v2/integration/scripts/build-integration-setup
 
 echo Running integrationsetup
-export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
+export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
 ./tests/v2/integration/bin/integrationsetup || {
   dump_rancher_logs
   exit 1
 }
 
 echo Running go integration tests
-CGO_ENABLED=0 go test -v -failfast -p 1 ./tests/v2/integration/... || {
+CGO_ENABLED=0 go test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
   dump_rancher_logs
   exit 1
 }
-
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
 
 tail -f /tmp/rancher-test.log &

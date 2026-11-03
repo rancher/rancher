@@ -79,6 +79,7 @@ type ClusterInterface interface {
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Cluster, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Cluster, error)
 	Update(*v3.Cluster) (*v3.Cluster, error)
+	UpdateStatus(*v3.Cluster) (*v3.Cluster, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*v3.ClusterList, error)

@@ -241,6 +241,10 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		},
 	}
 
+	if len(args.ImagePullSecrets) > 0 {
+		job.Spec.Template.Spec.ImagePullSecrets = args.ImagePullSecrets
+	}
+
 	return []runtime.Object{
 		args.EnvSecret,
 		secret,

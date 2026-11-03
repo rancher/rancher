@@ -9,6 +9,8 @@ func RequiredCRDs() []string {
 	requiredCRDS := BasicCRDs()
 	if features.ProvisioningV2.Enabled() {
 		requiredCRDS = append(requiredCRDS, ProvisioningV2CRDs()...)
+		requiredCRDS = append(requiredCRDS, PlanCRDs()...)
+		requiredCRDS = append(requiredCRDS, OperationCRDs()...)
 		if features.RKE2.Enabled() {
 			requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
 		}
@@ -22,14 +24,16 @@ func RequiredCRDs() []string {
 	if features.MCM.Enabled() {
 		requiredCRDS = append(requiredCRDS, MCMCRDs()...)
 	}
-	if features.Auth.Enabled() {
-		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
-	}
+	requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	if features.UIExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
 	if features.OIDCProvider.Enabled() {
 		requiredCRDS = append(requiredCRDS, OIDCClientCRD()...)
+	}
+	if features.ImportedDay2Ops.Enabled() {
+		requiredCRDS = append(requiredCRDS, PlanCRDs()...)
+		requiredCRDS = append(requiredCRDS, OperationCRDs()...)
 	}
 
 	requiredCRDS = append(requiredCRDS, TelemetryCRDs()...)
@@ -64,6 +68,7 @@ func BasicCRDs() []string {
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
+		"tableconfigurations.ui.cattle.io",
 		"proxyendpoints.management.cattle.io",
 	}
 }
@@ -196,6 +201,21 @@ func TelemetryCRDs() []string {
 	}
 }
 
+func PlanCRDs() []string {
+	return []string{
+		"beacons.plan.cattle.io",
+	}
+}
+
+func OperationCRDs() []string {
+	return []string{
+		"certificaterotations.operation.cattle.io",
+		"encryptionkeyrotations.operation.cattle.io",
+		"etcdsnapshotsaves.operation.cattle.io",
+		"etcdsnapshotrestores.operation.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -207,6 +227,7 @@ var MigratedResources = map[string]bool{
 	"authtokens.management.cattle.io":                                 false,
 	"azureadproviders.management.cattle.io":                           false,
 	"basicauths.project.cattle.io":                                    false,
+	"beacons.plan.cattle.io":                                          true,
 	"certificates.project.cattle.io":                                  false,
 	"cloudcredentials.management.cattle.io":                           false,
 	"clusterauthtokens.cluster.cattle.io":                             false,
@@ -220,14 +241,17 @@ var MigratedResources = map[string]bool{
 	"clusters.management.cattle.io":                                   false,
 	"clusters.provisioning.cattle.io":                                 true,
 	"clusteruserattributes.cluster.cattle.io":                         false,
+	"certificaterotations.operation.cattle.io":                        true,
 	"composeconfigs.management.cattle.io":                             false,
 	"custommachines.rke.cattle.io":                                    true,
 	"dockercredentials.project.cattle.io":                             false,
 	"dynamicschemas.management.cattle.io":                             true,
+	"encryptionkeyrotations.operation.cattle.io":                      true,
 	"etcdsnapshots.rke.cattle.io":                                     true,
+	"etcdsnapshotsaves.operation.cattle.io":                           true,
+	"etcdsnapshotrestores.operation.cattle.io":                        true,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
 	"features.management.cattle.io":                                   false,
-	"fleetworkspaces.management.cattle.io":                            false,
 	"freeipaproviders.management.cattle.io":                           false,
 	"githubproviders.management.cattle.io":                            false,
 	"globalrolebindings.management.cattle.io":                         true,
@@ -270,6 +294,7 @@ var MigratedResources = map[string]bool{
 	"serviceaccounttokens.project.cattle.io":                          false,
 	"settings.management.cattle.io":                                   false,
 	"sshauths.project.cattle.io":                                      false,
+	"tableconfigurations.ui.cattle.io":                                true,
 	"templatecontents.management.cattle.io":                           false,
 	"templates.management.cattle.io":                                  false,
 	"templateversions.management.cattle.io":                           false,

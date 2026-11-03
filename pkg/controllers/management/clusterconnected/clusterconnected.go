@@ -10,19 +10,15 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-)
-
-var (
-	Connected = condition.Cond("Connected")
 )
 
 func Register(ctx context.Context, wrangler *wrangler.Context) {
@@ -81,15 +77,15 @@ func (c *checker) hasSession(cluster *v3.Cluster) bool {
 		return false
 	}
 	defer func() {
-		io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_, _ = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 	}()
 	return resp.StatusCode == http.StatusOK
 }
 
 func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
-		if !Connected.IsTrue(cluster) {
+		if !v3.ClusterConditionConnected.IsTrue(cluster) {
 			return c.updateClusterConnectedCondition(cluster, true)
 		}
 		return nil
@@ -98,15 +94,14 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	hasSession := c.hasSession(cluster)
 	// The simpler condition of hasSession == Connected.IsTrue(cluster) is not
 	// used because it treats a non-existent conditions as False
-	if hasSession && Connected.IsTrue(cluster) {
+	if hasSession && v3.ClusterConditionConnected.IsTrue(cluster) {
 		return nil
-	} else if !hasSession && Connected.IsFalse(cluster) && v3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
+	} else if !hasSession && v3.ClusterConditionConnected.IsFalse(cluster) {
 		return nil
 	}
 
 	// RKE2: wait to update the connected condition until it is pre-bootstrapped
-	if capr.PreBootstrap(cluster) &&
-		cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
+	if capr.ShouldPreBootstrap(cluster) && pkgcluster.IsAdministrated(cluster) &&
 		cluster.Name != "local" {
 		// overriding it to be disconnected until bootstrapping is done
 		logrus.Debugf("[pre-bootstrap][%v] Waiting for cluster to be pre-bootstrapped - not marking agent connected", cluster.Name)
@@ -120,21 +115,24 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 	if cluster == nil {
 		return fmt.Errorf("cluster cannot be nil")
 	}
-	for i := 0; i < 3; i++ {
-		cluster = cluster.DeepCopy()
-		Connected.SetStatusBool(cluster, connected)
-		if !connected && v3.ClusterConditionProvisioned.IsTrue(cluster) {
-			v3.ClusterConditionReady.False(cluster)
-			v3.ClusterConditionReady.Reason(cluster, "Disconnected")
-			v3.ClusterConditionReady.Message(cluster, "Cluster agent is not connected")
+
+	clusterName := cluster.Name
+	for range 3 {
+		cluster, err := c.clusters.Get(clusterName, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
+
+		v3.ClusterConditionConnected.SetStatusBool(cluster, connected)
+		// set other conditions to unknown to prevent ready from becoming immediately true.
+		v3.ClusterConditionProbeSucceeded.CreateUnknownIfNotExists(cluster)
+		v3.ClusterConditionControllersRunning.CreateUnknownIfNotExists(cluster)
+		pkgcluster.SummarizeReadyCondition(cluster)
+
 		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
-		_, err := c.clusters.Update(cluster)
+
+		_, err = c.clusters.UpdateStatus(cluster)
 		if apierror.IsConflict(err) {
-			cluster, err = c.clusters.Get(cluster.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
 			continue
 		}
 		return err

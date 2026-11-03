@@ -28,30 +28,44 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Token struct {
-	metav1.TypeMeta    `json:",inline"`
-	metav1.ObjectMeta  `json:"metadata,omitempty"`
-	Token              string            `json:"token" norman:"writeOnly,noupdate"`
-	UserPrincipal      Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
-	GroupPrincipals    []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
-	ProviderInfo       map[string]string `json:"providerInfo,omitempty"`
-	UserID             string            `json:"userId" norman:"type=reference[user]"`
-	AuthProvider       string            `json:"authProvider"`
-	TTLMillis          int64             `json:"ttl"`
-	LastUsedAt         *metav1.Time      `json:"lastUsedAt,omitempty"`
-	ActivityLastSeenAt *metav1.Time      `json:"activityLastSeenAt,omitempty"`
-	IsDerived          bool              `json:"isDerived"`
-	Description        string            `json:"description"`
-	Expired            bool              `json:"expired"`
-	ExpiresAt          string            `json:"expiresAt"`
-	Current            bool              `json:"current"`
-	ClusterName        string            `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
-	Enabled            *bool             `json:"enabled,omitempty" norman:"default=true"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Token             string            `json:"token" norman:"writeOnly,noupdate"`
+	UserPrincipal     Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
+	GroupPrincipals   []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
+	ProviderInfo      map[string]string `json:"providerInfo,omitempty"`
+	UserID            string            `json:"userId" norman:"type=reference[user]"`
+	// Deprecated: The AuthConfig name is parsed from the UserPrincipal.Name
+	// and the provider is derived from that AuthConfig's type.
+	AuthProvider       string       `json:"authProvider"`
+	TTLMillis          int64        `json:"ttl"`
+	LastUsedAt         *metav1.Time `json:"lastUsedAt,omitempty"`
+	ActivityLastSeenAt *metav1.Time `json:"activityLastSeenAt,omitempty"`
+	IsDerived          bool         `json:"isDerived"`
+	Description        string       `json:"description"`
+	Expired            bool         `json:"expired"`
+	ExpiresAt          string       `json:"expiresAt"`
+	Current            bool         `json:"current"`
+	ClusterName        string       `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
+	Enabled            *bool        `json:"enabled,omitempty" norman:"default=true"`
 }
 
 // Implement the TokenAccessor interface
 
+func (t *Token) GetLabels() map[string]string {
+	return t.ObjectMeta.Labels
+}
+
 func (t *Token) GetName() string {
 	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetFullName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetKind() string {
+	return "v3"
 }
 
 func (t *Token) GetIsEnabled() bool {
@@ -62,6 +76,8 @@ func (t *Token) GetIsDerived() bool {
 	return t.IsDerived
 }
 
+// Deprecated: GetAuthProvider is deprecated in favour of parsing the
+// AuthConfig name from the Principal's ID and using that AuthConfig's type.
 func (t *Token) GetAuthProvider() string {
 	return t.AuthProvider
 }
@@ -304,6 +320,10 @@ type AuthConfig struct {
 	// Currently only the SAML providers do, with their `Single Log Out` flow.
 	LogoutAllSupported bool `json:"logoutAllSupported,omitempty"`
 
+	// DisplayName is the user friendly name shown in the UI.
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
+
 	Status AuthConfigStatus `json:"status"`
 }
 
@@ -377,6 +397,8 @@ type GithubConfigApplyInput struct {
 	GithubConfig GithubConfig `json:"githubConfig,omitempty"`
 	Code         string       `json:"code,omitempty"`
 	Enabled      bool         `json:"enabled,omitempty"`
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +genclient
@@ -419,6 +441,9 @@ type GithubAppConfigApplyInput struct {
 	GithubConfig GithubAppConfig `json:"githubConfig,omitempty"`
 	Code         string          `json:"code,omitempty"`
 	Enabled      bool            `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -442,6 +467,9 @@ type GoogleOauthConfigApplyInput struct {
 	GoogleOauthConfig GoogleOauthConfig `json:"googleOauthConfig,omitempty"`
 	Code              string            `json:"code,omitempty"`
 	Enabled           bool              `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -459,6 +487,18 @@ type AzureADConfig struct {
 	ApplicationSecret     string `json:"applicationSecret,omitempty" norman:"required,type=password"`
 	RancherURL            string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 	GroupMembershipFilter string `json:"groupMembershipFilter,omitempty"`
+
+	// EndSessionEndpoint overrides the Azure AD end_session_endpoint used for SSO logout.
+	// If empty, defaults to {Endpoint}/{TenantID}/oauth2/v2.0/logout.
+	EndSessionEndpoint string `json:"endSessionEndpoint,omitempty"`
+
+	// LogoutAllEnabled enables SSO logout (RP-Initiated Logout) for this provider.
+	// Can be set only if AuthConfig.LogoutAllSupported is true.
+	LogoutAllEnabled bool `json:"logoutAllEnabled,omitempty"`
+
+	// LogoutAllForced, when set, makes SSO logout the only accepted logout path.
+	// Requires LogoutAllEnabled to be true.
+	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
 }
 
 type AzureADConfigTestOutput struct {
@@ -466,8 +506,9 @@ type AzureADConfigTestOutput struct {
 }
 
 type AzureADConfigApplyInput struct {
-	Config AzureADConfig `json:"config,omitempty"`
-	Code   string        `json:"code,omitempty"`
+	Config     AzureADConfig `json:"config,omitempty"`
+	Code       string        `json:"code,omitempty"`
+	ConfigName string        `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -502,6 +543,8 @@ type ActiveDirectoryConfig struct {
 	GroupMemberMappingAttribute  string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
 	ConnectionTimeout            int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
+	UserIDAttribute              string   `json:"userIDAttribute,omitempty"`
+	GroupIDAttribute             string   `json:"groupIDAttribute,omitempty"`
 }
 
 func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
@@ -510,6 +553,9 @@ func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...stri
 		c.UserLoginAttribute,
 		c.UserNameAttribute,
 		c.UserEnabledAttribute,
+	}
+	if c.UserIDAttribute != "" {
+		userSearchAttributes = append(userSearchAttributes, c.UserIDAttribute)
 	}
 	return append(userSearchAttributes, searchAttributes...)
 }
@@ -521,6 +567,9 @@ func (c *ActiveDirectoryConfig) GetGroupSearchAttributes(searchAttributes ...str
 		c.GroupNameAttribute,
 		c.GroupSearchAttribute,
 	}
+	if c.GroupIDAttribute != "" {
+		groupSeachAttributes = append(groupSeachAttributes, c.GroupIDAttribute)
+	}
 	return append(groupSeachAttributes, searchAttributes...)
 }
 
@@ -529,6 +578,9 @@ type ActiveDirectoryTestAndApplyInput struct {
 	Username              string                `json:"username"`
 	Password              string                `json:"password"`
 	Enabled               bool                  `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 type LdapFields struct {
@@ -560,6 +612,8 @@ type LdapFields struct {
 	ConnectionTimeout               int64    `json:"connectionTimeout,omitempty"               norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"              norman:"default=false"`
 	SearchUsingServiceAccount       bool     `json:"searchUsingServiceAccount"       norman:"default=false"`
+	UserIDAttribute                 string   `json:"userIDAttribute,omitempty"`
+	GroupIDAttribute                string   `json:"groupIDAttribute,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -578,6 +632,9 @@ func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []strin
 		c.UserNameAttribute,
 		c.UserEnabledAttribute,
 	}
+	if c.UserIDAttribute != "" {
+		userSearchAttributes = append(userSearchAttributes, c.UserIDAttribute)
+	}
 	return append(userSearchAttributes, searchAttributes...)
 }
 
@@ -589,6 +646,9 @@ func (c *LdapConfig) GetGroupSearchAttributes(searchAttributes ...string) []stri
 		c.GroupNameAttribute,
 		c.GroupSearchAttribute,
 	}
+	if c.GroupIDAttribute != "" {
+		groupSeachAttributes = append(groupSeachAttributes, c.GroupIDAttribute)
+	}
 	return append(groupSeachAttributes, searchAttributes...)
 }
 
@@ -596,6 +656,9 @@ type LdapTestAndApplyInput struct {
 	LdapConfig `json:"ldapConfig,omitempty"`
 	Username   string `json:"username"`
 	Password   string `json:"password" norman:"type=password,required"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 type OpenLdapConfig struct {
@@ -638,6 +701,25 @@ type SamlConfig struct {
 	UIDField           string `json:"uidField"           norman:"required"`
 	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
 	EntityID           string `json:"entityID"`
+
+	// NameIDFormat is the SAML NameID format the SP requests in the AuthnRequest.
+	// Consumed by the generic SAML provider only. Empty defaults to "unspecified".
+	// +optional
+	NameIDFormat string `json:"nameIDFormat,omitempty" norman:"type=enum,options=unspecified|emailAddress|transient|persistent"`
+
+	// SignatureMethod is the XML signature algorithm the SP uses to sign requests.
+	// Consumed by the generic SAML provider only. Empty defaults to "RSA-SHA256".
+	// +optional
+	SignatureMethod string `json:"signatureMethod,omitempty" norman:"type=enum,options=RSA-SHA256|RSA-SHA1|RSA-SHA512"`
+
+	// AllowIdpInitiated enables IdP-initiated SSO. Consumed by the generic SAML provider only.
+	// +optional
+	AllowIdpInitiated bool `json:"allowIdpInitiated,omitempty"`
+
+	// ForceAuthn, when set true, requests that the IdP force re-authentication.
+	// Consumed by the generic SAML provider only.
+	// +optional
+	ForceAuthn *bool `json:"forceAuthn,omitempty"`
 }
 
 type SamlConfigTestInput struct {
@@ -661,7 +743,8 @@ type PingConfig struct {
 }
 
 type ADFSConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type KeyCloakConfig struct {
@@ -678,6 +761,13 @@ type ShibbolethConfig struct {
 	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
+// GenericSAMLConfig is the config for the generic, configurable SAML 2.0 auth provider.
+type GenericSAMLConfig struct {
+	SamlConfig `json:",inline" mapstructure:",squash"`
+}
+
+// AuthSystemImages is a list of images used for auth systems
+// Deprecated: Image value now stored as buildconfig.DefaultKubeAPIAuthImage updated via build.yaml
 type AuthSystemImages struct {
 	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
 }
@@ -732,6 +822,11 @@ type OIDCConfig struct {
 	// RancherAPIHost should be the base URL for accessing Rancher through the
 	// web. e.g. https://rancher.example.com.
 	RancherAPIHost string `json:"rancherApiHost"`
+
+	// clientAuthenticatedSearch indicates that we should search with the
+	// client/secret rather than the user credentials if the underlying provider
+	// supports this.
+	ClientAuthenticatedSearch bool `json:"clientAuthenticatedSearch"`
 }
 
 type OIDCTestOutput struct {
@@ -742,10 +837,9 @@ type OIDCApplyInput struct {
 	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
 	Code       string     `json:"code,omitempty"`
 	Enabled    bool       `json:"enabled,omitempty"`
-}
 
-type KeyCloakOIDCConfig struct {
-	OIDCConfig `json:",inline" mapstructure:",squash"`
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName"`
 }
 
 // +genclient
@@ -777,6 +871,11 @@ type GenericOIDCTestOutput struct {
 // the configuration for the OIDC provider as well as an auth code.
 type GenericOIDCApplyInput struct {
 	OIDCApplyInput `json:",inline" mapstructure:",squash"`
+}
+
+// KeyCloakOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
+type KeyCloakOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
 }
 
 // GenericOIDCConfig is a wrapper for the AWS Cognito provider holding the OIDC Configuration

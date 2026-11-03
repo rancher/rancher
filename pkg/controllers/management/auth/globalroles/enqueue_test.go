@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/assert"
@@ -128,7 +129,7 @@ func Test_enqueueGRBs(t *testing.T) {
 						UserName:       "u-123xyz",
 					},
 				}
-				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return(grbs, nil)
+				state.grbCacheMock.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "test-gr").Return(grbs, nil)
 
 			},
 			wantKeys: []relatedresource.Key{{Name: "test-grb-1"}},
@@ -151,7 +152,7 @@ func Test_enqueueGRBs(t *testing.T) {
 						UserName:       "u-123xyz",
 					},
 				}
-				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return(grbs, nil)
+				state.grbCacheMock.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "test-gr").Return(grbs, nil)
 
 			},
 			wantKeys: []relatedresource.Key{{Name: "test-grb-1"}},
@@ -182,7 +183,7 @@ func Test_enqueueGRBs(t *testing.T) {
 						UserName:       "u-123abc",
 					},
 				}
-				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return(grbs, nil)
+				state.grbCacheMock.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "test-gr").Return(grbs, nil)
 			},
 			wantKeys: []relatedresource.Key{{Name: "test-grb-1"}, {Name: "test-grb-2"}},
 		},
@@ -195,7 +196,7 @@ func Test_enqueueGRBs(t *testing.T) {
 				InheritedClusterRoles: []string{"test-role"},
 			},
 			stateSetup: func(state testState) {
-				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return(nil, fmt.Errorf("server not available"))
+				state.grbCacheMock.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "test-gr").Return(nil, fmt.Errorf("server not available"))
 			},
 			wantError: true,
 		},
@@ -208,7 +209,7 @@ func Test_enqueueGRBs(t *testing.T) {
 				InheritedClusterRoles: []string{"test-role"},
 			},
 			stateSetup: func(state testState) {
-				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return([]*v3.GlobalRoleBinding{}, nil)
+				state.grbCacheMock.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "test-gr").Return([]*v3.GlobalRoleBinding{}, nil)
 			},
 			wantKeys: nil,
 		},

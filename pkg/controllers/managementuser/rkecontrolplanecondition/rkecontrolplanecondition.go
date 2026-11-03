@@ -3,40 +3,61 @@ package rkecontrolplanecondition
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
-	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-type handler struct {
-	mgmtClusterName      string
-	clusterCache         provisioningcontrollers.ClusterCache
-	downstreamAppClient  catalogv1.AppClient
-	downstreamPlanClient upgradev1.PlanClient
+const (
+	// systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
+	// downstream API calls to check the system-upgrade-controller app status.
+	systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+
+	// noSUCChartVersionReason is the SystemUpgradeControllerReady reason used when the
+	// SystemUpgradeControllerChartVersion setting is empty. It is compared against the existing
+	// condition so the accompanying warning is logged only when the state actually changes.
+	noSUCChartVersionReason = "the SystemUpgradeControllerChartVersion setting is not set"
+)
+
+// throttleState tracks throttle and enqueue deduplication state for a single RKEControlPlane object.
+type throttleState struct {
+	lastDownstreamCheck time.Time // when the downstream API was last called
+	enqueuePending      bool      // whether an EnqueueAfter has already been scheduled for this throttle window
 }
 
-func Register(ctx context.Context, mgmtClusterName string, clusterCache provisioningcontrollers.ClusterCache,
-	downstreamAppClient catalogv1.AppClient, downstreamPlanClient upgradev1.PlanClient,
-	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
+type handler struct {
+	mgmtClusterName           string
+	mgmtClusterUID            types.UID
+	mgmtClusterCache          mgmtcontrollers.ClusterCache
+	downstreamAppClient       catalogv1.AppClient
+	rkeControlPlaneController rkecontrollers.RKEControlPlaneController
+	pendingEnqueues           sync.Map
+}
+
+// Register registers the handler for the management cluster mgmtClusterName. If mgmtClusterUID is set, it
+// only handles the control plane of the management cluster with that UID, which mgmtClusterCache finds.
+func Register(ctx context.Context, mgmtClusterName string, mgmtClusterUID types.UID, mgmtClusterCache mgmtcontrollers.ClusterCache,
+	downstreamAppClient catalogv1.AppClient, rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
 
 	h := handler{
-		mgmtClusterName:      mgmtClusterName,
-		clusterCache:         clusterCache,
-		downstreamAppClient:  downstreamAppClient,
-		downstreamPlanClient: downstreamPlanClient,
+		mgmtClusterName:           mgmtClusterName,
+		mgmtClusterUID:            mgmtClusterUID,
+		mgmtClusterCache:          mgmtClusterCache,
+		downstreamAppClient:       downstreamAppClient,
+		rkeControlPlaneController: rkeControlPlaneController,
 	}
 
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, rkeControlPlaneController,
@@ -46,19 +67,48 @@ func Register(ctx context.Context, mgmtClusterName string, clusterCache provisio
 // syncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the target cluster
 // and manages the SystemUpgradeControllerReady condition on the RKEControlPlane object
 func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+	if obj == nil {
 		return status, nil
 	}
+
+	key := obj.Namespace + "/" + obj.Name
+	if obj.DeletionTimestamp != nil {
+		h.pendingEnqueues.Delete(key)
+		return status, nil
+	}
+
 	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
 		return status, nil
+	}
+	if h.mgmtClusterUID != "" {
+		// The control plane of a cluster created again under the same name is not this controller's.
+		mgmtCluster, err := h.mgmtClusterCache.Get(h.mgmtClusterName)
+		if errors.IsNotFound(err) {
+			return status, nil
+		} else if err != nil {
+			return status, err
+		}
+		if !config.MatchesClusterUID(h.mgmtClusterUID, mgmtCluster) {
+			return status, nil
+		}
 	}
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
-		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
+		// Log only on transition; this is a status handler, so it runs on every change, and the condition set below
+		// already records the reason so we can filter out duplicate logs.
+		if !capr.SystemUpgradeControllerReady.IsFalse(&status) ||
+			capr.SystemUpgradeControllerReady.GetReason(&status) != noSUCChartVersionReason {
+			logrus.Warnf("[rkecontrolplanecondition] %s/%s: %s", obj.Namespace, obj.Name, noSUCChartVersionReason)
+		}
+		capr.SystemUpgradeControllerReady.Reason(&status, noSUCChartVersionReason)
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
+		return status, nil
+	}
+
+	// Skip if Rancher does not have a connection to the cluster
+	if !status.AgentConnected {
 		return status, nil
 	}
 
@@ -70,7 +120,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		} else if actual == "" {
 			// If SystemUpgradeControllerReady is true but its message is empty, this may occur in scenarios where Rancher
 			// is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
-			// In such cases, the condition should be rest
+			// In such cases, the condition should be reset
 			capr.SystemUpgradeControllerReady.Reason(&status, "reset the condition")
 			capr.SystemUpgradeControllerReady.Message(&status, "")
 			capr.SystemUpgradeControllerReady.False(&status)
@@ -78,19 +128,29 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		}
 	}
 
-	cluster, err := h.getCluster()
-	if err != nil {
-		return status, err
-	}
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
-		return status, nil
+	// Skip if a downstream API check was performed recently, to reduce load on downstream clusters.
+	if val, ok := h.pendingEnqueues.Load(key); ok {
+		ts := val.(*throttleState)
+		if wait := systemUpgradeControllerConditionThrottleDuration - time.Since(ts.lastDownstreamCheck); wait > 0 {
+			// Only call EnqueueAfter if there isn't already a pending enqueue for this object.
+			// This avoids stacking up redundant delayed enqueues when the handler is invoked
+			// multiple times during the throttle window.
+			if !ts.enqueuePending {
+				ts.enqueuePending = true
+				h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, wait)
+			}
+			return status, nil
+		}
 	}
 
-	// In rare cases, downstream cluster may become disconnected even if the Connected condition was recently true.
+	// Record that we are performing a downstream API check for throttle purposes.
+	h.pendingEnqueues.Store(key, &throttleState{lastDownstreamCheck: time.Now()})
+
+	// In rare cases, downstream cluster may become disconnected but AgentConnected has not been updated to false.
 	// If that happens, the following Get call can hang until it times out, causing this handler to take longer to return
 	// and delaying the execution of other handlers.
 	name := appName(obj.Spec.ClusterName)
+	logrus.Debugf("[rkecontrolplanecondition] checking %s app in cluster %s", name, obj.Spec.ClusterName)
 	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		capr.SystemUpgradeControllerReady.Reason(&status, err.Error())
@@ -99,6 +159,8 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		// don't return the error, otherwise the status won't be set to 'false'
 		return status, nil
 	} else if err != nil {
+		// Don't throttle retries on transient errors.
+		h.pendingEnqueues.Delete(key)
 		return status, err
 	}
 	if app.DeletionTimestamp != nil {
@@ -133,13 +195,4 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 func appName(clusterName string) string {
 	return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
 		capr.SafeConcatName(48, clusterName, "managed", "system-upgrade-controller"))
-}
-
-// getCluster returns the provisioning cluster associated with the current userContext.
-func (h *handler) getCluster() (*provv1.Cluster, error) {
-	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.mgmtClusterName)
-	if err != nil || len(clusters) != 1 {
-		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.mgmtClusterName, err)
-	}
-	return clusters[0], nil
 }

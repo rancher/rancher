@@ -15,11 +15,14 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/util/retry"
+	rbacauth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 const (
@@ -64,7 +67,21 @@ const (
 	failedToDeleteClusterMembershipBinding                           = "FailedToDeleteClusterMembershipBinding"
 	failedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace      = "FailedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace"
 	failedToDeleteAuthV2Permissions                                  = "FailedToDeleteAuthV2Permissions"
+	failedToRevokeManagementPlanePrivileges                          = "FailedToRevokeManagementPlanePrivileges"
+	crtTokenReaderRoleName                                           = "crt-token-reader"
 )
+
+var crtTokenReaderRoleRef = v1.RoleRef{
+	Kind:     "Role",
+	Name:     crtTokenReaderRoleName,
+	APIGroup: "rbac.authorization.k8s.io",
+}
+
+// crtTokenReaderRoleBindingName returns the deterministic name of the reserved crt-token-reader
+// RoleBinding for the given namespace and subject.
+func crtTokenReaderRoleBindingName(namespace string, subject v1.Subject) string {
+	return pkgrbac.NameForRoleBinding(namespace, crtTokenReaderRoleRef, subject)
+}
 
 var clusterManagementPlaneResources = map[string]string{
 	"clusterscans":                "management.cattle.io",
@@ -75,6 +92,10 @@ var clusterManagementPlaneResources = map[string]string{
 	"nodepools":                   "management.cattle.io",
 	"projects":                    "management.cattle.io",
 	"etcdsnapshots":               "rke.cattle.io",
+	"etcdsnapshotsaves":           "operation.cattle.io",
+	"etcdsnapshotrestores":        "operation.cattle.io",
+	"encryptionkeyrotations":      "operation.cattle.io",
+	"certificaterotations":        "operation.cattle.io",
 }
 
 type crtbLifecycle struct {
@@ -130,6 +151,18 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
 	}
 
+	// Clean up CRT token reader RoleBinding
+	subject, err := pkgrbac.BuildSubjectFromRTB(obj)
+	if err != nil {
+		logrus.Warnf("[%v] Failed to build subject for cleanup of CRT token reader RoleBinding: %v", ctrbMGMTController, err)
+	} else {
+		if err := c.removeCRTTokenReaderRoleBinding(obj, subject); err != nil {
+			logrus.Warnf("[%v] Failed to remove CRT token reader RoleBinding during deletion of %s: %v",
+				ctrbMGMTController, obj.Name, err)
+			// Don't fail deletion for cleanup errors - owner references will GC it anyway
+		}
+	}
+
 	if err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj); err != nil {
 		c.s.AddCondition(&obj.Status.LocalConditions, condition, failedToDeleteAuthV2Permissions, err)
 		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
@@ -182,7 +215,7 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding,
 // When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
 // Specifically:
 // - ensure the subject can see the cluster in the mgmt API
-// - if the subject was granted owner permissions for the clsuter, ensure they can create/update/delete the cluster
+// - if the subject was granted owner permissions for the cluster, ensure they can create/update/delete the cluster
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
 func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: bindingExists}
@@ -193,14 +226,15 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 
 	clusterName := binding.ClusterName
 	cluster, err := c.clusterLister.Get("", clusterName)
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		c.s.AddCondition(localConditions, condition, failedToGetCluster, err)
 		return err
 	}
 	if cluster == nil {
-		err = fmt.Errorf("cannot create binding because cluster %s was not found", clusterName)
-		c.s.AddCondition(localConditions, condition, clusterNotFound, err)
-		return err
+		notFoundErr := fmt.Errorf("cannot create binding %s/%s because cluster %s was not found", binding.Namespace, binding.Name, clusterName)
+		logrus.Warn(notFoundErr)
+		c.s.AddCondition(localConditions, condition, clusterNotFound, notFoundErr)
+		return nil
 	}
 	// if roletemplate is not builtin, check if it's inherited/cloned
 	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
@@ -235,6 +269,32 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToGrantManagementPlanePrivileges, err)
 		return err
+	}
+
+	// Check if RoleTemplate grants CRT access, and if so, grant access to CRT token secrets -
+	// unless the RoleTemplate already grants unrestricted secret access, which makes a
+	// separate crt-token-reader RoleBinding redundant.
+	grantsCRT, hasUnrestrictedSecretAccess, err := c.mgr.checkIfRoleTemplateGrantsCRTAccess(binding.RoleTemplateName)
+	if err != nil {
+		c.s.AddCondition(localConditions, condition, failedToCheckReferencedRole, err)
+		return err
+	}
+
+	if grantsCRT && !hasUnrestrictedSecretAccess {
+		if err := c.ensureCRTTokenReaderRoleBinding(binding, subject); err != nil {
+			c.s.AddCondition(localConditions, condition, failedToGrantManagementPlanePrivileges, err)
+			return err
+		}
+	} else {
+		// Role doesn't grant CRT access, or already grants unrestricted secret access that
+		// covers it - ensure RoleBinding is removed if it exists (handles the case where the
+		// RoleTemplate was updated to remove CRT permissions, or gained unrestricted secret access).
+		// Unlike the CRTB deletion path, the CRTB is still alive here so owner reference GC
+		// will not clean this up - we must return the error to trigger a re-enqueue.
+		if err := c.removeCRTTokenReaderRoleBinding(binding, subject); err != nil {
+			c.s.AddCondition(localConditions, condition, failedToRevokeManagementPlanePrivileges, err)
+			return err
+		}
 	}
 
 	projects, err := c.projectLister.List(binding.Namespace, labels.Everything())
@@ -277,6 +337,113 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+var crtReadOrCreateVerbs = []string{"get", "list", "watch", "create"}
+
+// grantsCRTAccessFromRoleTemplate reports whether a RoleTemplate grants access to
+// clusterregistrationtokens, and whether it separately grants unrestricted secret
+// access (making a dedicated crt-token-reader RoleBinding redundant). Uses the same
+// rule-matching semantics as the Kubernetes RBAC authorizer (via rbacauth.RulesAllow).
+func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.ClusterRoleLister) (grantsCRT bool, hasUnrestrictedSecretAccess bool) {
+	var rules []v1.PolicyRule
+	if rt.External {
+		if rt.ExternalRules != nil {
+			rules = rt.ExternalRules
+		} else {
+			externalRole, err := crLister.Get("", rt.Name)
+			if err != nil || externalRole == nil {
+				return false, false
+			}
+			rules = externalRole.Rules
+		}
+	} else {
+		rules = rt.Rules
+	}
+
+	for _, verb := range crtReadOrCreateVerbs {
+		if rbacauth.RulesAllow(authorizer.AttributesRecord{
+			Verb:            verb,
+			APIGroup:        "management.cattle.io",
+			Resource:        "clusterregistrationtokens",
+			ResourceRequest: true,
+		}, rules...) {
+			grantsCRT = true
+			break
+		}
+	}
+
+	// Name left empty: only matches rules with no ResourceNames restriction, i.e. unrestricted access.
+	hasUnrestrictedSecretAccess = rbacauth.RulesAllow(authorizer.AttributesRecord{
+		Verb:            "get",
+		APIGroup:        "",
+		Resource:        "secrets",
+		ResourceRequest: true,
+	}, rules...)
+
+	return grantsCRT, hasUnrestrictedSecretAccess
+}
+
+// ensureCRTTokenReaderRoleBinding ensures RoleBinding to crt-token-reader exists
+func (c *crtbLifecycle) ensureCRTTokenReaderRoleBinding(binding *v3.ClusterRoleTemplateBinding, subject v1.Subject) error {
+	rbName := crtTokenReaderRoleBindingName(binding.Namespace, subject)
+
+	// Check if already exists
+	existing, err := c.rbLister.Get(binding.Namespace, rbName)
+	if err == nil {
+		// Already exists - verify it's correct
+		if len(existing.Subjects) == 1 &&
+			existing.Subjects[0] == subject &&
+			existing.RoleRef.Name == crtTokenReaderRoleName {
+			return nil
+		}
+
+		// Exists but incorrect - update
+		updated := existing.DeepCopy()
+		updated.Subjects = []v1.Subject{subject}
+		updated.RoleRef = crtTokenReaderRoleRef
+		_, err = c.rbClient.Update(updated)
+		return err
+	}
+
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Create new RoleBinding
+	rb := &v1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: binding.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "ClusterRoleTemplateBinding",
+					Name:       binding.Name,
+					UID:        binding.UID,
+				},
+			},
+		},
+		Subjects: []v1.Subject{subject},
+		RoleRef:  crtTokenReaderRoleRef,
+	}
+
+	_, err = c.rbClient.Create(rb)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+// removeCRTTokenReaderRoleBinding deletes the RoleBinding to crt-token-reader if it exists
+func (c *crtbLifecycle) removeCRTTokenReaderRoleBinding(binding *v3.ClusterRoleTemplateBinding, subject v1.Subject) error {
+	rbName := crtTokenReaderRoleBindingName(binding.Namespace, subject)
+
+	err := c.rbClient.DeleteNamespaced(binding.Namespace, rbName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
 	}
 	return nil
 }

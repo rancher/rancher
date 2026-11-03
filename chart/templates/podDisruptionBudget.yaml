@@ -1,0 +1,37 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  {{- if and .Values.podDisruptionBudget.minAvailable .Values.podDisruptionBudget.maxUnavailable }}
+  {{- fail "Cannot set both podDisruptionBudget.minAvailable and podDisruptionBudget.maxUnavailable" }}
+  {{- end }}
+
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- else if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- else }}
+  # Safe fallback if enabled: true, but no values were specified:
+  # Works safely whether replicaCount is 1 or >1
+  maxUnavailable: 1
+  {{- end }}
+
+  {{- if .Values.podDisruptionBudget.unhealthyPodEvictionPolicy }}
+  unhealthyPodEvictionPolicy: {{ .Values.podDisruptionBudget.unhealthyPodEvictionPolicy }}
+  {{- end }}
+
+  selector:
+  {{- if .Values.podDisruptionBudget.selector }}
+{{ toYaml .Values.podDisruptionBudget.selector | indent 4 }}
+  {{- else }}
+    matchLabels:
+{{ include "rancher.selectorLabels" . | indent 6 }}
+    {{- range $key, $value := .Values.podDisruptionBudget.extraMatchLabels }}
+      {{ $key }}: {{ $value }}
+    {{- end }}
+  {{- end }}
+{{- end }}

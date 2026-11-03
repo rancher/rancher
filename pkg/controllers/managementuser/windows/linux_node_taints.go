@@ -51,8 +51,9 @@ func (n *NodeTaintsController) sync(_ string, obj *v1.Node) (*v1.Node, error) {
 
 	newObj := obj.DeepCopy()
 	newObj.Spec.Taints = append(newObj.Spec.Taints, nodeTaint)
-	if _, err := n.nodeClient.Update(newObj); err != nil {
+	updatedObj, err := n.nodeClient.Update(newObj)
+	if err != nil {
 		return nil, fmt.Errorf("failed to update node taints for node %s/%s, error: %s", obj.Namespace, obj.Name, err.Error())
 	}
-	return obj, nil
+	return updatedObj, nil
 }

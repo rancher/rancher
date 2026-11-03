@@ -3,6 +3,7 @@ package roletemplates
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
@@ -12,17 +13,22 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestPRTBHandlerReconcileSubject(t *testing.T) {
 	t.Parallel()
+	type controllers struct {
+		userMGR        *userMocks.MockManager
+		userController *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]
+		prtbController *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+	}
 	tests := []struct {
-		name                string
-		setupUserManager    func(*userMocks.MockManager)
-		setupUserController func(*fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList])
-		binding             *v3.ProjectRoleTemplateBinding
-		want                *v3.ProjectRoleTemplateBinding
-		wantErr             bool
+		name             string
+		setupControllers func(controllers)
+		binding          *v3.ProjectRoleTemplateBinding
+		want             *v3.ProjectRoleTemplateBinding
+		wantErr          bool
 	}{
 		{
 			name: "prtb with a UserPrincipalName and Username is no-op",
@@ -72,10 +78,13 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "",
 				UserPrincipalName: "test-principal",
 			},
-			setupUserManager: func(m *userMocks.MockManager) {
-				m.EXPECT().EnsureUser("test-principal", "display-name").Return(&v3.User{
+			setupControllers: func(c controllers) {
+				c.userMGR.EXPECT().EnsureUser("test-principal", "display-name").Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-user"},
 				}, nil)
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					return prtb, nil
+				})
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -98,8 +107,8 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "",
 				UserPrincipalName: "test-principal",
 			},
-			setupUserManager: func(m *userMocks.MockManager) {
-				m.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, errDefault)
+			setupControllers: func(c controllers) {
+				c.userMGR.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, errDefault)
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -118,10 +127,13 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "test-user",
 				UserPrincipalName: "",
 			},
-			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(&v3.User{
+			setupControllers: func(c controllers) {
+				c.userController.EXPECT().Get("test-user", metav1.GetOptions{}).Return(&v3.User{
 					PrincipalIDs: []string{"principal-test-user"},
 				}, nil)
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					return prtb, nil
+				})
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				UserName:          "test-user",
@@ -134,8 +146,8 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "test-user",
 				UserPrincipalName: "",
 			},
-			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, errDefault)
+			setupControllers: func(c controllers) {
+				c.userController.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				UserName:          "test-user",
@@ -148,17 +160,18 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			mockUserManager := userMocks.NewMockManager(ctrl)
-			mockUserController := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
-			if tt.setupUserManager != nil {
-				tt.setupUserManager(mockUserManager)
+			controllers := controllers{
+				userMGR:        userMocks.NewMockManager(ctrl),
+				userController: fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl),
+				prtbController: fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl),
 			}
-			if tt.setupUserController != nil {
-				tt.setupUserController(mockUserController)
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers)
 			}
 			p := &prtbHandler{
-				userMGR:        mockUserManager,
-				userController: mockUserController,
+				userMGR:        controllers.userMGR,
+				userController: controllers.userController,
+				prtbClient:     controllers.prtbController,
 			}
 
 			got, err := p.reconcileSubject(tt.binding)
@@ -968,6 +981,293 @@ func TestPRTBHandlerHandleMigration(t *testing.T) {
 			} else {
 				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
 					t.Error("expected label to be absent or not set to 'true'")
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteDuplicatePRTBs(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	earlier := metav1.NewTime(now.Add(-1 * time.Minute))
+
+	tests := []struct {
+		name              string
+		prtb              *v3.ProjectRoleTemplateBinding
+		cachedPRTBs       []*v3.ProjectRoleTemplateBinding
+		expectDeleted     []string
+		expectIsDuplicate bool
+		wantErr           bool
+		cacheListErr      error
+		deleteErr         map[string]error
+	}{
+		{
+			name: "no duplicates",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: now},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     nil,
+			expectIsDuplicate: false,
+		},
+		{
+			name: "two duplicates - newer one is deleted, current is the newer",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-2", Namespace: "ns", CreationTimestamp: now},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-2", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     []string{"prtb-2"},
+			expectIsDuplicate: true,
+		},
+		{
+			name: "two duplicates - current is the oldest (keeper)",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-2", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     []string{"prtb-2"},
+			expectIsDuplicate: false,
+		},
+		{
+			name: "different content - no duplicates",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: now},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-2", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user2",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     nil,
+			expectIsDuplicate: false,
+		},
+		{
+			name: "three duplicates - two deleted",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-3", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-2", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     []string{"prtb-2", "prtb-3"},
+			expectIsDuplicate: false,
+		},
+		{
+			name: "cache list error",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: now},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cacheListErr:      errDefault,
+			expectIsDuplicate: false,
+			wantErr:           true,
+		},
+		{
+			name: "delete error is returned",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-2", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			deleteErr:         map[string]error{"prtb-2": errDefault},
+			expectDeleted:     []string{"prtb-2"},
+			expectIsDuplicate: false,
+			wantErr:           true,
+		},
+		{
+			name: "prtb with deletion timestamp is ignored",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-1", Namespace: "ns", CreationTimestamp: earlier},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "prtb-2",
+						Namespace:         "ns",
+						CreationTimestamp: now,
+						DeletionTimestamp: &now,
+					},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     nil,
+			expectIsDuplicate: false,
+		},
+		{
+			name: "same timestamp tiebroken by name",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta:       metav1.ObjectMeta{Name: "prtb-b", Namespace: "ns", CreationTimestamp: now},
+				UserName:         "user1",
+				RoleTemplateName: "rt1",
+				ProjectName:      "c:p",
+			},
+			cachedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-b", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+				{
+					ObjectMeta:       metav1.ObjectMeta{Name: "prtb-a", Namespace: "ns", CreationTimestamp: now},
+					UserName:         "user1",
+					RoleTemplateName: "rt1",
+					ProjectName:      "c:p",
+				},
+			},
+			expectDeleted:     []string{"prtb-b"},
+			expectIsDuplicate: true,
+		},
+	}
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			prtbController := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+			prtbCache := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+
+			prtbController.EXPECT().Cache().Return(prtbCache).AnyTimes()
+
+			if tt.cacheListErr != nil {
+				prtbCache.EXPECT().List(tt.prtb.Namespace, labels.Everything()).Return(nil, tt.cacheListErr)
+			} else {
+				prtbCache.EXPECT().List(tt.prtb.Namespace, labels.Everything()).Return(tt.cachedPRTBs, nil)
+			}
+
+			deletedNames := map[string]bool{}
+			if len(tt.expectDeleted) > 0 {
+				prtbController.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ns, name string, opts *metav1.DeleteOptions) error {
+						deletedNames[name] = true
+						if tt.deleteErr != nil {
+							if err, ok := tt.deleteErr[name]; ok {
+								return err
+							}
+						}
+						return nil
+					}).Times(len(tt.expectDeleted))
+			}
+
+			p := &prtbHandler{
+				prtbClient: prtbController,
+			}
+
+			isDuplicate, err := p.deleteDuplicatePRTBs(tt.prtb)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("deleteDuplicatePRTBs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if isDuplicate != tt.expectIsDuplicate {
+				t.Errorf("deleteDuplicatePRTBs() isDuplicate = %v, want %v", isDuplicate, tt.expectIsDuplicate)
+			}
+			for _, name := range tt.expectDeleted {
+				if !deletedNames[name] {
+					t.Errorf("expected PRTB %s to be deleted, but it was not", name)
 				}
 			}
 		})

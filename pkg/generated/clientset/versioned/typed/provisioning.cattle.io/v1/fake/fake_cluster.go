@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	provisioningcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
+	provisioningcattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/provisioning.cattle.io/v1"
+	typedprovisioningcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeClusters implements ClusterInterface
 type fakeClusters struct {
-	*gentype.FakeClientWithList[*v1.Cluster, *v1.ClusterList]
+	*gentype.FakeClientWithListAndApply[*v1.Cluster, *v1.ClusterList, *provisioningcattleiov1.ClusterApplyConfiguration]
 	Fake *FakeProvisioningV1
 }
 
-func newFakeClusters(fake *FakeProvisioningV1, namespace string) provisioningcattleiov1.ClusterInterface {
+func newFakeClusters(fake *FakeProvisioningV1, namespace string) typedprovisioningcattleiov1.ClusterInterface {
 	return &fakeClusters{
-		gentype.NewFakeClientWithList[*v1.Cluster, *v1.ClusterList](
+		gentype.NewFakeClientWithListAndApply[*v1.Cluster, *v1.ClusterList, *provisioningcattleiov1.ClusterApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("clusters"),

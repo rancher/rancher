@@ -2,15 +2,21 @@ package common
 
 import (
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
+	"github.com/rancher/rancher/pkg/features"
 	fake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
@@ -33,9 +39,9 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 			userID: "user1",
 			principal: v3.Principal{
 				ObjectMeta: v1.ObjectMeta{
-					Name: "github_user1",
+					Name: "github_user1://1",
 				},
-				DisplayName: "github_user1",
+				DisplayName: "github_user1s",
 				Provider:    "github",
 			},
 			existingUser: &v3.User{
@@ -52,7 +58,7 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 					Name: "user1",
 					UID:  "uid1",
 				},
-				PrincipalIDs: []string{"local://user", "github_user1"},
+				PrincipalIDs: []string{"local://user", "github_user1://1"},
 			},
 			expectedError:    nil,
 			expectedToUpdate: true,
@@ -106,6 +112,35 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 			expectedError:    errors.New("refusing to set principal on user that is already bound to another user"),
 			expectedToUpdate: false,
 		},
+		{
+			name:   "successfully add principal to user with custom name for config",
+			userID: "user1",
+			principal: v3.Principal{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "github-eu_user1://12345",
+				},
+				DisplayName: "github_user1",
+				Provider:    "github",
+			},
+			existingUser: &v3.User{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "user1",
+					UID:  "uid1",
+				},
+				PrincipalIDs: []string{"local://user"},
+			},
+			principalUser:  nil,
+			principalError: nil,
+			expectedUser: &v3.User{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "user1",
+					UID:  "uid1",
+				},
+				PrincipalIDs: []string{"local://user", "github-eu_user1://12345"},
+			},
+			expectedError:    nil,
+			expectedToUpdate: true,
+		},
 	}
 
 	for _, test := range testCases {
@@ -125,7 +160,9 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 			} else {
 				userControllerMock.EXPECT().List(gomock.Any()).Return(&v3.UserList{}, test.principalError).AnyTimes()
 			}
-			userControllerMock.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(user *v3.User) (*v3.User, error) {
+			impClientMock := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+			userControllerMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil).AnyTimes()
+			impClientMock.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(user *v3.User) (*v3.User, error) {
 				u := user.DeepCopy()
 				return u, nil
 			})
@@ -334,4 +371,688 @@ func TestUserAttributeCreateOrUpdateUpdatesGroups(t *testing.T) {
 	require.NotEmpty(t, principals)
 	require.Len(t, principals.Items, 1)
 	assert.Equal(t, principals.Items[0].Name, "group1")
+}
+
+func TestUserAttributeCreateOrUpdateWithSCIM(t *testing.T) {
+	const (
+		userID   = "u-abcdef"
+		provider = "okta"
+	)
+
+	group := func(name string) v3.Principal {
+		return v3.Principal{ObjectMeta: v1.ObjectMeta{Name: name}}
+	}
+	scimExtras := map[string][]string{
+		UserAttributePrincipalID: {"okta_user://alice"},
+		UserAttributeUserName:    {"alice"},
+		"externalid":             {"00u123"},
+		"email":                  {"alice@example.com"},
+	}
+	loginExtras := map[string][]string{
+		UserAttributePrincipalID: {"okta_user://alice"},
+		UserAttributeUserName:    {"alice.login"},
+	}
+	sameLoginExtras := map[string][]string{
+		UserAttributePrincipalID: {"okta_user://alice"},
+		UserAttributeUserName:    {"alice"},
+	}
+	stored := &v3.UserAttribute{
+		ObjectMeta: v1.ObjectMeta{Name: userID},
+		GroupPrincipals: map[string]v3.Principals{
+			provider: {Items: []v3.Principal{group("okta_group://g1")}},
+		},
+		ExtraByProvider: map[string]map[string][]string{
+			provider: scimExtras,
+		},
+	}
+	loginTime := time.Now()
+
+	tests := []struct {
+		name        string
+		scimEnabled bool
+		stored      *v3.UserAttribute
+		groups      []v3.Principal
+		extras      map[string][]string
+		loginTime   []time.Time
+		wantWrite   string
+		wantExtras  map[string][]string
+		wantGroups  []string
+	}{
+		{
+			name:        "SCIM enabled keeps stored keys login doesn't write",
+			scimEnabled: true,
+			stored:      stored,
+			groups:      []v3.Principal{group("okta_group://g1")},
+			extras:      loginExtras,
+			loginTime:   []time.Time{loginTime},
+			wantWrite:   "update",
+			wantExtras: map[string][]string{
+				UserAttributePrincipalID: {"okta_user://alice"},
+				UserAttributeUserName:    {"alice.login"},
+				"externalid":             {"00u123"},
+				"email":                  {"alice@example.com"},
+			},
+			wantGroups: []string{"okta_group://g1"},
+		},
+		{
+			name:       "SCIM not enabled replaces the extras",
+			stored:     stored,
+			groups:     []v3.Principal{group("okta_group://g1")},
+			extras:     loginExtras,
+			loginTime:  []time.Time{loginTime},
+			wantWrite:  "update",
+			wantExtras: loginExtras,
+			wantGroups: []string{"okta_group://g1"},
+		},
+		{
+			name:        "SCIM enabled replaces the groups",
+			scimEnabled: true,
+			stored:      stored,
+			groups:      []v3.Principal{group("okta_group://g2")},
+			extras:      sameLoginExtras,
+			wantWrite:   "update",
+			wantExtras:  scimExtras,
+			wantGroups:  []string{"okta_group://g2"},
+		},
+		{
+			name:        "SCIM enabled replaces the groups with an empty list",
+			scimEnabled: true,
+			stored:      stored,
+			groups:      []v3.Principal{},
+			extras:      sameLoginExtras,
+			wantWrite:   "update",
+			wantExtras:  scimExtras,
+			wantGroups:  []string{},
+		},
+		{
+			name:       "SCIM not enabled replaces the groups",
+			stored:     stored,
+			groups:     []v3.Principal{group("okta_group://g2")},
+			extras:     sameLoginExtras,
+			wantWrite:  "update",
+			wantExtras: sameLoginExtras,
+			wantGroups: []string{"okta_group://g2"},
+		},
+		{
+			name:       "SCIM not enabled replaces the groups with an empty list",
+			stored:     stored,
+			groups:     []v3.Principal{},
+			extras:     sameLoginExtras,
+			wantWrite:  "update",
+			wantExtras: sameLoginExtras,
+			wantGroups: []string{},
+		},
+		{
+			name:        "SCIM enabled makes no update when nothing changed",
+			scimEnabled: true,
+			stored:      stored,
+			groups:      []v3.Principal{group("okta_group://g1")},
+			extras:      sameLoginExtras,
+		},
+		{
+			name:       "SCIM not enabled updates when login doesn't write every stored key",
+			stored:     stored,
+			groups:     []v3.Principal{group("okta_group://g1")},
+			extras:     sameLoginExtras,
+			wantWrite:  "update",
+			wantExtras: sameLoginExtras,
+			wantGroups: []string{"okta_group://g1"},
+		},
+		{
+			name:        "SCIM enabled creates with the written extras",
+			scimEnabled: true,
+			groups:      []v3.Principal{group("okta_group://g1")},
+			extras:      loginExtras,
+			loginTime:   []time.Time{loginTime},
+			wantWrite:   "create",
+			wantExtras:  loginExtras,
+			wantGroups:  []string{"okta_group://g1"},
+		},
+		{
+			name:       "SCIM not enabled creates with the written extras",
+			groups:     []v3.Principal{group("okta_group://g1")},
+			extras:     loginExtras,
+			loginTime:  []time.Time{loginTime},
+			wantWrite:  "create",
+			wantExtras: loginExtras,
+			wantGroups: []string{"okta_group://g1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Not parallel: the feature flag and the environment are global.
+			t.Setenv("RANCHER_VERSION_TYPE", "prime")
+			features.SCIM.Set(true)
+			t.Cleanup(features.SCIM.Unset)
+
+			ctrl := gomock.NewController(t)
+
+			configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+			configMapCache.EXPECT().Get(scimconfig.Namespace, "scim-config-"+provider).Return(&corev1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{Name: "scim-config-" + provider},
+				Data:       map[string]string{"enabled": strconv.FormatBool(tt.scimEnabled)},
+			}, nil).AnyTimes()
+
+			userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			userCache.EXPECT().Get(userID).Return(&v3.User{
+				ObjectMeta: v1.ObjectMeta{Name: userID},
+				Enabled:    ptr.To(true),
+			}, nil).AnyTimes()
+
+			var storedBefore *v3.UserAttribute
+			userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+			userAttributes := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+			if tt.stored != nil {
+				storedBefore = tt.stored.DeepCopy()
+				userAttributeCache.EXPECT().Get(userID).Return(tt.stored, nil)
+			} else {
+				notFound := apierrors.NewNotFound(schema.GroupResource{}, userID)
+				userAttributeCache.EXPECT().Get(userID).Return(nil, notFound)
+				userAttributes.EXPECT().Get(userID, gomock.Any()).Return(nil, notFound)
+			}
+
+			var written *v3.UserAttribute
+			var write string
+			userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				write = "update"
+				written = userAttribute.DeepCopy()
+				return written, nil
+			}).AnyTimes()
+			userAttributes.EXPECT().Create(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				write = "create"
+				written = userAttribute.DeepCopy()
+				return written, nil
+			}).AnyTimes()
+
+			manager := userManager{
+				userCache:          userCache,
+				userAttributes:     userAttributes,
+				userAttributeCache: userAttributeCache,
+				configMapCache:     configMapCache,
+			}
+
+			err := manager.UserAttributeCreateOrUpdate(userID, provider, tt.groups, tt.extras, tt.loginTime...)
+			require.NoError(t, err)
+
+			// The cached object isn't changed.
+			assert.Equal(t, storedBefore, tt.stored)
+
+			require.Equal(t, tt.wantWrite, write)
+			if tt.wantWrite == "" {
+				return
+			}
+			assert.Equal(t, tt.wantExtras, written.ExtraByProvider[provider])
+			var gotGroups []string
+			for _, p := range written.GroupPrincipals[provider].Items {
+				gotGroups = append(gotGroups, p.Name)
+			}
+			assert.ElementsMatch(t, tt.wantGroups, gotGroups)
+		})
+	}
+}
+
+func TestUserAttributeCreateOrUpdateNoGroups(t *testing.T) {
+	const (
+		userID   = "u-abcdef"
+		provider = "okta"
+	)
+
+	group := func(name string) v3.Principal {
+		return v3.Principal{ObjectMeta: v1.ObjectMeta{Name: name}}
+	}
+	scimExtras := map[string][]string{
+		UserAttributePrincipalID: {"okta_user://alice"},
+		UserAttributeUserName:    {"alice"},
+		"externalid":             {"00u123"},
+		"email":                  {"alice@example.com"},
+	}
+	loginExtras := map[string][]string{
+		UserAttributePrincipalID: {"okta_user://alice"},
+		UserAttributeUserName:    {"alice.login"},
+	}
+	sameLoginExtras := map[string][]string{
+		UserAttributePrincipalID: {"okta_user://alice"},
+		UserAttributeUserName:    {"alice"},
+	}
+	withGroups := &v3.UserAttribute{
+		ObjectMeta: v1.ObjectMeta{Name: userID},
+		GroupPrincipals: map[string]v3.Principals{
+			provider: {Items: []v3.Principal{group("okta_group://g1")}},
+		},
+		ExtraByProvider: map[string]map[string][]string{
+			provider: scimExtras,
+		},
+	}
+	withoutGroupEntry := &v3.UserAttribute{
+		ObjectMeta: v1.ObjectMeta{Name: userID},
+		ExtraByProvider: map[string]map[string][]string{
+			provider: scimExtras,
+		},
+	}
+	loginTime := time.Now()
+
+	tests := []struct {
+		name        string
+		scimEnabled bool
+		stored      *v3.UserAttribute
+		extras      map[string][]string
+		loginTime   []time.Time
+		wantWrite   string
+		wantExtras  map[string][]string
+		wantGroups  []string
+	}{
+		{
+			name:        "SCIM enabled login keeps the stored groups",
+			scimEnabled: true,
+			stored:      withGroups,
+			extras:      loginExtras,
+			loginTime:   []time.Time{loginTime},
+			wantWrite:   "update",
+			wantExtras: map[string][]string{
+				UserAttributePrincipalID: {"okta_user://alice"},
+				UserAttributeUserName:    {"alice.login"},
+				"externalid":             {"00u123"},
+				"email":                  {"alice@example.com"},
+			},
+			wantGroups: []string{"okta_group://g1"},
+		},
+		{
+			name:        "SCIM enabled update without a login time keeps the groups login stored",
+			scimEnabled: true,
+			stored:      withGroups,
+			extras: map[string][]string{
+				UserAttributePrincipalID: {"okta_user://alice"},
+				UserAttributeUserName:    {"alice"},
+				"externalid":             {"00u456"},
+				"email":                  {""},
+			},
+			wantWrite: "update",
+			wantExtras: map[string][]string{
+				UserAttributePrincipalID: {"okta_user://alice"},
+				UserAttributeUserName:    {"alice"},
+				"externalid":             {"00u456"},
+				"email":                  {""},
+			},
+			wantGroups: []string{"okta_group://g1"},
+		},
+		{
+			name:        "SCIM enabled writes an empty group entry when the provider has none",
+			scimEnabled: true,
+			stored:      withoutGroupEntry,
+			extras:      scimExtras,
+			wantWrite:   "update",
+			wantExtras:  scimExtras,
+			wantGroups:  []string{},
+		},
+		{
+			name:        "SCIM enabled makes no update when nothing changed",
+			scimEnabled: true,
+			stored:      withGroups,
+			extras:      sameLoginExtras,
+		},
+		{
+			name:        "SCIM enabled creates with an empty group entry",
+			scimEnabled: true,
+			extras:      scimExtras,
+			wantWrite:   "create",
+			wantExtras:  scimExtras,
+			wantGroups:  []string{},
+		},
+		{
+			name:       "SCIM not enabled replaces the groups with an empty list",
+			stored:     withGroups,
+			extras:     loginExtras,
+			loginTime:  []time.Time{loginTime},
+			wantWrite:  "update",
+			wantExtras: loginExtras,
+			wantGroups: []string{},
+		},
+		{
+			name:       "SCIM not enabled creates with an empty group entry",
+			extras:     loginExtras,
+			loginTime:  []time.Time{loginTime},
+			wantWrite:  "create",
+			wantExtras: loginExtras,
+			wantGroups: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Not parallel: the feature flag and the environment are global.
+			t.Setenv("RANCHER_VERSION_TYPE", "prime")
+			features.SCIM.Set(true)
+			t.Cleanup(features.SCIM.Unset)
+
+			ctrl := gomock.NewController(t)
+
+			configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+			configMapCache.EXPECT().Get(scimconfig.Namespace, "scim-config-"+provider).Return(&corev1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{Name: "scim-config-" + provider},
+				Data:       map[string]string{"enabled": strconv.FormatBool(tt.scimEnabled)},
+			}, nil).AnyTimes()
+
+			userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			userCache.EXPECT().Get(userID).Return(&v3.User{
+				ObjectMeta: v1.ObjectMeta{Name: userID},
+				Enabled:    ptr.To(true),
+			}, nil).AnyTimes()
+
+			var storedBefore *v3.UserAttribute
+			userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+			userAttributes := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+			if tt.stored != nil {
+				storedBefore = tt.stored.DeepCopy()
+				userAttributeCache.EXPECT().Get(userID).Return(tt.stored, nil)
+			} else {
+				notFound := apierrors.NewNotFound(schema.GroupResource{}, userID)
+				userAttributeCache.EXPECT().Get(userID).Return(nil, notFound)
+				userAttributes.EXPECT().Get(userID, gomock.Any()).Return(nil, notFound)
+			}
+
+			var written *v3.UserAttribute
+			var write string
+			userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				write = "update"
+				written = userAttribute.DeepCopy()
+				return written, nil
+			}).AnyTimes()
+			userAttributes.EXPECT().Create(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				write = "create"
+				written = userAttribute.DeepCopy()
+				return written, nil
+			}).AnyTimes()
+
+			manager := userManager{
+				userCache:          userCache,
+				userAttributes:     userAttributes,
+				userAttributeCache: userAttributeCache,
+				configMapCache:     configMapCache,
+			}
+
+			err := manager.UserAttributeCreateOrUpdateNoGroups(userID, provider, tt.extras, tt.loginTime...)
+			require.NoError(t, err)
+
+			// The cached object isn't changed.
+			assert.Equal(t, storedBefore, tt.stored)
+
+			require.Equal(t, tt.wantWrite, write)
+			if tt.wantWrite == "" {
+				return
+			}
+			assert.Equal(t, tt.wantExtras, written.ExtraByProvider[provider])
+			require.Contains(t, written.GroupPrincipals, provider)
+			var gotGroups []string
+			for _, p := range written.GroupPrincipals[provider].Items {
+				gotGroups = append(gotGroups, p.Name)
+			}
+			assert.ElementsMatch(t, tt.wantGroups, gotGroups)
+		})
+	}
+}
+
+func TestProviderExists(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		principalIDs []string
+		provider     string
+		want         bool
+	}{
+		{
+			name:     "no principal IDs",
+			provider: "github",
+			want:     false,
+		},
+		{
+			name:         "provider in principal ID prefix",
+			principalIDs: []string{"github_user://123"},
+			provider:     "github",
+			want:         true,
+		},
+		{
+			name:         "provider in one of multiple principal IDs",
+			principalIDs: []string{"local://user", "github_user://123"},
+			provider:     "github",
+			want:         true,
+		},
+		{
+			name:         "different provider",
+			principalIDs: []string{"google_user://123"},
+			provider:     "github",
+			want:         false,
+		},
+		{
+			name:         "similarly named provider",
+			principalIDs: []string{"google-eu_user://123"},
+			provider:     "google",
+			want:         false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, test.want, providerExists(test.principalIDs, test.provider))
+		})
+	}
+}
+
+func TestGetGroupsForTokenAuthProviderUsesConfigName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	userAttributeCache.EXPECT().Get("u-abcdef").Return(&v3.UserAttribute{
+		GroupPrincipals: map[string]v3.Principals{
+			"github":    {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}, Provider: "github"}}},
+			"github-eu": {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}}},
+		},
+	}, nil)
+
+	manager := userManager{userAttributeCache: userAttributeCache}
+
+	// The principal records the provider type, but the groups must come from the
+	// config that issued it.
+	token := &v3.Token{
+		UserID: "u-abcdef",
+		UserPrincipal: v3.Principal{
+			ObjectMeta: v1.ObjectMeta{Name: "github-eu_user://42"},
+			Provider:   "github",
+		},
+	}
+
+	groups := manager.GetGroupsForTokenAuthProvider(token)
+
+	assert.Equal(t, []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}}, groups)
+}
+
+// Groups used by the IsMemberOf and GetGroupsForTokenAuthProvider tests.
+var (
+	groupGitHub   = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}, Provider: "github"}
+	groupGitHubEU = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}, Provider: "github"}
+	groupLocal    = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "local://g-local"}, Provider: "local"}
+	groupLegacy   = v3.Principal{ObjectMeta: v1.ObjectMeta{Name: "legacy_org://3"}, Provider: "legacy"}
+)
+
+// newGroupsTestToken returns a token with the given user principal ID and
+// AuthProvider, carrying groupLegacy as its legacy group principals.
+func newGroupsTestToken(principalID, authProvider string) *v3.Token {
+	return &v3.Token{
+		UserID:       "u-abcdef",
+		AuthProvider: authProvider,
+		UserPrincipal: v3.Principal{
+			ObjectMeta: v1.ObjectMeta{Name: principalID},
+			Provider:   authProvider,
+		},
+		GroupPrincipals: []v3.Principal{groupLegacy},
+	}
+}
+
+// The UserAttribute is looked up at most once: tokens with an unparseable
+// principal are refused before it is.
+func newGroupsTestUserManager(t *testing.T, groupPrincipals map[string]v3.Principals) *userManager {
+	ctrl := gomock.NewController(t)
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	if groupPrincipals == nil {
+		userAttributeCache.EXPECT().Get("u-abcdef").
+			Return(nil, apierrors.NewNotFound(v3.Resource("userattributes"), "u-abcdef")).MaxTimes(1)
+	} else {
+		userAttributeCache.EXPECT().Get("u-abcdef").Return(&v3.UserAttribute{
+			ObjectMeta:      v1.ObjectMeta{Name: "u-abcdef"},
+			GroupPrincipals: groupPrincipals,
+		}, nil).MaxTimes(1)
+	}
+
+	return &userManager{userAttributeCache: userAttributeCache}
+}
+
+func TestIsMemberOf(t *testing.T) {
+	tests := []struct {
+		name            string
+		token           *v3.Token
+		groupPrincipals map[string]v3.Principals // nil means the UserAttribute is not found
+		wantMember      []v3.Principal
+		wantNotMember   []v3.Principal
+	}{
+		{
+			// The AuthProvider records the provider type, which differs from the
+			// config name; the legacy fallback must be decided by the config name.
+			name:  "token from a named config uses its config's groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github-eu": {Items: []v3.Principal{groupGitHubEU}},
+				"local":     {Items: []v3.Principal{groupLocal}},
+			},
+			wantMember:    []v3.Principal{groupGitHubEU, groupLocal},
+			wantNotMember: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token from a named config with no groups for its config falls back to legacy groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			wantMember: []v3.Principal{groupGitHub, groupLegacy},
+		},
+		{
+			name:  "token with an empty principal uses local groups",
+			token: newGroupsTestToken("", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+				"local":  {Items: []v3.Principal{groupLocal}},
+			},
+			wantMember:    []v3.Principal{groupGitHub, groupLocal},
+			wantNotMember: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token with an unparseable principal is not a member of any group",
+			token: newGroupsTestToken("not-a-principal", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+				"local":  {Items: []v3.Principal{groupLocal}},
+			},
+			wantNotMember: []v3.Principal{groupGitHub, groupLocal, groupLegacy},
+		},
+		{
+			name:  "token with an empty principal and no local groups falls back to legacy groups",
+			token: newGroupsTestToken("", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			wantMember: []v3.Principal{groupGitHub, groupLegacy},
+		},
+		{
+			name:          "user attribute not found falls back to legacy groups",
+			token:         newGroupsTestToken("github-eu_user://1", "github"),
+			wantMember:    []v3.Principal{groupLegacy},
+			wantNotMember: []v3.Principal{groupGitHubEU, groupLocal},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, group := range tt.wantMember {
+				manager := newGroupsTestUserManager(t, tt.groupPrincipals)
+				assert.True(t, manager.IsMemberOf(tt.token, group), "expected to be a member of %s", group.Name)
+			}
+			for _, group := range tt.wantNotMember {
+				manager := newGroupsTestUserManager(t, tt.groupPrincipals)
+				assert.False(t, manager.IsMemberOf(tt.token, group), "expected not to be a member of %s", group.Name)
+			}
+		})
+	}
+}
+
+func TestGetGroupsForTokenAuthProvider(t *testing.T) {
+	allGroups := map[string]v3.Principals{
+		"github":    {Items: []v3.Principal{groupGitHub}},
+		"github-eu": {Items: []v3.Principal{groupGitHubEU}},
+		"local":     {Items: []v3.Principal{groupLocal}},
+	}
+
+	tests := []struct {
+		name            string
+		token           *v3.Token
+		groupPrincipals map[string]v3.Principals // nil means the UserAttribute is not found
+		want            []v3.Principal
+	}{
+		{
+			name:            "token from a named config gets its config's groups",
+			token:           newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: allGroups,
+			want:            []v3.Principal{groupGitHubEU},
+		},
+		{
+			name:            "token with an empty principal gets local groups",
+			token:           newGroupsTestToken("", ""),
+			groupPrincipals: allGroups,
+			want:            []v3.Principal{groupLocal},
+		},
+		{
+			name:            "token with an unparseable principal gets no groups",
+			token:           newGroupsTestToken("not-a-principal", "github"),
+			groupPrincipals: allGroups,
+			want:            nil,
+		},
+		{
+			name:  "token whose config has no entry falls back to legacy groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			want: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token with an empty principal and no local entry falls back to legacy groups",
+			token: newGroupsTestToken("", ""),
+			groupPrincipals: map[string]v3.Principals{
+				"github": {Items: []v3.Principal{groupGitHub}},
+			},
+			want: []v3.Principal{groupLegacy},
+		},
+		{
+			name:  "token whose config has an empty entry gets no groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			groupPrincipals: map[string]v3.Principals{
+				"github":    {Items: []v3.Principal{groupGitHub}},
+				"github-eu": {},
+			},
+			want: nil,
+		},
+		{
+			name:  "user attribute not found falls back to legacy groups",
+			token: newGroupsTestToken("github-eu_user://1", "github"),
+			want:  []v3.Principal{groupLegacy},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := newGroupsTestUserManager(t, tt.groupPrincipals)
+
+			assert.Equal(t, tt.want, manager.GetGroupsForTokenAuthProvider(tt.token))
+		})
+	}
 }

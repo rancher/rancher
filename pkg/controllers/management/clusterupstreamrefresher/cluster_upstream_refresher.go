@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -161,24 +162,36 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	// If upstreamSpec is non-nil then the syncing occurred as expected, but the node groups have health issues that are reported to the user.
 	// In this second case, the message is set on the Updated condition, but execution continues because the sync was successful.
 	upstreamConfig, err := getComparableUpstreamSpec(c.secretsCache, c.secretClient, cluster)
+
+	// Track what needs updating
+	var setConditionFalse bool
+	var conditionMsg string
+	var clearSyncError bool
+	var syncFailedCompletely bool
+
 	if err != nil {
-		var syncFailed string
-		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil && upstreamConfig.aliConfig == nil) {
-			syncFailed = ": syncing failed"
+		syncFailedCompletely = upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil && upstreamConfig.aliConfig == nil)
+		var syncFailedStr string
+		if syncFailedCompletely {
+			syncFailedStr = ": syncing failed"
 		}
-		cluster = cluster.DeepCopy()
-		apimgmtv3.ClusterConditionUpdated.False(cluster)
-		apimgmtv3.ClusterConditionUpdated.Message(cluster, fmt.Sprintf("[Syncing error%s] %s", syncFailed, err.Error()))
+		setConditionFalse = true
+		conditionMsg = fmt.Sprintf("[Syncing error%s] %s", syncFailedStr, err.Error())
 
 		// Only continue if one of the configs on upstreamConfig is not nil.
 		// Otherwise, an error occurred and no syncing should occur.
-		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil && upstreamConfig.aliConfig == nil) {
-			return c.updateCluster(cluster)
+		if syncFailedCompletely {
+			// Update status with fresh fetch and set condition
+			cluster, err = c.updateClusterStatus(cluster.Name, cloudDriver, true, conditionMsg, false, nil)
+			if err != nil {
+				return cluster, err
+			}
+
+			// Update refreshTime annotation
+			return c.updateRefreshAnnotation(cluster)
 		}
 	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
-		cluster = cluster.DeepCopy()
-		apimgmtv3.ClusterConditionUpdated.True(cluster)
-		apimgmtv3.ClusterConditionUpdated.Message(cluster, "")
+		clearSyncError = true
 	}
 
 	var initialClusterConfig, appliedClusterConfig, upstreamClusterConfig, upstreamSpec interface{}
@@ -206,55 +219,54 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		upstreamSpec = upstreamConfig.aliConfig
 	}
 
-	// compare saved cluster.Status...UpstreamSpec with upstreamSpec,
-	// if there is difference then update cluster.Status...UpstreamSpec
-	if !reflect.DeepEqual(upstreamClusterConfig, upstreamSpec) {
+	// Check if upstream spec changed
+	upstreamSpecChanged := !reflect.DeepEqual(upstreamClusterConfig, upstreamSpec)
+	if upstreamSpecChanged {
 		logrus.Debugf("updating cluster [%s], upstream change detected", cluster.Name)
-		cluster = cluster.DeepCopy()
-		// for other cloud drivers, please edit HERE
-		switch cloudDriver {
-		case apimgmtv3.ClusterDriverAKS:
-			cluster.Status.AKSStatus.UpstreamSpec = upstreamConfig.aksConfig
-		case apimgmtv3.ClusterDriverEKS:
-			cluster.Status.EKSStatus.UpstreamSpec = upstreamConfig.eksConfig
-		case apimgmtv3.ClusterDriverGKE:
-			cluster.Status.GKEStatus.UpstreamSpec = upstreamConfig.gkeConfig
-		case apimgmtv3.ClusterDriverAlibaba:
-			cluster.Status.AliStatus.UpstreamSpec = upstreamConfig.aliConfig
-		}
 	}
 
 	// check if cluster is still updating changes
-	if !reflect.DeepEqual(initialClusterConfig, appliedClusterConfig) {
+	skipSpecSync := !reflect.DeepEqual(initialClusterConfig, appliedClusterConfig)
+	if skipSpecSync {
 		logrus.Debugf("cluster [%s] currently updating, skipping spec sync", cluster.Name)
-		return c.updateCluster(cluster)
 	}
 
-	// check for changes between upstream spec on cluster and initial ClusterConfig object
-	specMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(initialClusterConfig)
-	if err != nil {
-		return cluster, err
-	}
-
-	upstreamSpecMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(upstreamSpec)
-	if err != nil {
-		return cluster, err
-	}
-
-	var updateClusterConfig bool
-	for key, value := range upstreamSpecMap {
-		if specMap[key] == nil {
-			continue
+	// Determine spec config changes
+	var specChanged bool
+	var specMap map[string]interface{}
+	if !skipSpecSync {
+		var err error
+		specMap, err = runtime.DefaultUnstructuredConverter.ToUnstructured(initialClusterConfig)
+		if err != nil {
+			return cluster, err
 		}
-		if reflect.DeepEqual(specMap[key], value) {
-			continue
+
+		upstreamSpecMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(upstreamSpec)
+		if err != nil {
+			return cluster, err
 		}
-		updateClusterConfig = true
-		specMap[key] = value
+
+		for key, value := range upstreamSpecMap {
+			if specMap[key] == nil {
+				continue
+			}
+			if reflect.DeepEqual(specMap[key], value) {
+				continue
+			}
+			specChanged = true
+			specMap[key] = value
+		}
+
+		if specChanged {
+			logrus.Debugf("change detected for cluster [%s], updating spec", cluster.Name)
+		} else {
+			logrus.Debugf("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
+		}
 	}
 
-	if updateClusterConfig {
-		logrus.Debugf("change detected for cluster [%s], updating spec", cluster.Name)
+	// Update spec if needed
+	if specChanged {
+		cluster = cluster.DeepCopy()
 		// for other cloud drivers, please edit HERE
 		switch cloudDriver {
 		case apimgmtv3.ClusterDriverAKS:
@@ -278,20 +290,74 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 				return cluster, err
 			}
 		}
-	} else {
-		logrus.Debugf("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
+		cluster, err = c.clusterClient.Update(cluster)
+		if err != nil {
+			return cluster, err
+		}
 	}
 
-	return c.updateCluster(cluster)
+	// Update status if needed (conditions or upstreamSpec changed)
+	if setConditionFalse || clearSyncError || upstreamSpecChanged {
+		// Only pass upstreamConfig when it actually changed
+		var configToPass *clusterConfig
+		if upstreamSpecChanged {
+			configToPass = upstreamConfig
+		}
+
+		// Update status with fresh fetch
+		cluster, err = c.updateClusterStatus(cluster.Name, cloudDriver, setConditionFalse, conditionMsg, clearSyncError, configToPass)
+		if err != nil {
+			return cluster, err
+		}
+	}
+
+	// Update refreshTime annotation
+	return c.updateRefreshAnnotation(cluster)
 }
 
-func (c *clusterRefreshController) updateCluster(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+// updateClusterStatus updates the cluster status.
+// It fetches a fresh cluster, optionally sets the ClusterConditionUpdated state,
+// and updates UpstreamSpec if upstreamConfig is provided.
+func (c *clusterRefreshController) updateClusterStatus(clusterName, cloudDriver string, setConditionFalse bool, conditionMsg string, clearSyncError bool, upstreamConfig *clusterConfig) (*mgmtv3.Cluster, error) {
+	toUpdate, err := c.clusterClient.Get(clusterName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Set condition directly on fresh cluster if needed
+	if setConditionFalse {
+		apimgmtv3.ClusterConditionUpdated.False(toUpdate)
+		apimgmtv3.ClusterConditionUpdated.Message(toUpdate, conditionMsg)
+	} else if clearSyncError {
+		apimgmtv3.ClusterConditionUpdated.True(toUpdate)
+		apimgmtv3.ClusterConditionUpdated.Message(toUpdate, "")
+	}
+
+	// Update UpstreamSpec if provided
+	if upstreamConfig != nil {
+		// for other cloud drivers, please edit HERE
+		switch cloudDriver {
+		case apimgmtv3.ClusterDriverAKS:
+			toUpdate.Status.AKSStatus.UpstreamSpec = upstreamConfig.aksConfig
+		case apimgmtv3.ClusterDriverEKS:
+			toUpdate.Status.EKSStatus.UpstreamSpec = upstreamConfig.eksConfig
+		case apimgmtv3.ClusterDriverGKE:
+			toUpdate.Status.GKEStatus.UpstreamSpec = upstreamConfig.gkeConfig
+		case apimgmtv3.ClusterDriverAlibaba:
+			toUpdate.Status.AliStatus.UpstreamSpec = upstreamConfig.aliConfig
+		}
+	}
+
+	return c.clusterClient.UpdateStatus(toUpdate)
+}
+
+// updateRefreshAnnotation updates the cluster refreshTime annotation
+func (c *clusterRefreshController) updateRefreshAnnotation(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	cluster = cluster.DeepCopy()
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
-	// Update the cluster refresh time.
 	cluster.Annotations[clusterLastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
-
 	return c.clusterClient.Update(cluster)
 }
 

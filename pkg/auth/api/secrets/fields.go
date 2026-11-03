@@ -19,6 +19,7 @@ var (
 		client.KeyCloakConfigType:        {client.KeyCloakConfigFieldSpKey},
 		client.OKTAConfigType:            {client.OKTAConfigFieldSpKey},
 		client.ShibbolethConfigType:      {client.ShibbolethConfigFieldSpKey},
+		client.GenericSAMLConfigType:     {client.GenericSAMLConfigFieldSpKey},
 		client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
 		client.OIDCConfigType:            {client.OIDCConfigFieldPrivateKey, client.OIDCConfigFieldClientSecret},
 		client.KeyCloakOIDCConfigType:    {client.KeyCloakOIDCConfigFieldPrivateKey, client.KeyCloakOIDCConfigFieldClientSecret},
@@ -32,6 +33,9 @@ var (
 		},
 		client.OKTAConfigType: {
 			client.OKTAConfigFieldOpenLdapConfig: {client.LdapConfigFieldServiceAccountPassword},
+		},
+		client.ADFSConfigType: {
+			client.ADFSConfigFieldOpenLdapConfig: {client.LdapConfigFieldServiceAccountPassword},
 		},
 	}
 

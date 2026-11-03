@@ -122,14 +122,15 @@ type AuditPolicy struct {
 type AuditPolicySpec struct {
 	Enabled bool `json:"enabled"`
 
-	// Filters described what logs are explicitly allowed and denied. Leave empty if all logs should be allowed. The
-	// Allow action has higher precedence than Deny. So if there are multiple filters that match a log and at least one
-	// Allow, the log will be allowed.
+	// Filters describe what logs are explicitly allowed and denied. Leave empty if all logs should be allowed by
+	// this policy. Within a single AuditPolicy, Allow has higher precedence than Deny when multiple filters match.
+	// Across AuditPolicy objects, an explicit Deny has higher precedence than Allow. If no filter in a policy matches,
+	// that policy has no effect on the log.
 	Filters []Filter `json:"filters,omitempty"`
 
 	// AdditionalRedactions details additional informatino to be redacted. If there are any Filers defined in the same
-	// policy, these Redactions will only be applied to logs that are Allowed by those filters. If there are no
-	// Filters, the redactions will be applied to all logs.
+	// policy, these Redactions will only be applied to logs that are allowed by that policy. If there are no Filters,
+	// the redactions will be applied to all logs.
 	AdditionalRedactions []Redaction `json:"additionalRedactions,omitempty"`
 
 	// Verbosity defines how much data to collect from each log. The end verbosity for a log is calculated as a merge

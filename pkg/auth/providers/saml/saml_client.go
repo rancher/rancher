@@ -1,6 +1,7 @@
 package saml
 
 import (
+	"cmp"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -19,14 +20,15 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/namespace"
 	dsig "github.com/russellhaering/goxmldsig"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
@@ -39,30 +41,43 @@ type IDPMetadata struct {
 	SPSSODescriptors  []saml.SPSSODescriptor  `xml:"SPSSODescriptor"`
 }
 
-var root *mux.Router
-var appliedVersion string
+var root *http.ServeMux
+
+// appliedVersions holds the ResourceVersion of the last SamlConfig applied for
+// each AuthConfig, keyed by the name of the AuthConfig.
+var appliedVersions = make(map[string]string)
 var initMu sync.Mutex
 
 const UITranslationKeyForErrorMessage = "invalidSamlAttrs"
 const dashboardAuthPath = "/dashboard/auth"
 const loginPath = "/login?"
 
+// serveSamlConfig passes the request to the provider for the AuthConfig named
+// in the path, if it has been initialized.
+func serveSamlConfig(w http.ResponseWriter, r *http.Request) {
+	configName := r.PathValue("configName")
+	provider, ok := getSamlProvider(configName)
+	if !ok || provider == nil || provider.serviceProvider == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	provider.ServeHTTP(w, r)
+}
+
 // InitializeSamlServiceProvider validates changes to SamlConfig structures and
 // creates or updates the associated in-memory information. It is called from the
 // auth samlconfig controller when a SAML configuration was changed.
-func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) error {
-
+func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, configName string) error {
 	initMu.Lock()
 	defer initMu.Unlock()
-
-	if configToSet.ResourceVersion == appliedVersion {
+	if configToSet.ResourceVersion == appliedVersions[configName] {
 		return nil
 	}
 
 	var privKey *rsa.PrivateKey
 	var cert *x509.Certificate
 	var err error
-	var ok bool
 
 	if configToSet.IDPMetadataContent == "" {
 		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing IDP URL/metadata in the config %v", configToSet)
@@ -77,46 +92,16 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 	}
 
 	if configToSet.SpKey != "" {
-		// used from ssh.ParseRawPrivateKey
-
-		block, _ := pem.Decode([]byte(configToSet.SpKey))
-		if block == nil {
-			return fmt.Errorf("SAML: no key found")
-		}
-
-		if strings.Contains(block.Headers["Proc-Type"], "ENCRYPTED") {
-			return fmt.Errorf("SAML: cannot decode encrypted private keys")
-		}
-
-		switch block.Type {
-		case "RSA PRIVATE KEY":
-			privKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-			if err != nil {
-				return fmt.Errorf("SAML: error parsing PKCS1 RSA key: %v", err)
-			}
-		case "PRIVATE KEY":
-			pk, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-			if err != nil {
-				return fmt.Errorf("SAML: error parsing PKCS8 RSA key: %v", err)
-			}
-			privKey, ok = pk.(*rsa.PrivateKey)
-			if !ok {
-				return fmt.Errorf("SAML: unable to get rsa key")
-			}
-		default:
-			return fmt.Errorf("SAML: unsupported key type %q", block.Type)
+		privKey, err = parsePrivateKeyFromPEM(configToSet.SpKey)
+		if err != nil {
+			return err
 		}
 	}
 
 	if configToSet.SpCert != "" {
-		block, _ := pem.Decode([]byte(configToSet.SpCert))
-		if block == nil {
-			return fmt.Errorf("SAML: failed to parse PEM block containing the private key")
-		}
-
-		cert, err = x509.ParseCertificate(block.Bytes)
+		cert, err = parseCertificate(configToSet.SpCert)
 		if err != nil {
-			return fmt.Errorf("SAML: failed to parse DER encoded public key: %w", err)
+			return err
 		}
 	}
 
@@ -124,14 +109,17 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 		return fmt.Errorf("invalid SAML configuration: cannot force SLO if not enabled")
 	}
 
-	provider, ok := SamlProviders[name]
+	providerName := common.ProviderNameFromType(configToSet.Type)
+	baseProvider, ok := getSamlProviderType(providerName)
 	if !ok {
-		return fmt.Errorf("SAML [InitializeSamlServiceProvider]: Provider %v not configured", name)
+		return fmt.Errorf("SAML [InitializeSamlServiceProvider]: Provider %v not configured for %v", providerName, configName)
 	}
+	provider := baseProvider.forConfig()
 
 	rancherAPIHost := strings.TrimRight(configToSet.RancherAPIHost, "/")
 	samlURL := rancherAPIHost + "/v1-saml/"
-	samlURL += name
+
+	samlURL += configName
 	actURL, err := url.Parse(samlURL)
 	if err != nil {
 		return fmt.Errorf("SAML: error in parsing URL")
@@ -139,8 +127,10 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 
 	metadataURL := *actURL
 	metadataURL.Path = metadataURL.Path + "/saml/metadata"
+
 	acsURL := *actURL
 	acsURL.Path = acsURL.Path + "/saml/acs"
+
 	sloURL := *actURL
 	sloURL.Path = sloURL.Path + "/saml/slo"
 
@@ -171,8 +161,27 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 	sp.IDPMetadata.EntityID = idm.EntityID
 	sp.IDPMetadata.SPSSODescriptors = idm.SPSSODescriptors
 	sp.IDPMetadata.IDPSSODescriptors = idm.IDPSSODescriptors
-	if name == ADFSName || name == OKTAName {
+
+	// TODO: Are there constants for this?
+	if configToSet.Type == "adfsConfig" || configToSet.Type == "oktaConfig" {
 		sp.AuthnNameIDFormat = saml.UnspecifiedNameIDFormat
+	}
+
+	if configToSet.Type == "genericSAMLConfig" {
+		nameIDFormat, err := mapNameIDFormat(configToSet.NameIDFormat)
+		if err != nil {
+			return fmt.Errorf("SAML: %w", err)
+		}
+		sp.AuthnNameIDFormat = nameIDFormat
+
+		signatureMethod, err := mapSignatureMethod(configToSet.SignatureMethod)
+		if err != nil {
+			return fmt.Errorf("SAML: %w", err)
+		}
+		sp.SignatureMethod = signatureMethod
+
+		sp.AllowIDPInitiated = configToSet.AllowIdpInitiated
+		sp.ForceAuthn = configToSet.ForceAuthn
 	}
 
 	provider.serviceProvider = &sp
@@ -185,82 +194,92 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 
 	provider.clientState = &cookieStore
 
-	root.Use(responsewriter.ContentTypeOptions)
+	logrus.Debugf("SAML [InitializeSamlServiceProvider]: configuring provider %q", configName)
 
-	SamlProviders[name] = provider
+	setSamlProvider(configName, provider)
 
-	log.Debugf("SAML [InitializeSamlServiceProvider]: Set /v1-saml handlers for %s on root %p", name, root)
+	logrus.Debugf("SAML [InitializeSamlServiceProvider]: /v1-saml handlers for %s active", configName)
 
-	switch name {
-	case PingName:
-		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("PingSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("PingSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("PingMetadata").HandlerFunc(provider.ServeHTTP)
-	case ADFSName:
-		root.Get("AdfsACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("AdfsSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("AdfsSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("AdfsMetadata").HandlerFunc(provider.ServeHTTP)
-	case KeyCloakName:
-		root.Get("KeyCloakACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("KeyCloakSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("KeyCloakSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("KeyCloakMetadata").HandlerFunc(provider.ServeHTTP)
-	case OKTAName:
-		root.Get("OktaACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("OktaSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("OktaSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("OktaMetadata").HandlerFunc(provider.ServeHTTP)
-	case ShibbolethName:
-		root.Get("ShibbolethACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("ShibbolethSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("ShibbolethSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
-	}
-
-	log.Debugf("SAML [InitializeSamlServiceProvider]: /v1-saml handlers for %s on root %p active", name, root)
-
-	appliedVersion = configToSet.ResourceVersion
+	appliedVersions[configName] = configToSet.ResourceVersion
 	return nil
 }
 
+// RemoveSamlServiceProvider removes the in-memory information for the named
+// SAML AuthConfig, so that its /v1-saml routes are no longer served. It is
+// called from the auth samlconfig controller when a SAML configuration is
+// disabled or deleted.
+func RemoveSamlServiceProvider(configName string) {
+	initMu.Lock()
+	defer initMu.Unlock()
+
+	removeSamlProvider(configName)
+	delete(appliedVersions, configName)
+	logrus.Debugf("SAML [RemoveSamlServiceProvider]: removed provider %q", configName)
+}
+
+func parseCertificate(spCert string) (*x509.Certificate, error) {
+	block, _ := pem.Decode([]byte(spCert))
+	if block == nil {
+		return nil, fmt.Errorf("SAML: failed to parse PEM block containing the private key")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("SAML: failed to parse DER encoded public key: %w", err)
+	}
+
+	return cert, nil
+}
+
+func parsePrivateKeyFromPEM(pemPrivateKey string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(pemPrivateKey))
+	if block == nil {
+		return nil, fmt.Errorf("SAML: no key found")
+	}
+
+	if strings.Contains(block.Headers["Proc-Type"], "ENCRYPTED") {
+		return nil, fmt.Errorf("SAML: cannot decode encrypted private keys")
+	}
+
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("SAML: error parsing PKCS1 RSA key: %w", err)
+		}
+		return privKey, nil
+	case "PRIVATE KEY":
+		pk, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("SAML: error parsing PKCS8 RSA key: %w", err)
+		}
+		privKey, ok := pk.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("SAML: unable to parse RSA key")
+		}
+		return privKey, nil
+	default:
+		return nil, fmt.Errorf("SAML: unsupported key type %q", block.Type)
+	}
+}
+
 func AuthHandler() http.Handler {
-	log.Debugf("SAML [AuthHandler]: Setting up /v1-saml routes, mux is %p", root)
+	logrus.Debugf("SAML [AuthHandler]: Setting up /v1-saml routes, mux is %p", root)
 
 	if root != nil {
-		log.Debugf("SAML [AuthHandler]: /v1-saml routes are already set, mux is %p", root)
+		logrus.Debugf("SAML [AuthHandler]: /v1-saml routes are already set, mux is %p", root)
 		return root
 	}
 
-	root = mux.NewRouter()
+	root = http.NewServeMux()
 
-	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
-	root.Methods("POST").Path("/v1-saml/ping/saml/slo").Name("PingSLO")
-	root.Methods("GET").Path("/v1-saml/ping/saml/slo").Name("PingSLOGet")
-	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
+	handler := responsewriter.ContentTypeOptions(http.HandlerFunc(serveSamlConfig))
+	root.Handle("POST /v1-saml/{configName}/saml/acs", handler)
+	root.Handle("POST /v1-saml/{configName}/saml/slo", handler)
+	root.Handle("GET /v1-saml/{configName}/saml/slo", handler)
+	root.Handle("GET /v1-saml/{configName}/saml/metadata", handler)
 
-	root.Methods("POST").Path("/v1-saml/adfs/saml/acs").Name("AdfsACS")
-	root.Methods("POST").Path("/v1-saml/adfs/saml/slo").Name("AdfsSLO")
-	root.Methods("GET").Path("/v1-saml/adfs/saml/slo").Name("AdfsSLOGet")
-	root.Methods("GET").Path("/v1-saml/adfs/saml/metadata").Name("AdfsMetadata")
-
-	root.Methods("POST").Path("/v1-saml/keycloak/saml/acs").Name("KeyCloakACS")
-	root.Methods("POST").Path("/v1-saml/keycloak/saml/slo").Name("KeyCloakSLO")
-	root.Methods("GET").Path("/v1-saml/keycloak/saml/slo").Name("KeyCloakSLOGet")
-	root.Methods("GET").Path("/v1-saml/keycloak/saml/metadata").Name("KeyCloakMetadata")
-
-	root.Methods("POST").Path("/v1-saml/okta/saml/acs").Name("OktaACS")
-	root.Methods("POST").Path("/v1-saml/okta/saml/slo").Name("OktaSLO")
-	root.Methods("GET").Path("/v1-saml/okta/saml/slo").Name("OktaSLOGet")
-	root.Methods("GET").Path("/v1-saml/okta/saml/metadata").Name("OktaMetadata")
-
-	root.Methods("POST").Path("/v1-saml/shibboleth/saml/acs").Name("ShibbolethACS")
-	root.Methods("POST").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLO")
-	root.Methods("GET").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLOGet")
-	root.Methods("GET").Path("/v1-saml/shibboleth/saml/metadata").Name("ShibbolethMetadata")
-
-	log.Debugf("SAML [AuthHandler]: /v1-saml routes made, mux is %p", root)
+	logrus.Debugf("SAML [AuthHandler]: /v1-saml routes made, mux is %p", root)
 	return root
 }
 
@@ -274,9 +293,9 @@ func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[stri
 	}
 
 	userPrincipal = apiv3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
+		ObjectMeta:    metav1.ObjectMeta{Name: config.Name + "_" + common.UserPrincipalType + "://" + uid[0]},
 		Provider:      s.name,
-		PrincipalType: "user",
+		PrincipalType: common.UserPrincipalType,
 		Me:            true,
 	}
 
@@ -294,10 +313,10 @@ func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[stri
 	if ok {
 		for _, group := range groups {
 			group := apiv3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
+				ObjectMeta:    metav1.ObjectMeta{Name: config.Name + "_" + common.GroupPrincipalType + "://" + group},
 				DisplayName:   group,
 				Provider:      s.name,
-				PrincipalType: "group",
+				PrincipalType: common.GroupPrincipalType,
 				MemberOf:      true,
 			}
 			groupPrincipals = append(groupPrincipals, group)
@@ -307,9 +326,18 @@ func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[stri
 	return userPrincipal, groupPrincipals, nil
 }
 
+// updateUserAttribute stores the login's extra attributes and groups.
+// With an empty groupsField the IdP sends no groups, so the write carries none.
+func (s *Provider) updateUserAttribute(config *apiv3.SamlConfig, userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime time.Time) error {
+	if config.GroupsField == "" {
+		return s.userMGR.UserAttributeCreateOrUpdateNoGroups(userID, provider, userExtraInfo, loginTime)
+	}
+
+	return s.userMGR.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo, loginTime)
+}
+
 // FinalizeSamlLogout processes the logout obtained by the POST to /saml/slo from IdP
 func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
-
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, relayState)
@@ -323,12 +351,12 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	err := s.serviceProvider.ValidateLogoutResponseRequest(r)
 	if err != nil {
-		log.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
+		logrus.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
 		if parseErr, ok := err.(*saml.InvalidResponseError); ok {
 			// Note: If access to the response itself is needed (debugging)
 			// just add `parseErr.Response` to the log statement.
 
-			log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
+			logrus.Debugf("SAML [FinalizeSamlLogout]: NOW: %s\nSAML ERROR: %s",
 				parseErr.Now, parseErr.PrivateErr)
 		}
 
@@ -336,7 +364,6 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 		if errParse != nil {
 			// The redirect url is bad. That is bad for error reporting.
 			// We go with the old string ops, and pray.
-
 			redirectURL += "&errorCode=500&err=" + url.QueryEscape(err.Error())
 		} else {
 			// Principled extension of a good url with the error information
@@ -352,15 +379,15 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 
 		http.Redirect(w, r, redirectURL, http.StatusFound)
 
-		log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
+		logrus.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
 		return
 	}
 
-	log.Debugf("SAML [FinalizeSamlLogout]: response validated ok")
+	logrus.Debugf("SAML [FinalizeSamlLogout]: response validated ok")
 
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 
-	log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
+	logrus.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
 }
 
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
@@ -381,7 +408,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		var err error
 		userID, err = s.getUserIdFromRelayStateCookie(r)
 		if err != nil {
-			log.Errorf("SAML: Error getting state from cookie: %v", err)
+			logrus.Errorf("SAML: Error getting state from cookie: %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		}
@@ -392,6 +419,31 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, relayState)
+	}
+
+	// Validate the assertion's time conditions.
+	now := time.Now()
+	if err := checkAssertionTimeConditions(now, assertion.Conditions); err != nil {
+		logrus.Errorf("SAML: Rejected assertion ID %q: %v", assertion.ID, err)
+		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
+		return
+	}
+
+	assertionExpiry := now.Add(time.Hour)
+	if assertion.Conditions != nil && !assertion.Conditions.NotOnOrAfter.IsZero() {
+		assertionExpiry = assertion.Conditions.NotOnOrAfter
+	}
+	seen, err := s.assertionStore.seen(assertion.ID, assertionExpiry)
+	if err != nil {
+		logrus.Errorf("SAML: failed to lookup assertion ID %q: %v", assertion.ID, err)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		return
+	}
+
+	if seen {
+		logrus.Errorf("SAML: Rejected previous assertion ID %q", assertion.ID)
+		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
+		return
 	}
 
 	samlData := make(map[string][]string)
@@ -408,16 +460,18 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		}
 	}
 
-	config, err := s.getSamlConfig()
+	configName := cmp.Or(r.PathValue("configName"), s.name)
+
+	config, err := s.getSamlConfig(configName)
 	if err != nil {
-		log.Errorf("SAML: Error getting saml config %v", err)
+		logrus.Errorf("SAML: Error getting saml %v config %v", configName, err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 
 	userPrincipal, groupPrincipals, err = s.getSamlPrincipals(config, samlData)
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 		// UI uses this translation key to get the error message
 		http.Redirect(w, r, redirectURL+"errorCode=422&err="+UITranslationKeyForErrorMessage, http.StatusFound)
 		return
@@ -426,12 +480,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
-		log.Errorf("SAML: Error during login while checking access %v", err)
+		logrus.Errorf("SAML: Error during login while checking access %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 	if !allowed {
-		log.Errorf("SAML: User [%s] is not an authorized user or is not a member of an authorized group", userPrincipal.Name)
+		logrus.Errorf("SAML: User [%s] is not an authorized user or is not a member of an authorized group", userPrincipal.Name)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
@@ -439,7 +493,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if userID != "" && rancherAction == testAndEnableAction {
 		user, err := s.userMGR.SetPrincipalOnCurrentUserByUserID(userID, userPrincipal)
 		if err != nil && user == nil {
-			log.Errorf("SAML: Error setting principal on current user %v", err)
+			logrus.Errorf("SAML: Error setting principal on current user %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		} else if err != nil && user != nil {
@@ -450,7 +504,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		config.Enabled = true
 		err = s.saveSamlConfig(config)
 		if err != nil {
-			log.Errorf("SAML: Error saving saml config %v", err)
+			logrus.Errorf("SAML: Error saving saml config %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		}
@@ -461,7 +515,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		}
 		err = s.setRancherToken(w, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
 		if err != nil {
-			log.Errorf("SAML: Failed creating token with error: %v", err)
+			logrus.Errorf("SAML: Failed creating token with error: %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		}
 		// delete the cookies
@@ -482,13 +536,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 	user, err := s.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
-		log.Errorf("SAML: Failed getting user with error: %v", err)
+		logrus.Errorf("SAML: Failed getting user with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 
 	if user.Enabled != nil && !*user.Enabled {
-		log.Errorf("SAML: User %v permission denied", user.Name)
+		logrus.Errorf("SAML: User %v permission denied", user.Name)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
@@ -496,16 +550,16 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	loginTime := time.Now()
 	userExtraInfo := s.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return s.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		return s.updateUserAttribute(config, user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo, loginTime)
 	}); err != nil {
-		log.Errorf("SAML: Failed creating or updating userAttribute with error: %v", err)
+		logrus.Errorf("SAML: Failed creating or updating userAttribute with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 
 	err = s.setRancherToken(w, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
-		log.Errorf("SAML: Failed creating token with error: %v", err)
+		logrus.Errorf("SAML: Failed creating token with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 	}
 	redirectURL = s.clientState.GetState(r, "Rancher_FinalRedirectURL")
@@ -522,21 +576,21 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.tokenMGR, userPrincipal)
 			if err != nil {
-				log.Errorf("SAML: getToken error %v", err)
+				logrus.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 				return
 			}
 
 			keyBytes, err := base64.StdEncoding.DecodeString(publicKey)
 			if err != nil {
-				log.Errorf("SAML: base64 DecodeString error %v", err)
+				logrus.Errorf("SAML: base64 DecodeString error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 				return
 			}
 			pubKey := &rsa.PublicKey{}
 			err = json.Unmarshal(keyBytes, pubKey)
 			if err != nil {
-				log.Errorf("SAML: getPublicKey error %v", err)
+				logrus.Errorf("SAML: getPublicKey error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 				return
 			}
@@ -547,7 +601,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				[]byte(fmt.Sprintf("%s:%s", token.ObjectMeta.Name, tokenValue)),
 				nil)
 			if err != nil {
-				log.Errorf("SAML: getEncryptedToken error %v", err)
+				logrus.Errorf("SAML: getEncryptedToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 				return
 			}
@@ -564,7 +618,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 			_, err = s.samlTokens.Create(samlToken)
 			if err != nil {
-				log.Errorf("SAML: createToken err %v", err)
+				logrus.Errorf("SAML: createToken err %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			}
 
@@ -598,6 +652,9 @@ func (s *Provider) setRancherToken(w http.ResponseWriter, tokenMGR *tokens.Manag
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, tokenCookie)
 
@@ -629,4 +686,45 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 
 func newJWTParser() *jwt.Parser {
 	return jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+}
+
+func validateFinalRedirectURL(redirectURL string, rancherServerURL string) (string, error) {
+	if redirectURL == "" {
+		return "", errors.New("redirect URL was not provided")
+	}
+	parsed, err := url.Parse(redirectURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid redirect URL: %w", err)
+	}
+	rancherParsed, err := url.Parse(rancherServerURL)
+	if err != nil {
+		return "", fmt.Errorf("could not parse Rancher server URL: %w", err)
+	}
+	if parsed.Host != rancherParsed.Host {
+		return "", fmt.Errorf("redirect URL host %q does not match Rancher host %q", parsed.Host, rancherParsed.Host)
+	}
+
+	return redirectURL, nil
+}
+
+// checkAssertionTimeConditions returns an error if now falls outside the
+// assertion's [NotBefore, NotOnOrAfter) validity window. A nil or zero-valued
+// bound is treated as unbounded on that side.
+func checkAssertionTimeConditions(now time.Time, conditions *saml.Conditions) error {
+	if conditions == nil {
+		return nil
+	}
+	if !conditions.NotBefore.IsZero() && now.Before(conditions.NotBefore) {
+		return fmt.Errorf("current time %s is before NotBefore %s", now, conditions.NotBefore)
+	}
+	if !conditions.NotOnOrAfter.IsZero() && !now.Before(conditions.NotOnOrAfter) {
+		return fmt.Errorf("current time %s is on or after NotOnOrAfter %s", now, conditions.NotOnOrAfter)
+	}
+
+	return nil
+}
+
+type assertionStore interface {
+	// seen returns true if the assertion ID was seen before.
+	seen(id string, expiry time.Time) (bool, error)
 }

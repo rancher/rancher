@@ -1,6 +1,9 @@
 package telemetry
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -24,7 +27,7 @@ func TestSccPayloadVersion(t *testing.T) {
 		{"not-a-version", "not-a-version"},
 	}
 	for _, tc := range cases {
-		rancherT := newTelemetryImpl(tc.input, "", "", "", "", &v3.Cluster{}, nil, nil, nil)
+		rancherT := newTelemetryImpl(tc.input, "", "", "", "", true, &v3.Cluster{}, nil, nil, nil)
 		payload, err := GenerateSCCPayload(rancherT)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.expected, payload.Version, "input: %s", tc.input)
@@ -337,6 +340,7 @@ func TestSccPayload(t *testing.T) {
 			"",
 			"",
 			"",
+			true,
 			tc.input.localCluster,
 			tc.input.localNodes,
 			tc.input.managedClusters,
@@ -347,4 +351,25 @@ func TestSccPayload(t *testing.T) {
 		assert.ElementsMatch(tc.expectedClusters, payload.ManagedClusters)
 		assert.ElementsMatch(tc.expectedSystems, payload.ManagedSystems)
 	}
+}
+
+func TestSccSchemaUpToDate(t *testing.T) {
+	schema, err := GenerateSccSchema()
+	if err != nil {
+		t.Fatalf("failed to generate in-memory schema: %v", err)
+	}
+
+	generatedBytes, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal in-memory schema: %v", err)
+	}
+	generatedBytes = append(generatedBytes, '\n')
+
+	schemaPath := filepath.Join("schemas", "scc-RMSSubscription.json")
+	onDiskBytes, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("failed to read on-disk schema from %s: %v", schemaPath, err)
+	}
+
+	assert.Equal(t, string(onDiskBytes), string(generatedBytes), "JSON schema is out of sync with pkg/telemetry/scc.go structs. Please run 'go generate ./pkg/telemetry/schemas' to update the schema file on disk.")
 }

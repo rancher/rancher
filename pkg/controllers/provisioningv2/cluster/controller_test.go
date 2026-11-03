@@ -122,6 +122,21 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "test-webhook-customization",
+			cluster: &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "c-55555",
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						WebhookDeploymentCustomization: getTestWebhookCustomizationV3(),
+					},
+					FleetWorkspaceName: "test-fleet-workspace-name",
+				},
+			},
+			expected: true,
+		},
+		{
 			name: "test-turtles-owned-cluster-creation",
 			cluster: &v3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -156,6 +171,9 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := handler{}
+			// The management cluster already carries the finalizer it needs before creating its
+			// provisioning cluster; adding it is covered by the creator tests.
+			tt.cluster.Finalizers = append(tt.cluster.Finalizers, removeProvisioningClusterFinalizer)
 
 			obj, _, err := h.generateProvisioningClusterFromLegacyCluster(tt.cluster, tt.cluster.Status)
 
@@ -173,10 +191,15 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 			case "test-default":
 				assert.Nil(t, provCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Nil(t, provCluster.Spec.FleetAgentDeploymentCustomization)
+				assert.Nil(t, provCluster.Spec.WebhookDeploymentCustomization)
 				assert.Equal(t, provCluster.Annotations[mgmtClusterDisplayNameAnn], tt.cluster.Spec.DisplayName)
 			case "test-cluster-agent-customization":
 				assert.Equal(t, getTestClusterAgentCustomizationV1(), provCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Equal(t, getTestFleetAgentCustomizationV1(), provCluster.Spec.FleetAgentDeploymentCustomization)
+			case "test-webhook-customization":
+				assert.Nil(t, provCluster.Spec.ClusterAgentDeploymentCustomization)
+				assert.Nil(t, provCluster.Spec.FleetAgentDeploymentCustomization)
+				assert.Equal(t, getTestWebhookCustomizationV1(), provCluster.Spec.WebhookDeploymentCustomization)
 			}
 		})
 	}
@@ -210,6 +233,19 @@ func TestController_createNewCluster(t *testing.T) {
 				ClusterSpecBase: v3.ClusterSpecBase{},
 			},
 		},
+		{
+			name: "test-webhook-customization",
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: v1.ClusterSpec{
+					RKEConfig:                      &v1.RKEConfig{},
+					WebhookDeploymentCustomization: getTestWebhookCustomizationV1(),
+				},
+			},
+			clusterSpec: v3.ClusterSpec{
+				ClusterSpecBase: v3.ClusterSpecBase{},
+			},
+		},
 	}
 
 	mockCtrl := gomock.NewController(t)
@@ -223,7 +259,10 @@ func TestController_createNewCluster(t *testing.T) {
 	}, nil).AnyTimes()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			provClusterCache := fake.NewMockCacheInterface[*v1.Cluster](gomock.NewController(t))
+			provClusterCache.EXPECT().GetByIndex(ByCluster, gomock.Any()).Return(nil, nil).AnyTimes()
 			h := handler{
+				clusterCache:     provClusterCache,
 				mgmtClusterCache: clusterCache,
 				featureCache:     featureCache,
 			}
@@ -240,9 +279,14 @@ func TestController_createNewCluster(t *testing.T) {
 			case "test-default":
 				assert.Nil(t, legacyCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Nil(t, legacyCluster.Spec.FleetAgentDeploymentCustomization)
+				assert.Nil(t, legacyCluster.Spec.WebhookDeploymentCustomization)
 			case "test-cluster-agent-customization":
 				assert.Equal(t, getTestClusterAgentCustomizationV3(), legacyCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Equal(t, getTestFleetAgentCustomizationV3(), legacyCluster.Spec.FleetAgentDeploymentCustomization)
+			case "test-webhook-customization":
+				assert.Nil(t, legacyCluster.Spec.ClusterAgentDeploymentCustomization)
+				assert.Nil(t, legacyCluster.Spec.FleetAgentDeploymentCustomization)
+				assert.Equal(t, getTestWebhookCustomizationV3(), legacyCluster.Spec.WebhookDeploymentCustomization)
 			}
 		})
 	}
@@ -671,6 +715,40 @@ func getTestFleetAgentResourceReq() *corev1.ResourceRequirements {
 		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
+}
+
+func getTestWebhookCustomizationV1() *v1.WebhookDeploymentCustomization {
+	replicaCount := int32(3)
+	return &v1.WebhookDeploymentCustomization{
+		ReplicaCount: &replicaCount,
+		AppendTolerations: []corev1.Toleration{{
+			Key:      "webhook.cattle.io/node",
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}},
+		OverrideAffinity:             getTestClusterAgentAffinity(),
+		OverrideResourceRequirements: getTestClusterAgentResourceReq(),
+		PodDisruptionBudget: &v1.PodDisruptionBudgetSpec{
+			MinAvailable: "1",
+		},
+	}
+}
+
+func getTestWebhookCustomizationV3() *v3.WebhookDeploymentCustomization {
+	replicaCount := int32(3)
+	return &v3.WebhookDeploymentCustomization{
+		ReplicaCount: &replicaCount,
+		AppendTolerations: []corev1.Toleration{{
+			Key:      "webhook.cattle.io/node",
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}},
+		OverrideAffinity:             getTestClusterAgentAffinity(),
+		OverrideResourceRequirements: getTestClusterAgentResourceReq(),
+		PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+			MinAvailable: "1",
 		},
 	}
 }

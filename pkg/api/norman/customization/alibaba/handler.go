@@ -15,7 +15,6 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 
-	"github.com/gorilla/mux"
 	credential "github.com/rancher/muchang/credentials"
 	"github.com/rancher/muchang/utils/tea"
 	"github.com/rancher/muchang/utils/tea/dara"
@@ -59,7 +58,7 @@ func NewAlibabaHandler(scaledContext *config.ScaledContext) http.Handler {
 func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 
-	resourceType := mux.Vars(req)["resource"]
+	resourceType := req.PathValue("resource")
 
 	if resourceType == "alibabaCheckCredentials" {
 		if req.Method != http.MethodPost {

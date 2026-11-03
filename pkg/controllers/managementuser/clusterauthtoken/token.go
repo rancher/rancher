@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync/atomic"
 
+	clusterapiv3 "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	mgmtapiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -36,16 +40,49 @@ type tokenHandler struct {
 	clusterUserAttribute       clusterv3.ClusterUserAttributeInterface
 	clusterUserAttributeLister clusterv3.ClusterUserAttributeLister
 	tokenIndexer               cache.Indexer
-	extTokenIndexer            cache.Indexer
+	extTokenIndexer            atomic.Value // holds cache.Indexer; written once by the EXT API DeferFunc, read by v3 remove handlers
+	extTokenStore              *extstore.SystemStore
 	userLister                 managementv3.UserLister
 	userAttributeLister        managementv3.UserAttributeLister
 	clusterSecret              wcore.SecretClient
 	clusterSecretLister        wcore.SecretCache
 }
 
+// validateToken rejects tokens missing a name or userID before they reach any
+// Kubernetes API call. Without this, an empty string triggers "resource name may
+// not be empty" errors that requeue forever and block sync for the entire cluster.
+func validateToken(name, userID string) error {
+	if name == "" || userID == "" {
+		logrus.Warnf("[%s] skipping token with empty name=%q or userID=%q", clusterAuthTokenController, name, userID)
+		return generic.ErrSkip
+	}
+	return nil
+}
+
+// extTokenHash returns the hash of the named ext token. The ext.cattle.io API
+// strips Status.Hash from everything it serves, including the list and watch
+// calls backing this controller's informer, so the hash has to be read from the
+// token's backing secret instead.
+func (h *tokenHandler) extTokenHash(name string) (string, error) {
+	secret, err := h.extTokenStore.GetSecret(name, nil, true)
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve backing secret of token [%s]: %w", name, err)
+	}
+
+	hash := string(secret.Data[extstore.FieldHash])
+	if hash == "" {
+		return "", fmt.Errorf("backing secret of token [%s] carries no hash", name)
+	}
+
+	return hash, nil
+}
+
 // extCreate is called when a given ext token is created, and is responsible for
 // updating/creating the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
+	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] ext CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -54,8 +91,13 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	}
 
 	// we can sync tokens which are hashed by copying the hash downstream
+	hash, err := h.extTokenHash(token.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// token is hashed, we can safely attempt to sync downstream
-	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
+	hashVersion, err := hashers.GetHashVersion(hash)
 	if err != nil {
 		// the token hash is unlikely to change, re-enqueing would just produce a flood of errors
 		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
@@ -63,7 +105,7 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	}
 	// we only sync tokens downstream that were created with SHA3
 	if hashVersion == hashers.SHA3Version {
-		return nil, h.createClusterAuthToken(token, token.Status.Hash)
+		return nil, h.createClusterAuthToken(token, hash)
 	}
 
 	// token is hashed, but we can't sync it since we don't have the raw value
@@ -75,12 +117,21 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 // ExtUpdated is called when a given ext token is modified, and is responsible
 // for updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
+	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] ext UPDATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
 
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
 		return h.extCreate(token)
 	}
+	if err != nil {
+		return nil, err
+	}
+	clusterAuthToken = clusterAuthToken.DeepCopy()
+
+	hash, err := h.extTokenHash(token.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +147,9 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 		// missing. Make it now, and force an update later.
 
 		forced = true
-		hashedValue := token.Status.Hash
-		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
+		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hash)
+	} else {
+		clusterAuthTokenSecret = clusterAuthTokenSecret.DeepCopy()
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
@@ -118,7 +170,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	}
 
 	// note: ext tokens are always hashed (contrary to v3 Tokens)
-	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
+	hashVersion, err := hashers.GetHashVersion(hash)
 	if err != nil {
 		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
 		return token, generic.ErrSkip
@@ -126,7 +178,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	// we only sync tokens downstream that were created with SHA3
 	if hashVersion == hashers.SHA3Version {
 		// trigger the compare to compare the values of the tokens
-		current.value = token.Status.Hash
+		current.value = hash
 		old.value = common.ClusterAuthTokenSecretValue(clusterAuthTokenSecret)
 	}
 
@@ -154,6 +206,21 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
 	if errors.IsNotFound(err) {
 		_, err = h.clusterAuthToken.Create(clusterAuthToken)
+		// Lister said NotFound but the API server says it exists — the
+		// lister cache was stale. Fetch the real object and update it so
+		// we don't silently accept stale field values.
+		if errors.IsAlreadyExists(err) {
+			existing, err := h.clusterAuthToken.Get(clusterAuthToken.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			existing = existing.DeepCopy()
+			existing.UserName = clusterAuthToken.UserName
+			existing.Enabled = clusterAuthToken.Enabled
+			existing.ExpiresAt = clusterAuthToken.ExpiresAt
+			_, err = h.clusterAuthToken.Update(existing)
+			return nil, err
+		}
 	}
 	return nil, err
 }
@@ -161,13 +228,19 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 // ExtRemove is called when a given ext token is deleted,
 // and removes the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
+	if err := validateToken(token.GetName(), token.GetUserID()); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] ext REMOVE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
 
 	return nil, h.remove(token.GetName(), token.GetUserID(), extTokenUserClusterKey(token))
 }
 
 // Create is called when a given token is created, and is responsible for creating a ClusterAuthToken in a downstream cluster.
-func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
+func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
+	if err := validateToken(token.Name, token.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] v3 CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -233,31 +306,44 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 			logrus.Errorf("error migrating clusterAuthToken's secret %s: %s", clusterAuthTokenSecret.Name, err)
 			return err
 		}
+		existing = existing.DeepCopy()
 		existing.Data = clusterAuthTokenSecret.Data
 		if _, err = h.clusterSecret.Update(existing); err != nil {
 			return err
 		}
 	}
 
-	// Now create the shadow token.
-	clusterAuthToken, err = h.clusterAuthToken.Create(clusterAuthToken)
-	if err == nil {
-		return nil
+	// Now create the shadow token. If it already exists (e.g. a previous
+	// attempt created it but setInitialized failed due to a resourceVersion
+	// conflict), update it rather than deleting. Deleting can cause
+	// a create-delete loop that blocks ACE authentication.
+	if _, err = h.clusterAuthToken.Create(clusterAuthToken); err != nil {
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+
+		existing, err := h.clusterAuthToken.Get(clusterAuthToken.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		existing = existing.DeepCopy()
+		existing.UserName = clusterAuthToken.UserName
+		existing.Enabled = clusterAuthToken.Enabled
+		existing.ExpiresAt = clusterAuthToken.ExpiresAt
+		if _, err = h.clusterAuthToken.Update(existing); err != nil {
+			return err
+		}
 	}
 
-	// Avoid leaving partially created resources.
-	if err := h.clusterAuthToken.Delete(clusterAuthToken.Name, &metav1.DeleteOptions{}); err != nil {
-		logrus.Errorf("failed to delete cluster auth token `%s` after creation failure: %v",
-			clusterAuthToken.Name, err)
-	}
-
-	// Report creation failure
-	return err
+	return nil
 }
 
 // Updated is called when a token is updated, and is responsible for creating/updating the corresponding
 // ClusterAuthTokens in the downstream cluster.
-func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
+func (h *tokenHandler) Updated(token *mgmtapiv3.Token) (runtime.Object, error) {
+	if err := validateToken(token.Name, token.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] v3 UPDATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
 
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -267,6 +353,7 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	if err != nil {
 		return nil, err
 	}
+	clusterAuthToken = clusterAuthToken.DeepCopy()
 
 	forced := false
 	clusterAuthTokenSecret, err := h.clusterSecretLister.Get(h.namespace, common.ClusterAuthTokenSecretName(token.Name))
@@ -290,6 +377,8 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 		}
 
 		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
+	} else {
+		clusterAuthTokenSecret = clusterAuthTokenSecret.DeepCopy()
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
@@ -309,11 +398,8 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 		username:  clusterAuthToken.UserName,
 	}
 
-	// if the token is hashed, compare its value to make sure the downstream has the latest hash
-	//
-	// BEWARE! for an unhashed token a comparison here is bogus. the downstream hash was
-	// made on creation and any hash we make here to compare with will be different from
-	// it due to the random salt!
+	// Only compare values if the token was hashed — for plaintext tokens the
+	// downstream copy was salted at creation time, so the two will never match.
 	if token.Annotations[tokens.TokenHashed] == "true" {
 		hashVersion, err := hashers.GetHashVersion(token.Token)
 		if err != nil {
@@ -355,12 +441,28 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
 	if errors.IsNotFound(err) {
 		_, err = h.clusterAuthToken.Create(clusterAuthToken)
+		// Same stale-lister recovery as in [ExtUpdated] above.
+		if errors.IsAlreadyExists(err) {
+			existing, err := h.clusterAuthToken.Get(clusterAuthToken.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			existing = existing.DeepCopy()
+			existing.UserName = clusterAuthToken.UserName
+			existing.Enabled = clusterAuthToken.Enabled
+			existing.ExpiresAt = clusterAuthToken.ExpiresAt
+			_, err = h.clusterAuthToken.Update(existing)
+			return nil, err
+		}
 	}
 
 	return nil, err
 }
 
-func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
+func (h *tokenHandler) Remove(token *mgmtapiv3.Token) (runtime.Object, error) {
+	if err := validateToken(token.Name, token.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] v3 REMOVE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
 
 	return nil, h.remove(token.GetName(), token.GetUserID(), tokenUserClusterKey(token))
@@ -372,10 +474,9 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 		return err
 	}
 
-	// skip ext tokens if feature is disabled
 	var extTokens []any
-	if h.extTokenIndexer != nil {
-		extTokens, err = h.extTokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
+	if idx, ok := h.extTokenIndexer.Load().(cache.Indexer); ok {
+		extTokens, err = idx.ByIndex(tokenByUserAndClusterIndex, key)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -397,7 +498,7 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 
 	var lastName string
 	if len(tokens) == 1 {
-		lastName = tokens[0].(*managementv3.Token).Name
+		lastName = tokens[0].(*mgmtapiv3.Token).Name
 	} else if len(extTokens) == 1 {
 		lastName = extTokens[0].(*extv1.Token).Name
 	}
@@ -437,7 +538,7 @@ func (h *tokenHandler) updateClusterUserAttribute(userID string) error {
 
 	clusterUserAttribute, err := h.clusterUserAttributeLister.Get(h.namespace, userID)
 	if errors.IsNotFound(err) {
-		_, err = h.clusterUserAttribute.Create(&clusterv3.ClusterUserAttribute{
+		_, err = h.clusterUserAttribute.Create(&clusterapiv3.ClusterUserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},

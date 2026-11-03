@@ -6,16 +6,10 @@ import (
 )
 
 var (
-	ember = newHandler(settings.UIIndex.Get,
-		settings.UIPath.Get,
-		settings.UIOfflinePreferred.Get)
-	emberAlwaysOffline = newHandler(settings.UIIndex.Get,
-		settings.UIPath.Get,
-		func() string { return "true" })
 	vue = newHandler(settings.UIDashboardIndex.Get,
 		settings.UIDashboardPath.Get,
 		settings.UIOfflinePreferred.Get)
-	emberIndex = ember.IndexFile()
+	vueIndex = vue.IndexFile()
 )
 
 func newHandler(
@@ -28,5 +22,6 @@ func newHandler(
 		Path:                pathSetting,
 		ReleaseSetting:      settings.IsRelease,
 		APIUIVersionSetting: settings.APIUIVersion.Get,
+		CSPPolicy:           settings.UICSPPolicyValue,
 	})
 }

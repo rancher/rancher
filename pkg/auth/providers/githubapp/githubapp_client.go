@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/v73/github"
+	"github.com/google/go-github/v93/github"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/sirupsen/logrus"
@@ -169,7 +169,7 @@ func (g *githubAppClient) getUserOrgByID(ctx context.Context, id int, config *ap
 		return *acct, nil
 	}
 
-	return common.GitHubAccount{}, fmt.Errorf("unknown ID %v", id)
+	return common.GitHubAccount{}, &common.NonTransientError{Err: fmt.Errorf("unknown ID %v", id)}
 }
 
 func (g *githubAppClient) postToGithub(ctx context.Context, url string, form url.Values) ([]byte, error) {
@@ -228,6 +228,8 @@ func (g *githubAppClient) getFromGithub(ctx context.Context, githubAccessToken s
 	switch resp.StatusCode {
 	case 200:
 	case 201:
+	case 404:
+		return nil, "", &common.NonTransientError{Err: fmt.Errorf("request failed, got status code: %d", resp.StatusCode)}
 	default:
 		return nil, "", fmt.Errorf("request failed, got status code: %d", resp.StatusCode)
 	}

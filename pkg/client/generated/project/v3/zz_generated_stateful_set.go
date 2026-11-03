@@ -19,6 +19,7 @@ const (
 	StatefulSetFieldDNSPolicy                            = "dnsPolicy"
 	StatefulSetFieldEnableServiceLinks                   = "enableServiceLinks"
 	StatefulSetFieldEphemeralContainers                  = "ephemeralContainers"
+	StatefulSetFieldEvictionResponders                   = "evictionResponders"
 	StatefulSetFieldFSGroupChangePolicy                  = "fsGroupChangePolicy"
 	StatefulSetFieldFsgid                                = "fsgid"
 	StatefulSetFieldGids                                 = "gids"
@@ -56,6 +57,7 @@ const (
 	StatefulSetFieldScale                                = "scale"
 	StatefulSetFieldScheduling                           = "scheduling"
 	StatefulSetFieldSchedulingGates                      = "schedulingGates"
+	StatefulSetFieldSchedulingGroup                      = "schedulingGroup"
 	StatefulSetFieldSeccompProfile                       = "seccompProfile"
 	StatefulSetFieldSelector                             = "selector"
 	StatefulSetFieldServiceAccountName                   = "serviceAccountName"
@@ -78,7 +80,6 @@ const (
 	StatefulSetFieldWorkloadAnnotations                  = "workloadAnnotations"
 	StatefulSetFieldWorkloadLabels                       = "workloadLabels"
 	StatefulSetFieldWorkloadMetrics                      = "workloadMetrics"
-	StatefulSetFieldWorkloadRef                          = "workloadRef"
 )
 
 type StatefulSet struct {
@@ -94,6 +95,7 @@ type StatefulSet struct {
 	DNSPolicy                            string                                           `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks                   *bool                                            `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers                  []EphemeralContainer                             `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders                   []EvictionResponder                              `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy                  string                                           `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                                *int64                                           `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                                 []int64                                          `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -131,6 +133,7 @@ type StatefulSet struct {
 	Scale                                *int64                                           `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                           *Scheduling                                      `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates                      []PodSchedulingGate                              `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup                      *PodSchedulingGroup                              `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                       *SeccompProfile                                  `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                             *LabelSelector                                   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName                   string                                           `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -153,7 +156,6 @@ type StatefulSet struct {
 	WorkloadAnnotations                  map[string]string                                `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                       map[string]string                                `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics                      []WorkloadMetric                                 `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
-	WorkloadRef                          *WorkloadReference                               `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type StatefulSetCollection struct {

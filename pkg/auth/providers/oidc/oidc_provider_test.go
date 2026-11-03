@@ -2,12 +2,12 @@ package oidc
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -19,11 +19,19 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestValidateACR(t *testing.T) {
@@ -60,7 +68,7 @@ func TestValidateACR(t *testing.T) {
 
 func TestParseACRFromAccessToken(t *testing.T) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	suffix := base64.URLEncoding.EncodeToString([]byte(`{}`))
+	suffix := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
 	validClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
 	invalidBase64Claims := "invalid_base64_claims"
 	noAcrClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
@@ -109,6 +117,115 @@ func TestParseACRFromAccessToken(t *testing.T) {
 	}
 }
 
+func TestClaimInfoUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		in          string
+		initial     *ClaimInfo
+		want        ClaimInfo
+		expectError bool
+	}{
+		"groups as array": {
+			in:   `{"sub":"u1","groups":["a","b"]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{"a", "b"}},
+		},
+		"groups as single string": {
+			in:   `{"sub":"u1","groups":"only"}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{"only"}},
+		},
+		"groups as empty string yields nil slice": {
+			in:   `{"sub":"u1","groups":""}`,
+			want: ClaimInfo{Subject: "u1"},
+		},
+		"groups as null yields nil slice": {
+			in:   `{"sub":"u1","groups":null}`,
+			want: ClaimInfo{Subject: "u1"},
+		},
+		"groups as empty array yields empty slice": {
+			in:   `{"sub":"u1","groups":[]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{}},
+		},
+		"groups array with empty string entry drops the empty entry": {
+			in:   `{"sub":"u1","groups":["a",""]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{"a"}},
+		},
+		"groups array of only empty strings yields empty slice": {
+			in:   `{"sub":"u1","groups":["",""]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{}},
+		},
+		"groups missing leaves existing value untouched": {
+			in:      `{"sub":"u1"}`,
+			initial: &ClaimInfo{Groups: []string{"previously", "set"}},
+			want:    ClaimInfo{Subject: "u1", Groups: []string{"previously", "set"}},
+		},
+		"groups present replaces existing value": {
+			in:      `{"sub":"u1","groups":"new"}`,
+			initial: &ClaimInfo{Groups: []string{"old"}},
+			want:    ClaimInfo{Subject: "u1", Groups: []string{"new"}},
+		},
+		"full_group_path as single string": {
+			in:   `{"sub":"u1","full_group_path":"/team/lead"}`,
+			want: ClaimInfo{Subject: "u1", FullGroupPath: []string{"/team/lead"}},
+		},
+		"full_group_path as array": {
+			in:   `{"sub":"u1","full_group_path":["/a","/b"]}`,
+			want: ClaimInfo{Subject: "u1", FullGroupPath: []string{"/a", "/b"}},
+		},
+		"roles as single string": {
+			in:   `{"sub":"u1","roles":"admin"}`,
+			want: ClaimInfo{Subject: "u1", Roles: []string{"admin"}},
+		},
+		"roles as array": {
+			in:   `{"sub":"u1","roles":["admin","viewer"]}`,
+			want: ClaimInfo{Subject: "u1", Roles: []string{"admin", "viewer"}},
+		},
+		"all string-or-array fields together": {
+			in: `{
+				"sub":"u1",
+				"name":"User One",
+				"email":"u1@example.com",
+				"groups":"g",
+				"full_group_path":"/g",
+				"roles":"r"
+			}`,
+			want: ClaimInfo{
+				Subject:       "u1",
+				Name:          "User One",
+				Email:         "u1@example.com",
+				Groups:        []string{"g"},
+				FullGroupPath: []string{"/g"},
+				Roles:         []string{"r"},
+			},
+		},
+		"groups as number is rejected": {
+			in:          `{"sub":"u1","groups":42}`,
+			expectError: true,
+		},
+		"invalid json is rejected": {
+			in:          `{"sub":`,
+			expectError: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := ClaimInfo{}
+			if tt.initial != nil {
+				got = *tt.initial
+			}
+			err := json.Unmarshal([]byte(tt.in), &got)
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestGetUserInfoFromAuthCode(t *testing.T) {
 	const (
 		providerName = "keycloak"
@@ -135,7 +252,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
-				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
 
 				return mock
 			},
@@ -149,7 +266,12 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				FullGroupPath: []string{"/admingroup"},
 				Roles:         []string{"adminrole"},
 			},
-			expectedClaimInfo: &ClaimInfo{},
+			expectedClaimInfo: &ClaimInfo{
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
+			},
 		},
 		"get groups with GroupsClaims": {
 			config: func(port string) *apiv3.OIDCConfig {
@@ -186,7 +308,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
-				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
 
 				return mock
 			},
@@ -195,7 +317,248 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Groups: []string{"group1", "group2"},
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"group1", "group2"},
+			},
+		},
+		"get groups with GroupsClaim present only in UserInfo": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "custom:groups"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				// ID token intentionally omits "custom:groups".
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud": "test",
+					"exp": time.Now().Add(5 * time.Minute).Unix(),
+					"iss": "http://localhost:" + port,
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				// UserInfo carries the groups claim.
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"custom:groups": ["group1", "group2"]
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"group1", "group2"},
+			},
+		},
+		"get single group with GroupsClaim as string in ID token": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "role"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":  "test",
+					"exp":  time.Now().Add(5 * time.Minute).Unix(),
+					"iss":  "http://localhost:" + port,
+					"role": "RANCHER_ADMIN",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"RANCHER_ADMIN"},
+			},
+		},
+		"get single group with GroupsClaim as string in UserInfo": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "role"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud": "test",
+					"exp": time.Now().Add(5 * time.Minute).Unix(),
+					"iss": "http://localhost:" + port,
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"role": "RANCHER_ADMIN"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"RANCHER_ADMIN"},
+			},
+		},
+		"null GroupsClaim in UserInfo preserves ID token groups": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "role"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":  "test",
+					"exp":  time.Now().Add(5 * time.Minute).Unix(),
+					"iss":  "http://localhost:" + port,
+					"role": []string{"FROM_ID_TOKEN"},
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"role": null
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"FROM_ID_TOKEN"},
+			},
+		},
+		"get single group from standard groups claim as string": {
+			config: func(port string) *apiv3.OIDCConfig {
+				return newOIDCConfig(port)
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":    "test",
+					"exp":    time.Now().Add(5 * time.Minute).Unix(),
+					"iss":    "http://localhost:" + port,
+					"groups": "only-group",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"only-group"},
 			},
 		},
 		"error - invalid certificate": {
@@ -237,7 +600,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
-				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
 
 				return mock
 			},
@@ -286,7 +649,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
-				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
 
 				return mock
 			},
@@ -295,7 +658,62 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Name:  "Test User",
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Name:    "Test User",
+				Email:   "test@example.com",
+			},
+		},
+		"nameClaim configured but claim absent preserves standard name": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.NameClaim = "display_name"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"name":  "Standard Name",
+					"aud":   "test",
+					"exp":   time.Now().Add(5 * time.Minute).Unix(),
+					"email": "test@example.com",
+					"iss":   "http://localhost:" + port,
+					// no "display_name" claim
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+                }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				// Name must be preserved from the standard "name" claim in the
+				// ID token; it must NOT be wiped to "" just because the
+				// configured NameClaim ("display_name") is absent.
+				Name:  "Standard Name",
 				Email: "test@example.com",
 			},
 		},
@@ -335,7 +753,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
-				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
 
 				return mock
 			},
@@ -344,7 +762,117 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Email: "test.dev@example.com",
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Email:   "test.dev@example.com",
+			},
+		},
+		"emailClaim configured but claim absent preserves standard email": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.EmailClaim = "work_email"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":   "test",
+					"exp":   time.Now().Add(5 * time.Minute).Unix(),
+					"email": "standard@example.com",
+					"iss":   "http://localhost:" + port,
+					// no "work_email" claim
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+                }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				// Email must be preserved from the standard "email" claim in the
+				// ID token; it must NOT be wiped to "" just because the
+				// configured EmailClaim ("work_email") is absent.
+				Email: "standard@example.com",
+			},
+		},
+		"groupsClaim configured but claim absent preserves standard groups": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "custom_groups"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud": "test",
+					"exp": time.Now().Add(5 * time.Minute).Unix(),
+					"iss": "http://localhost:" + port,
+					// no "custom_groups" claim
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				// UserInfo has standard "groups" and "full_group_path" but no "custom_groups".
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"groups": ["standardgroup"],
+				"full_group_path": ["/standardgroup"]
+                }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"standardgroup"},
+				FullGroupPath: []string{"/standardgroup"},
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				// Groups and FullGroupPath must be preserved from the standard
+				// UserInfo claims; they must NOT be wiped just because the
+				// configured GroupsClaim ("custom_groups") is absent.
+				Groups:        []string{"standardgroup"},
+				FullGroupPath: []string{"/standardgroup"},
 			},
 		},
 	}
@@ -357,7 +885,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 			oidcResp := test.oidcProviderResponses(port)
 			server := mockOIDCServer(listener, oidcResp)
-			defer server.Shutdown(context.TODO())
+			defer server.Shutdown(t.Context())
 			o := OpenIDCProvider{
 				Name:     providerName,
 				TokenMgr: test.tokenManagerMock(oidcResp.token),
@@ -477,7 +1005,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
-				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.RefreshToken))
+				mock.EXPECT().UpdateSecret(userId, testConfigName, EqToken(token.RefreshToken))
 
 				return mock
 			},
@@ -566,13 +1094,13 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			oidcResp := test.oidcProviderResponses(port)
 			server := mockOIDCServer(listener, oidcResp)
 			assert.NoError(t, err)
-			defer server.Shutdown(context.TODO())
+			defer server.Shutdown(t.Context())
 			o := OpenIDCProvider{
 				Name:     providerName,
 				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
 
-			claimsInfo, err := o.getClaimInfoFromToken(context.TODO(), test.config(port), test.storedToken(port), userId)
+			claimsInfo, err := o.getClaimInfoFromToken(t.Context(), test.config(port), test.storedToken(port), userId)
 
 			assert.Equal(t, test.expectedClaimInfo, claimsInfo)
 			if test.expectedErrorMessage == "" {
@@ -636,7 +1164,7 @@ func TestGetGroupsFromClaimInfo(t *testing.T) {
 			o := &OpenIDCProvider{
 				Name: "oidc",
 			}
-			got := o.getGroupsFromClaimInfo(tt.args.claimInfo)
+			got := o.getGroupsFromClaimInfo(tt.args.claimInfo, "oidc")
 			var gotGroupNames []string
 			for _, principal := range got {
 				parts := strings.Split(principal.Name, "://")
@@ -679,10 +1207,19 @@ func TestLogout(t *testing.T) {
 
 	for name, tt := range logoutTests {
 		t.Run(name, func(t *testing.T) {
-			testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+			testToken := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloak_user://9253000",
+					},
+					LoginName:     "developer",
+					PrincipalType: "user",
+				},
+			}
+
 			o := OpenIDCProvider{
 				Name:      providerName,
-				GetConfig: func() (*apiv3.OIDCConfig, error) { return tt.config, nil },
+				GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return tt.config, nil },
 			}
 			b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 				FinalRedirectURL: "https://example.com/logged-out",
@@ -708,10 +1245,18 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 		s.LogoutAllEnabled = false
 	})
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "keycloak_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
@@ -733,10 +1278,19 @@ func TestLogoutAll(t *testing.T) {
 	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
@@ -766,10 +1320,19 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	)
 
 	oidcConfig := newOIDCConfig("8090")
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
@@ -791,10 +1354,18 @@ func TestLogoutWithIDToken(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
 
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
@@ -825,10 +1396,19 @@ func TestLogoutAllNoIDToken(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
 
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
@@ -895,8 +1475,7 @@ type Token struct {
 func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	jwtToken := jwt.New(jwt.SigningMethodRS256)
 	jwtToken.Claims = jwt.RegisteredClaims{
-		Audience: []string{"test"},
-		// has expired
+		Audience:  []string{"test"},
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 		Issuer:    "http://localhost:" + port,
 	}
@@ -948,8 +1527,15 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	}
 }
 
+// testConfigName is the name of the AuthConfig returned by newOIDCConfig. It
+// differs from the provider name so tests can tell the two apart.
+const testConfigName = "keycloak-eu"
+
 func newOIDCConfig(port string, opts ...func(*apiv3.OIDCConfig)) *apiv3.OIDCConfig {
 	cfg := &apiv3.OIDCConfig{
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: testConfigName},
+		},
 		Issuer:           "http://localhost:" + port,
 		ClientID:         "test",
 		JWKSUrl:          "http://localhost:" + port + "/.well-known/jwks.json",
@@ -979,14 +1565,9 @@ type jsonWebKey struct {
 	E   string `json:"e"`
 }
 
-// Helper function to convert a big.Int (exponent) to []byte
+// Helper function to convert an integer exponent to its minimal big-endian byte representation.
 func bigIntToBytes(i int) []byte {
-	var b [4]byte
-	b[0] = byte(i >> 24)
-	b[1] = byte(i >> 16)
-	b[2] = byte(i >> 8)
-	b[3] = byte(i)
-	return b[:]
+	return big.NewInt(int64(i)).Bytes()
 }
 
 type providerJSON struct {
@@ -1167,6 +1748,376 @@ func TestGetOIDCRedirectionURL(t *testing.T) {
 			} else {
 				assert.Equal(t, tc.expectedURL, result)
 			}
+		})
+	}
+}
+
+func TestCookieSecurityAttributes(t *testing.T) {
+	tests := map[string]struct {
+		setCookie  func(req *http.Request, w http.ResponseWriter)
+		cookieName string
+	}{
+		"SetPKCEVerifier": {
+			setCookie:  func(req *http.Request, w http.ResponseWriter) { SetPKCEVerifier(req, w, "verifier-value") },
+			cookieName: pkceVerifierCookieName,
+		},
+		"deletePKCEVerifier": {
+			setCookie:  deletePKCEVerifier,
+			cookieName: pkceVerifierCookieName,
+		},
+		"setIDToken": {
+			setCookie:  func(req *http.Request, w http.ResponseWriter) { setIDToken(req, w, "id-token-value") },
+			cookieName: IDTokenCookie,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/", nil)
+			w := httptest.NewRecorder()
+
+			tc.setCookie(req, w)
+
+			var got *http.Cookie
+			for _, c := range w.Result().Cookies() {
+				if c.Name == tc.cookieName {
+					got = c
+					break
+				}
+			}
+			require.NotNil(t, got, "expected cookie %q to be set", tc.cookieName)
+			assert.True(t, got.HttpOnly, "HttpOnly must be true")
+			assert.Equal(t, "/", got.Path, "Path must be /")
+			assert.Equal(t, http.SameSiteLaxMode, got.SameSite, "SameSite must be Lax")
+		})
+	}
+}
+
+func TestSearchPrincipals(t *testing.T) {
+	t.Parallel()
+
+	users := []*apiv3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+			DisplayName:  "Test UserOne",
+			PrincipalIDs: []string{"oidc_user://sub-0001", "local://u-oidc1"},
+		},
+	}
+
+	provider := &OpenIDCProvider{
+		Name: ProviderName,
+		UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+				return users, nil
+			},
+		}),
+	}
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "oidc_user://aba2350c-4f51-4b0f-a807-ac89f1c9b5b2",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	tests := []struct {
+		name          string
+		searchValue   string
+		principalType string
+		expected      []apiv3.Principal
+	}{
+		{
+			name:          "known user is returned before the principal built from the search value",
+			searchValue:   "testu",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      ProviderName,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      ProviderName,
+				},
+			},
+		},
+		{
+			name:        "an empty principal type searches for users",
+			searchValue: "testu",
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      ProviderName,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      ProviderName,
+				},
+			},
+		},
+		{
+			name:          "searching the subject returns a single principal",
+			searchValue:   "sub-0001",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "sub-0001",
+					LoginName:     "sub-0001",
+					PrincipalType: UserType,
+					Provider:      ProviderName,
+				},
+			},
+		},
+		{
+			name:          "group search does not resolve users",
+			searchValue:   "testu",
+			principalType: GroupType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_group://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: GroupType,
+					Provider:      ProviderName,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := provider.SearchPrincipals(test.searchValue, test.principalType, token)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
+	t.Parallel()
+
+	provider := &OpenIDCProvider{Name: ProviderName}
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "oidc_user://aba2350c-4f51-4b0f-a807-ac89f1c9b5b2",
+			},
+			LoginName:     "developer",
+			PrincipalType: UserType,
+		},
+	}
+
+	result, err := provider.SearchPrincipals("testu", UserType, token)
+	require.NoError(t, err)
+	assert.Equal(t, []apiv3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+			DisplayName:   "testu",
+			LoginName:     "testu",
+			PrincipalType: UserType,
+			Provider:      ProviderName,
+		},
+	}, result)
+}
+
+func TestLoginUserPrincipalsUseConfigName(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		login     *apiv3.OIDCLogin
+		useConfig bool
+	}{
+		// TestAndApply passes the config being tested.
+		"config passed without a configName in the login": {
+			login:     &apiv3.OIDCLogin{Code: "test-code"},
+			useConfig: true,
+		},
+		"config passed with a configName in the login": {
+			login:     &apiv3.OIDCLogin{GenericLogin: apiv3.GenericLogin{ConfigName: testConfigName}, Code: "test-code"},
+			useConfig: true,
+		},
+		// Regular logins load the config by name.
+		"config loaded from the configName in the login": {
+			login: &apiv3.OIDCLogin{GenericLogin: apiv3.GenericLogin{ConfigName: testConfigName}, Code: "test-code"},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			listener, err := net.Listen("tcp", ":0")
+			require.NoError(t, err)
+			port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+			server := mockOIDCServer(listener, newOIDCResponses(privateKey, port))
+			defer server.Shutdown(t.Context())
+
+			ctrl := gomock.NewController(t)
+			userManager := userMocks.NewMockManager(ctrl)
+			userManager.EXPECT().CheckAccess(gomock.Any(), gomock.Any(), "keycloak-eu_user://a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd", gomock.Any()).Return(true, nil)
+
+			// The token is stored under the config name.
+			tokenManager := mocks.NewMocktokenManager(ctrl)
+
+			config := newOIDCConfig(port)
+			authConfigs, authConfigLister := authconfigtest.New(t, authConfig(testConfigName, client.KeyCloakOIDCConfigType, true))
+			o := OpenIDCProvider{
+				Name:             "keycloakoidc",
+				AuthConfigs:      authConfigs,
+				AuthConfigLister: authConfigLister,
+				TokenMgr:         tokenManager,
+				UserMGR:          userManager,
+				GetConfig: func(name string) (*apiv3.OIDCConfig, error) {
+					assert.Equal(t, testConfigName, name)
+					return config, nil
+				},
+			}
+			var passedConfig *apiv3.OIDCConfig
+			if tt.useConfig {
+				passedConfig = config
+			}
+
+			rw := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "https://localhost:"+port, nil)
+			userPrincipal, groupPrincipals, _, _, err := o.LoginUser(rw, req, tt.login, passedConfig)
+			require.NoError(t, err)
+
+			assert.Equal(t, "keycloak-eu_user://a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd", userPrincipal.Name)
+			assert.Equal(t, "keycloakoidc", userPrincipal.Provider)
+			assert.Equal(t, testConfigName, common.ConfigNameFromPrincipal(userPrincipal))
+			require.NotEmpty(t, groupPrincipals)
+			for _, group := range groupPrincipals {
+				assert.True(t, strings.HasPrefix(group.Name, testConfigName+"_group://"), group.Name)
+			}
+		})
+	}
+}
+
+func TestGetPrincipal(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(false).AnyTimes()
+	provider := &OpenIDCProvider{Name: ProviderName, UserMGR: userManager}
+	newToken := func(principalID string) *apiv3.Token {
+		return &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+				LoginName:     "sub-0001",
+				DisplayName:   "Developer",
+				PrincipalType: UserType,
+			},
+		}
+	}
+	token := newToken("test-eu-oidc_user://sub-0001")
+
+	tests := []struct {
+		name        string
+		principalID string
+		token       accessor.TokenAccessor
+		want        apiv3.Principal
+		wantErr     string
+	}{
+		{
+			name:        "user principal for the default config",
+			principalID: "oidc_user://sub-0002",
+			token:       newToken("oidc_user://sub-0001"),
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0002"},
+				DisplayName:   "sub-0002",
+				LoginName:     "sub-0002",
+				PrincipalType: UserType,
+				Provider:      ProviderName,
+			},
+		},
+		{
+			name:        "user principal for an additional config",
+			principalID: "test-eu-oidc_user://sub-0002",
+			token:       token,
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_user://sub-0002"},
+				DisplayName:   "sub-0002",
+				LoginName:     "sub-0002",
+				PrincipalType: UserType,
+				Provider:      ProviderName,
+			},
+		},
+		{
+			name:        "user principal matching the token",
+			principalID: "test-eu-oidc_user://sub-0001",
+			token:       token,
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_user://sub-0001"},
+				DisplayName:   "Developer",
+				LoginName:     "sub-0001",
+				PrincipalType: UserType,
+				Provider:      ProviderName,
+				Me:            true,
+			},
+		},
+		{
+			name:        "group principal for an additional config",
+			principalID: "test-eu-oidc_group://admins",
+			token:       token,
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "test-eu-oidc_group://admins"},
+				DisplayName:   "admins",
+				PrincipalType: GroupType,
+				Provider:      ProviderName,
+			},
+		},
+		{
+			name:        "user principal for another config than the token",
+			principalID: "test-us-oidc_user://sub-0002",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "group principal for another config than the token",
+			principalID: "test-us-oidc_group://admins",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "default config principal with a token from an additional config",
+			principalID: "oidc_user://sub-0002",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "invalid principal type",
+			principalID: "test-eu-oidc_other://admins",
+			token:       token,
+			wantErr:     "invalid principal type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := provider.GetPrincipal(tt.principalID, tt.token)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

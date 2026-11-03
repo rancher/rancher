@@ -10,7 +10,6 @@ type Config struct {
 	Version string `yaml:"version,omitempty"`
 
 	// Management Client
-	NodePools                                  map[string]managementClient.NodePool                                  `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	Nodes                                      map[string]managementClient.Node                                      `json:"nodes,omitempty" yaml:"nodes,omitempty"`
 	NodeDrivers                                map[string]managementClient.NodeDriver                                `json:"nodeDrivers,omitempty" yaml:"nodeDrivers,omitempty"`
 	PodSecurityAdmissionConfigurationTemplates map[string]managementClient.PodSecurityAdmissionConfigurationTemplate `json:"podSecurityAdmissionConfigurationTemplates,omitempty" yaml:"podSecurityAdmissionConfigurationTemplates,omitempty"`
@@ -26,6 +25,7 @@ type Config struct {
 	GroupMembers                               map[string]managementClient.GroupMember                               `json:"groupMembers,omitempty" yaml:"groupMembers,omitempty"`
 	SamlTokens                                 map[string]managementClient.SamlToken                                 `json:"samlTokens,omitempty" yaml:"samlTokens,omitempty"`
 	Users                                      map[string]managementClient.User                                      `json:"users,omitempty" yaml:"users,omitempty"`
+	AuthConfigs                                map[string]managementClient.AuthConfig                                `json:"authConfigs,omitempty" yaml:"authConfigs,omitempty"`
 	LdapConfigs                                map[string]managementClient.LdapConfig                                `json:"ldapConfigs,omitempty" yaml:"ldapConfigs,omitempty"`
 	Tokens                                     map[string]managementClient.Token                                     `json:"tokens,omitempty" yaml:"tokens,omitempty"`
 	DynamicSchemas                             map[string]managementClient.DynamicSchema                             `json:"dynamicSchemas,omitempty" yaml:"dynamicSchemas,omitempty"`

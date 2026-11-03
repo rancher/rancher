@@ -8,7 +8,10 @@ import (
 	"net/http"
 	"strings"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,45 +24,88 @@ const (
 	headerPrefix    = "X-Cattle-"
 )
 
-func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string, string, error) {
+func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1.ObjectReference, error) {
 	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 	if token == "" {
-		return "", "", nil
+		return nil, nil
 	}
 
 	machineID := req.Header.Get(machineIDHeader)
 	if machineID == "" {
-		return "", "", nil
+		return nil, nil
 	}
 
-	tokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
+	secrets, err := r.secretsCache.GetByIndex(crtTokenIndex, token)
 	if err != nil {
-		return "", "", err
+		return nil, err
+	}
+
+	namespace, mgmtCluster, err := r.tokenNamespace(secrets)
+	if err != nil || namespace == "" {
+		return nil, err
 	}
 
 	data := dataFromHeaders(req)
 
-	if len(tokens) == 0 {
-		return "", "", nil
+	// Classify the caller by the cluster its token was checked against, not by a cluster found by name again.
+	lc, err := resolveTokenCaller(mgmtCluster, r.capiClusterCache, namespace)
+	if err != nil {
+		return nil, err
 	}
 
-	secretName := machineRequestSecretName(machineID)
-	secret, err := r.secretsCache.Get(tokens[0].Namespace, secretName)
+	secretName := machineRequestSecretName(lc.Kind, machineID)
+	secret, err := r.secretsCache.Get(namespace, secretName)
 	if apierror.IsNotFound(err) {
-		secret, err = r.createSecret(tokens[0].Namespace, secretName, data)
+		secret, err = r.createSecret(namespace, secretName, data)
 	}
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	secret, err = r.waitReady(secret)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	machineNamespace, machineName := secret.Labels[capr.MachineNamespaceLabel], secret.Labels[capr.MachineNameLabel]
 	_ = r.secrets.Delete(secret.Namespace, secret.Name, nil)
-	return machineNamespace, machineName, nil
+
+	switch lc.Kind {
+	case KindImported:
+		return &corev1.ObjectReference{
+			APIVersion: v3.SchemeGroupVersion.String(),
+			Kind:       "Node",
+			Namespace:  machineNamespace,
+			Name:       machineName,
+		}, nil
+	case KindCAPINative, KindV2Prov:
+		return &corev1.ObjectReference{
+			APIVersion: capi.GroupVersion.String(),
+			Kind:       "Machine",
+			Namespace:  machineNamespace,
+			Name:       machineName,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("unknown caller kind %v", lc.Kind)
+}
+
+// tokenNamespace returns the namespace of the first token secret in secrets that can still be used to
+// register with its cluster, and the mgmt cluster it was checked against, or nil if its namespace has
+// none. The namespace is "" if there is no such secret. A token left behind by a previous cluster with the
+// same name is treated like an unknown token.
+func (r *RKE2ConfigServer) tokenNamespace(secrets []*corev1.Secret) (string, *v3.Cluster, error) {
+	for _, secret := range secrets {
+		cluster, stale, err := crt.TokenSecretCluster(secret, r.namespaceCache.Get, r.mgmtClusterCache.Get)
+		if err != nil {
+			return "", nil, err
+		}
+		if !stale {
+			return secret.Namespace, cluster, nil
+		}
+		logrus.Infof("[rke2configserver] rejecting registration token that belongs to a previous cluster named %s", secret.Namespace)
+	}
+	return "", nil, nil
 }
 
 func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*capi.Machine, error) {
@@ -126,9 +172,18 @@ func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, err
 	return nil, fmt.Errorf("timeout waiting for %s/%s to be ready", secret.Namespace, secret.Name)
 }
 
-func machineRequestSecretName(name string) string {
+func machineRequestSecretName(kind CallerKind, name string) string {
 	hash := sha256.Sum256([]byte(name))
-	return "custom-" + hex.EncodeToString(hash[:])[:12]
+	var prefix string
+	switch kind {
+	case KindImported:
+		prefix = "imported-"
+	case KindCAPINative:
+		prefix = "capi-"
+	default:
+		prefix = "custom-"
+	}
+	return prefix + hex.EncodeToString(hash[:])[:12]
 }
 
 func dataFromHeaders(req *http.Request) map[string]interface{} {

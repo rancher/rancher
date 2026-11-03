@@ -90,7 +90,6 @@ func IsCloudDriver(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal &&
 		cluster.Status.Driver != "" &&
 		cluster.Status.Driver != v32.ClusterDriverImported &&
-		cluster.Status.Driver != v32.ClusterDriverRKE &&
 		cluster.Status.Driver != v32.ClusterDriverK3s &&
 		cluster.Status.Driver != v32.ClusterDriverK3os &&
 		cluster.Status.Driver != v32.ClusterDriverRke2 &&
@@ -178,7 +177,7 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 	}
 
 	logrus.Debugf("No active connection for cluster [%s], will wait for about 30 seconds", cluster.Name)
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		if f.TunnelServer.HasSession(cluster.Name) {
 			logrus.Debugf("Cluster [%s] has reconnected, resuming", cluster.Name)
 			cd := f.TunnelServer.Dialer(cluster.Name)

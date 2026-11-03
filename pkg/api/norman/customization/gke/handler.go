@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -54,7 +53,7 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 	capa := &Capabilities{}
 
-	resourceType := mux.Vars(req)["resource"]
+	resourceType := req.PathValue("resource")
 
 	if credID := req.URL.Query().Get("cloudCredentialId"); credID != "" {
 

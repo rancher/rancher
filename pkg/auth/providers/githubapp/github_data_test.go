@@ -216,14 +216,9 @@ func TestGitHubAppData(t *testing.T) {
 	})
 
 	t.Run("teams for user", func(t *testing.T) {
+		// test-user is a member of: dev-team (example), dev-team2 (other-org), admin-team2 (other-org).
+		// test-user is NOT a member of admin-team (example) — it must not appear.
 		want := []common.GitHubAccount{
-			{
-				ID:        45678,
-				Login:     "admin-team",
-				Name:      "admin-team",
-				AvatarURL: "https://example.com/avatar1.jpg",
-				HTMLURL:   "https://example.com/org/example/team/admin-team",
-			},
 			{
 				ID:        34579,
 				Login:     "admin-team2",
@@ -253,6 +248,7 @@ func TestGitHubAppData(t *testing.T) {
 
 		assert.Equal(t, want, accounts)
 
+		// test-user2 is only a member of admin-team2 (other-org); dev-team2 must not appear.
 		want = []common.GitHubAccount{
 			{
 				ID:        34579,
@@ -261,19 +257,30 @@ func TestGitHubAppData(t *testing.T) {
 				AvatarURL: "https://example.com/avatar2.jpg",
 				HTMLURL:   "https://example.com/org/other-org/team-dev-team2",
 			},
-			{
-				ID:        23468,
-				Login:     "dev-team2",
-				Name:      "dev-team2",
-				AvatarURL: "https://example.com/avatar2.jpg",
-				HTMLURL:   "https://example.com/org/other-org/team/dev-team2",
-			},
 		}
 		accounts = data.listTeamsForUser("test-user2")
 		slices.SortFunc(accounts, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, accounts)
+	})
+
+	t.Run("non-member team is not returned", func(t *testing.T) {
+		// A user who belongs to one team in an org
+		// must not be reported as a member of other teams in that same org.
+		accounts := data.listTeamsForUser("test-user")
+		for _, a := range accounts {
+			if a.Login == "admin-team" {
+				t.Errorf("listTeamsForUser returned admin-team but test-user is not a member of it")
+			}
+		}
+
+		accounts = data.listTeamsForUser("test-user2")
+		for _, a := range accounts {
+			if a.Login == "dev-team2" {
+				t.Errorf("listTeamsForUser returned dev-team2 but test-user2 is not a member of it")
+			}
+		}
 	})
 
 	t.Run("list all teams", func(t *testing.T) {

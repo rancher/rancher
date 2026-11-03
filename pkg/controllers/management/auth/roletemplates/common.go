@@ -401,6 +401,27 @@ func handleAggregationMigration[T any](
 	return resource, nil
 }
 
+// rtbContentKey returns a string that uniquely identifies the content of a role template
+// binding. Two bindings with the same content key are considered duplicates regardless
+// of their metadata.name.
+// The subject is resolved using the same priority order as the webhook:
+// UserPrincipalName → UserName → GroupPrincipalName → GroupName.
+// The scope is the binding-specific identifier (ClusterName for CRTBs, ProjectName for PRTBs).
+func rtbContentKey(userPrincipalName, userName, groupPrincipalName, groupName, roleTemplateName, scope string) string {
+	var subject string
+	switch {
+	case userPrincipalName != "":
+		subject = userPrincipalName
+	case userName != "":
+		subject = userName
+	case groupPrincipalName != "":
+		subject = groupPrincipalName
+	case groupName != "":
+		subject = groupName
+	}
+	return subject + "/" + roleTemplateName + "/" + scope
+}
+
 // AddAggregationManagementFeatureLabel adds the aggregation management label to the given resource.
 func AddAggregationManagementFeatureLabel(obj metav1.Object) {
 	labels := obj.GetLabels()

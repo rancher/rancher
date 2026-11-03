@@ -29,7 +29,10 @@ const (
 	clusterContext                  = "cluster"
 )
 
-var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+var (
+	crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+	allNonCustomVerbs           = []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"}
+)
 
 func deleteNamespace(controller string, nsName string, nsClient corev1.NamespaceClient) error {
 	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
@@ -108,13 +111,13 @@ func createProjectMembershipRoles(project *apisv3.Project, roleController crbacv
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
 				Resources:     []string{apisv3.ProjectResourceName},
 				ResourceNames: []string{project.Name},
-				Verbs:         []string{rbacv1.VerbAll},
+				Verbs:         allNonCustomVerbs,
 			},
 		},
 	}
 	for _, role := range []*rbacv1.Role{memberRole, ownerRole} {
-		if err := rbac.CreateOrUpdateNamespacedResource(role, roleController, func(currentRole, wantedRole *rbacv1.Role) (bool, *rbacv1.Role) {
-			return !equality.Semantic.DeepEqual(currentRole.Rules, wantedRole.Rules), wantedRole
+		if _, err := rbac.CreateOrUpdateNamespacedResource(role, roleController, func(currentRole, wantedRole *rbacv1.Role) bool {
+			return equality.Semantic.DeepEqual(currentRole.Rules, wantedRole.Rules)
 		}); err != nil {
 			return err
 		}
@@ -157,7 +160,7 @@ func createClusterMembershipRoles(cluster *apisv3.Cluster, crClient crbacv1.Clus
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
 				Resources:     []string{apisv3.ClusterResourceName},
 				ResourceNames: []string{cluster.Name},
-				Verbs:         []string{rbacv1.VerbAll},
+				Verbs:         allNonCustomVerbs,
 			},
 		},
 	}

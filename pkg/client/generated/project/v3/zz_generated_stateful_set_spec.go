@@ -14,6 +14,7 @@ const (
 	StatefulSetSpecFieldDNSPolicy                            = "dnsPolicy"
 	StatefulSetSpecFieldEnableServiceLinks                   = "enableServiceLinks"
 	StatefulSetSpecFieldEphemeralContainers                  = "ephemeralContainers"
+	StatefulSetSpecFieldEvictionResponders                   = "evictionResponders"
 	StatefulSetSpecFieldFSGroupChangePolicy                  = "fsGroupChangePolicy"
 	StatefulSetSpecFieldFsgid                                = "fsgid"
 	StatefulSetSpecFieldGids                                 = "gids"
@@ -45,6 +46,7 @@ const (
 	StatefulSetSpecFieldScale                                = "scale"
 	StatefulSetSpecFieldScheduling                           = "scheduling"
 	StatefulSetSpecFieldSchedulingGates                      = "schedulingGates"
+	StatefulSetSpecFieldSchedulingGroup                      = "schedulingGroup"
 	StatefulSetSpecFieldSeccompProfile                       = "seccompProfile"
 	StatefulSetSpecFieldSelector                             = "selector"
 	StatefulSetSpecFieldServiceAccountName                   = "serviceAccountName"
@@ -59,7 +61,6 @@ const (
 	StatefulSetSpecFieldUid                                  = "uid"
 	StatefulSetSpecFieldVolumes                              = "volumes"
 	StatefulSetSpecFieldWindowsOptions                       = "windowsOptions"
-	StatefulSetSpecFieldWorkloadRef                          = "workloadRef"
 )
 
 type StatefulSetSpec struct {
@@ -71,6 +72,7 @@ type StatefulSetSpec struct {
 	DNSPolicy                            string                                           `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks                   *bool                                            `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers                  []EphemeralContainer                             `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders                   []EvictionResponder                              `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy                  string                                           `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                                *int64                                           `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                                 []int64                                          `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -102,6 +104,7 @@ type StatefulSetSpec struct {
 	Scale                                *int64                                           `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                           *Scheduling                                      `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates                      []PodSchedulingGate                              `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup                      *PodSchedulingGroup                              `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                       *SeccompProfile                                  `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                             *LabelSelector                                   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName                   string                                           `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -116,5 +119,4 @@ type StatefulSetSpec struct {
 	Uid                                  *int64                                           `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                              []Volume                                         `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                       *WindowsSecurityContextOptions                   `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                          *WorkloadReference                               `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

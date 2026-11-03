@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # this list doesn't include sha256sum.txt and the rancher-images-digests-*.txt files
 export ARTIFACTS=(
@@ -16,3 +16,14 @@ export ARTIFACTS=(
   "rancher-windows-images-sources.txt"
   "rancher-windows-images.txt"
 )
+
+export ARTIFACTS_WITH_CHECKSUM=("${ARTIFACTS[@]}" "sha256sum.txt")
+
+export IMAGES_DIGESTS_ARTIFACTS=(
+  "rancher-images-digests-linux.txt"
+  "rancher-images-digests-windows.txt"
+)
+
+export IMAGES_DIGESTS_ARTIFACTS_WITH_CHECKSUM=("${IMAGES_DIGESTS_ARTIFACTS[@]}" "images-digests-sha256sum.txt")
+
+export ALL_ARTIFACTS=("${ARTIFACTS_WITH_CHECKSUM[@]}" "${IMAGES_DIGESTS_ARTIFACTS_WITH_CHECKSUM[@]}")

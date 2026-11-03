@@ -3,6 +3,7 @@ package googleoauth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -28,7 +29,7 @@ func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAu
 			return userPrincipal, groupPrincipals, fmt.Errorf("invalid hostname provided")
 		}
 	}
-	userPrincipal = g.toPrincipal(userType, *user, nil)
+	userPrincipal = g.toPrincipal(userType, *user, config.GetName(), nil)
 	userPrincipal.Me = true
 	logrus.Debugf("[Google OAuth] loginuser: Obtained userinfo using oauth access token")
 
@@ -37,7 +38,8 @@ func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAu
 		// The error for this group request could be 403, because svc acc was not provided, and we're relying on individual
 		// users' creds to get groups
 		if config.ServiceAccountCredential == "" {
-			if gErr, ok := err.(*googleapi.Error); !ok || gErr.Code != http.StatusForbidden {
+			var gErr *googleapi.Error
+			if !errors.As(err, &gErr) || gErr.Code != http.StatusForbidden {
 				// if the error is not forbidden, return the error
 				return userPrincipal, groupPrincipals, err
 			}
@@ -82,7 +84,8 @@ func (g *googleOauthProvider) getGroupsUserBelongsTo(adminSvc *admin.Service, us
 		// users' creds to get groups
 		if config.ServiceAccountCredential == "" {
 			// used the client creds, if error is forbidden, don't throw error
-			if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusForbidden {
+			var gErr *googleapi.Error
+			if errors.As(err, &gErr) && gErr.Code == http.StatusForbidden {
 				return groupPrincipals, nil
 			}
 		}
@@ -91,7 +94,7 @@ func (g *googleOauthProvider) getGroupsUserBelongsTo(adminSvc *admin.Service, us
 	}
 	for _, gr := range groups {
 		group := Account{Name: gr.Name, Email: gr.Email, SubjectUniqueID: gr.Id}
-		groupPrincipal := g.toPrincipal(groupType, group, nil)
+		groupPrincipal := g.toPrincipal(groupType, group, config.GetName(), nil)
 		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -106,7 +109,8 @@ func (g *googleOauthProvider) searchPrincipals(adminSvc *admin.Service, searchKe
 		if err != nil {
 			if config.ServiceAccountCredential == "" {
 				// used the client creds, must try once with viewType domain_public
-				if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusForbidden {
+				var gErr *googleapi.Error
+				if errors.As(err, &gErr) && gErr.Code == http.StatusForbidden {
 					userAccounts, err = g.searchUsers(adminSvc, searchKey, config, true)
 					if err != nil {
 						return nil, err
@@ -126,7 +130,8 @@ func (g *googleOauthProvider) searchPrincipals(adminSvc *admin.Service, searchKe
 		if err != nil {
 			if config.ServiceAccountCredential == "" {
 				// used the client creds, if error is forbidden, don't throw error
-				if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusForbidden {
+				var gErr *googleapi.Error
+				if errors.As(err, &gErr) && gErr.Code == http.StatusForbidden {
 					return accounts, nil
 				}
 			}
@@ -159,6 +164,7 @@ func (g *googleOauthProvider) searchUsers(adminSvc *admin.Service, searchKey str
 		}
 		accounts = append(accounts, a)
 	}
+
 	return accounts, nil
 }
 

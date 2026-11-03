@@ -6,13 +6,20 @@ import (
 	"github.com/rancher/rancher/tests/v2/integration/actions/namespaces"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/api/scheme"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	authzv1 "k8s.io/api/authorization/v1"
 )
+
+func init() {
+	authzv1.SchemeBuilder.AddToScheme(scheme.Scheme.Scheme)
+}
 
 const (
 	namespaceName = "testnamespace"
@@ -72,10 +79,19 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectMember() {
 	client, err := p.client.WithSession(subSession)
 	require.NoError(p.T(), err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, "project-member", nil)
+	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		ProjectID:       p.project.ID,
+		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		RoleTemplateID:  "project-member",
+	})
 	require.NoError(p.T(), err)
 
 	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	err = extauthz.WaitForAllowed(testUser, p.project.ClusterID, []*authzv1.ResourceAttributes{
+		{Verb: "create", Resource: "namespaces"},
+	})
 	require.NoError(p.T(), err)
 
 	createdNamespace, err := namespaces.CreateNamespace(testUser, namespaceName, "{}", map[string]string{}, map[string]string{}, p.project)
@@ -90,10 +106,19 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectOwner() {
 	client, err := p.client.WithSession(subSession)
 	require.NoError(p.T(), err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, "project-owner", nil)
+	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		ProjectID:       p.project.ID,
+		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		RoleTemplateID:  "project-owner",
+	})
 	require.NoError(p.T(), err)
 
 	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	err = extauthz.WaitForAllowed(testUser, p.project.ClusterID, []*authzv1.ResourceAttributes{
+		{Verb: "create", Resource: "namespaces"},
+	})
 	require.NoError(p.T(), err)
 
 	createdNamespace, err := namespaces.CreateNamespace(testUser, namespaceName, "{}", map[string]string{}, map[string]string{}, p.project)

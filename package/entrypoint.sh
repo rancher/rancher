@@ -7,13 +7,6 @@ if [ ! -e /run/secrets/kubernetes.io/serviceaccount ] && [ ! -e /dev/kmsg ]; the
     exit 1
 fi
 
-git_dirs=$(find /var/lib/rancher-data/local-catalogs -type d -name '.git')
-echo "Restoring git repositories: "
-for dir in ${git_dirs[@]}; do
-  echo "- ${dir}"
-  cd "${dir}/.." && git checkout HEAD && cd -
-done
-
 #########################################################################################################################################
 # DISCLAIMER                                                                                                                            #
 # Copied from https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37                              #
@@ -48,10 +41,7 @@ if [ -e /var/lib/rancher/k3s/server/db/etcd ]; then
   fi
   set -e
 fi
-if [ -x "$(command -v update-ca-certificates)" ]; then
-  update-ca-certificates
-fi
-if [ -x "$(command -v c_rehash)" ]; then
-  c_rehash
-fi
-exec tini -- rancher --http-listen-port=80 --https-listen-port=443 --audit-log-path=${AUDIT_LOG_PATH} --audit-level=${AUDIT_LEVEL} --audit-log-maxage=${AUDIT_LOG_MAXAGE} --audit-log-maxbackup=${AUDIT_LOG_MAXBACKUP} --audit-log-maxsize=${AUDIT_LOG_MAXSIZE} "${@}"
+
+update-ca-certificates
+
+exec catatonit -- rancher --http-listen-port=80 --https-listen-port=443 --audit-log-path=${AUDIT_LOG_PATH} --audit-level=${AUDIT_LEVEL} --audit-log-maxage=${AUDIT_LOG_MAXAGE} --audit-log-maxbackup=${AUDIT_LOG_MAXBACKUP} --audit-log-maxsize=${AUDIT_LOG_MAXSIZE} "${@}"

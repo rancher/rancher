@@ -18,12 +18,13 @@ import (
 	"time"
 
 	registryGoogle "github.com/google/go-containerregistry/pkg/registry"
+	"github.com/hashicorp/go-version"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/rancher/tests/v2/integration/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -35,8 +36,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/registry"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,6 +119,7 @@ type ClusterRepoParams struct {
 	StatusCode        int
 	StatusCodeMessage string
 	RefreshInterval   int
+	TagFilter         string
 }
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
@@ -562,6 +564,30 @@ func (c *ClusterRepoTestSuite) TestOCIRepoMultipleChartRepos() {
 	})
 }
 
+func (c *ClusterRepoTestSuite) TestOCIRepoWithOptions() {
+	//start registry
+	ts, err := StartRegistry(c)
+	assert.NoError(c.T(), err)
+
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	require.NoError(c.T(), err)
+
+	err = AddHelmChart(u, "testingchart", "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
+	require.NoError(c.T(), err)
+	err = AddHelmChart(u, "testingchart", "../../../testdata/testingchart-1.0.0.tgz", "1.0.0")
+	require.NoError(c.T(), err)
+
+	c.testClusterRepoOCIOptions(ClusterRepoParams{
+		Name:              OCIClusterRepoName,
+		URL1:              fmt.Sprintf("oci://%s/rancher/testingchart", u.Host),
+		Type:              OCI,
+		InsecurePlainHTTP: true,
+		TagFilter:         "< 1.0.0",
+	})
+}
+
 func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	var err error
 
@@ -655,7 +681,9 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 	// Create a ClusterRepo
-	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
+	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{
+		Spec: v1.RepoSpec{ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60, MaxRetries: 2}},
+	})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	_, err := c.catalogClient.ClusterRepos().Create(context.TODO(), cr, metav1.CreateOptions{})
@@ -825,8 +853,9 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 			Name: repoName,
 		},
 		Spec: v1.RepoSpec{
-			URL:               fmt.Sprintf("oci://%s/rancher", u.Host),
-			InsecurePlainHTTP: true,
+			URL:                      fmt.Sprintf("oci://%s/rancher", u.Host),
+			InsecurePlainHTTP:        true,
+			ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60},
 		},
 	}
 	_, err = c.catalogClient.ClusterRepos().Create(context.Background(), clusterRepo, metav1.CreateOptions{})
@@ -919,7 +948,9 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 // testClusterRepo takes in ClusterRepoParams and tests CREATE, UPDATE, and DELETE operations
 func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	// Create a ClusterRepo
-	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
+	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{
+		Spec: v1.RepoSpec{ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60, MaxRetries: 2}},
+	})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
@@ -952,6 +983,134 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	status = c.getStatusFromClusterRepo(clusterRepo)
 	assert.Equal(c.T(), params.URL2, status.URL)
 	assert.Greater(c.T(), status.ObservedGeneration, observedGeneration)
+
+	// Validate deleting the ClusterRepo
+	err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Delete(clusterRepo)
+	require.NoError(c.T(), err)
+
+	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(params.Name)
+	require.Error(c.T(), err)
+}
+
+func (c *ClusterRepoTestSuite) testClusterRepoOCIOptions(params ClusterRepoParams) {
+	// Create a ClusterRepo
+	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{
+		Spec: v1.RepoSpec{OCIOptions: &v1.OCIOptions{TagFilter: params.TagFilter}},
+	})
+	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
+	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
+	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
+	require.NoError(c.T(), err)
+	time.Sleep(1 * time.Second)
+
+	// Validate the ClusterRepo was created and resources were downloaded
+	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
+	require.NoError(c.T(), err)
+
+	status := c.getStatusFromClusterRepo(clusterRepo)
+	assert.Equal(c.T(), params.URL1, status.URL)
+
+	//get index
+	configMap, err := c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+
+	data := configMap.BinaryData["content"]
+	gz, err := gzip.NewReader(bytes.NewBuffer(data))
+	assert.NoError(c.T(), err)
+	defer gz.Close()
+	data, err = io.ReadAll(gz)
+	assert.NoError(c.T(), err)
+	index := &repo.IndexFile{}
+	err = json.Unmarshal(data, index)
+	assert.NoError(c.T(), err)
+	constraint, err := version.NewConstraint(cr.Spec.OCIOptions.TagFilter)
+	if err != nil {
+		logrus.Errorf("failed to parse semver constraint %s: %s", cr.Spec.OCIOptions.TagFilter, err.Error())
+		constraint = version.Constraints{}
+	}
+	for _, chart := range index.Entries["testingchart"] {
+		assert.True(c.T(), constraint.Check(version.Must(version.NewVersion(chart.Version))), "tag filter constraint failed for ", chart.Version)
+	}
+
+	downloadTime := status.DownloadTime
+
+	// Add DownloadAllTags = true to clusterrepo but keep the filter
+	spec := c.getSpecFromClusterRepo(clusterRepo)
+	spec.OCIOptions.DownloadAllTags = true
+	clusterRepoUpdated := *clusterRepo
+	clusterRepoUpdated.Spec = spec
+
+	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(&clusterRepoUpdated)
+	require.NoError(c.T(), err)
+
+	var cr2 *v1.ClusterRepo
+	err = wait.Poll(PollInterval, 3*time.Minute, func() (done bool, err error) {
+		cr2, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+		assert.NoError(c.T(), err)
+
+		for _, condition := range cr2.Status.Conditions {
+			if v1.RepoCondition(condition.Type) == v1.OCIDownloaded &&
+				condition.LastUpdateTime != downloadTime.String() {
+				t, _ := time.Parse(time.RFC3339, condition.LastUpdateTime)
+				downloadTime = metav1.NewTime(t)
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+
+	//get index
+	configMap, err = c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+
+	data = configMap.BinaryData["content"]
+	gz, err = gzip.NewReader(bytes.NewBuffer(data))
+	assert.NoError(c.T(), err)
+	defer gz.Close()
+	data, err = io.ReadAll(gz)
+	assert.NoError(c.T(), err)
+	index = &repo.IndexFile{}
+	err = json.Unmarshal(data, index)
+	assert.NoError(c.T(), err)
+
+	assert.Equal(c.T(), 1, len(index.Entries["testingchart"]))
+
+	//remove tag filter from clusterrepo
+	cr2.Spec.OCIOptions.TagFilter = ""
+	cr2.Spec.OCIOptions.DownloadAllTags = true
+
+	cr2, err = c.catalogClient.ClusterRepos().Update(context.Background(), cr2, metav1.UpdateOptions{})
+	assert.NoError(c.T(), err)
+
+	err = wait.Poll(PollInterval, 3*time.Minute, func() (done bool, err error) {
+		cr, err := c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+		assert.NoError(c.T(), err)
+
+		for _, condition := range cr.Status.Conditions {
+			if v1.RepoCondition(condition.Type) == v1.OCIDownloaded {
+				return condition.LastUpdateTime != downloadTime.String(), nil
+			}
+		}
+
+		return false, nil
+	})
+
+	//get index
+	configMap, err = c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+
+	data = configMap.BinaryData["content"]
+	gz, err = gzip.NewReader(bytes.NewBuffer(data))
+	assert.NoError(c.T(), err)
+	defer gz.Close()
+	data, err = io.ReadAll(gz)
+	assert.NoError(c.T(), err)
+	index = &repo.IndexFile{}
+	err = json.Unmarshal(data, index)
+	assert.NoError(c.T(), err)
+
+	assert.Equal(c.T(), 2, len(index.Entries["testingchart"]))
 
 	// Validate deleting the ClusterRepo
 	err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Delete(clusterRepo)
@@ -1063,7 +1222,9 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 
 		return status.DownloadTime != prevDownloadTime, nil
 	})
-
+	if err != nil {
+		c.T().Logf("Error while downloading ClusterRepo %s from catalog: %v. \n CR status: \n %v", ClusterRepoName, err, clusterRepo.Status)
+	}
 	return clusterRepo, err
 }
 

@@ -67,6 +67,27 @@ Prepare the Rancher Image Pull Policy value w/ new fields as opt-in for now.
 {{ end -}}
 
 {{/*
+Prepare the Rancher Image repo value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancherCharts.imageRepo" -}}
+{{ default "rancher/rancher-assets" .Values.assetsImage.repository -}}
+{{ end -}}
+
+{{/*
+Prepare the Rancher Image value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancherCharts.image" -}}
+{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.assetsImage.registry))) (include "rancherCharts.imageRepo" .) -}}
+{{ end -}}
+
+{{/*
+Prepare the Rancher Image Pull Policy value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancherCharts.imagePullPolicy" -}}
+{{ default "IfNotPresent" .Values.assetsImage.pullPolicy }}
+{{ end -}}
+
+{{/*
 Render Values in configurationSnippet
 */}}
 {{- define "configurationSnippet" -}}
@@ -74,11 +95,21 @@ Render Values in configurationSnippet
 {{- end -}}
 
 {{/*
-Generate the labels.
+Selector labels.
+Used in Deployment spec.selector, Service spec.selector, PDB spec.selector.
+Keep this minimal and stable over time!
+*/}}
+{{- define "rancher.selectorLabels" -}}
+app: {{ include "rancher.fullname" . }}
+{{- end }}
+
+{{/*
+Common labels.
+Used in metadata.labels on ALL resources (metadata only, never immutable selectors).
 */}}
 {{- define "rancher.labels" -}}
-app: {{ template "rancher.fullname" . }}
-chart: {{ template "rancher.chartname" . }}
+{{ include "rancher.selectorLabels" . }}
+chart: {{ include "rancher.chartname" . }}
 heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
 {{- end }}
@@ -155,11 +186,7 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     Select correct auditLog image
 */}}
 {{ define "auditLog.image" -}}
-  {{ if .Values.busyboxImage -}}
-    {{ .Values.busyboxImage -}}
-  {{ else -}}
-    {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
-  {{ end -}}
+  {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
 {{ end -}}
 
 {{- define "rancher.certmanager.notes" -}}

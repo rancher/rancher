@@ -5,10 +5,29 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rancher/norman/condition"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+// CopyCondition copies all fields of a single condition (status, reason, message,
+// lastUpdated) from src to dst using per-condition helpers. The helpers find or
+// create the matching condition entry in-place, so unrelated conditions on dst
+// are not affected. If the condition doesn't exist on src, this is a no-op.
+// Consider moving this to norman to optimize.
+func CopyCondition(cond condition.Cond, src, dst runtime.Object) {
+	status := cond.GetStatus(src)
+	if status == "" {
+		// Condition doesn't exist on src, don't create it on dst
+		return
+	}
+	cond.SetStatus(dst, status)
+	cond.Reason(dst, cond.GetReason(src))
+	cond.Message(dst, cond.GetMessage(src))
+	cond.LastUpdated(dst, cond.GetLastUpdated(src))
+}
 
 const (
 	PriorityClassName        = "cattle-cluster-agent-priority-class"
@@ -161,17 +180,9 @@ func AgentDeploymentCustomizationChanged(cluster *v3.Cluster) bool {
 		return affinitiesDiffer || tolerationsDiffer || resourcesDiffer
 	}
 
-	if specCustomization.AppendTolerations != nil && statusCustomization.AppendTolerations != nil {
-		tolerationsDiffer = !reflect.DeepEqual(specCustomization.AppendTolerations, statusCustomization.AppendTolerations)
-	}
-
-	if specCustomization.OverrideAffinity != nil && statusCustomization.OverrideAffinity != nil {
-		affinitiesDiffer = !reflect.DeepEqual(specCustomization.OverrideAffinity, statusCustomization.OverrideAffinity)
-	}
-
-	if specCustomization.OverrideResourceRequirements != nil && statusCustomization.OverrideResourceRequirements != nil {
-		resourcesDiffer = !reflect.DeepEqual(specCustomization.OverrideResourceRequirements, statusCustomization.OverrideResourceRequirements)
-	}
+	tolerationsDiffer = !reflect.DeepEqual(specCustomization.AppendTolerations, statusCustomization.AppendTolerations)
+	affinitiesDiffer = !reflect.DeepEqual(specCustomization.OverrideAffinity, statusCustomization.OverrideAffinity)
+	resourcesDiffer = !reflect.DeepEqual(specCustomization.OverrideResourceRequirements, statusCustomization.OverrideResourceRequirements)
 
 	return affinitiesDiffer || tolerationsDiffer || resourcesDiffer
 }
@@ -200,7 +211,7 @@ func AgentSchedulingPodDisruptionBudgetChanged(cluster *v3.Cluster) (bool, bool)
 		return false, false
 	}
 
-	return !reflect.DeepEqual(specCustomization.PodDisruptionBudget, statusCustomization.PodDisruptionBudget), specCustomization.PodDisruptionBudget == nil
+	return !reflect.DeepEqual(specCustomization.PodDisruptionBudget, statusCustomization.PodDisruptionBudget), specCustomization.PodDisruptionBudget == nil && statusCustomization.PodDisruptionBudget != nil
 }
 
 // AgentSchedulingPriorityClassChanged compares the cluster spec and status to determine if the
@@ -227,7 +238,11 @@ func AgentSchedulingPriorityClassChanged(cluster *v3.Cluster) (bool, bool, bool)
 		return false, false, false
 	}
 
-	return !reflect.DeepEqual(specCustomization.PriorityClass, statusCustomization.PriorityClass), false, specCustomization.PriorityClass == nil
+	if specCustomization.PriorityClass != nil && statusCustomization.PriorityClass == nil {
+		return false, true, false
+	}
+
+	return !reflect.DeepEqual(specCustomization.PriorityClass, statusCustomization.PriorityClass), false, specCustomization.PriorityClass == nil && statusCustomization.PriorityClass != nil
 }
 
 // AgentSchedulingCustomizationEnabled determines if scheduling customization has been defined for either the
@@ -303,6 +318,45 @@ func GetDesiredPriorityClassValueAndPreemption(cluster *v3.Cluster) (int, string
 	}
 
 	return agentCustomization.PriorityClass.Value, PCPreemption
+}
+
+// WebhookDeploymentCustomizationChanged reports whether the webhook customization in the
+// cluster spec differs from what was last applied (stored in the status).  A return value
+// of true means the webhook chart should be re-deployed.
+func WebhookDeploymentCustomizationChanged(cluster *v3.Cluster) bool {
+	if cluster == nil {
+		return false
+	}
+	return !reflect.DeepEqual(cluster.Spec.WebhookDeploymentCustomization,
+		cluster.Status.AppliedWebhookDeploymentCustomization)
+}
+
+// UpdateAppliedWebhookDeploymentCustomization copies the webhook customization from the
+// cluster spec into the status so that it reflects what was most recently applied to the
+// rancher-webhook Helm release.
+func UpdateAppliedWebhookDeploymentCustomization(cluster *v3.Cluster) {
+	if cluster == nil {
+		return
+	}
+
+	wdc := cluster.Spec.WebhookDeploymentCustomization
+	if wdc == nil {
+		cluster.Status.AppliedWebhookDeploymentCustomization = nil
+		return
+	}
+
+	// If the struct exists but all fields are empty, clear the status too.
+	if wdc.ReplicaCount == nil &&
+		wdc.AppendTolerations == nil &&
+		wdc.OverrideAffinity == nil &&
+		wdc.OverrideResourceRequirements == nil &&
+		wdc.PodDisruptionBudget == nil {
+
+		cluster.Status.AppliedWebhookDeploymentCustomization = nil
+		return
+	}
+
+	cluster.Status.AppliedWebhookDeploymentCustomization = wdc.DeepCopy()
 }
 
 // UpdateAppliedAgentDeploymentCustomization updates the cluster AppliedClusterAgentDeploymentCustomization Status

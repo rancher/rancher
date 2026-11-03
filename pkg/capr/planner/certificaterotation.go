@@ -11,10 +11,11 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // rotateCertificates checks if there is a need to rotate any certificates and updates the plan accordingly.
-func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
+func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, cluster *capi.Cluster, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
 	if !shouldRotate(controlPlane) {
 		return status, nil
 	}
@@ -37,7 +38,7 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 			continue
 		}
 
-		rotatePlan, joinedServer, err := p.rotateCertificatesPlan(controlPlane, tokensSecret, controlPlane.Spec.RotateCertificates, node, joinServer)
+		rotatePlan, joinedServer, err := p.rotateCertificatesPlan(controlPlane, cluster, tokensSecret, controlPlane.Spec.RotateCertificates, node, joinServer)
 		if err != nil {
 			return status, err
 		}
@@ -87,12 +88,12 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 
 // rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If no services are specified
 // all certificates are rotated.
-func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, rotation *rkev1.RotateCertificates, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
+func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, rotation *rkev1.RotateCertificates, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
 	if isOnlyWorker(entry) {
 		// Don't overwrite the joinURL annotation.
 		joinServer = ""
 	}
-	rotatePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
+	rotatePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, cluster, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return plan.NodePlan{}, joinedServer, err
 	}

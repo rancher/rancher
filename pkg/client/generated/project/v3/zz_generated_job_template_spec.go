@@ -12,6 +12,7 @@ const (
 	JobTemplateSpecFieldDNSPolicy                     = "dnsPolicy"
 	JobTemplateSpecFieldEnableServiceLinks            = "enableServiceLinks"
 	JobTemplateSpecFieldEphemeralContainers           = "ephemeralContainers"
+	JobTemplateSpecFieldEvictionResponders            = "evictionResponders"
 	JobTemplateSpecFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	JobTemplateSpecFieldFsgid                         = "fsgid"
 	JobTemplateSpecFieldGids                          = "gids"
@@ -44,6 +45,7 @@ const (
 	JobTemplateSpecFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	JobTemplateSpecFieldScheduling                    = "scheduling"
 	JobTemplateSpecFieldSchedulingGates               = "schedulingGates"
+	JobTemplateSpecFieldSchedulingGroup               = "schedulingGroup"
 	JobTemplateSpecFieldSeccompProfile                = "seccompProfile"
 	JobTemplateSpecFieldSelector                      = "selector"
 	JobTemplateSpecFieldServiceAccountName            = "serviceAccountName"
@@ -60,7 +62,6 @@ const (
 	JobTemplateSpecFieldUid                           = "uid"
 	JobTemplateSpecFieldVolumes                       = "volumes"
 	JobTemplateSpecFieldWindowsOptions                = "windowsOptions"
-	JobTemplateSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type JobTemplateSpec struct {
@@ -74,6 +75,7 @@ type JobTemplateSpec struct {
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -106,6 +108,7 @@ type JobTemplateSpec struct {
 	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -122,5 +125,4 @@ type JobTemplateSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

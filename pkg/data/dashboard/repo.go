@@ -1,9 +1,12 @@
 package dashboard
 
 import (
+	"slices"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -33,6 +36,17 @@ func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) e
 		)
 	}
 
+	registry, _ := cluster.GetPrivateRegistry(nil)
+	var secretReferences []v1.SecretReference
+	if registry != nil {
+		for _, ps := range registry.PullSecrets {
+			secretReferences = append(secretReferences, v1.SecretReference{
+				Name:      ps.Name,
+				Namespace: namespaces.System,
+			})
+		}
+	}
+
 	repo, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
@@ -40,13 +54,15 @@ func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) e
 				Name: repoName,
 			},
 			Spec: v1.RepoSpec{
-				GitRepo:   repoURL,
-				GitBranch: branchName,
+				GitRepo:                 repoURL,
+				GitBranch:               branchName,
+				DefaultImagePullSecrets: secretReferences,
 			},
 		})
-	} else if err == nil && (repo.Spec.GitRepo != repoURL || repo.Spec.GitBranch != branchName) {
+	} else if err == nil && (repo.Spec.GitRepo != repoURL || repo.Spec.GitBranch != branchName || !slices.Equal(repo.Spec.DefaultImagePullSecrets, secretReferences)) {
 		repo.Spec.GitRepo = repoURL
 		repo.Spec.GitBranch = branchName
+		repo.Spec.DefaultImagePullSecrets = secretReferences
 		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
 	}
 

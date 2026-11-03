@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -26,27 +27,23 @@ func (p Policy) actionForUri(uri string) auditlogv1.FilterAction {
 		return auditlogv1.FilterActionAllow
 	}
 
-	for _, f := range p.Filters {
-		if f.Allowed(uri) {
+	action := auditlogv1.FilterActionUnknown
+	for _, filter := range p.Filters {
+		switch filter.ActionForURI(uri) {
+		case auditlogv1.FilterActionAllow:
+			// Preserve Allow precedence within one AuditPolicy.
 			return auditlogv1.FilterActionAllow
+		case auditlogv1.FilterActionDeny:
+			// Remember the deny, but continue looking for a matching Allow.
+			action = auditlogv1.FilterActionDeny
 		}
 	}
 
-	return auditlogv1.FilterActionDeny
+	return action
 }
 
 func (p Policy) actionForLog(log *logEntry) auditlogv1.FilterAction {
-	if len(p.Filters) == 0 {
-		return auditlogv1.FilterActionAllow
-	}
-
-	for _, f := range p.Filters {
-		if f.LogAllowed(log) {
-			return auditlogv1.FilterActionAllow
-		}
-	}
-
-	return auditlogv1.FilterActionDeny
+	return p.actionForUri(log.RequestURI)
 }
 
 func PolicyFromAuditPolicy(policy *auditlogv1.AuditPolicy) (Policy, error) {
@@ -91,6 +88,7 @@ type WriterOptions struct {
 	DefaultPolicyLevel auditlogv1.Level
 
 	DisableDefaultPolicies bool
+	ExcludeGroups          bool
 }
 
 type Writer struct {
@@ -118,6 +116,27 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 		}
 	}
 
+	if opts.ExcludeGroups {
+		additionalPolicy := auditlogv1.AuditPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "drop-impersonation-groups",
+			},
+			Spec: auditlogv1.AuditPolicySpec{
+				AdditionalRedactions: []auditlogv1.Redaction{
+					{
+						Headers: []string{
+							"Impersonate-Group",
+						},
+					},
+				},
+			},
+		}
+
+		if err := w.UpdatePolicy(&additionalPolicy); err != nil {
+			return nil, fmt.Errorf("failed to add redact impersonation policy: %w", err)
+		}
+	}
+
 	return w, nil
 }
 
@@ -134,14 +153,16 @@ func (w *Writer) Write(log *logEntry) error {
 	w.policiesMutex.RLock()
 	for _, policy := range w.policies {
 		switch policy.actionForLog(log) {
+		case auditlogv1.FilterActionDeny:
+			action = auditlogv1.FilterActionDeny
 		case auditlogv1.FilterActionAllow:
 			redactors = append(redactors, policy.Redactors...)
 
 			action = auditlogv1.FilterActionAllow
-		case auditlogv1.FilterActionDeny:
-			if action != auditlogv1.FilterActionAllow {
-				action = auditlogv1.FilterActionDeny
-			}
+		}
+
+		if action == auditlogv1.FilterActionDeny {
+			break
 		}
 	}
 	w.policiesMutex.RUnlock()

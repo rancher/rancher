@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,10 +23,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	registry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 var (
@@ -55,7 +61,7 @@ var (
 			FieldDescription:    []byte(""),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("13:00:05"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
@@ -76,7 +82,7 @@ var (
 			FieldDescription:    []byte(""),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("13:00:05"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
@@ -103,8 +109,12 @@ var (
 			UserPrincipal: properPrincipal,
 		},
 		Status: ext.TokenStatus{
-			Value:          "",
-			Hash:           "kla9jkdmj",
+			Value: "",
+			// Hash is intentionally empty: every API read path (get, list,
+			// watch, update response) strips the stored hash. properToken
+			// models a token as returned to a client. The backing secret in
+			// properSecret still carries the hash in its data.
+			Hash:           "",
 			Expired:        true,
 			ExpiresAt:      "0001-01-01T00:00:04Z",
 			LastUpdateTime: "13:00:05",
@@ -126,7 +136,7 @@ var (
 		Data: map[string][]byte{
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("this is a fake now"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("5000"),
@@ -146,7 +156,7 @@ var (
 		Data: map[string][]byte{
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("this is a fake now"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("3000"),
@@ -165,9 +175,12 @@ var (
 	errInvalidContext      = fmt.Errorf("context has no user info")
 
 	bogusNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
+	sessionNotFoundError    = apierrors.NewNotFound(GVR.GroupResource(), "session-token")
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
+	createSessionKind       = apierrors.NewBadRequest("unable to create token of kind session")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
+	admissionDenialMessage  = "ValidatingAdmissionPolicy 'block' denied request: blocked"
 
 	parseBoolError error
 	parseIntError  error
@@ -265,9 +278,73 @@ func TestStoreGroupVersionKind(t *testing.T) {
 func TestStoreDeleteCollection(t *testing.T) {
 	t.Parallel()
 
-	ctrl := gomock.NewController(t)
+	t.Run("ignore not found errors due to concurrent other delete", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		var deleteValidationCalledTimes int
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			deleteValidationCalledTimes++
+			return nil
+		}
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: ptr.To(int64(60)),
+		}
+		listOptions := &metainternalversion.ListOptions{
+			LabelSelector: labels.Set{
+				UserIDLabel: properUser,
+				"custom":    "label",
+			}.AsSelector(),
+		}
+
+		secretClient := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		secretClient.EXPECT().List(TokenNamespace, gomock.Any()).
+			DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.SecretList, error) {
+				labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
+				require.NoError(t, err)
+				assert.Equal(t, properUser, labelSet[UserIDLabel])
+				assert.Equal(t, "label", labelSet["custom"])
+
+				return &corev1.SecretList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "1",
+					},
+					Items: []corev1.Secret{*properSecret.DeepCopy()},
+				}, nil
+			}).Times(1)
+		secretClient.EXPECT().Delete(TokenNamespace, "bogus", gomock.Any()).
+			DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+				assert.Equal(t, deleteOptions, options)
+				// report concurrent deletion of listed resource
+				return apierrors.NewNotFound(GVR.GroupResource(), name)
+			}).Times(1)
+		secretClient.EXPECT().Cache().Return(nil)
+		userClient := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Cache().Return(nil)
+		auth := NewMockauthHandler(ctrl)
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, false, true, nil)
+
+		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
+
+		obj, err := store.DeleteCollection(t.Context(), deleteValidation,
+			deleteOptions, listOptions)
+
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.TokenList{}, obj)
+
+		list := obj.(*ext.TokenList)
+		// len == 0, not listing the concurrently deleted object
+		require.Len(t, list.Items, 0)
+		assert.Equal(t, "1", list.ResourceVersion)
+
+		assert.Equal(t, deleteValidationCalledTimes, 1)
+
+	})
 
 	t.Run("admin deletes a user's tokens with a label", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
 		var deleteValidationCalledTimes int
 		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
 			deleteValidationCalledTimes++
@@ -312,7 +389,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 
 		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
 
-		obj, err := store.DeleteCollection(context.Background(), deleteValidation,
+		obj, err := store.DeleteCollection(t.Context(), deleteValidation,
 			deleteOptions, listOptions)
 
 		require.NoError(t, err)
@@ -324,6 +401,171 @@ func TestStoreDeleteCollection(t *testing.T) {
 		assert.Equal(t, "1", list.ResourceVersion)
 
 		assert.Equal(t, deleteValidationCalledTimes, 1)
+	})
+}
+
+func TestStoreDeleteCollectionKeepsItemStatusCode(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	secretClient := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretClient.EXPECT().List(TokenNamespace, gomock.Any()).
+		Return(&corev1.SecretList{
+			ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+			Items:    []corev1.Secret{*properSecret.DeepCopy()},
+		}, nil)
+	denied := apierrors.NewInvalid(schema.GroupKind{Kind: "Secret"}, "bogus", nil)
+	denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+	secretClient.EXPECT().Delete(TokenNamespace, "bogus", gomock.Any()).Return(denied)
+	secretClient.EXPECT().Cache().Return(nil)
+	userClient := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+	userClient.EXPECT().Cache().Return(nil)
+	auth := NewMockauthHandler(ctrl)
+	auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&mockUser{name: properUser}, false, true, nil)
+
+	store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
+
+	obj, err := store.DeleteCollection(t.Context(), nil, &metav1.DeleteOptions{}, &metainternalversion.ListOptions{})
+	require.Error(t, err)
+	assert.Nil(t, obj)
+	assert.True(t, apierrors.IsInvalid(err), "admission denial must stay 422, got %v", err)
+	assert.Contains(t, err.Error(), admissionDenialMessage)
+	assert.NotContains(t, err.Error(), "secret")
+}
+
+type fakeUpdatedObjectInfo struct {
+	obj runtime.Object
+	err error
+}
+
+func (i *fakeUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
+	return nil
+}
+
+func (i *fakeUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
+	return i.obj, i.err
+}
+
+var _ rest.UpdatedObjectInfo = &fakeUpdatedObjectInfo{}
+
+func TestStoreUpdate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("forbidden secret keeps its status code", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().Get(TokenNamespace, "bogus").
+			Return(nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied")))
+
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+		obj, created, err := store.Update(context.TODO(), "bogus", &fakeUpdatedObjectInfo{}, nil, nil, false, &metav1.UpdateOptions{})
+
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, created)
+		assert.True(t, apierrors.IsForbidden(err), "backing 403 must stay 403, got %v", err)
+		assert.NotContains(t, err.Error(), "secret")
+	})
+
+	t.Run("status error from updated object keeps its status code", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().Get(TokenNamespace, "bogus").Return(properSecret.DeepCopy(), nil)
+
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+		objInfo := &fakeUpdatedObjectInfo{err: apierrors.NewBadRequest("malformed patch")}
+		obj, created, err := store.Update(context.TODO(), "bogus", objInfo, nil, nil, false, &metav1.UpdateOptions{})
+
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, created)
+		assert.True(t, apierrors.IsBadRequest(err), "patch 400 must stay 400, got %v", err)
+	})
+}
+
+func TestStoreValidationCallbackErrors(t *testing.T) {
+	t.Parallel()
+
+	wrappedForbidden := fmt.Errorf("admission: %w", apierrors.NewForbidden(GVR.GroupResource(), "bogus", errors.New("denied")))
+
+	newStore := func(t *testing.T, cachedSecret *corev1.Secret) *Store {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil).AnyTimes()
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		if cachedSecret != nil {
+			// Update reads through the cache, Delete bypasses it.
+			scache.EXPECT().Get(TokenNamespace, "bogus").Return(cachedSecret, nil).AnyTimes()
+			secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).Return(cachedSecret, nil).AnyTimes()
+		}
+		return New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+	}
+
+	t.Run("create keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, nil)
+		validation := func(ctx context.Context, obj runtime.Object) error { return wrappedForbidden }
+
+		_, err := store.Create(context.TODO(), properToken.DeepCopy(), validation, &metav1.CreateOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+
+	t.Run("create turns a plain error into a bad request", func(t *testing.T) {
+		store := newStore(t, nil)
+		validation := func(ctx context.Context, obj runtime.Object) error { return errors.New("nope") }
+
+		_, err := store.Create(context.TODO(), properToken.DeepCopy(), validation, &metav1.CreateOptions{})
+		assert.True(t, apierrors.IsBadRequest(err), "plain validation error must be 400, got %v", err)
+	})
+
+	t.Run("delete keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj runtime.Object) error { return wrappedForbidden }
+
+		_, _, err := store.Delete(context.TODO(), "bogus", validation, &metav1.DeleteOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+
+	t.Run("delete turns a plain error into a bad request", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj runtime.Object) error { return errors.New("nope") }
+
+		_, _, err := store.Delete(context.TODO(), "bogus", validation, &metav1.DeleteOptions{})
+		assert.True(t, apierrors.IsBadRequest(err), "plain validation error must be 400, got %v", err)
+	})
+
+	t.Run("update keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj, old runtime.Object) error { return wrappedForbidden }
+
+		_, _, err := store.Update(context.TODO(), "bogus", &fakeUpdatedObjectInfo{obj: properToken.DeepCopy()}, nil, validation, false, &metav1.UpdateOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
 	})
 }
 
@@ -341,15 +583,14 @@ func TestStoreDelete(t *testing.T) {
 			Return(&mockUser{name: "laber"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
+		secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).
 			Return(nil, errSomeError)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
-		assert.Equal(t, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token bogus: %w",
-			errSomeError)), err)
+		assert.Equal(t, apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")), err)
 	})
 
 	t.Run("failed to get secret, not found", func(t *testing.T) {
@@ -362,7 +603,7 @@ func TestStoreDelete(t *testing.T) {
 			Return(&mockUser{name: "laber"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
+		secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).
 			Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "bogus"))
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -400,7 +641,7 @@ func TestStoreDelete(t *testing.T) {
 			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
+		secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -420,10 +661,10 @@ func TestStoreDelete(t *testing.T) {
 			Return(&mockUser{name: properUser}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
+		secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 		secrets.EXPECT().
-			Delete("cattle-tokens", "bogus", gomock.Any()).
+			Delete(TokenNamespace, "bogus", gomock.Any()).
 			Return(nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -443,10 +684,10 @@ func TestStoreDelete(t *testing.T) {
 			Return(&mockUser{name: properUser}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
+		secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 		secrets.EXPECT().
-			Delete("cattle-tokens", "bogus", gomock.Any()).
+			Delete(TokenNamespace, "bogus", gomock.Any()).
 			DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 				// verify that the delete option data was properly translated
 				assert.Equal(t, options.Preconditions, metav1.NewUIDPreconditions("bombastic"))
@@ -480,7 +721,7 @@ func TestStoreGet(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+			Get(TokenNamespace, "bogus").
 			Return(&properSecret, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -503,7 +744,7 @@ func TestStoreGet(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+			Get(TokenNamespace, "bogus").
 			Return(&properSecret, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -526,7 +767,7 @@ func TestStoreGet(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+			Get(TokenNamespace, "bogus").
 			Return(&properSecret, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -607,7 +848,7 @@ func TestStoreGet(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+			Get(TokenNamespace, "bogus").
 			Return(fieldSecret, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
@@ -631,7 +872,7 @@ func TestStoreWatch(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(nil, errSomeError)
 
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -656,7 +897,7 @@ func TestStoreWatch(t *testing.T) {
 		secrets.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -689,7 +930,7 @@ func TestStoreWatch(t *testing.T) {
 		secrets.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -725,7 +966,7 @@ func TestStoreWatch(t *testing.T) {
 			watch.Event{Object: &corev1.Namespace{}, Type: watch.Added},
 			watch.Event{Object: &properSecret, Type: watch.Bookmark},
 		)
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -760,7 +1001,7 @@ func TestStoreWatch(t *testing.T) {
 			watch.Event{Object: &corev1.Secret{}, Type: watch.Added},
 			watch.Event{Object: &properSecret, Type: watch.Bookmark},
 		)
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -793,13 +1034,13 @@ func TestStoreWatch(t *testing.T) {
 		// return fake bookmark for easy channel management
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		// Expect a watch() call with filter for user
-		secrets.EXPECT().Watch("cattle-tokens", metav1.ListOptions{
-			LabelSelector: UserIDLabel + "=lkajdl/ksjlkds",
+		secrets.EXPECT().Watch(TokenNamespace, metav1.ListOptions{
+			LabelSelector: UserIDLabel + "=" + properUser,
 		}).Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -825,7 +1066,7 @@ func TestStoreWatch(t *testing.T) {
 		secrets.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Modified})
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -855,7 +1096,7 @@ func TestStoreWatch(t *testing.T) {
 		secrets.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Modified})
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus", nil)
@@ -888,7 +1129,7 @@ func TestStoreWatch(t *testing.T) {
 		watcher := NewWatcherFor(
 			watch.Event{Object: &corev1.Namespace{}, Type: watch.Error},
 		)
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -923,7 +1164,7 @@ func TestStoreWatch(t *testing.T) {
 			watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark},
 			watch.Event{Object: &properSecret, Type: watch.Bookmark},
 		)
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -964,7 +1205,7 @@ func TestStoreWatch(t *testing.T) {
 			},
 			Type: watch.Bookmark,
 		})
-		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+		secrets.EXPECT().Watch(TokenNamespace, gomock.Any()).
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
@@ -995,6 +1236,7 @@ func TestStoreCreate(t *testing.T) {
 		tok        *ext.Token            // token input
 		rtok       *ext.Token            // expected op result, created token
 		opts       *metav1.CreateOptions // create options
+		defaultmin string                // not empty --> use as modified default ttl setting
 		storeSetup func(                 // configure store backend clients
 			space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
@@ -1024,6 +1266,66 @@ func TestStoreCreate(t *testing.T) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(&mockUser{name: properUser}, false, true, nil)
+			},
+		},
+		{
+			name: "session kind",
+			err:  createSessionKind,
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+			},
+		},
+		{
+			name: "session kind, dry run",
+			err:  createSessionKind,
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
+			opts: &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+			},
+		},
+		{
+			name: "session kind, full access",
+			err:  createSessionKind,
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, true, true, nil)
 			},
 		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
@@ -1085,7 +1387,43 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token \"session-token\"")),
+			err:  fmt.Errorf("unable to fetch token \"session-token\": %w", sessionNotFoundError),
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// fail fetch of session token, v3 and ext, neither is found
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").
+					Return(nil, sessionNotFoundError)
+				scache.EXPECT().Get("cattle-tokens", "session-token").
+					Return(nil, sessionNotFoundError)
+
+				users.EXPECT().Get("world").
+					Return(enabledUser, nil)
+			},
+		},
+		{
+			name: "provider/principal retrieval error, not found",
+			err: fmt.Errorf("unable to fetch token \"session-token\": %w",
+				apierrors.NewNotFound(GVR.GroupResource(), "session-token")),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1110,9 +1448,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").
-					Return(nil, errSomeError)
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
 				scache.EXPECT().Get("cattle-tokens", "session-token").
-					Return(nil, errSomeError)
+					Return(nil, sessionNotFoundError)
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
@@ -1145,9 +1483,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1159,7 +1497,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "failed to create secret - some error",
-			err:  apierrors.NewInternalError(fmt.Errorf("failed to store token: %w", errSomeError)),
+			err:  apierrors.NewInternalError(errors.New("error accessing backing object for token " + GeneratePrefix)),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1184,9 +1522,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1207,8 +1545,57 @@ func TestStoreCreate(t *testing.T) {
 			},
 		},
 		{
+			name: "failed to create secret - admission denied",
+			err: func() error {
+				denied := apierrors.NewInvalid(GVK.GroupKind(), GeneratePrefix, nil)
+				denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+				denied.ErrStatus.Message += ": " + admissionDenialMessage
+				return denied
+			}(),
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
+					}}, nil)
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+				hasher.EXPECT().MakeAndHashSecret().Return("", "", nil)
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				denied := apierrors.NewInvalid(schema.GroupKind{Kind: "Secret"}, "", nil)
+				denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+				secrets.EXPECT().Create(gomock.Any()).
+					Return(nil, denied)
+			},
+		},
+		{
 			name: "failed to create secret - already exists",
-			err:  helloAlreadyExistsError,
+			err:  apierrors.NewAlreadyExists(GVR.GroupResource(), GeneratePrefix),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1233,9 +1620,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1282,9 +1669,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1307,13 +1694,13 @@ func TestStoreCreate(t *testing.T) {
 
 				// on failure to read back the secret is deleted again
 				secrets.EXPECT().
-					Delete("cattle-tokens", "bogus", gomock.Any()).
+					Delete(TokenNamespace, "bogus", gomock.Any()).
 					Return(nil)
 
 			},
 		},
 		{
-			name: "created secret ok",
+			name: "created secret ok, ttl == default == max",
 			err:  nil,
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
@@ -1339,9 +1726,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1357,10 +1744,411 @@ func TestStoreCreate(t *testing.T) {
 				// Fake current time
 				timer.EXPECT().Now().Return("this is a fake now")
 
-				// note: returning an arbitrary good secret here.
-				// no connection to the token spec which went into create
 				secrets.EXPECT().Create(gomock.Any()).
-					Return(&properSecret, nil)
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
+								FieldTTL:              "7776000000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name: "created secret ok, ttl > max, clamped",
+			err:  nil,
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					TTL:    8776000000,
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
+								FieldTTL:              "7776000000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name:       "created secret ok, ttl == default > max, clamped",
+			err:        nil,
+			defaultmin: "146266",
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
+								FieldTTL:              "7776000000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name:       "created secret ok, ttl == default < max",
+			err:        nil,
+			defaultmin: "112933",
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
+								FieldTTL:              "6775980000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name: "created secret ok, kind other than session",
+			err:  nil,
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   "kubeconfig",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "kubeconfig",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "kubeconfig",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
+								FieldTTL:              "2592000000", // the kubeconfig default, 30 days
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
 			},
 			rtok: func() *ext.Token {
 				copy := properToken.DeepCopy()
@@ -1397,6 +2185,15 @@ func TestStoreCreate(t *testing.T) {
 			store := New(nil, nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth)
 			test.storeSetup(nil, secrets, scache, ucache, tcache, ccache, timer, hasher, auth)
 
+			// inject a modified auth-token-default-ttl-minutes setting
+			if test.defaultmin != "" {
+				prior := settings.AuthTokenDefaultTTLMinutes.Get()
+				assert.NoError(t, settings.AuthTokenDefaultTTLMinutes.Set(test.defaultmin))
+				t.Cleanup(func() {
+					assert.NoError(t, settings.AuthTokenDefaultTTLMinutes.Set(prior))
+				})
+			}
+
 			// perform test and validate results
 			tok, err := store.create(context.TODO(), test.tok, test.opts)
 			if test.err != nil {
@@ -1406,6 +2203,181 @@ func TestStoreCreate(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, test.rtok, tok)
 			}
+		})
+	}
+}
+
+func TestSystemStoreCreateClusterScoped(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		authorizer authorizer.Authorizer
+		cluster    *v3.Cluster
+		clusterErr error
+		err        string
+	}{
+		{
+			name:       "nil authorizer returns error",
+			authorizer: nil,
+			cluster:    &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+			err:        "authorizer is required for cluster-scoped tokens",
+		},
+		{
+			name:       "cluster not found",
+			authorizer: nil,
+			clusterErr: apierrors.NewNotFound(GVR.GroupResource(), "c-m-missing"),
+			err:        "cluster c-m-missing not found",
+		},
+		{
+			name: "authorizer denies access",
+			authorizer: authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "denied", nil
+			}),
+			cluster: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+			err:     "is not allowed to access cluster",
+		},
+		{
+			name: "authorizer allows access",
+			authorizer: authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			cluster: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			nsCache.EXPECT().Get(TokenNamespace).AnyTimes()
+
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			ccache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+
+			timer := NewMocktimeHandler(ctrl)
+			hasher := NewMockhashHandler(ctrl)
+			auth := NewMockauthHandler(ctrl)
+
+			store := NewSystem(nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth, test.authorizer)
+
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					Provider:   "local",
+				},
+			}, nil)
+
+			if test.clusterErr != nil {
+				ccache.EXPECT().Get("c-m-missing").Return(nil, test.clusterErr)
+			} else {
+				ccache.EXPECT().Get(test.cluster.Name).Return(test.cluster, nil)
+			}
+
+			if test.err == "" {
+				hasher.EXPECT().MakeAndHashSecret().Return("secretval", "hashval", nil)
+				timer.EXPECT().Now().Return("fake-now")
+
+				secrets.EXPECT().Create(gomock.Any()).Return(&properSecret, nil)
+			}
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID:      "world",
+					ClusterName: "c-m-test",
+				},
+			}
+			if test.clusterErr != nil {
+				token.Spec.ClusterName = "c-m-missing"
+			}
+
+			userInfo := &mockUser{name: "world"}
+			_, err := store.Create(t.Context(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
+
+			if test.err != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSystemStoreCreateRejectsIncompleteRequestPrincipal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		principal v3.Principal
+	}{
+		{
+			name:      "empty principal",
+			principal: v3.Principal{},
+		},
+		{
+			name:      "missing provider",
+			principal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://world"}},
+		},
+		{
+			name:      "missing name",
+			principal: v3.Principal{Provider: "local"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			// No secret is expected to be created.
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			ccache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+
+			timer := NewMocktimeHandler(ctrl)
+			hasher := NewMockhashHandler(ctrl)
+			auth := NewMockauthHandler(ctrl)
+
+			store := NewSystem(nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth, nil)
+
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				UserPrincipal: test.principal,
+			}, nil)
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			}
+
+			_, err := store.Create(t.Context(), GVR.GroupResource(), token, &metav1.CreateOptions{}, &mockUser{name: "world"})
+			require.Error(t, err)
+			assert.True(t, apierrors.IsForbidden(err), "expected forbidden, got %v", err)
+			assert.Contains(t, err.Error(), "authentication token session-token has no user principal")
 		})
 	}
 }
@@ -1427,10 +2399,9 @@ func TestSystemStoreList(t *testing.T) {
 			user: "",
 			opts: &metav1.ListOptions{},
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", errSomeError)),
-			toks: nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List("cattle-tokens", gomock.Any()).
+					List(TokenNamespace, gomock.Any()).
 					Return(nil, errSomeError)
 			},
 		},
@@ -1442,7 +2413,19 @@ func TestSystemStoreList(t *testing.T) {
 			toks: &ext.TokenList{Items: []ext.Token{}},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List("cattle-tokens", gomock.Any()).
+					List(TokenNamespace, gomock.Any()).
+					Return(&corev1.SecretList{}, nil)
+			},
+		},
+		{
+			name: "ok, empty, nil options",
+			user: "",
+			opts: nil,
+			err:  nil,
+			toks: &ext.TokenList{Items: []ext.Token{}},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List(TokenNamespace, gomock.Any()).
 					Return(&corev1.SecretList{}, nil)
 			},
 		},
@@ -1463,7 +2446,7 @@ func TestSystemStoreList(t *testing.T) {
 			},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List("cattle-tokens", gomock.Any()).
+					List(TokenNamespace, gomock.Any()).
 					Return(&corev1.SecretList{
 						ListMeta: metav1.ListMeta{
 							ResourceVersion:    "1",
@@ -1494,7 +2477,7 @@ func TestSystemStoreList(t *testing.T) {
 			},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List("cattle-tokens", gomock.Any()).
+					List(TokenNamespace, gomock.Any()).
 					Return(&corev1.SecretList{
 						Items: []corev1.Secret{
 							properSecret,
@@ -1519,7 +2502,7 @@ func TestSystemStoreList(t *testing.T) {
 			},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List("cattle-tokens", gomock.Any()).
+					List(TokenNamespace, gomock.Any()).
 					Return(&corev1.SecretList{
 						Items: []corev1.Secret{
 							properSecret,
@@ -1536,9 +2519,40 @@ func TestSystemStoreList(t *testing.T) {
 			toks: &ext.TokenList{Items: []ext.Token{}},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List("cattle-tokens", metav1.ListOptions{
+					List(TokenNamespace, metav1.ListOptions{
 						LabelSelector: UserIDLabel + "=other",
 					}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
+			},
+		},
+		{
+			// A non-admin selector that pins the owner label to a different
+			// value gains a second, conflicting owner requirement when the
+			// requesting user's own owner requirement is ANDed on. The combined
+			// selector is unsatisfiable, so the backing store matches nothing.
+			name: "non-admin selector is scoped to the requesting user",
+			user: "alice",
+			opts: &metav1.ListOptions{LabelSelector: UserIDLabel + "=otheruser"},
+			err:  nil,
+			toks: &ext.TokenList{Items: []ext.Token{}},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					DoAndReturn(func(_ string, o metav1.ListOptions) (*corev1.SecretList, error) {
+						sel, err := labels.Parse(o.LabelSelector)
+						require.NoError(t, err)
+						reqs, _ := sel.Requirements()
+						var userIDValues []string
+						for _, r := range reqs {
+							if r.Key() == UserIDLabel {
+								userIDValues = append(userIDValues, r.Values().List()...)
+							}
+						}
+						// Both the caller's value and the requesting user's own
+						// value are present, so the selector is unsatisfiable
+						// rather than reduced to the caller's value alone.
+						assert.ElementsMatch(t, []string{"alice", "otheruser"}, userIDValues)
+						return &corev1.SecretList{Items: []corev1.Secret{}}, nil
+					})
 			},
 		},
 	}
@@ -1570,46 +2584,51 @@ func TestSystemStoreList(t *testing.T) {
 	}
 }
 
-func TestSystemStoreDelete(t *testing.T) {
+func TestSystemStoreDeleteCollection(t *testing.T) {
 	tests := []struct {
-		name       string                // test name
-		token      string                // name of token to delete
-		opts       *metav1.DeleteOptions // delete options
-		err        error                 // expected op result, error
-		storeSetup func(                 // configure store backend clients
+		name       string              // test name
+		opts       *metav1.ListOptions // list options
+		err        error               // expected op result, error
+		storeSetup func(               // configure store backend clients
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
 	}{
 		{
-			name:  "secret not found is ok",
-			token: "bogus",
-			opts:  &metav1.DeleteOptions{},
-			err:   nil,
+			name: "some arbitrary error",
+			opts: &metav1.ListOptions{},
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", errSomeError)),
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					Delete("cattle-tokens", "bogus", gomock.Any()).
-					Return(emptyNotFoundError)
-
-			},
-		},
-		{
-			name:  "secret other error is fail",
-			token: "bogus",
-			opts:  &metav1.DeleteOptions{},
-			err:   apierrors.NewInternalError(fmt.Errorf("failed to delete token bogus: %w", errSomeError)),
-			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
-				secrets.EXPECT().
-					Delete("cattle-tokens", "bogus", gomock.Any()).
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, gomock.Any()).
 					Return(errSomeError)
 			},
 		},
 		{
-			name:  "secret deleted is ok",
-			token: "bogus",
-			opts:  &metav1.DeleteOptions{},
-			err:   nil,
+			name: "namespace not found error, ignored",
+			opts: &metav1.ListOptions{},
+			err:  nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					Delete("cattle-tokens", "bogus", gomock.Any()).
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, metav1.ListOptions{}).
+					Return(apierrors.NewNotFound(GVR.GroupResource(), TokenNamespace))
+			},
+		},
+		{
+			name: "empty options",
+			opts: &metav1.ListOptions{},
+			err:  nil,
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, metav1.ListOptions{}).
+					Return(nil)
+			},
+		},
+		{
+			name: "nil options",
+			opts: nil,
+			err:  nil,
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, metav1.ListOptions{}).
 					Return(nil)
 			},
 		},
@@ -1630,7 +2649,7 @@ func TestSystemStoreDelete(t *testing.T) {
 			test.storeSetup(secrets)
 
 			// perform test and validate results
-			err := store.Delete(test.token, test.opts)
+			err := store.DeleteCollection(test.opts)
 			if test.err != nil {
 				assert.Equal(t, test.err, err)
 			} else {
@@ -1638,6 +2657,225 @@ func TestSystemStoreDelete(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSystemStoreDelete(t *testing.T) {
+	tests := []struct {
+		name       string                // test name
+		token      string                // name of token to delete
+		opts       *metav1.DeleteOptions // delete options
+		err        error                 // expected op result, error
+		check      func(t *testing.T, err error)
+		storeSetup func( // configure store backend clients
+			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
+	}{
+		{
+			name:  "secret not found is ok",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			err:   apierrors.NewNotFound(GVR.GroupResource(), "bogus"),
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(emptyNotFoundError)
+
+			},
+		},
+		{
+			name:  "secret other error is fail",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			err:   apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")),
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(errSomeError)
+			},
+		},
+		{
+			name:  "secret deleted is ok",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			err:   nil,
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(nil)
+			},
+		},
+		{
+			name:  "admission denial on secret keeps its status code",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				denied := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus",
+					errors.New("ValidatingAdmissionPolicy 'block' denied request: blocked"))
+				denied.ErrStatus.Reason = metav1.StatusReasonInvalid
+				denied.ErrStatus.Code = 422
+				denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: "ValidatingAdmissionPolicy 'block' denied request: blocked"}}
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(denied)
+			},
+			check: func(t *testing.T, err error) {
+				require.True(t, apierrors.IsInvalid(err), "expected 422, got %v", err)
+				status, ok := err.(apierrors.APIStatus)
+				require.True(t, ok)
+				details := status.Status().Details
+				require.NotNil(t, details)
+				assert.Equal(t, GVR.Group, details.Group)
+				assert.Equal(t, GVK.Kind, details.Kind)
+				assert.Equal(t, "bogus", details.Name)
+				require.Len(t, details.Causes, 1)
+				assert.Equal(t, "ValidatingAdmissionPolicy 'block' denied request: blocked", details.Causes[0].Message)
+				assert.Contains(t, err.Error(), "ValidatingAdmissionPolicy 'block' denied request: blocked")
+				assert.NotContains(t, err.Error(), "secret")
+				assert.NotContains(t, err.Error(), "unhandled error code")
+			},
+		},
+		{
+			name:  "conflict on secret keeps its status code",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(apierrors.NewConflict(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("uid mismatch")))
+			},
+			check: func(t *testing.T, err error) {
+				require.True(t, apierrors.IsConflict(err), "expected 409, got %v", err)
+				assert.NotContains(t, err.Error(), "secret")
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			// assemble and configure store from mock clients ...
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(nil)
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+			test.storeSetup(secrets)
+
+			// perform test and validate results
+			err := store.Delete(test.token, test.opts)
+			switch {
+			case test.check != nil:
+				test.check(t, err)
+			case test.err != nil:
+				assert.Equal(t, test.err, err)
+			default:
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAPIStatusOrInternalError(t *testing.T) {
+	t.Parallel()
+
+	bad := apierrors.NewBadRequest("malformed")
+	assert.Same(t, bad, apiStatusOrInternalError(bad))
+
+	// A wrapped status error must come back unwrapped: the apiserver derives
+	// the HTTP code with a type switch and would treat the wrapper as a 500.
+	got := apiStatusOrInternalError(fmt.Errorf("validation: %w", bad))
+	assert.True(t, apierrors.IsBadRequest(got), "wrapped 400 must stay 400, got %v", got)
+	assert.IsType(t, &apierrors.StatusError{}, got)
+
+	// Any APIStatus implementation counts, not only *StatusError, since the
+	// apiserver matches on the interface.
+	custom := &customStatusError{code: 409}
+	assert.Same(t, custom, apiStatusOrInternalError(fmt.Errorf("wrapped: %w", custom)))
+
+	assert.True(t, apierrors.IsInternalError(apiStatusOrInternalError(errors.New("boom"))))
+}
+
+type customStatusError struct{ code int32 }
+
+func (e *customStatusError) Error() string { return "custom" }
+func (e *customStatusError) Status() metav1.Status {
+	return metav1.Status{Status: metav1.StatusFailure, Code: e.code, Reason: metav1.StatusReasonConflict}
+}
+
+func TestMapBackingErrorForbiddenCauseReachesMessage(t *testing.T) {
+	t.Parallel()
+
+	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied"))
+	denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+
+	got := mapBackingError(denied, "bogus")
+	require.True(t, apierrors.IsForbidden(got))
+	assert.Contains(t, got.Error(), admissionDenialMessage)
+	assert.NotContains(t, got.Error(), "secret")
+	status, ok := got.(apierrors.APIStatus)
+	require.True(t, ok)
+	require.Len(t, status.Status().Details.Causes, 1)
+	assert.Equal(t, admissionDenialMessage, status.Status().Details.Causes[0].Message)
+}
+
+func TestSystemStoreAddLabel(t *testing.T) {
+	t.Run("add label", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+
+		patch, err := json.Marshal([]JsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/labels/cattle.io.oidc-client-placeholder",
+			Value: "true",
+		}})
+		assert.NoError(t, err)
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, patch).
+			Return(nil, nil).Times(1)
+
+		err = store.AddLabel("atoken", "cattle.io.oidc-client-placeholder", "true")
+		assert.NoError(t, err)
+		// note that the main check, that the patch is correct, is done
+		// by the test framework itself, as it matches the call, or
+		// misses the match
+	})
+
+	t.Run("add label with special characters", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+
+		patch, err := json.Marshal([]JsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/labels/cattle.io~1test",
+			Value: "true",
+		}})
+		assert.NoError(t, err)
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, patch).
+			Return(nil, nil).Times(1)
+
+		err = store.AddLabel("atoken", "cattle.io/test", "true")
+		assert.NoError(t, err)
+		// note that the main check, that the patch is correct, is done
+		// by the test framework itself, as it matches the call, or
+		// misses the match
+	})
 }
 
 func TestSystemStoreUpdateLastUsedAt(t *testing.T) {
@@ -1654,7 +2892,7 @@ func TestSystemStoreUpdateLastUsedAt(t *testing.T) {
 		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
 		var patchData []byte
-		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
+		secrets.EXPECT().Patch(TokenNamespace, "atoken", types.JSONPatchType, gomock.Any()).
 			DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*ext.Token, error) {
 				patchData = data
 				return nil, nil
@@ -1683,7 +2921,7 @@ func TestSystemStoreUpdateLastUsedAt(t *testing.T) {
 
 		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
-		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
+		secrets.EXPECT().Patch(TokenNamespace, "atoken", types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
 			Times(1)
 
@@ -1726,7 +2964,7 @@ func TestSystemStoreUpdateLastActivitySeen(t *testing.T) {
 						FieldDescription:      []byte(""),
 						FieldEnabled:          []byte("true"),
 						FieldHash:             []byte("kla9jkdmj"),
-						FieldKind:             []byte(IsLogin),
+						FieldKind:             []byte(KindSession),
 						FieldLastUpdateTime:   []byte(now.Add(-time.Hour).Format(time.RFC3339)),
 						FieldPrincipal:        properPrincipalBytes,
 						FieldTTL:              []byte("4000"),
@@ -1981,7 +3219,32 @@ func TestSystemStoreUpdate(t *testing.T) {
 					Update(gomock.Any()).
 					Return(nil, errSomeError)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", errSomeError)),
+			err: apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")),
+		},
+		{
+			name:     "update conflict keeps its status code",
+			fullPerm: true,
+			opts:     &metav1.UpdateOptions{},
+			old:      &properToken,
+			token: func() *ext.Token {
+				changed := properToken.DeepCopy()
+				changed.Spec.TTL = 2000
+				return changed
+			}(),
+			storeSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().
+					Update(gomock.Any()).
+					Return(nil, apierrors.NewConflict(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("stale")))
+			},
+			err: apierrors.NewConflict(GVR.GroupResource(), "bogus", errors.New(registry.OptimisticLockErrorMsg)),
 		},
 		{
 			name:     "read back broken data after update",
@@ -2108,7 +3371,7 @@ func TestSystemStoreGet(t *testing.T) {
 			name: "backing secret not found",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(nil, bogusNotFoundError)
 			},
 			tokname: "bogus",
@@ -2120,20 +3383,31 @@ func TestSystemStoreGet(t *testing.T) {
 			name: "some other error",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(nil, errSomeError)
 			},
 			tokname: "bogus",
 			opts:    &metav1.GetOptions{},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus",
-				errSomeError)),
-			tok: nil,
+			err:     apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")),
+			tok:     nil,
+		},
+		{
+			name: "forbidden secret keeps its status code",
+			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
+				secrets.EXPECT().
+					Get(TokenNamespace, "bogus").
+					Return(nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied")))
+			},
+			tokname: "bogus",
+			opts:    &metav1.GetOptions{},
+			err:     apierrors.NewForbidden(GVR.GroupResource(), "bogus", errors.New("backing store denied the request")),
+			tok:     nil,
 		},
 		{
 			name: "empty secret (not found)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(&corev1.Secret{}, nil)
 			},
 			tokname: "bogus",
@@ -2148,7 +3422,7 @@ func TestSystemStoreGet(t *testing.T) {
 				delete(reduced.Data, FieldEnabled)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2163,7 +3437,7 @@ func TestSystemStoreGet(t *testing.T) {
 				delete(reduced.Data, FieldTTL)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2178,7 +3452,7 @@ func TestSystemStoreGet(t *testing.T) {
 				delete(reduced.Data, FieldHash)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2196,7 +3470,7 @@ func TestSystemStoreGet(t *testing.T) {
 				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2212,7 +3486,7 @@ func TestSystemStoreGet(t *testing.T) {
 				delete(reduced.Data, FieldLastUpdateTime)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2230,7 +3504,7 @@ func TestSystemStoreGet(t *testing.T) {
 				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2245,7 +3519,7 @@ func TestSystemStoreGet(t *testing.T) {
 				delete(reduced.Data, FieldUID)
 
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(reduced, nil)
 			},
 			tokname: "bogus",
@@ -2257,7 +3531,7 @@ func TestSystemStoreGet(t *testing.T) {
 			name: "filled secret",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
-					Get("cattle-tokens", "bogus").
+					Get(TokenNamespace, "bogus").
 					Return(&properSecret, nil)
 			},
 			tokname: "bogus",
@@ -2282,7 +3556,11 @@ func TestSystemStoreGet(t *testing.T) {
 					UserPrincipal: properPrincipal,
 				},
 				Status: ext.TokenStatus{
-					Value:          "",
+					Value: "",
+					// SystemStore.Get is an internal accessor, not the public
+					// get verb (that is Store.Get, which strips the hash). It
+					// intentionally returns the stored hash for internal
+					// verification callers.
 					Hash:           "kla9jkdmj",
 					Expired:        true,
 					ExpiresAt:      "0001-01-01T00:00:04Z",
@@ -2362,3 +3640,682 @@ func (w *mockWatch) ResultChan() <-chan watch.Event {
 }
 
 func (w *mockWatch) Stop() {}
+
+func TestSystemStoreListForConfig(t *testing.T) {
+	t.Parallel()
+
+	newSecret := func(name, principalID string) *corev1.Secret {
+		principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+			Name:     principalID,
+			Provider: "github",
+		})
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					UserIDLabel:     name + "-user",
+					SecretKindLabel: SecretKindLabelValue,
+				},
+				UID: types.UID(name + "-uid"),
+			},
+			Data: map[string][]byte{
+				FieldDescription:    []byte(""),
+				FieldEnabled:        []byte("true"),
+				FieldHash:           []byte("somehash"),
+				FieldKind:           []byte(KindSession),
+				FieldLastUpdateTime: []byte("14:00:00"),
+				FieldPrincipal:      principalBytes,
+				FieldTTL:            []byte("5000"),
+				FieldUID:            []byte(name + "-kube-uid"),
+				FieldUserID:         []byte(name + "-user"),
+			},
+		}
+	}
+
+	// Both configs have the provider type github.
+	githubSecret := newSecret("token-github", "github_user://1")
+	githubEUSecret := newSecret("token-github-eu", "github-eu_user://2")
+
+	tests := []struct {
+		name       string
+		configName string
+		err        error
+		wantTokens []string
+		storeSetup func(scache *fake.MockCacheInterface[*corev1.Secret])
+	}{
+		{
+			name:       "cache error propagates",
+			configName: "github",
+			err:        apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config github: %w", errSomeError)),
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return(nil, errSomeError)
+			},
+		},
+		{
+			name:       "empty result",
+			configName: "github",
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return(nil, nil)
+			},
+		},
+		{
+			name:       "returns only the default config's tokens",
+			configName: "github",
+			wantTokens: []string{"token-github"},
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return([]*corev1.Secret{githubSecret, githubEUSecret}, nil)
+			},
+		},
+		{
+			name:       "returns only the named config's tokens",
+			configName: "github-eu",
+			wantTokens: []string{"token-github-eu"},
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return([]*corev1.Secret{githubSecret, githubEUSecret}, nil)
+			},
+		},
+		{
+			name:       "does not match by provider type",
+			configName: "somebody",
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					// properSecret has the provider somebody but an
+					// unparseable principal ID.
+					Return([]*corev1.Secret{&properSecret, githubSecret}, nil)
+			},
+		},
+		{
+			name:       "skips broken secrets",
+			configName: "github",
+			wantTokens: []string{"token-github"},
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return([]*corev1.Secret{githubSecret, &badSecret}, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+			tt.storeSetup(scache)
+
+			toks, err := store.ListForConfig(tt.configName)
+			if tt.err != nil {
+				assert.Equal(t, tt.err, err)
+				assert.Nil(t, toks)
+				return
+			}
+
+			require.NoError(t, err)
+			var names []string
+			for _, tok := range toks.Items {
+				names = append(names, tok.Name)
+			}
+			assert.ElementsMatch(t, tt.wantTokens, names)
+		})
+	}
+}
+
+// setTTLSettings sets the token and session TTL settings, in minutes, for the duration of the test.
+func setTTLSettings(t *testing.T, maxMinutes, defaultMinutes, sessionMinutes string) {
+	t.Helper()
+
+	for setting, value := range map[*settings.Setting]string{
+		&settings.AuthTokenMaxTTLMinutes:     maxMinutes,
+		&settings.AuthTokenDefaultTTLMinutes: defaultMinutes,
+		&settings.AuthUserSessionTTLMinutes:  sessionMinutes,
+	} {
+		prior := setting.Get()
+		require.NoError(t, setting.Set(value))
+		t.Cleanup(func() {
+			assert.NoError(t, setting.Set(prior))
+		})
+	}
+}
+
+// setKubeconfigTTLSettings sets the kubeconfig TTL settings, in minutes, for the duration of the test.
+func setKubeconfigTTLSettings(t *testing.T, maxMinutes, defaultMinutes string) {
+	t.Helper()
+
+	for setting, value := range map[*settings.Setting]string{
+		&settings.KubeconfigMaxTokenTTLMinutes:     maxMinutes,
+		&settings.KubeconfigDefaultTokenTTLMinutes: defaultMinutes,
+	} {
+		prior := setting.Get()
+		require.NoError(t, setting.Set(value))
+		t.Cleanup(func() {
+			assert.NoError(t, setting.Set(prior))
+		})
+	}
+}
+
+func TestTTLLimits(t *testing.T) {
+	const (
+		hour  = int64(time.Hour / time.Millisecond)
+		day   = 24 * hour
+		never = int64(-1)
+	)
+
+	tests := []struct {
+		name                     string
+		kind                     string
+		maxMinutes               string
+		defaultMinutes           string
+		sessionMinutes           string
+		kubeconfigMaxMinutes     string
+		kubeconfigDefaultMinutes string
+		wantDefault              int64
+		wantMax                  int64
+	}{
+		{
+			name:        "session",
+			kind:        KindSession,
+			wantDefault: 16 * hour,
+			wantMax:     16 * hour,
+		},
+		{
+			name:           "session, no session ttl limit",
+			kind:           KindSession,
+			sessionMinutes: "0",
+			wantDefault:    never,
+			wantMax:        never,
+		},
+		{
+			name:        "session ignores the token max",
+			kind:        KindSession,
+			maxMinutes:  "60",
+			wantDefault: 16 * hour,
+			wantMax:     16 * hour,
+		},
+		{
+			name:        "derived",
+			kind:        "",
+			wantDefault: 90 * day,
+			wantMax:     90 * day,
+		},
+		{
+			name:           "derived, default below the max",
+			kind:           "",
+			defaultMinutes: "43200",
+			wantDefault:    30 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, default above the max",
+			kind:           "",
+			defaultMinutes: "144000",
+			wantDefault:    90 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, default 0",
+			kind:           "",
+			defaultMinutes: "0",
+			wantDefault:    90 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, no max",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "43200",
+			wantDefault:    30 * day,
+			wantMax:        never,
+		},
+		{
+			name:           "derived, no max, default 0",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "0",
+			wantDefault:    never,
+			wantMax:        never,
+		},
+		{
+			name:        "derived, negative max",
+			kind:        "",
+			maxMinutes:  "-5",
+			wantDefault: 90 * day,
+			wantMax:     never,
+		},
+		{
+			name:        "kubeconfig",
+			kind:        KindKubeconfig,
+			wantDefault: 30 * day,
+			wantMax:     90 * day,
+		},
+		{
+			name:           "kubeconfig ignores the token default",
+			kind:           KindKubeconfig,
+			defaultMinutes: "1440",
+			wantDefault:    30 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max above the max",
+			kind:                 KindKubeconfig,
+			kubeconfigMaxMinutes: "259200",
+			wantDefault:          30 * day,
+			wantMax:              90 * day,
+		},
+		{
+			name:                     "kubeconfig, kubeconfig max below the max",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "28800",
+			kubeconfigDefaultMinutes: "86400",
+			wantDefault:              20 * day,
+			wantMax:                  20 * day,
+		},
+		{
+			name:                     "kubeconfig, default above the max",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "259200",
+			kubeconfigDefaultMinutes: "259200",
+			wantDefault:              90 * day,
+			wantMax:                  90 * day,
+		},
+		{
+			name:                 "kubeconfig, no kubeconfig max",
+			kind:                 KindKubeconfig,
+			kubeconfigMaxMinutes: "0",
+			wantDefault:          30 * day,
+			wantMax:              90 * day,
+		},
+		{
+			name:                 "kubeconfig, no max",
+			kind:                 KindKubeconfig,
+			maxMinutes:           "0",
+			kubeconfigMaxMinutes: "86400",
+			wantDefault:          30 * day,
+			wantMax:              60 * day,
+		},
+		{
+			name:                     "kubeconfig, both kubeconfig settings 0",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantDefault:              90 * day,
+			wantMax:                  90 * day,
+		},
+		{
+			name:                     "kubeconfig, no max at any level",
+			kind:                     KindKubeconfig,
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantDefault:              never,
+			wantMax:                  never,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			orDefault := func(value, fallback string) string {
+				if value == "" {
+					return fallback
+				}
+				return value
+			}
+			setTTLSettings(t,
+				orDefault(test.maxMinutes, "129600"),
+				orDefault(test.defaultMinutes, "129600"),
+				orDefault(test.sessionMinutes, "960"))
+			setKubeconfigTTLSettings(t,
+				orDefault(test.kubeconfigMaxMinutes, "129600"),
+				orDefault(test.kubeconfigDefaultMinutes, "43200"))
+
+			defaultTTL, maxTTL, err := TTLLimits(test.kind)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantDefault, defaultTTL, "default")
+			assert.Equal(t, test.wantMax, maxTTL, "max")
+		})
+	}
+}
+
+func TestTTLLimitsInvalidSetting(t *testing.T) {
+	setTTLSettings(t, "90d", "129600", "960")
+
+	_, _, err := TTLLimits("")
+	assert.ErrorContains(t, err, "auth-token-max-ttl-minutes")
+}
+
+func TestToSecretTTL(t *testing.T) {
+	const (
+		hour  = int64(time.Hour / time.Millisecond)
+		day   = 24 * hour
+		never = int64(-1)
+	)
+
+	tests := []struct {
+		name                 string
+		kind                 string
+		ttl                  int64
+		maxMinutes           string
+		sessionMinutes       string
+		kubeconfigMaxMinutes string
+		want                 int64
+	}{
+		{
+			name: "session, default",
+			kind: KindSession,
+			want: 16 * hour,
+		},
+		{
+			name: "session, shorter than the session ttl",
+			kind: KindSession,
+			ttl:  hour,
+			want: hour,
+		},
+		{
+			name: "session, longer than the session ttl",
+			kind: KindSession,
+			ttl:  30 * day,
+			want: 16 * hour,
+		},
+		{
+			name: "session, never expires",
+			kind: KindSession,
+			ttl:  never,
+			want: 16 * hour,
+		},
+		{
+			name:           "session, no session ttl limit",
+			kind:           KindSession,
+			sessionMinutes: "0",
+			want:           never,
+		},
+		{
+			name:       "session, never expires, no max",
+			kind:       KindSession,
+			ttl:        never,
+			maxMinutes: "0",
+			want:       16 * hour,
+		},
+		{
+			name:       "session, default, no max",
+			kind:       KindSession,
+			maxMinutes: "0",
+			want:       16 * hour,
+		},
+		{
+			name: "derived, default",
+			kind: "",
+			want: 90 * day,
+		},
+		{
+			name:       "derived, never expires, no max",
+			kind:       "",
+			ttl:        never,
+			maxMinutes: "0",
+			want:       never,
+		},
+		{
+			name: "derived, longer than the session ttl",
+			kind: "",
+			ttl:  30 * day,
+			want: 30 * day,
+		},
+		{
+			name: "derived, longer than the max",
+			kind: "",
+			ttl:  100 * day,
+			want: 90 * day,
+		},
+		{
+			name: "kubeconfig, default",
+			kind: KindKubeconfig,
+			want: 30 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max above the max",
+			kind:                 KindKubeconfig,
+			ttl:                  150 * day,
+			kubeconfigMaxMinutes: "259200", // 180 days
+			want:                 90 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max below the max",
+			kind:                 KindKubeconfig,
+			ttl:                  60 * day,
+			kubeconfigMaxMinutes: "28800", // 20 days
+			want:                 20 * day,
+		},
+		{
+			name:       "kubeconfig, never expires, no max, kubeconfig max",
+			kind:       KindKubeconfig,
+			ttl:        never,
+			maxMinutes: "0",
+			want:       90 * day,
+		},
+		{
+			name:                 "kubeconfig, never expires, no max at either level",
+			kind:                 KindKubeconfig,
+			ttl:                  never,
+			maxMinutes:           "0",
+			kubeconfigMaxMinutes: "0",
+			want:                 never,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			maxMinutes := "129600"
+			if test.maxMinutes != "" {
+				maxMinutes = test.maxMinutes
+			}
+			sessionMinutes := "960"
+			if test.sessionMinutes != "" {
+				sessionMinutes = test.sessionMinutes
+			}
+			kubeconfigMaxMinutes := "129600"
+			if test.kubeconfigMaxMinutes != "" {
+				kubeconfigMaxMinutes = test.kubeconfigMaxMinutes
+			}
+			setTTLSettings(t, maxMinutes, "129600", sessionMinutes)
+			setKubeconfigTTLSettings(t, kubeconfigMaxMinutes, "43200")
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   test.kind,
+					TTL:    test.ttl,
+				},
+			}
+
+			secret, err := toSecret(token)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.want, token.Spec.TTL)
+			assert.Equal(t, strconv.FormatInt(test.want, 10), secret.StringData[FieldTTL])
+		})
+	}
+}
+
+func TestSystemStoreUpdateTTL(t *testing.T) {
+	const (
+		hour = int64(time.Hour / time.Millisecond)
+		day  = 24 * hour
+	)
+
+	tests := []struct {
+		name   string
+		kind   string
+		oldTTL int64
+		ttl    int64
+		want   int64
+	}{
+		{
+			name:   "session, default is the session ttl",
+			kind:   KindSession,
+			oldTTL: 16 * hour,
+			ttl:    0,
+			want:   16 * hour,
+		},
+		{
+			name:   "session, longer ttl is limited to the session ttl",
+			kind:   KindSession,
+			oldTTL: 90 * day,
+			ttl:    90 * day,
+			want:   16 * hour,
+		},
+		{
+			name:   "session, shorter ttl is kept",
+			kind:   KindSession,
+			oldTTL: 16 * hour,
+			ttl:    hour,
+			want:   hour,
+		},
+		{
+			name:   "kubeconfig, default is capped to the kubeconfig max",
+			kind:   KindKubeconfig,
+			oldTTL: 30 * day,
+			ttl:    0,
+			want:   20 * day,
+		},
+		{
+			name:   "kubeconfig, longer ttl is limited to the kubeconfig max",
+			kind:   KindKubeconfig,
+			oldTTL: 90 * day,
+			ttl:    90 * day,
+			want:   20 * day,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTTLSettings(t, "129600", "129600", "960")
+			setKubeconfigTTLSettings(t, "28800", "43200") // 20 days, 30 days
+
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+
+			timer := NewMocktimeHandler(ctrl)
+			timer.EXPECT().Now().Return("this is a fake now")
+
+			secrets.EXPECT().Update(gomock.Any()).
+				DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+					assert.Equal(t, strconv.FormatInt(test.want, 10), secret.StringData[FieldTTL])
+					return &properSecret, nil
+				})
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, timer, NewMockhashHandler(ctrl), NewMockauthHandler(ctrl))
+
+			old := properToken.DeepCopy()
+			old.Spec.Kind = test.kind
+			old.Spec.TTL = test.oldTTL
+			token := old.DeepCopy()
+			token.Spec.TTL = test.ttl
+
+			_, err := store.update("", false, old, token, &metav1.UpdateOptions{})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestSystemStoreCreateDryRun(t *testing.T) {
+	const (
+		hour = int64(time.Hour / time.Millisecond)
+		day  = 24 * hour
+	)
+
+	tests := []struct {
+		name string
+		kind string
+		ttl  int64
+		want int64
+	}{
+		{
+			name: "default",
+			want: 90 * day,
+		},
+		{
+			name: "longer than the max",
+			ttl:  100 * day,
+			want: 90 * day,
+		},
+		{
+			name: "session, default",
+			kind: KindSession,
+			want: 16 * hour,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTTLSettings(t, "129600", "129600", "960")
+
+			ctrl := gomock.NewController(t)
+
+			// No secret is created on a dry run.
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().Get(TokenNamespace, gomock.Any()).
+				Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "token"))
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					Provider:   "local",
+				},
+			}, nil)
+
+			auth := NewMockauthHandler(ctrl)
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+
+			hasher := NewMockhashHandler(ctrl)
+			hasher.EXPECT().MakeAndHashSecret().Return("secretval", "hashval", nil)
+
+			timer := NewMocktimeHandler(ctrl)
+			timer.EXPECT().Now().Return("fake-now")
+
+			store := NewSystem(nil, nil, secrets, users, tcache, nil, timer, hasher, auth)
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   test.kind,
+					TTL:    test.ttl,
+				},
+			}
+
+			opts := &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+			created, err := store.Create(t.Context(), GVR.GroupResource(), token, opts, &mockUser{name: "world"})
+			require.NoError(t, err)
+			assert.Equal(t, test.want, created.Spec.TTL)
+			assert.Empty(t, created.Status.Hash)
+		})
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -37,12 +39,13 @@ var (
 	}
 
 	watchedSettings = map[string]struct{}{
-		settings.ServerURL.Name:             {},
-		settings.CACerts.Name:               {},
-		settings.SystemDefaultRegistry.Name: {},
-		settings.FleetMinVersion.Name:       {},
-		settings.FleetVersion.Name:          {},
-		settings.AgentTLSMode.Name:          {},
+		settings.ServerURL.Name:                        {},
+		settings.CACerts.Name:                          {},
+		settings.SystemDefaultRegistry.Name:            {},
+		settings.SystemDefaultRegistryPullSecrets.Name: {},
+		settings.FleetMinVersion.Name:                  {},
+		settings.FleetVersion.Name:                     {},
+		settings.AgentTLSMode.Name:                     {},
 	}
 )
 
@@ -71,7 +74,7 @@ type handler struct {
 	chartsConfig chart.RancherConfigGetter
 }
 
-func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error) {
+func (h *handler) onSetting(_ string, setting *v3.Setting) (*v3.Setting, error) {
 	if setting == nil {
 		return nil, nil
 	}
@@ -111,6 +114,13 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 		},
 	}
+
+	var pullSecrets []v1.LocalObjectReference
+	registry, _ := cluster.GetPrivateRegistry(nil)
+	if registry != nil {
+		pullSecrets = registry.PullSecretsAsObjectReferences()
+	}
+	systemGlobalRegistry["cattle"].(map[string]interface{})["imagePullSecrets"] = pullSecrets
 
 	fleetChartValues := map[string]interface{}{
 		"agentTLSMode": settings.AgentTLSMode.Get(),

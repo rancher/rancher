@@ -13,6 +13,7 @@ const (
 	KeyCloakOIDCProviderFieldOwnerReferences    = "ownerReferences"
 	KeyCloakOIDCProviderFieldRedirectURL        = "redirectUrl"
 	KeyCloakOIDCProviderFieldRemoved            = "removed"
+	KeyCloakOIDCProviderFieldScopes             = "scopes"
 	KeyCloakOIDCProviderFieldType               = "type"
 	KeyCloakOIDCProviderFieldUUID               = "uuid"
 )
@@ -29,6 +30,7 @@ type KeyCloakOIDCProvider struct {
 	OwnerReferences    []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RedirectURL        string            `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
 	Removed            string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Scopes             string            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	Type               string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID               string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

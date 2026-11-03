@@ -25,18 +25,21 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
+	"github.com/rancher/rancher/pkg/cluster"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
+	steveclient "github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/podimpersonation"
-	"github.com/rancher/steve/pkg/stores/proxy"
 	data2 "github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	rbacv1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +55,6 @@ import (
 const (
 	// helmDataPath contains the files such as values.yaml for a given chart and tar of the chart.
 	helmDataPath = "/home/shell/helm"
-	helmRunPath  = "/home/shell/helm-run"
 )
 
 var (
@@ -64,6 +66,17 @@ var (
 		"chart.yml":  true,
 		"Chart.yml":  true,
 	}
+	valuesYAML = map[string]bool{
+		"values.yaml": true,
+		"values.yml":  true,
+		"Values.yaml": true,
+		"Values.yml":  true,
+	}
+	imagePullSecretPaths = [][]string{
+		{"global", "cattle", "imagePullSecrets"},
+		{"global", "imagePullSecrets"},
+		{"imagePullSecrets"},
+	}
 )
 
 var (
@@ -71,112 +84,52 @@ var (
 	podOptionsCodec  = runtime.NewParameterCodec(podOptionsScheme)
 )
 
-var kustomization = `apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-transformers:
-- /home/shell/helm-run/transform%s.yaml
-resources:
-- /home/shell/helm-run/all.yaml`
-
-var transform = `apiVersion: builtin
-kind: LabelTransformer
-metadata:
-  name: common-labels
-labels:
-  io.cattle.field/appId: %s
-fieldSpecs:
-- path: metadata/labels
-  create: true
-- path: spec/selector
-  create: true
-  version: v1
-  kind: ReplicationController
-- path: spec/template/metadata/labels
-  create: true
-  version: v1
-  kind: ReplicationController
-- path: spec/selector/matchLabels
-  create: true
-  kind: Deployment
-- path: spec/template/metadata/labels
-  create: true
-  kind: Deployment
-- path: spec/selector/matchLabels
-  create: true
-  kind: ReplicaSet
-- path: spec/template/metadata/labels
-  create: true
-  kind: ReplicaSet
-- path: spec/selector/matchLabels
-  create: true
-  kind: DaemonSet
-- path: spec/template/metadata/labels
-  create: true
-  kind: DaemonSet
-- path: spec/selector/matchLabels
-  create: true
-  group: apps
-  kind: StatefulSet
-- path: spec/template/metadata/labels
-  create: true
-  group: apps
-  kind: StatefulSet
-- path: spec/volumeClaimTemplates[]/metadata/labels
-  create: true
-  group: apps
-  kind: StatefulSet
-- path: spec/template/metadata/labels
-  create: true
-  group: batch
-  kind: Job
-- path: spec/jobTemplate/metadata/labels
-  create: true
-  group: batch
-  kind: CronJob
-- path: spec/jobTemplate/spec/template/metadata/labels
-  create: true
-  group: batch
-  kind: CronJob`
-
 func init() {
 	v1internal.AddToScheme(podOptionsScheme)
 }
 
 // Operations describes a helm operation, containing its namespace, roles and such
 type Operations struct {
-	namespace      string                               // namespace the operation is going to be in
-	contentManager *content.Manager                     // manager struct to retrieve information about helm repos and its charts
-	Impersonator   *podimpersonation.PodImpersonation   // the impersonator used to manage pods created using the service account of the logged in user
-	clusterRepos   catalogcontrollers.ClusterRepoClient // client for cluster repo custom resource
-	ops            catalogcontrollers.OperationClient   // client for operation custom resource
-	pods           corev1controllers.PodClient          // client for pod kubernetes resource
-	nodes          corev1controllers.NodeClient
-	apps           catalogcontrollers.AppClient        // client for apps custom resource
-	roles          rbacv1controllers.RoleClient        // client for role kubernetes resource
-	roleBindings   rbacv1controllers.RoleBindingClient // client for rolebinding kubernetes resource
-	cg             proxy.ClientGetter                  // dynamic kubernetes client factory
+	namespace         string                               // namespace the operation is going to be in
+	contentManager    *content.Manager                     // manager struct to retrieve information about helm repos and its charts
+	Impersonator      *podimpersonation.PodImpersonation   // the impersonator used to manage pods created using the service account of the logged in user
+	clusterRepos      catalogcontrollers.ClusterRepoClient // client for cluster repo custom resource
+	clusterReposCache catalogcontrollers.ClusterRepoCache
+	ops               catalogcontrollers.OperationClient // client for operation custom resource
+	pods              corev1controllers.PodClient        // client for pod kubernetes resource
+	nodes             corev1controllers.NodeClient
+	apps              catalogcontrollers.AppClient // client for apps custom resource
+	roles             rbacv1controllers.RoleClient // client for role kubernetes resource
+	secretCache       corev1controllers.SecretCache
+	secrets           corev1controllers.SecretClient
+	roleBindings      rbacv1controllers.RoleBindingClient // client for rolebinding kubernetes resource
+	cg                steveclient.ClientGetter            // dynamic kubernetes client factory
 }
 
 // NewOperations creates a new Operations struct with all fields initialized
 func NewOperations(
-	cg proxy.ClientGetter,
+	cg steveclient.ClientGetter,
 	catalog catalogcontrollers.Interface,
 	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,
 	pods corev1controllers.PodClient,
-	nodes corev1controllers.NodeClient) *Operations {
+	nodes corev1controllers.NodeClient,
+	secrets corev1controllers.SecretController) *Operations {
 	return &Operations{
-		cg:             cg,
-		contentManager: contentManager,
-		namespace:      namespaces.System,
-		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour, settings.FullShellImage),
-		pods:           pods,
-		clusterRepos:   catalog.ClusterRepo(),
-		ops:            catalog.Operation(),
-		apps:           catalog.App(),
-		roleBindings:   rbac.RoleBinding(),
-		roles:          rbac.Role(),
-		nodes:          nodes,
+		cg:                cg,
+		contentManager:    contentManager,
+		namespace:         namespaces.System,
+		Impersonator:      podimpersonation.New("helm-op", cg, time.Hour, settings.FullShellImage),
+		pods:              pods,
+		clusterRepos:      catalog.ClusterRepo(),
+		clusterReposCache: catalog.ClusterRepo().Cache(),
+		ops:               catalog.Operation(),
+		apps:              catalog.App(),
+		roleBindings:      rbac.RoleBinding(),
+		roles:             rbac.Role(),
+		nodes:             nodes,
+		secretCache:       secrets.Cache(),
+		secrets:           secrets,
 	}
 }
 
@@ -188,8 +141,10 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
+	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
+		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -200,7 +155,7 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name, podTolerations)
 }
 
 // Upgrade gets the upgrade commands using the given namespace, name and options and gets the user using the isApp flag as false.
@@ -211,8 +166,10 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
+	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
+		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -223,7 +180,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name, podTolerations)
 }
 
 // Install gets the install commands using the given namespace, name and options and gets the user using the isApp flag as false.
@@ -234,8 +191,10 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
+	var podTolerations []corev1.Toleration
+	podTolerations = append(podTolerations, status.Tolerations...)
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
+		podTolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -246,7 +205,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name, podTolerations)
 }
 
 // decodeParams decodes the request using its url and v1 group version into the target object
@@ -481,11 +440,11 @@ type Command struct {
 	ArgObjects       []interface{} // the arguments that will be used in the command
 	ValuesFile       string        // name of the values.yaml file
 	Values           []byte        // content of the values.yaml file
+	ChartBaseValues  []byte        // the full values.yaml file of the incoming chart
 	ChartFile        string        // name of the chart tar file
 	Chart            []byte        // content of the chart file
 	ReleaseName      string        // name of the release
 	ReleaseNamespace string        // namespace of the release
-	Kustomize        bool          // flag to inform if it should use kustomize.sh
 }
 
 type Commands []Command
@@ -544,11 +503,6 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 		data[c.ChartFile] = c.Chart
 	}
 
-	if c.Kustomize {
-		data[fmt.Sprintf("kustomization%s.yaml", fileNumID)] = []byte(fmt.Sprintf(kustomization, fileNumID))
-		data[fmt.Sprintf("transform%s.yaml", fileNumID)] = []byte(fmt.Sprintf(transform, c.ReleaseName))
-	}
-
 	return data, nil
 }
 
@@ -584,6 +538,36 @@ func (c Command) renderArgs() ([]string, error) {
 		dataMap["disableOpenapiValidation"] = v
 	}
 
+	if v, ok := dataMap["atomic"]; ok {
+		delete(dataMap, "atomic")
+		dataMap["rollback-on-failure"] = v
+	}
+
+	if v, ok := dataMap["force"]; ok {
+		delete(dataMap, "force")
+		dataMap["force-replace"] = v
+	}
+
+	if v, ok := dataMap["serverSide"]; ok {
+		delete(dataMap, "serverSide")
+		dataMap["server-side"] = v
+	}
+
+	if v, ok := dataMap["takeOwnership"]; ok && convert.ToString(v) == "true" {
+		dataMap["force-conflicts"] = "true"
+		dataMap["server-side"] = "true"
+	}
+
+	if v, ok := dataMap["wait"]; ok {
+		delete(dataMap, "wait")
+		waitValue := convert.ToString(v)
+		if waitValue == "true" {
+			dataMap["wait"] = "watcher"
+		}
+		// If wait is false or any other value, omit the flag entirely.
+		// Helm v4 defaults to hookOnly when --wait is not specified.
+	}
+
 	for k, v := range dataMap {
 		s := convert.ToString(v)
 		k = convert.ToArgKey(k)
@@ -596,13 +580,6 @@ func (c Command) renderArgs() ([]string, error) {
 	}
 
 	runPath := helmDataPath
-	if c.Kustomize {
-		// Run path when using kustomize.sh will be different. Original cannot be used
-		// because write permissions are necessary and the helmDataPath cannot be
-		// written to due to it having a SecretVolumeSource.
-		runPath = helmRunPath
-		args = append(args, "--post-renderer=/home/shell/kustomize.sh")
-	}
 
 	if len(c.Values) > 0 {
 		args = append(args, "--values="+filepath.Join(runPath, c.ValuesFile))
@@ -631,23 +608,20 @@ func sanitizeVersion(chartVersion string) string {
 	return badChars.ReplaceAllString(chartVersion, "-")
 }
 
-// injectAnnotation receives the chart data from a tar file and injects the given annotations.
-// Returns the modified chart data
-func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error) {
-	if len(annotations) == 0 {
-		return data, nil
-	}
-
+// injectAnnotationAndRetrieveValues receives the chart data from a tar file and injects the given annotations.
+// Returns the modified chart data and values.yaml of the chart.
+func injectAnnotationAndRetrieveValues(data []byte, annotations map[string]string) ([]byte, []byte, error) {
 	tgz, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var (
-		dest    = &bytes.Buffer{}
-		destGz  = gzip.NewWriter(dest)
-		destTar = tar.NewWriter(destGz)
-		tar     = tar.NewReader(tgz)
+		dest            = &bytes.Buffer{}
+		destGz          = gzip.NewWriter(dest)
+		destTar         = tar.NewWriter(destGz)
+		tar             = tar.NewReader(tgz)
+		chartValuesYaml []byte
 	)
 
 	for {
@@ -658,38 +632,43 @@ func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error
 
 		data, err := io.ReadAll(tar)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// checks if its chart.yaml
 		parts := strings.Split(header.Name, "/")
-		if len(parts) == 2 && chartYAML[parts[1]] {
+		if len(parts) == 2 && chartYAML[parts[1]] && len(annotations) != 0 {
 			data, err = addAnnotations(data, annotations)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			header.Size = int64(len(data))
 		}
 
+		// checks if its values.yaml
+		if len(parts) == 2 && valuesYAML[parts[1]] {
+			chartValuesYaml = data
+		}
+
 		if err := destTar.WriteHeader(header); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		_, err = destTar.Write(data)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if err = destTar.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err = destGz.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return dest.Bytes(), nil
+	return dest.Bytes(), chartValuesYaml, nil
 }
 
 // addAnnotations receives that chart.yaml data and injects the given annotations in it
@@ -711,27 +690,9 @@ func addAnnotations(data []byte, annotations map[string]string) ([]byte, error) 
 	return yaml.Marshal(chartData)
 }
 
-// enableKustomize returns whether kustomize should be used. If the helm operation is
-// an upgrade and the migrated annotation is present, true will be returned.
-func (s *Operations) enableKustomize(annotations map[string]string, upgrade bool) bool {
-	if !upgrade {
-		return false
-	}
-
-	if len(annotations) == 0 {
-		return false
-	}
-
-	if annotations["apps.cattle.io/migrated"] != "true" {
-		return false
-	}
-
-	return true
-}
-
-// getChartCommand gets the chart based on the input, inject the annotations into it
-// and then creates and return a Command containing the name of the values file, name of the chart file, the chart data
-// and if the command should use kustomize.sh
+// getChartCommand gets the chart based on the input, inject the annotations
+// into it and then creates and return a Command containing the name of the
+// values file, name of the chart file and the chart data
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, upgrade bool, annotations map[string]string, values map[string]interface{}) (Command, error) {
 	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion, true)
 	if err != nil {
@@ -742,8 +703,8 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	if err != nil {
 		return Command{}, err
 	}
-
-	chartData, err = injectAnnotation(chartData, annotations)
+	var baseChartValues []byte
+	chartData, baseChartValues, err = injectAnnotationAndRetrieveValues(chartData, annotations)
 	if err != nil {
 		return Command{}, err
 	}
@@ -752,10 +713,10 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	chartFileName := sanitizeCommandKeyNames(fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)))
 
 	c := Command{
-		ValuesFile: valuesFileName,
-		ChartFile:  chartFileName,
-		Chart:      chartData,
-		Kustomize:  s.enableKustomize(annotations, upgrade),
+		ValuesFile:      valuesFileName,
+		ChartBaseValues: baseChartValues,
+		ChartFile:       chartFileName,
+		Chart:           chartData,
 	}
 
 	if len(values) > 0 {
@@ -840,9 +801,13 @@ func namespace(ns string) string {
 // createOperation creates an operation and its pod, along with its roles and roleBinding.
 // Uses the Operations.Impersonator and Operations.ops to do it.
 // Returns the created catalog.Operation struct
-func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string) (*catalog.Operation, error) {
-	if status.Action != "uninstall" {
-		_, err := s.createNamespace(ctx, status.Namespace, status.ProjectID)
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string, clusterRepoName string, podTolerations []corev1.Toleration) (*catalog.Operation, error) {
+	if status.Action == "uninstall" {
+		if err := s.deleteReleasePullSecrets(status.Namespace, status.Release); err != nil {
+			return nil, err
+		}
+	} else {
+		err := s.createNamespaceAndPullSecrets(ctx, status, cmds, clusterRepoName)
 		if err != nil {
 			return nil, err
 		}
@@ -853,15 +818,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
-	var kustomize bool
-	for _, cmd := range cmds {
-		if !cmd.Kustomize {
-			continue
-		}
-		kustomize = true
-		break
-	}
-	pod, podOptions := s.createPod(secretData, kustomize, imageOverride, status.Tolerations)
+	pod, podOptions := s.createPod(secretData, imageOverride, podTolerations)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -954,8 +911,10 @@ func (s *Operations) createRoleAndRoleBindings(op *catalog.Operation, user strin
 
 // createNamespace creates a new k8s namespace and returns its object.
 // It can also set the field.cattle.io/projectId annotation on the namespace if a non-empty projectID is provided.
-// It creates a watch on the namespace and waits for the v3.ProjectConditionInitialRolesPopulated condition
-// If the condition is not met within 30 seconds, it returns an error
+// It creates a watch on the namespace and waits for the v3.ProjectConditionInitialRolesPopulated condition.
+// If the condition is not met within 30 seconds, it logs a warning and returns the namespace anyway; the
+// condition may never be reachable (e.g. a PRTB referencing a deleted role template), and the actual
+// permission check happens later when the operation pod's impersonated helm/kubectl calls run.
 func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*corev1.Namespace, error) {
 	apiContext := types.GetAPIContext(ctx)
 	client, err := s.cg.K8sInterface(apiContext)
@@ -1014,15 +973,20 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 		}
 	}
 
-	return nil, fmt.Errorf("failed to wait for roles to be populated")
+	// The watch ended before InitialRolesPopulated was observed - this can happen if the project's
+	// RBAC can never fully converge (e.g. a PRTB referencing a deleted role template). Proceed with
+	// the namespace as-is rather than failing the install outright; the RBAC controller keeps
+	// reconciling roles for it in the background, and any permission gap will surface when the
+	// operation pod's impersonated helm/kubectl calls run against the namespace.
+	logrus.Warnf("[helmop] timed out waiting for roles to be populated in namespace %s, proceeding anyway", namespace)
+	return adminClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
 // createPod creates the struct of the pod for the operation to run in. It also mounts a secret with the secretdata provided.
 // If imageOverride is provided, it will override the default value of settings.FullShellImage.
 // The created pod has default tolerations and node selectors.
-// If the kustomize flag is true, the created pod is modified to be able to run the kustomize.sh script.
 // Returns a pod object and a pod options object representing the helm operation pod and it's options
-func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*corev1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, imageOverride string, tolerations []corev1.Toleration) (*corev1.Pod, *podimpersonation.PodOptions) {
 	var (
 		f = false
 		t = true
@@ -1151,36 +1115,17 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 		},
 	}
 
-	// if kustomize is false then helmDataPath is an acceptable path for helm to run. If it is true,
-	// files are copied from helmDataPath to helmRunPath. This is because the kustomize.sh script
-	// needs write permissions but volumes using a SecretVolumeSource are readOnly. This can not be
-	// changed with the readOnly field or the defaultMode field.
-	// See: https://github.com/kubernetes/kubernetes/issues/62099.
-	if kustomize {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: "helm-run",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		})
-		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "helm-run",
-			MountPath: helmRunPath,
-		})
-		pod.Spec.Containers[0].Lifecycle = &corev1.Lifecycle{
-			PostStart: &corev1.LifecycleHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"/bin/sh", "-c", fmt.Sprintf("cp -r %s/. %s", helmDataPath, helmRunPath)},
-				},
-			},
-		}
-		pod.Spec.Containers[0].WorkingDir = helmRunPath
+	registry, _ := cluster.GetPrivateRegistry(nil)
+	if registry != nil && len(registry.PullSecrets) > 0 {
+		pod.Spec.ImagePullSecrets = registry.PullSecretsAsObjectReferences()
 	}
+
 	return pod, &podimpersonation.PodOptions{
 		SecretsToCreate: []*corev1.Secret{
 			secret,
 		},
-		ImageOverride: imageOverride,
+		ImageOverride:     imageOverride,
+		ExtraClusterRoles: []string{rbac.HelmProvisioningReaderRole},
 	}
 }
 

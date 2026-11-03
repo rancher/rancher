@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -55,6 +57,7 @@ func newPRTBHandler(management *config.ManagementContext, clusterManager *cluste
 }
 
 // OnChange syncs the required resources used to implement a PRTB. It does the following:
+//   - Delete duplicate PRTBs with the same content (subject, role template, and project).
 //   - Create the specified user if it doesn't already exist.
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project management role if it exists.
@@ -63,7 +66,14 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	var err error
+	isDuplicate, err := p.deleteDuplicatePRTBs(prtb)
+	if err != nil {
+		return prtb, err
+	}
+	if isDuplicate {
+		return prtb, nil
+	}
+
 	prtb, err = p.handleMigration(prtb)
 	if err != nil {
 		return prtb, err
@@ -83,6 +93,69 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	return prtb, p.reconcileBindings(prtb)
+}
+
+// deleteDuplicatePRTBs checks if there are duplicate PRTBs with the same content in the same namespace.
+// If duplicates are found, it keeps the oldest one (by creation timestamp, then by name as tiebreaker)
+// and deletes the rest. It returns true if the given prtb was itself deleted as a duplicate.
+func (p *prtbHandler) deleteDuplicatePRTBs(prtb *v3.ProjectRoleTemplateBinding) (bool, error) {
+	allPRTBs, err := p.prtbClient.Cache().List(prtb.Namespace, labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("failed to list PRTBs in namespace %s: %w", prtb.Namespace, err)
+	}
+
+	currentKey := rtbContentKey(prtb.UserPrincipalName, prtb.UserName, prtb.GroupPrincipalName, prtb.GroupName,
+		prtb.RoleTemplateName, prtb.ProjectName)
+
+	// Find all PRTBs with the same content key.
+	var duplicates []*v3.ProjectRoleTemplateBinding
+	for _, other := range allPRTBs {
+		if other.DeletionTimestamp != nil {
+			continue
+		}
+		if rtbContentKey(other.UserPrincipalName,
+			other.UserName,
+			other.GroupPrincipalName,
+			other.GroupName,
+			other.RoleTemplateName,
+			other.ProjectName) == currentKey {
+			duplicates = append(duplicates, other)
+		}
+	}
+
+	if len(duplicates) <= 1 {
+		return false, nil
+	}
+
+	// Sort: oldest first by CreationTimestamp, then by Name as tiebreaker.
+	sort.Slice(duplicates, func(i, j int) bool {
+		ti := duplicates[i].CreationTimestamp
+		tj := duplicates[j].CreationTimestamp
+		if !ti.Equal(&tj) {
+			return ti.Before(&tj)
+		}
+		return duplicates[i].Name < duplicates[j].Name
+	})
+
+	// Keep the first (oldest), delete the rest.
+	keeper := duplicates[0]
+	logrus.Infof("[prtb-handler] found %d duplicate PRTBs for key %q in namespace %s, keeping %s",
+		len(duplicates), currentKey, prtb.Namespace, keeper.Name)
+
+	currentDeleted := false
+	var returnErr error
+	for _, dup := range duplicates[1:] {
+		logrus.Infof("[prtb-handler] deleting duplicate PRTB %s/%s", dup.Namespace, dup.Name)
+		if err := p.prtbClient.Delete(dup.Namespace, dup.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			returnErr = errors.Join(returnErr, fmt.Errorf("failed to delete duplicate PRTB %s/%s: %w", dup.Namespace, dup.Name, err))
+			continue
+		}
+		if dup.Name == prtb.Name {
+			currentDeleted = true
+		}
+	}
+
+	return currentDeleted, returnErr
 }
 
 // handleMigration handles the migration of PRTBs when toggling the AggregatedRoleTemplates feature flag.
@@ -154,6 +227,12 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
+	}
+	if cluster.DeletionTimestamp != nil {
+		if skip, why := util.SkipDownstreamCleanupOnRemoval(cluster); skip {
+			logrus.Infof("Cluster %s is being removed and %s: not deleting downstream resources for PRTB %s.", clusterName, why, prtb.Name)
+			return nil
+		}
 	}
 
 	userContext, err := p.clusterManager.UserContext(cluster.Name)
@@ -238,6 +317,8 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		return nil, fmt.Errorf("binding %v has no subject", binding.Name)
 	}
 
+	needsUpdate := false
+
 	if binding.UserName == "" {
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := p.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
@@ -246,6 +327,7 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		}
 
 		binding.UserName = user.Name
+		needsUpdate = true
 	}
 
 	if binding.UserPrincipalName == "" {
@@ -256,9 +338,18 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
 				binding.UserPrincipalName = p
+				needsUpdate = true
 				break
 			}
 		}
+	}
+
+	if needsUpdate {
+		updated, err := p.prtbClient.Update(binding)
+		if err != nil {
+			return binding, err
+		}
+		binding = updated
 	}
 
 	return binding, nil

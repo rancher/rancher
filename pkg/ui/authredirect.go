@@ -5,35 +5,28 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-
-	"github.com/gorilla/mux"
 )
 
-var (
-	authToTarget = map[string]string{
-		"vue":   "/dashboard/auth/verify",
-		"ember": "/verify",
-	}
-)
+const vueAuthVerifyPath = "/dashboard/auth/verify"
 
 func redirectAuth(rw http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	bytes, err := base64.RawURLEncoding.DecodeString(vars["state"])
+	state := req.URL.Query().Get("state")
+	bytes, err := base64.RawURLEncoding.DecodeString(state)
 	if err != nil {
-		emberIndexUnlessAPI().ServeHTTP(rw, req)
+		vueIndexUnlessAPI().ServeHTTP(rw, req)
 		return
 	}
 
 	input := struct {
 		To string `json:"to,omitempty"`
 	}{}
-	if err := json.Unmarshal(bytes, &input); err != nil || authToTarget[input.To] == "" {
-		emberIndexUnlessAPI().ServeHTTP(rw, req)
+	if err := json.Unmarshal(bytes, &input); err != nil || input.To != "vue" {
+		vueIndexUnlessAPI().ServeHTTP(rw, req)
 		return
 	}
 
 	u := url.URL{
-		Path:     authToTarget[input.To],
+		Path:     vueAuthVerifyPath,
 		RawQuery: req.URL.RawQuery,
 	}
 	http.Redirect(rw, req, u.String(), http.StatusFound)

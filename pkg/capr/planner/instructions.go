@@ -8,6 +8,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -50,19 +51,23 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 	switch cattleOS {
 	case capr.WindowsMachineOS:
 		instruction = plan.OneTimeInstruction{
-			Name:    "install",
-			Image:   image,
-			Command: "powershell.exe",
-			Args:    []string{"-File", "run.ps1"},
-			Env:     env,
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "install",
+				Image:   image,
+				Command: "powershell.exe",
+				Args:    []string{"-File", "run.ps1"},
+				Env:     env,
+			},
 		}
 	default:
 		instruction = plan.OneTimeInstruction{
-			Name:    "install",
-			Image:   image,
-			Command: "sh",
-			Args:    []string{"-c", "run.sh"},
-			Env:     env,
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "install",
+				Image:   image,
+				Command: "sh",
+				Args:    []string{"-c", "run.sh"},
+				Env:     env,
+			},
 		}
 	}
 
@@ -129,23 +134,27 @@ func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RK
 func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
 	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, []plan.PeriodicInstruction{
 		{
-			Name:    captureAddressInstructionName,
-			Command: "sh",
-			Args: []string{
-				"-c",
-				// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-				fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert %s https://localhost:%d/db/info | grep 'clientURLs'",
-					path.Join(capr.GetDistroDataDir(controlPlane), "server/tls/server-ca.crt"),
-					capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    captureAddressInstructionName,
+				Command: "sh",
+				Args: []string{
+					"-c",
+					// the grep here is to make the command fail if we don't get the output we expect, like empty string.
+					fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert %s https://localhost:%d/db/info | grep 'clientURLs'",
+						path.Join(capr.GetDistroDataDir(controlPlane), "server/tls/server-ca.crt"),
+						capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+				},
 			},
 			PeriodSeconds: 600,
 		},
 		{
-			Name:    etcdNameInstructionName,
-			Command: "sh",
-			Args: []string{
-				"-c",
-				fmt.Sprintf("cat %s", path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/name")),
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    etcdNameInstructionName,
+				Command: "sh",
+				Args: []string{
+					"-c",
+					fmt.Sprintf("cat %s", path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/name")),
+				},
 			},
 			PeriodSeconds: 600,
 		},
@@ -160,11 +169,13 @@ func generateManifestRemovalInstruction(controlPlane *rkev1.RKEControlPlane, ent
 		return false, plan.OneTimeInstruction{}
 	}
 	return true, plan.OneTimeInstruction{
-		Name:    "remove server manifests",
-		Command: "/bin/sh",
-		Args: []string{
-			"-c",
-			fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests"), runtime),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "remove server manifests",
+			Command: "/bin/sh",
+			Args: []string{
+				"-c",
+				fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests"), runtime),
+			},
 		},
 	}
 }

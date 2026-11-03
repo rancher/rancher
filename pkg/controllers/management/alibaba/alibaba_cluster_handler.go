@@ -82,7 +82,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	if cluster.Status.Driver == "" {
 		cluster = cluster.DeepCopy()
 		cluster.Status.Driver = apimgmtv3.ClusterDriverAlibaba
-		return e.ClusterClient.Update(cluster)
+		return e.ClusterClient.UpdateStatus(cluster)
 	}
 
 	cluster, err := e.CheckCrdReady(cluster, "ali")
@@ -120,7 +120,13 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 
 	// fixAliConfig update the clusterID in clusterSpec (cluster.Spec.AliConfig.ClusterID) for cluster that are created with rancher
 	// since this field is only available in AliClusterConfig object after ali-operator creates the cluster, it is needed to be fixed on clusterSpec
-	e.fixAliConfig(cluster, aliClusterConfigDynamic)
+	clusterIDFixed := e.fixAliConfig(cluster, aliClusterConfigDynamic)
+	if clusterIDFixed {
+		cluster, err = e.ClusterClient.Update(cluster)
+		if err != nil {
+			return cluster, err
+		}
+	}
 
 	// check for changes between ali spec on cluster and the ali spec on the aliClusterConfig object
 	if !reflect.DeepEqual(aliClusterConfigMap, aliClusterConfigDynamic.Object["spec"]) {
@@ -131,6 +137,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	// get ali Cluster Config's phase
 	status, _ := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase := status["phase"]
+	message, _ := status["message"].(string)
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {
 		failureMessage = fmt.Sprintf("cannot access alibaba cloud, check cloud credential: %s", failureMessage)
@@ -149,7 +156,13 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster ACK [%s] to finish creating", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			if message != "" {
+				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, message)
+				if err != nil {
+					return cluster, err
+				}
+			}
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, message)
 		}
 		logrus.Infof("waiting for cluster ACK [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -199,7 +212,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 					cluster.Status.ServiceAccountTokenSecret = secret.Name
 					cluster.Status.ServiceAccountToken = ""
 				}
-				return e.ClusterClient.Update(cluster)
+				return e.ClusterClient.UpdateStatus(cluster)
 			}
 		}
 
@@ -238,33 +251,32 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster ACK [%s] to update", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		}
 		logrus.Infof("waiting for cluster ACK [%s] update failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionUpdated, failureMessage)
 	default:
+		statusMessage := message
+		if statusMessage == "" {
+			if cluster.Spec.AliConfig.Imported {
+				statusMessage = fmt.Sprintf("Waiting for cluster import [%s] to start", cluster.Name)
+			} else {
+				statusMessage = fmt.Sprintf("Waiting for cluster creation [%s] to start", cluster.Name)
+			}
+		}
+
 		if cluster.Spec.AliConfig.Imported {
-			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
+			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, statusMessage)
 			if err != nil {
 				return cluster, err
 			}
-			logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-		} else {
-			logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
 		}
 
+		logrus.Info(statusMessage)
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
+
 		if failureMessage == "" {
-			if cluster.Spec.AliConfig.Imported {
-				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
-				if err != nil {
-					return cluster, err
-				}
-				logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-			} else {
-				logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
-			}
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, statusMessage)
 		}
 		logrus.Infof("waiting for cluster ACK [%s] pre-create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -329,13 +341,15 @@ func (e *aliOperatorController) updateAliClusterConfig(cluster *apimgmtv3.Cluste
 		case event := <-w.ResultChan():
 			aliClusterConfigDynamic = event.Object.(*unstructured.Unstructured)
 			status, _ := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
-			if status["phase"] == "active" {
+			phase := status["phase"]
+			message, _ := status["message"].(string)
+			if phase == "active" {
 				continue
 			}
 
 			// this enqueue is necessary to ensure that the controller is reentered with the updating phase
 			e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		case <-timeout.C:
 			return cluster, nil
 		}
@@ -350,14 +364,14 @@ func (e *aliOperatorController) setInitialUpstreamSpec(cluster *apimgmtv3.Cluste
 		return cluster, err
 	}
 	cluster.Status.AliStatus.UpstreamSpec = upstreamSpec
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.UpdateStatus(cluster)
 }
 
 // recordAppliedSpec sets the cluster's current spec as its appliedSpec
 func (e *aliOperatorController) recordAppliedSpec(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.AliConfig = cluster.Spec.AliConfig
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.UpdateStatus(cluster)
 }
 
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
@@ -446,16 +460,21 @@ func (e *aliOperatorController) generateAndSetServiceAccount(secretsCache coreco
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.UpdateStatus(cluster)
 }
 
-func (e *aliOperatorController) fixAliConfig(cluster *apimgmtv3.Cluster, aliClusterConfigDynamic *unstructured.Unstructured) {
+func (e *aliOperatorController) fixAliConfig(cluster *apimgmtv3.Cluster, aliClusterConfigDynamic *unstructured.Unstructured) bool {
 	aliConfigSpec, exist := aliClusterConfigDynamic.Object["spec"]
 	if exist && aliConfigSpec != nil {
 		spec := aliConfigSpec.(map[string]interface{})
 		clusterID, exists := spec["clusterId"]
 		if exists && clusterID != nil {
-			cluster.Spec.AliConfig.ClusterID = clusterID.(string)
+			clusterIDStr := clusterID.(string)
+			if cluster.Spec.AliConfig.ClusterID != clusterIDStr {
+				cluster.Spec.AliConfig.ClusterID = clusterIDStr
+				return true
+			}
 		}
 	}
+	return false
 }

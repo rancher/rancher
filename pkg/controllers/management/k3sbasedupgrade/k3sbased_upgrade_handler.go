@@ -5,7 +5,7 @@ import (
 	"time"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	cluster2 "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
@@ -31,7 +31,16 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 		return cluster, nil
 	}
 
-	if !importedclusterversionmanagement.Enabled(cluster) {
+	// An etcd snapshot restore suspends version management while it rewrites the cluster's desired
+	// version and reinstalls the distro itself. Exit before touching anything: mid-restore there is
+	// nothing useful to render, and both branches below write plans and modify the cluster object.
+	if cluster2.ImportedVersionManagementPaused(cluster) {
+		logrus.Debugf("[k3s-based-upgrader] [%s] version management is paused by %s, skipping",
+			cluster.Name, mgmtv3.ClusterImportedVersionManagementPausedAnnotation)
+		return cluster, nil
+	}
+
+	if !cluster2.ImportedVersionManagementEnabled(cluster) {
 		var masterPlan, workerPlan planv1.Plan
 
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
@@ -129,7 +138,10 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 				logrus.Debug("[k3s-based-upgrader] updating the Upgraded condition to true")
 				cluster = cluster.DeepCopy()
 				cluster = upgradeDone(cluster)
-				if cluster, err = h.clusterClient.Update(cluster); err != nil {
+				if cluster, err = h.clusterClient.UpdateStatus(cluster); err != nil {
+					return nil, err
+				}
+				if cluster, err = h.forceDeployIfACEEnabled(cluster); err != nil {
 					return nil, err
 				}
 				logrus.Infof("[k3s-based-upgrader] finished upgrading cluster [%s]", cluster.Name)

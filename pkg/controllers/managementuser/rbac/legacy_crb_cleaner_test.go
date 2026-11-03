@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 func TestCRBSyncChecksGlobalAdminRole(t *testing.T) {
@@ -195,4 +196,107 @@ func TestCRBSyncDoesntChecksGlobalAdminRoleWithAnnotation(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, obj)
 	})
+}
+
+// TestCRBSyncDeletesOrphanedLegacyProjectCRBs verifies that crb-<hash> project ClusterRoleBindings left behind by legacy
+// RBAC are deleted once none of their PRTB owners exist, without deleting bindings aggregated RBAC still owns.
+func TestCRBSyncDeletesOrphanedLegacyProjectCRBs(t *testing.T) {
+	livePRTB := &apiv3.ProjectRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "live-prtb", Namespace: "p-xyz789"},
+	}
+	// noRemainingOwnerLabels also resolves owner-user keys as UIDs, so both indexes must exist.
+	prtbIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		prtbByUIDIndex:       prtbByUID,
+		prtbByNsAndNameIndex: prtbByNsName,
+	})
+	require.NoError(t, prtbIndexer.Add(livePRTB))
+	m := &manager{prtbIndexer: prtbIndexer}
+
+	const crbName = "crb-abc123"
+	tests := []struct {
+		name       string
+		roleName   string
+		labels     map[string]string
+		wantDelete bool
+	}{
+		{
+			name:       "namespaces role with only a missing legacy owner",
+			roleName:   "xyz789-namespaces-edit",
+			labels:     map[string]string{"p-xyz789_deleted-prtb": owner},
+			wantDelete: true,
+		},
+		{
+			name:       "create-ns role with only a missing legacy owner",
+			roleName:   createNSRoleRef,
+			labels:     map[string]string{"p-xyz789_deleted-prtb": owner},
+			wantDelete: true,
+		},
+		{
+			name:       "promoted role with only a missing legacy owner",
+			roleName:   "test-rt-promoted",
+			labels:     map[string]string{"p-xyz789_deleted-prtb": owner},
+			wantDelete: true,
+		},
+		{
+			name:     "namespaces role with an existing legacy owner",
+			roleName: "xyz789-namespaces-edit",
+			labels:   map[string]string{"p-xyz789_deleted-prtb": owner, rbac.GetRTBLabel(livePRTB.ObjectMeta): owner},
+		},
+		{
+			name:     "aggregated CRB",
+			roleName: "xyz789-namespaces-edit",
+			labels: map[string]string{
+				rbac.GetPRTBOwnerLabel("deleted-prtb"): "true",
+				rbac.AggregationFeatureLabel:           "true",
+			},
+		},
+		{
+			name:     "missing legacy owner and an aggregated owner",
+			roleName: "xyz789-namespaces-edit",
+			labels: map[string]string{
+				"p-xyz789_deleted-prtb":                owner,
+				rbac.GetPRTBOwnerLabel("deleted-prtb"): "true",
+			},
+		},
+		{
+			name:     "missing legacy owner and the aggregation label",
+			roleName: "xyz789-namespaces-edit",
+			labels: map[string]string{
+				"p-xyz789_deleted-prtb":      owner,
+				rbac.AggregationFeatureLabel: "true",
+			},
+		},
+		{
+			name:     "unrelated role with only a missing legacy owner",
+			roleName: "some-other-role",
+			labels:   map[string]string{"p-xyz789_deleted-prtb": owner},
+		},
+		{
+			name:     "namespaces role with no legacy owner label",
+			roleName: "xyz789-namespaces-edit",
+			labels:   map[string]string{"app": "something"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			crbs := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+			if tt.wantDelete {
+				crbs.EXPECT().Delete(crbName, &metav1.DeleteOptions{}).Return(nil)
+			}
+			c := &crbCleaner{
+				noRemainingOwnerLabels: m.noRemainingOwnerLabels,
+				crbs:                   crbs,
+			}
+
+			crb := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: crbName, Labels: tt.labels},
+				RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: tt.roleName},
+				Subjects:   []rbacv1.Subject{{Kind: rbacv1.UserKind, Name: "u-abc123", APIGroup: rbacv1.GroupName}},
+			}
+			obj, err := c.sync(crbName, crb)
+			require.NoError(t, err)
+			assert.Equal(t, crb, obj)
+		})
+	}
 }

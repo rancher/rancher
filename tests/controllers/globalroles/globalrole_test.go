@@ -71,7 +71,12 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 		crd.CRD{
 			SchemaObject: v3.GlobalRoleBinding{},
 			NonNamespace: true,
-		})
+		},
+		crd.CRD{
+			SchemaObject: v3.Cluster{},
+			NonNamespace: true,
+		},
+	)
 
 	// Create wrangler context
 	wranglerContext, err := wrangler.NewContext(s.ctx, nil, restCfg)
@@ -83,7 +88,9 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 	s.managementContext, err = scaledContext.NewManagementContext()
 	assert.NoError(s.T(), err)
 
-	// Register controller
+	// Register controller. The indexers shared with the downstream controllers are registered
+	// separately on every replica, and the enqueuers wired by Register depend on them.
+	globalroles.RegisterWranglerIndexers(s.managementContext.Wrangler.Mgmt.GlobalRoleBinding().Cache())
 	globalroles.Register(s.ctx, s.managementContext, clusterManager)
 
 	// Start controllers
@@ -97,7 +104,8 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 			Group:   "management.cattle.io",
 			Version: "v3",
 			Kind:    "GlobalRole",
-		})
+		},
+	)
 
 	// Start caches
 	common.StartWranglerCaches(s.ctx, s.T(), s.managementContext.Wrangler,
@@ -130,7 +138,13 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 			Group:   "",
 			Version: "v1",
 			Kind:    "Namespace",
-		})
+		},
+		schema.GroupVersionKind{
+			Group:   "management.cattle.io",
+			Version: "v3",
+			Kind:    "Cluster",
+		},
+	)
 }
 
 func (s *GlobalRoleTestSuite) TearDownSuite() {
@@ -167,11 +181,11 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 	}{
 		// NOTE: These test can be run in parallel only if the global role names are unique
 		{
-			name: "create primary cluster role given cr-name",
+			name: "ignore cr-name label and use global role name for cluster role",
 			globalRole: v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						crNameLabel: "cr-name",
+						crNameLabel: "cr-label",
 					},
 					Name: "cr-name-gr",
 				},
@@ -179,7 +193,7 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 			},
 			clusterRole: rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "cr-name",
+					Name: "cattle-globalrole-cr-name-gr",
 				},
 				Rules: []rbacv1.PolicyRule{getPodRule},
 			},
@@ -240,7 +254,6 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		s.Run(test.name, func() {
 			t := s.T()
 			t.Parallel()

@@ -12,6 +12,7 @@ import (
 	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -51,23 +52,40 @@ func (h *handler) initializeCRDs(crdClient apiextcontrollers.CustomResourceDefin
 	return nil
 }
 
+// crdToResourceMatch returns the first served non-deprecated version of the CRD as a resourceMatch.
+// If none exists, it falls back to the first served deprecated version.
+// It returns nil if there are no served versions or the CRD is not valid.
 func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 	if crd.Status.AcceptedNames.Kind == "" || len(crd.Spec.Versions) == 0 {
+		logrus.Debugf("[authprovisioningv2] CRD %s does not have any versions or accepted names, skipping", crd.Name)
 		return nil
 	}
 
-	version := crd.Spec.Versions[0]
-
+	versionName := ""
 	for _, ver := range crd.Spec.Versions {
-		if !ver.Deprecated {
-			version = ver
+		if !ver.Deprecated && ver.Served {
+			versionName = ver.Name
 			break
 		}
 	}
 
+	if versionName == "" {
+		for _, ver := range crd.Spec.Versions {
+			if ver.Served {
+				versionName = ver.Name
+				break
+			}
+		}
+	}
+
+	if versionName == "" {
+		logrus.Debugf("[authprovisioningv2] CRD %s does not have served version, skipping", crd.Name)
+		return nil
+	}
+
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
-		Version: version.Name,
+		Version: versionName,
 		Kind:    crd.Status.AcceptedNames.Kind,
 	}
 
@@ -373,8 +391,14 @@ type indexGetter interface {
 	GetByIndex(gvk schema.GroupVersionKind, indexName, key string) ([]runtime.Object, error)
 }
 
+// clusterIndexKey returns the clusterIndexed index key for the given cluster. It must stay in
+// sync with the keys produced by indexByCluster.
+func clusterIndexKey(cluster *v1.Cluster) string {
+	return fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name)
+}
+
 func getResourceNames(indexer indexGetter, resourceMatch resourceMatch, cluster *v1.Cluster) ([]string, error) {
-	objs, err := indexer.GetByIndex(resourceMatch.GVK, clusterIndexed, fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name))
+	objs, err := indexer.GetByIndex(resourceMatch.GVK, clusterIndexed, clusterIndexKey(cluster))
 	if err != nil {
 		return nil, err
 	}

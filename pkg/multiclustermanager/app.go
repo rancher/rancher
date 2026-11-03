@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
-	managementcrds "github.com/rancher/rancher/pkg/crds/management"
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
@@ -65,10 +64,6 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	}
 
 	scaledContext.Wrangler = wranglerContext
-
-	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
-		return nil, nil, nil, err
-	}
 
 	dialerFactory, err := dialer.NewFactory(scaledContext, wranglerContext)
 	if err != nil {
@@ -210,6 +205,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		go adunmigration.UnmigrateAdGUIDUsersOnce(m.ScaledContext)
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(m.ScaledContext, management)
+		managementdata.RefreshGitHubAppUsersOnce(ctx, m.wranglerContext.Mgmt.AuthConfig())
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)

@@ -1,15 +1,353 @@
 package planner
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
+	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+func TestClusterObjectNameAuthorized(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		clusterName string
+		want        bool
+	}{
+		{"listed cluster", map[string]string{capr.AuthorizedObjectAnnotation: "alpha,beta"}, "beta", true},
+		{"whitespace around names", map[string]string{capr.AuthorizedObjectAnnotation: "alpha, beta "}, "beta", true},
+		{"unlisted cluster", map[string]string{capr.AuthorizedObjectAnnotation: "alpha,beta"}, "gamma", false},
+		{"exact name only", map[string]string{capr.AuthorizedObjectAnnotation: "alpha,beta"}, "bet", false},
+		{"missing annotation", nil, "alpha", false},
+		{"empty cluster name", map[string]string{capr.AuthorizedObjectAnnotation: "alpha"}, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: tt.annotations}}
+			assert.Equal(t, tt.want, clusterObjectNameAuthorized(secret, capr.AuthorizedObjectAnnotation, tt.clusterName))
+		})
+	}
+	t.Run("nil object", func(t *testing.T) {
+		var secret *corev1.Secret
+		assert.False(t, clusterObjectNameAuthorized(secret, capr.AuthorizedObjectAnnotation, "beta"))
+	})
+}
+
+func TestClusterObjectLabelSelectorAuthorized(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		labels      map[string]string
+		want        bool
+	}{
+		{"missing annotation", nil, map[string]string{"env": "dev"}, false},
+		{"empty selector matches all", map[string]string{capr.AuthorizedObjectSelectorAnnotation: ""}, nil, true},
+		{"matching label", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"}, map[string]string{"env": "dev"}, true},
+		{"different label", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"}, map[string]string{"env": "prod"}, false},
+		{"set selector matches", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env in (dev,prod)"}, map[string]string{"env": "dev"}, true},
+		{"negative selector matches", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "!restricted"}, nil, true},
+		{"invalid selector rejected", map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env in ("}, map[string]string{"env": "dev"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: tt.annotations}}
+			assert.Equal(t, tt.want, clusterObjectLabelSelectorAuthorized(secret, tt.labels))
+		})
+	}
+}
+
+func TestRenderFilesAuthorization(t *testing.T) {
+	for _, kind := range []struct {
+		name         string
+		fileSource   rkev1.ProvisioningFileSource
+		expectObject func(*mockPlanner, map[string]string)
+		file         plan.File
+	}{
+		{
+			name: "secret",
+			fileSource: rkev1.ProvisioningFileSource{Secret: rkev1.K8sObjectFileSource{
+				Name: "shared-secret", Items: []rkev1.KeyToPath{{Key: "file", Path: "/etc/secret"}},
+			}},
+			expectObject: func(mp *mockPlanner, annotations map[string]string) {
+				mp.secretCache.EXPECT().Get("fleet-default", "shared-secret").Return(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+					Data:       map[string][]byte{"file": []byte("secret data")},
+				}, nil).Times(1)
+			},
+			file: plan.File{Path: "/etc/secret", Content: base64.StdEncoding.EncodeToString([]byte("secret data"))},
+		},
+		{
+			name: "configmap",
+			fileSource: rkev1.ProvisioningFileSource{ConfigMap: rkev1.K8sObjectFileSource{
+				Name: "shared-configmap", Items: []rkev1.KeyToPath{{Key: "file", Path: "/etc/configmap"}},
+			}},
+			expectObject: func(mp *mockPlanner, annotations map[string]string) {
+				mp.configMapCache.EXPECT().Get("fleet-default", "shared-configmap").Return(&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+					Data:       map[string]string{"file": "config data"},
+				}, nil).Times(1)
+			},
+			file: plan.File{Path: "/etc/configmap", Content: base64.StdEncoding.EncodeToString([]byte("config data"))},
+		},
+	} {
+		t.Run(kind.name, func(t *testing.T) {
+			tests := []struct {
+				name          string
+				annotations   map[string]string
+				clusterLabels map[string]string
+				clusterErr    error
+				clusterCalls  int
+				wantFiles     []plan.File
+				wantError     string
+			}{
+				{
+					name:        "name authorized",
+					annotations: map[string]string{capr.AuthorizedObjectAnnotation: "example"},
+					wantFiles:   []plan.File{kind.file},
+				},
+				{
+					name:          "selector authorized",
+					annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+					clusterLabels: map[string]string{"env": "dev"},
+					clusterCalls:  1,
+					wantFiles:     []plan.File{kind.file},
+				},
+				{
+					name:      "missing annotations deny access",
+					wantError: fmt.Sprintf("error rendering files: cluster fleet-default/example was not authorized to access %s fleet-default/shared-%s", kind.name, kind.name),
+				},
+				{
+					name:          "selector denies access",
+					annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+					clusterLabels: map[string]string{"env": "prod"},
+					clusterCalls:  1,
+					wantError:     fmt.Sprintf("error rendering files: cluster fleet-default/example was not authorized to access %s fleet-default/shared-%s", kind.name, kind.name),
+				},
+				{
+					name:         "cluster lookup fails",
+					annotations:  map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+					clusterErr:   fmt.Errorf("cache unavailable"),
+					clusterCalls: 1,
+					wantError:    fmt.Sprintf("error checking authorization for %s fleet-default/shared-%s: error retrieving cluster fleet-default/example while rendering files: cache unavailable", kind.name, kind.name),
+				},
+			}
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					mp := newMockPlanner(t, InfoFunctions{})
+					kind.expectObject(mp, tt.annotations)
+					mp.rancherClusterCache.EXPECT().Get("fleet-default", "example").Return(&provisioningv1.Cluster{
+						ObjectMeta: metav1.ObjectMeta{Labels: tt.clusterLabels},
+					}, tt.clusterErr).Times(tt.clusterCalls)
+					controlPlane := &rkev1.RKEControlPlane{
+						ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
+						Spec: rkev1.RKEControlPlaneSpec{ClusterConfiguration: rkev1.ClusterConfiguration{
+							MachineSelectorFiles: []rkev1.RKEProvisioningFiles{{FileSources: []rkev1.ProvisioningFileSource{kind.fileSource}}},
+						}},
+					}
+					files, err := mp.planner.renderFiles(controlPlane, &planEntry{Machine: &capi.Machine{}})
+					if tt.wantError != "" {
+						assert.EqualError(t, err, tt.wantError)
+					} else {
+						assert.NoError(t, err)
+					}
+					assert.Equal(t, tt.wantFiles, files)
+				})
+			}
+		})
+	}
+}
+
+func TestMachineSelectorFileAuthorized(t *testing.T) {
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
+	}
+
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		clusterLabels map[string]string
+		clusterErr    error
+		clusterCalls  int
+		want          bool
+		wantError     string
+	}{
+		{
+			name: "name match skips cluster lookup",
+			annotations: map[string]string{
+				capr.AuthorizedObjectAnnotation:         "example",
+				capr.AuthorizedObjectSelectorAnnotation: "env=dev",
+			},
+			want: true,
+		},
+		{name: "missing annotations skip cluster lookup"},
+		{
+			name:          "selector matches",
+			annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+			clusterLabels: map[string]string{"env": "dev"},
+			clusterCalls:  1,
+			want:          true,
+		},
+		{
+			name: "selector matches after name list misses",
+			annotations: map[string]string{
+				capr.AuthorizedObjectAnnotation:         "other-cluster",
+				capr.AuthorizedObjectSelectorAnnotation: "env=dev",
+			},
+			clusterLabels: map[string]string{"env": "dev"},
+			clusterCalls:  1,
+			want:          true,
+		},
+		{
+			name:          "selector does not match",
+			annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+			clusterLabels: map[string]string{"env": "prod"},
+			clusterCalls:  1,
+		},
+		{
+			name:         "cluster lookup error fails closed",
+			annotations:  map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+			clusterErr:   fmt.Errorf("cache unavailable"),
+			clusterCalls: 1,
+			wantError:    "error retrieving cluster fleet-default/example while rendering files: cache unavailable",
+		},
+	}
+
+	for _, kind := range []struct {
+		name   string
+		object func(map[string]string) runtime.Object
+	}{
+		{"secret", func(annotations map[string]string) runtime.Object {
+			return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: annotations}}
+		}},
+		{"configmap", func(annotations map[string]string) runtime.Object {
+			return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Annotations: annotations}}
+		}},
+	} {
+		t.Run(kind.name, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					mp := newMockPlanner(t, InfoFunctions{})
+					mp.rancherClusterCache.EXPECT().Get("fleet-default", "example").Return(&provisioningv1.Cluster{
+						ObjectMeta: metav1.ObjectMeta{Labels: tt.clusterLabels},
+					}, tt.clusterErr).Times(tt.clusterCalls)
+					authorized, err := mp.planner.machineSelectorFileAuthorized(kind.object(tt.annotations), controlPlane)
+					if tt.wantError != "" {
+						assert.EqualError(t, err, tt.wantError)
+					} else {
+						assert.NoError(t, err)
+					}
+					assert.Equal(t, tt.want, authorized)
+				})
+			}
+		})
+	}
+}
+
+func TestPrimaryAddressFamily(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   map[string]interface{}
+		expected int
+	}{
+		{
+			name:     "returns 0 when service-cidr is missing",
+			config:   map[string]interface{}{},
+			expected: 0,
+		},
+		{
+			name: "returns 4 for IPv4-first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "10.43.0.0/16,2001:db8:43::/112",
+			},
+			expected: 4,
+		},
+		{
+			name: "returns 6 for IPv6-first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "2001:db8:43::/112,10.43.0.0/16",
+			},
+			expected: 6,
+		},
+		{
+			name: "handles whitespace and multiple list entries",
+			config: map[string]interface{}{
+				"service-cidr": []string{"   ", "  2001:db8:43::/112  ,10.43.0.0/16"},
+			},
+			expected: 6,
+		},
+		{
+			name: "returns 0 for invalid first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "not-a-cidr,10.43.0.0/16",
+			},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, primaryAddressFamily(tt.config))
+		})
+	}
+}
+
+func TestReorderAddressesByFamily(t *testing.T) {
+	tests := []struct {
+		name          string
+		addresses     []string
+		primaryFamily int
+		expected      []string
+	}{
+		{
+			name:          "no-op when fewer than two addresses",
+			addresses:     []string{"10.0.0.1"},
+			primaryFamily: 4,
+			expected:      []string{"10.0.0.1"},
+		},
+		{
+			name:          "no-op when primary family is unset",
+			addresses:     []string{"2001:db8::1", "10.0.0.1"},
+			primaryFamily: 0,
+			expected:      []string{"2001:db8::1", "10.0.0.1"},
+		},
+		{
+			name:          "reorders IPv4 first and keeps group order stable",
+			addresses:     []string{"2001:db8::1", "10.0.0.1", "eth0", "10.0.0.2", "iface0", "2001:db8::2"},
+			primaryFamily: 4,
+			expected:      []string{"10.0.0.1", "10.0.0.2", "2001:db8::1", "2001:db8::2", "eth0", "iface0"},
+		},
+		{
+			name:          "reorders IPv6 first and keeps non-IP values at the end",
+			addresses:     []string{"10.0.0.2", "2001:db8::b", "eth0", "2001:db8::a", "10.0.0.1"},
+			primaryFamily: 6,
+			expected:      []string{"2001:db8::b", "2001:db8::a", "10.0.0.2", "10.0.0.1", "eth0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, reorderAddressesByFamily(tt.addresses, tt.primaryFamily))
+		})
+	}
+}
 
 func TestUpdateConfigWithAddresses(t *testing.T) {
 	tests := []struct {
@@ -24,6 +362,7 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			initialConfig: map[string]interface{}{
 				"node-ip":             []string{},
 				"node-external-ip":    []string{},
+				"service-cidr":        "10.43.0.0/16,2001:db8:43::/112",
 				"cloud-provider-name": "",
 			},
 			info: &machineNetworkInfo{
@@ -33,6 +372,23 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 				DriverName:        management.Amazonec2driver,
 			},
 			expectedNodeIPs:         []string{"10.0.0.5", "2001:db8::1"},
+			expectedNodeExternalIPs: []string{"1.2.3.4"},
+		},
+		{
+			name: "AWS dual-stack node with IPv6-first service-cidr",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "2001:db8:43::/112,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Amazonec2driver,
+			},
+			expectedNodeIPs:         []string{"2001:db8::1", "10.0.0.5"},
 			expectedNodeExternalIPs: []string{"1.2.3.4"},
 		},
 		{
@@ -258,6 +614,104 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			expectedNodeIPs:         []string{"10.0.0.5"},
 			expectedNodeExternalIPs: []string{"2001:db8::dead:beef"},
 		},
+		{
+			name: "node-external-ip is reordered to match IPv6-first service-cidr",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "2001:db8:43::/112,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4", "2001:db8::dead:beef"},
+			},
+			expectedNodeIPs:         []string{"10.0.0.5"},
+			expectedNodeExternalIPs: []string{"2001:db8::dead:beef", "1.2.3.4"},
+		},
+		{
+			name: "invalid service-cidr preserves existing node-ip order",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "not-a-cidr,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Amazonec2driver,
+			},
+			expectedNodeIPs:         []string{"10.0.0.5", "2001:db8::1"},
+			expectedNodeExternalIPs: []string{"1.2.3.4"},
+		},
+		// Azure (and other drivers that only populate Driver.IPAddress with no PrivateIPAddress):
+		// node-ip and node-external-ip must both remain unset when there is no internal IP.
+		{
+			name: "Azure default config: only external IP, no internal IP - neither node-ip nor node-external-ip set",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{},
+				ExternalAddresses: []string{"20.1.2.3"},
+				DriverName:        management.Azuredriver,
+			},
+			expectedNodeIPs:         []string{},
+			expectedNodeExternalIPs: []string{},
+		},
+		// Other drivers without PrivateIPAddress (e.g. vSphere, Google) also hit the default
+		// case and must not have node-external-ip set when InternalAddresses is empty.
+		{
+			name: "Generic driver with only external IP and no internal IP - neither node-ip nor node-external-ip set",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{},
+				ExternalAddresses: []string{"10.0.0.5"},
+				DriverName:        "vsphere",
+			},
+			expectedNodeIPs:         []string{},
+			expectedNodeExternalIPs: []string{},
+		},
+		// When InternalAddresses is empty but an IPv6 address is present, nodeIPs is non-empty
+		// after the IPv6 append, so node-external-ip must still be set from ExternalAddresses.
+		{
+			name: "No internal IP but IPv6 address present: node-external-ip still set",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{},
+				ExternalAddresses: []string{"20.1.2.3"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Azuredriver,
+			},
+			expectedNodeIPs:         []string{"2001:db8::1"},
+			expectedNodeExternalIPs: []string{"20.1.2.3"},
+		},
+		// When all external IPs are already present in node-ip (duplicates), node-external-ip
+		// must not be written to the config at all (new len(nodeExternalIPs)>0 guard).
+		{
+			name: "All external IPs are duplicates of node-ip: node-external-ip key not written",
+			initialConfig: map[string]interface{}{
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"10.0.0.5"},
+			},
+			expectedNodeIPs:         []string{"10.0.0.5"},
+			expectedNodeExternalIPs: []string{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -315,139 +769,125 @@ func TestUpdateConfigWithAdvertiseAddresses(t *testing.T) {
 		expectedConfig map[string]interface{}
 	}{
 		{
-			name:          "control-plane node with different internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with different node-ip and node-external-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1", "tls-san": []string{"192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with same internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"192.168.1.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with same node-ip and node-external-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"192.168.1.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"192.168.1.1"}, "node-external-ip": []string{"192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with same set of node-ip and node-external-ip in different order",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"192.168.1.1", "192.168.1.2"},
+				"node-external-ip": []string{"192.168.1.2", "192.168.1.1"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"192.168.1.1", "192.168.1.2"}, "node-external-ip": []string{"192.168.1.2", "192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with empty node-ip returns early",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{},
+				"node-external-ip": []string{"192.168.1.1"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{}, "node-external-ip": []string{"192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with empty node-external-ip returns early",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"10.0.0.1"}, "node-external-ip": []string{}},
+		},
+		{
+			name:           "control-plane node with absent node-ip returns early",
+			initialConfig:  map[string]interface{}{},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  false,
 			expectedConfig: map[string]interface{}{},
 		},
 		{
-			name:          "control-plane node with same set of internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"192.168.1.1", "192.168.1.2"},
-				ExternalAddresses: []string{"192.168.1.2", "192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "worker-only node should be skipped",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: workerEntry},
 			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
+			expectedConfig: map[string]interface{}{"node-ip": []string{"10.0.0.1"}, "node-external-ip": []string{"192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with no internal IP",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with multiple different IPs uses first node-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.2", "10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.2", "192.168.1.1"},
 			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with no external IP",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with no internal or external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{},
-				ExternalAddresses: []string{},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "worker-only node should be skipped",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             workerEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with multiple different IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.2", "10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.2", "192.168.1.1"},
-				Entry:             controlPlaneEntry,
-			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.2", "tls-san": []string{"192.168.1.2", "192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with different internal and external interface names",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"eth1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with interface names uses first node-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"eth0"},
+				"node-external-ip": []string{"eth1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "eth0", "tls-san": []string{"eth1"}},
 		},
 		{
-			name:          "control-plane node with same internal and external interface names",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"eth0"},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with mixed different ip and interface name",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  true,
-			expectedConfig: map[string]interface{}{"advertise-address": "eth0", "tls-san": []string{"192.168.1.1"}},
-		},
-		{
-			name: "control-plane node with pre-existing tls-san",
+			name: "control-plane node with pre-existing tls-san appends node-external-ip",
 			initialConfig: map[string]interface{}{
-				"tls-san": []string{"existing-san", "192.168.1.1"},
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1", "192.168.1.2"},
+				"tls-san":          []string{"existing-san", "192.168.1.1"},
 			},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1", "192.168.1.2"},
-				Entry:             controlPlaneEntry,
-			},
+			info:          &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet: true,
-			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1",
-				"tls-san": []string{"existing-san", "192.168.1.1", "192.168.1.2"}},
+			expectedConfig: map[string]interface{}{
+				"advertise-address": "10.0.0.1",
+				"tls-san":           []string{"existing-san", "192.168.1.1", "192.168.1.2"},
+			},
+		},
+		{
+			name: "IPv6-first node-ip uses first (IPv6) as advertise-address",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"2001:db8::1", "10.0.0.1"},
+				"node-external-ip": []string{"1.2.3.4"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  true,
+			expectedConfig: map[string]interface{}{"advertise-address": "2001:db8::1", "tls-san": []string{"1.2.3.4"}},
+		},
+		{
+			name: "IPv4-first node-ip uses first (IPv4) as advertise-address",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1", "2001:db8::1"},
+				"node-external-ip": []string{"1.2.3.4"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  true,
+			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1", "tls-san": []string{"1.2.3.4"}},
 		},
 	}
 
@@ -470,4 +910,124 @@ func TestUpdateConfigWithAdvertiseAddresses(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExtractConfigJSON(t *testing.T) {
+	tests := []struct {
+		name           string
+		extracted      string
+		expected       map[string]interface{}
+		errContains    string
+		assertResultFn func(t *testing.T, result map[string]interface{})
+	}{
+		{
+			name: "extracts machine config json from tar.gz archive",
+			extracted: buildExtractConfigArchive(t, map[string][]byte{
+				"state/machines/node-1/config.json": []byte(`{"DriverName":"amazonec2","Driver":{"IPAddress":"1.2.3.4","PrivateIPAddress":"10.0.0.10"}}`),
+				"state/machines/node-1/other.txt":   []byte("ignored"),
+			}),
+			assertResultFn: func(t *testing.T, result map[string]interface{}) {
+				assert.Equal(t, "amazonec2", result["DriverName"])
+				driver := result["Driver"].(map[string]interface{})
+				assert.Equal(t, "1.2.3.4", driver["IPAddress"])
+				assert.Equal(t, "10.0.0.10", driver["PrivateIPAddress"])
+			},
+		},
+		{
+			name: "returns empty result when archive has no matching config.json",
+			extracted: buildExtractConfigArchive(t, map[string][]byte{
+				"state/machines/node-1/not-config.json": []byte(`{"ignored":true}`),
+				"state/cluster/config.json":             []byte(`{"ignored":true}`),
+			}),
+			expected: map[string]interface{}{},
+		},
+		{
+			name:        "fails on invalid base64",
+			extracted:   "not-valid-base64",
+			errContains: "base64.DecodeString",
+		},
+		{
+			name:        "fails on non-gzip payload",
+			extracted:   base64.StdEncoding.EncodeToString([]byte("plain text")),
+			errContains: "gzip",
+		},
+		{
+			name:        "fails on invalid tar payload",
+			extracted:   buildExtractConfigGzipPayload(t, []byte("invalid tar payload")),
+			errContains: "tarRead.Next",
+		},
+		{
+			name: "fails when matching config json is invalid",
+			extracted: buildExtractConfigArchive(t, map[string][]byte{
+				"state/machines/node-1/config.json": []byte(`{"Driver":`),
+			}),
+			errContains: "failed to read config.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := extractConfigJSON(tt.extracted)
+			if tt.errContains != "" {
+				assert.Error(t, err)
+				if err != nil {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains), fmt.Sprintf("expected error to contain %q, got %q", tt.errContains, err.Error()))
+				}
+				return
+			}
+
+			assert.NoError(t, err)
+			if tt.assertResultFn != nil {
+				tt.assertResultFn(t, result)
+				return
+			}
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func buildExtractConfigArchive(t *testing.T, files map[string][]byte) string {
+	t.Helper()
+
+	buf := &bytes.Buffer{}
+	gz := gzip.NewWriter(buf)
+	tarWriter := tar.NewWriter(gz)
+
+	for name, content := range files {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0600,
+			Size: int64(len(content)),
+		}
+		if err := tarWriter.WriteHeader(hdr); err != nil {
+			t.Fatalf("failed to write tar header: %v", err)
+		}
+		if _, err := tarWriter.Write(content); err != nil {
+			t.Fatalf("failed to write tar content: %v", err)
+		}
+	}
+
+	if err := tarWriter.Close(); err != nil {
+		t.Fatalf("failed to close tar writer: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("failed to close gzip writer: %v", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
+	t.Helper()
+
+	buf := &bytes.Buffer{}
+	gz := gzip.NewWriter(buf)
+	if _, err := gz.Write(payload); err != nil {
+		t.Fatalf("failed to write gzip payload: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("failed to close gzip payload writer: %v", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }

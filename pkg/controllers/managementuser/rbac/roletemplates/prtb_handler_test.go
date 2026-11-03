@@ -33,34 +33,51 @@ var (
 	errNotFound    = apierrors.NewNotFound(schema.GroupResource{}, "error")
 )
 
-func TestPRTBHandlerDoesRoleTemplateHavePromotedRules(t *testing.T) {
+func TestPRTBHandlerDoesRoleTemplateHaveRules(t *testing.T) {
 	tests := []struct {
-		name      string
-		rt        *v3.RoleTemplate
-		getCRFunc func() (*rbacv1.ClusterRole, error)
-		want      bool
-		wantErr   bool
+		name       string
+		rt         *v3.RoleTemplate
+		nameFunc   func(string) string
+		expectedCR string
+		getCRFunc  func() (*rbacv1.ClusterRole, error)
+		want       bool
+		wantErr    bool
 	}{
 		{
-			name:      "error getting cluster role",
-			rt:        defaultRT.DeepCopy(),
-			getCRFunc: func() (*rbacv1.ClusterRole, error) { return nil, errDefault },
-			want:      false,
-			wantErr:   true,
+			name:       "error getting cluster role",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.PromotedClusterRoleNameFor,
+			expectedCR: promotedCRName,
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return nil, errDefault },
+			want:       false,
+			wantErr:    true,
 		},
 		{
-			name:      "cluster role not found",
-			rt:        defaultRT.DeepCopy(),
-			getCRFunc: func() (*rbacv1.ClusterRole, error) { return nil, errNotFound },
-			want:      false,
-			wantErr:   false,
+			name:       "cluster role not found",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.PromotedClusterRoleNameFor,
+			expectedCR: promotedCRName,
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return nil, errNotFound },
+			want:       false,
+			wantErr:    false,
 		},
 		{
-			name:      "cluster role found",
-			rt:        defaultRT.DeepCopy(),
-			getCRFunc: func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
-			want:      true,
-			wantErr:   false,
+			name:       "promoted cluster role found",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.PromotedClusterRoleNameFor,
+			expectedCR: promotedCRName,
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
+			want:       true,
+			wantErr:    false,
+		},
+		{
+			name:       "cluster scoped cluster role found",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.ClusterScopedClusterRoleNameFor,
+			expectedCR: "test-rt-cluster-scoped-aggregator",
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
+			want:       true,
+			wantErr:    false,
 		},
 	}
 	for _, tt := range tests {
@@ -68,30 +85,31 @@ func TestPRTBHandlerDoesRoleTemplateHavePromotedRules(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.getCRFunc != nil {
-				crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(tt.getCRFunc())
+				crController.EXPECT().Get(tt.expectedCR, metav1.GetOptions{}).Return(tt.getCRFunc())
 			}
 
 			p := &prtbHandler{
 				crClient: crController,
 			}
 
-			got, err := p.doesRoleTemplateHavePromotedRules(tt.rt)
+			got, err := p.doesRoleTemplateHaveRules(tt.rt, tt.nameFunc)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("prtbHandler.doesRoleTemplateHavePromotedRules() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("prtbHandler.doesRoleTemplateHaveRules() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("prtbHandler.doesRoleTemplateHavePromotedRules() = %v, want %v", got, tt.want)
+				t.Errorf("prtbHandler.doesRoleTemplateHaveRules() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
 var (
-	listOption       = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
-	legacyListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/rtb-owner-updated=_test-prtb"}
-	subject          = rbacv1.Subject{
+	listOption              = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
+	legacyListOption        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/rtb-owner-updated=_test-prtb"}
+	legacyProjectListOption = metav1.ListOptions{LabelSelector: "_test-prtb=owner-user"}
+	subject                 = rbacv1.Subject{
 		Name: "test-subject",
 	}
 	roleRef = rbacv1.RoleRef{
@@ -106,6 +124,85 @@ var (
 		RoleRef:  roleRef,
 	}
 )
+
+func TestPRTBHandlerReconcileClusterRoleBindingsWithClusterScopedRules(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+	crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+
+	// ClusterScopedRules is set here to model a realistic RoleTemplate. The reconcile path itself keys off the presence
+	// of the aggregating cluster role (mocked below), not off the field, so the mocked Gets drive the behavior.
+	rt := defaultRT.DeepCopy()
+	rt.ClusterScopedRules = []rbacv1.PolicyRule{{
+		Verbs:     []string{"get"},
+		Resources: []string{"nodes"},
+	}}
+	rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(rt, nil)
+	crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(nil, errNotFound)
+	crController.EXPECT().Get("test-rt-cluster-scoped-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+	crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+	crbController.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+	crbController.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+	crbController.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+
+	expectedCRB, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(defaultPRTB.DeepCopy(), "test-rt-cluster-scoped")
+	if err != nil {
+		t.Fatalf("failed to build expected cluster role binding: %v", err)
+	}
+	AddAggregationFeatureLabel(expectedCRB)
+	crbController.EXPECT().Create(expectedCRB).Return(expectedCRB, nil)
+
+	p := &prtbHandler{
+		crClient:  crController,
+		crbClient: crbController,
+		rtClient:  rtController,
+	}
+	if err := p.reconcileClusterRoleBindings(defaultPRTB.DeepCopy()); err != nil {
+		t.Fatalf("reconcileClusterRoleBindings() error = %v", err)
+	}
+}
+
+// TestPRTBHandlerReconcileClusterRoleBindingsWithPromotedAndClusterScopedRules verifies that when a RoleTemplate has
+// both promoted and cluster scoped aggregating cluster roles, a ClusterRoleBinding is created for each of them.
+func TestPRTBHandlerReconcileClusterRoleBindingsWithPromotedAndClusterScopedRules(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+	crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+
+	rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(defaultRT.DeepCopy(), nil)
+	// Both the promoted and cluster scoped aggregating cluster roles exist for this RoleTemplate.
+	crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+	crController.EXPECT().Get("test-rt-cluster-scoped-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+	crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+	crbController.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+	crbController.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+	crbController.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+
+	expectedPromotedCRB, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(defaultPRTB.DeepCopy(), "test-rt-promoted")
+	if err != nil {
+		t.Fatalf("failed to build expected promoted cluster role binding: %v", err)
+	}
+	AddAggregationFeatureLabel(expectedPromotedCRB)
+	crbController.EXPECT().Create(expectedPromotedCRB).Return(expectedPromotedCRB, nil)
+
+	expectedClusterScopedCRB, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(defaultPRTB.DeepCopy(), "test-rt-cluster-scoped")
+	if err != nil {
+		t.Fatalf("failed to build expected cluster scoped cluster role binding: %v", err)
+	}
+	AddAggregationFeatureLabel(expectedClusterScopedCRB)
+	crbController.EXPECT().Create(expectedClusterScopedCRB).Return(expectedClusterScopedCRB, nil)
+
+	p := &prtbHandler{
+		crClient:  crController,
+		crbClient: crbController,
+		rtClient:  rtController,
+	}
+	if err := p.reconcileClusterRoleBindings(defaultPRTB.DeepCopy()); err != nil {
+		t.Fatalf("reconcileClusterRoleBindings() error = %v", err)
+	}
+}
 
 func TestPRTBHandlerEnsureOnlyDesiredRoleBindingsExist(t *testing.T) {
 	tests := []struct {
@@ -626,6 +723,7 @@ func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb1",
@@ -643,6 +741,7 @@ func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb1",
@@ -683,6 +782,7 @@ func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 					},
 				}}, nil)
 				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 			},
 		},
 		{
@@ -712,6 +812,7 @@ func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 				}}, nil)
 				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Delete("crb2", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb2",
@@ -739,6 +840,7 @@ func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 					},
 				}}, nil)
 				m.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().List(legacyProjectListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb1",
@@ -775,6 +877,180 @@ func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			prtb := defaultPRTB.DeepCopy()
 			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestPRTBHandlerMigratesLegacyProjectClusterRoleBindings verifies that the project cluster-wide ClusterRoleBindings
+// created by legacy RBAC (labelled <ns>_<name>: owner-user) are adopted when still desired, and otherwise pruned without
+// removing access another owner still grants.
+func TestPRTBHandlerMigratesLegacyProjectClusterRoleBindings(t *testing.T) {
+	prtb := defaultPRTB.DeepCopy()
+	prtb.Namespace = "p-xyz789"
+	rtbLabel := rbac.GetRTBLabel(prtb.ObjectMeta)
+	otherRTBLabel := "p-xyz789_other-prtb"
+
+	buildCRB := func(roleName string) *rbacv1.ClusterRoleBinding {
+		crb, err := rbac.BuildClusterRoleBindingFromRTB(prtb, roleName)
+		if err != nil {
+			t.Fatalf("failed to build cluster role binding: %v", err)
+		}
+		AddAggregationFeatureLabel(crb)
+		return crb
+	}
+	desiredEdit := buildCRB("xyz789-namespaces-edit")
+	desiredReadOnly := buildCRB("xyz789-namespaces-readonly")
+
+	// legacyCRB returns the legacy binding for the desired CRB's role and subject, which has the same name.
+	legacyCRB := func(desired *rbacv1.ClusterRoleBinding, labels map[string]string) rbacv1.ClusterRoleBinding {
+		return rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: desired.Name, Labels: labels},
+			RoleRef:    desired.RoleRef,
+			Subjects:   desired.Subjects,
+		}
+	}
+	withLabels := func(crb rbacv1.ClusterRoleBinding, labels map[string]string) *rbacv1.ClusterRoleBinding {
+		crb.Labels = labels
+		return &crb
+	}
+
+	aggregatedListOption := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
+	legacyRTBListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rtbLabel}
+	byRTBLabelListOption := metav1.ListOptions{LabelSelector: rtbLabel + "=owner-user"}
+
+	type mocks struct {
+		crbs      *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
+		prtbCache *fake.MockCacheInterface[*v3.ProjectRoleTemplateBinding]
+	}
+
+	tests := []struct {
+		name    string
+		desired []*rbacv1.ClusterRoleBinding
+		setup   func(m mocks)
+		wantErr bool
+	}{
+		{
+			name:    "desired legacy CRB is adopted in place",
+			desired: []*rbacv1.ClusterRoleBinding{desiredEdit.DeepCopy()},
+			setup: func(m mocks) {
+				legacy := legacyCRB(desiredEdit, map[string]string{rtbLabel: "owner-user"})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{legacy}}, nil)
+				m.crbs.EXPECT().Update(withLabels(legacy, desiredEdit.Labels)).Return(nil, nil)
+			},
+		},
+		{
+			name:    "undesired legacy CRB with no other owner is deleted",
+			desired: []*rbacv1.ClusterRoleBinding{desiredReadOnly.DeepCopy()},
+			setup: func(m mocks) {
+				legacy := legacyCRB(desiredEdit, map[string]string{rtbLabel: "owner-user"})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{legacy}}, nil)
+				m.crbs.EXPECT().Delete(legacy.Name, &metav1.DeleteOptions{}).Return(nil)
+				m.crbs.EXPECT().Create(desiredReadOnly).Return(desiredReadOnly, nil)
+			},
+		},
+		{
+			name:    "undesired legacy CRB whose other legacy owner no longer exists is deleted",
+			desired: []*rbacv1.ClusterRoleBinding{desiredReadOnly.DeepCopy()},
+			setup: func(m mocks) {
+				legacy := legacyCRB(desiredEdit, map[string]string{rtbLabel: "owner-user", otherRTBLabel: "owner-user"})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{legacy}}, nil)
+				m.prtbCache.EXPECT().GetByIndex(rbac.PRTBByRTBLabelIndex, otherRTBLabel).Return(nil, nil)
+				m.crbs.EXPECT().Delete(legacy.Name, &metav1.DeleteOptions{}).Return(nil)
+				m.crbs.EXPECT().Create(desiredReadOnly).Return(desiredReadOnly, nil)
+			},
+		},
+		{
+			name:    "undesired legacy CRB shared with an existing PRTB only loses this PRTB's label",
+			desired: []*rbacv1.ClusterRoleBinding{desiredReadOnly.DeepCopy()},
+			setup: func(m mocks) {
+				legacy := legacyCRB(desiredEdit, map[string]string{rtbLabel: "owner-user", otherRTBLabel: "owner-user"})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{legacy}}, nil)
+				m.prtbCache.EXPECT().GetByIndex(rbac.PRTBByRTBLabelIndex, otherRTBLabel).Return([]*v3.ProjectRoleTemplateBinding{{}}, nil)
+				m.crbs.EXPECT().Update(withLabels(legacy, map[string]string{otherRTBLabel: "owner-user"})).Return(nil, nil)
+				m.crbs.EXPECT().Create(desiredReadOnly).Return(desiredReadOnly, nil)
+			},
+		},
+		{
+			name:    "undesired legacy CRB with another PRTB's aggregated owner label is not deleted",
+			desired: []*rbacv1.ClusterRoleBinding{desiredReadOnly.DeepCopy()},
+			setup: func(m mocks) {
+				legacy := legacyCRB(desiredEdit, map[string]string{
+					rtbLabel: "owner-user",
+					"authz.cluster.cattle.io/prtb-owner-other-prtb": "true",
+					rbac.AggregationFeatureLabel:                    "true",
+				})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{legacy}}, nil)
+				m.crbs.EXPECT().Update(withLabels(legacy, map[string]string{
+					"authz.cluster.cattle.io/prtb-owner-other-prtb": "true",
+					rbac.AggregationFeatureLabel:                    "true",
+				})).Return(nil, nil)
+				m.crbs.EXPECT().Create(desiredReadOnly).Return(desiredReadOnly, nil)
+			},
+		},
+		{
+			name:    "legacy CRB already deleted as an undesired aggregated CRB is skipped",
+			desired: []*rbacv1.ClusterRoleBinding{desiredReadOnly.DeepCopy()},
+			setup: func(m mocks) {
+				both := legacyCRB(desiredEdit, map[string]string{
+					rtbLabel:                          "owner-user",
+					rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+					rbac.AggregationFeatureLabel:      "true",
+				})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{both}}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().Delete(both.Name, &metav1.DeleteOptions{}).Return(nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{both}}, nil)
+				m.crbs.EXPECT().Create(desiredReadOnly).Return(desiredReadOnly, nil)
+			},
+		},
+		{
+			name:    "error listing legacy project CRBs",
+			desired: []*rbacv1.ClusterRoleBinding{desiredEdit.DeepCopy()},
+			setup: func(m mocks) {
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name:    "error looking up other legacy owner",
+			desired: []*rbacv1.ClusterRoleBinding{desiredReadOnly.DeepCopy()},
+			setup: func(m mocks) {
+				legacy := legacyCRB(desiredEdit, map[string]string{rtbLabel: "owner-user", otherRTBLabel: "owner-user"})
+				m.crbs.EXPECT().List(aggregatedListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(legacyRTBListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.crbs.EXPECT().List(byRTBLabelListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{legacy}}, nil)
+				m.prtbCache.EXPECT().GetByIndex(rbac.PRTBByRTBLabelIndex, otherRTBLabel).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			m := mocks{
+				crbs:      fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
+				prtbCache: fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl),
+			}
+			tt.setup(m)
+			p := &prtbHandler{
+				crbClient: m.crbs,
+				prtbCache: m.prtbCache,
+			}
+			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.desired, prtb.DeepCopy()); (err != nil) != tt.wantErr {
+				t.Errorf("ensureOnlyDesiredClusterRoleBindingsExists() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

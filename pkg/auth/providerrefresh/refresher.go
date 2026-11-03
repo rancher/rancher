@@ -1,6 +1,7 @@
 package providerrefresh
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,15 +11,20 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
 
@@ -30,7 +36,7 @@ type UserAuthRefresher interface {
 func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher {
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
 
-	return &refresher{
+	r := &refresher{
 		tokenLister:               scaledContext.Management.Tokens("").Controller().Lister(),
 		tokens:                    scaledContext.Management.Tokens(""),
 		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
@@ -38,8 +44,13 @@ func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher
 		userAttributes:            scaledContext.Management.UserAttributes(""),
 		userAttributeLister:       scaledContext.Management.UserAttributes("").Controller().Lister(),
 		extTokenStore:             extTokenStore,
+		authConfigLister:          scaledContext.Management.AuthConfigs("").Controller().Lister(),
 		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
+		configMapCache:            scaledContext.Wrangler.Core.ConfigMap().Cache(),
 	}
+	r.isDisabledProvider = providers.IsDisabledProvider
+
+	return r
 }
 
 type refresher struct {
@@ -54,6 +65,19 @@ type refresher struct {
 	maxAge                    time.Duration
 	extTokenStore             *exttokenstore.SystemStore
 	ensureAndGetUserAttribute func(userID string) (*apiv3.UserAttribute, bool, error)
+	configMapCache            wcorev1.ConfigMapCache
+	authConfigLister          v3.AuthConfigLister
+	isDisabledProvider        func(providerName, configName string) (bool, error)
+}
+
+// configuredProvider identifies an AuthConfig and the provider that implements
+// it. Several AuthConfigs can share the same provider.
+type configuredProvider struct {
+	// configName is the name of the AuthConfig, used as the prefix for
+	// principal IDs and as the key for per-provider user attributes and tokens.
+	configName string
+	// providerName is the name of the registered provider implementation.
+	providerName string
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
@@ -78,8 +102,9 @@ func (r *refresher) TriggerUserRefresh(userName string, force bool) {
 	}
 	r.Lock()
 	r.ensureMaxAgeUpToDate(settings.AuthUserInfoMaxAgeSeconds.Get())
+	maxAge := r.maxAge
 	r.Unlock()
-	if !force && (r.maxAge <= 0) {
+	if !force && (maxAge <= 0) {
 		logrus.Debugf("Skipping refresh trigger on user %v because max age setting is <= 0", userName)
 		return
 	}
@@ -111,7 +136,10 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	now := time.Now().UTC()
 	// in the case there is an invalid (or no) last refresh ignore the error, lastrefresh will be 0
 	lastRefresh, _ := time.Parse(time.RFC3339, attribs.LastRefresh)
-	earliestRefresh := lastRefresh.Add(r.maxAge)
+	r.Lock()
+	maxAge := r.maxAge
+	r.Unlock()
+	earliestRefresh := lastRefresh.Add(maxAge)
 	if !force && now.Before(earliestRefresh) {
 		logrus.Debugf("Skipping refresh for %v due to max-age", userName)
 		return
@@ -130,26 +158,98 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		}
 	}
 
-	attribs.NeedsRefresh = true
+	if _, ok := attribs.Annotations[common.ProviderRefreshErrorAnnotation]; ok {
+		logrus.Debugf("Skipping refresh trigger for %v: annotated with non-transient error", userName)
+		return
+	}
+
 	if needCreate {
-		_, err := r.userAttributes.Create(attribs)
-		if err != nil {
+		attribs.NeedsRefresh = true
+		if _, err := r.userAttributes.Create(attribs); err != nil {
 			logrus.Errorf("Error creating user attribute to trigger refresh: %v", err)
 		}
-	} else {
-		_, err = r.userAttributes.Update(attribs)
-		if err != nil {
-			if apierrors.IsConflict(err) {
-				// User attribute has just been updated, triggering the refresh.
-				logrus.Debugf("Error updating user attribute to trigger refresh: %v", err)
-			} else {
-				logrus.Errorf("Error updating user attribute to trigger refresh: %v", err)
-			}
+		return
+	}
+
+	// Re-fetch from the API server (not the lister) inside the retry so the
+	// ResourceVersion is fresh; the initial read above came from the informer
+	// cache and can be stale, which has caused frequent 409 conflicts under
+	// contention with the refresh-consumer writeback.
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := r.userAttributes.Get(userName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			// The user attribute was deleted between the cache read and this
+			// retry (user cleanup, provider disable). Nothing to refresh.
+			return nil
 		}
+		if err != nil {
+			return err
+		}
+		if _, ok := latest.Annotations[common.ProviderRefreshErrorAnnotation]; ok {
+			return nil
+		}
+		if latest.NeedsRefresh {
+			return nil
+		}
+
+		latest.NeedsRefresh = true
+		_, err = r.userAttributes.Update(latest)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	})
+	if err != nil {
+		logrus.Errorf("Error updating user attribute to trigger refresh: %v", err)
 	}
 }
 
-func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAttribute, error) {
+func (r *refresher) deleteToken(token accessor.TokenAccessor) error {
+	switch token.(type) {
+	case *apiv3.Token:
+		return r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
+	case *ext.Token:
+		return r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+	default:
+		return fmt.Errorf("unable to delete token of unknown type %T", token)
+	}
+}
+
+func (r *refresher) disableToken(token accessor.TokenAccessor) error {
+	switch t := token.(type) {
+	case *apiv3.Token:
+		v3Token := t.DeepCopy()
+		v3Token.Enabled = ptr.To(false)
+		_, err := r.tokenMGR.UpdateToken(v3Token)
+		return err
+	case *ext.Token:
+		return r.extTokenStore.Disable(t.GetName())
+	default:
+		return fmt.Errorf("unable to disable token of unknown type %T", token)
+	}
+}
+
+func (r *refresher) deleteLoginTokens(configName string, loginTokens map[string][]accessor.TokenAccessor) error {
+	for _, token := range loginTokens[configName] {
+		if err := r.deleteToken(token); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+// refreshAttributes re-evaluates a user's access across all configured auth
+// providers. For each provider it refreshes group memberships, checks whether
+// the user can still log in, and cleans up login tokens for providers that
+// rejected the user. If no provider confirms access and none had transient
+// errors, all derived (non-login) tokens are disabled. Transient errors are
+// treated conservatively: tokens are preserved to avoid locking out users due
+// to temporary IdP failures.
+func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
 	var (
 		derivedTokenList      []accessor.TokenAccessor
 		canLogInAtAll         bool
@@ -166,8 +266,16 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 	loginTokens := make(map[string][]accessor.TokenAccessor)
 	derivedTokens := make(map[string][]accessor.TokenAccessor)
 
+	// Tokens are grouped by the AuthConfig they were issued for rather than
+	// by provider, so tokens from different configs of the same provider are
+	// handled independently. Tokens whose AuthConfig can't be determined
+	// belong to no config, so they are skipped.
 	assign := func(token accessor.TokenAccessor) {
-		provider := token.GetAuthProvider()
+		provider, err := common.ConfigNameOrLocalFromToken(token)
+		if err != nil {
+			logrus.Warnf("Skipping token %s of user %s: %v", token.GetName(), user.Name, err)
+			return
+		}
 		if token.GetIsDerived() {
 			derivedTokens[provider] = append(derivedTokens[provider], token)
 			derivedTokenList = append(derivedTokenList, token)
@@ -176,7 +284,6 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		}
 	}
 
-	// List v3.Tokens.
 	tokenUserIDLabelSet := labels.Set(map[string]string{tokens.UserIDLabel: user.Name})
 	v3Tokens, err := r.tokenLister.List("", tokenUserIDLabelSet.AsSelector())
 	if err != nil {
@@ -187,7 +294,6 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		assign(token)
 	}
 
-	// List ext.Tokens.
 	extTokens, err := r.extTokenStore.ListForUser(user.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error listing ext tokens for user %s: %w", user.Name, err)
@@ -197,171 +303,255 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		assign(&token)
 	}
 
-	for providerName := range providers.ProviderNames {
-		// We have to find out if the user has a principal for the provider.
-		principalID := GetPrincipalIDForProvider(providerName, user)
-		var newGroupPrincipals []apiv3.Principal
-
-		providerDisabled, err := providers.IsDisabledProvider(providerName)
+	configured, err := r.configuredProviders()
+	if err != nil {
+		return nil, err
+	}
+	for _, provider := range configured {
+		canAccess, errConfirming, err := r.refreshProvider(attribs, provider, user, loginTokens, derivedTokens, errorConfirmingLogins)
 		if err != nil {
-			logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
-			// This is set as false by the return, but it's re-set here to be explicit/safe about the behavior.
-			providerDisabled = false
+			return nil, err
 		}
-		if providerDisabled {
-			// If this auth provider has been disabled, act as though the user lost access to this provider.
-			principalID = ""
+		if errConfirming {
+			errorConfirmingLogins = true
 		}
-
-		// If there is no principalID for the provider, there is no reason to go through the refetch process
-		if principalID != "" {
-			secret := ""
-			hasPerUserSecrets, err := providers.ProviderHasPerUserSecrets(providerName)
-			if err != nil {
-				return nil, err
-			}
-			if hasPerUserSecrets {
-				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
-				if apierrors.IsNotFound(err) {
-					// There is no secret so we can't refresh, just continue to the next attribute.
-					return attribs, nil
-				}
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			// SAML cannot refresh, so we do restore the existing providers.
-			if providers.UnrefreshableProviders[providerName] {
-				existingPrincipals := attribs.GroupPrincipals[providerName].Items
-				if existingPrincipals != nil {
-					newGroupPrincipals = existingPrincipals
-				}
-			} else {
-				newGroupPrincipals, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
-				if err != nil {
-					// In the case that we cant access a server, we still want to continue refreshing, but
-					// we no longer want to disable derived tokens, or remove their login tokens for this provider.
-					if err.Error() != "no access" {
-						errorConfirmingLogins = true
-						logrus.Warnf(
-							"Error refreshing token principals for auth provider %s, userattribute %s, principal %s, skipping: %v",
-							providerName,
-							attribs.Name,
-							principalID,
-							err,
-						)
-						existingPrincipals := attribs.GroupPrincipals[providerName].Items
-						if existingPrincipals != nil {
-							newGroupPrincipals = existingPrincipals
-						}
-					} else {
-						// In the case that the user explicitly cannot login at all to this provider
-						// (e.g. they no longer exist) we pretend they have no principal with this provider
-						// so that their login tokens get blanked out
-						principalID = ""
-					}
-				}
-			}
-		}
-
-		if len(newGroupPrincipals) == 0 {
-			newGroupPrincipals = nil
-		}
-
-		attribs.GroupPrincipals[providerName] = apiv3.Principals{Items: newGroupPrincipals}
-
-		canAccessProvider := false
-
-		if principalID != "" && !errorConfirmingLogins {
-			// We want to verify that the user still has rancher access.
-			canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
-			if err != nil {
-				return nil, err
-			}
-
-			if canStillAccess {
-				canAccessProvider = true
-				canLogInAtAll = true
-			}
-		}
-
-		// Update extras if either the user has an active login token, or an API token/kubeconfig token and is still active in the auth provider.
-		// If the user cannot access the auth provider, the derived tokens are deactivated below and should not be used to determine extra attributes.
-		if principalID != "" && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
-			// A user is 1:1 with its principal for a given provider, no need to get principals from tokens beyond the first one
-			var token accessor.TokenAccessor
-			if len(loginTokens[providerName]) > 0 {
-				token = loginTokens[providerName][0]
-			} else {
-				token = derivedTokens[providerName][0]
-			}
-			userPrincipal, err := providers.GetPrincipal(principalID, token)
-			if err != nil {
-				return nil, err
-			}
-			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-			if userExtraInfo != nil {
-				if attribs.ExtraByProvider == nil {
-					attribs.ExtraByProvider = make(map[string]map[string][]string)
-				}
-				attribs.ExtraByProvider[providerName] = userExtraInfo
-			}
-		}
-
-		// If the user doesn't have access through this provider, we want to remove their
-		// login tokens for this provider
-		if !canAccessProvider && !errorConfirmingLogins {
-			for _, token := range loginTokens[providerName] {
-				var err error
-				switch token.(type) {
-				case *apiv3.Token:
-					err = r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
-				case *ext.Token:
-					err = r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
-				default:
-					err = fmt.Errorf("unable to delete token of unknown type %T", token)
-				}
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						continue
-					}
-					return nil, err
-				}
-			}
+		if canAccess {
+			canLogInAtAll = true
 		}
 	}
 
-	// If they can still log in, or we failed to validate one of their logins, don't disable derived tokens
+	if err := r.cleanupDeletedConfigs(attribs, configured, loginTokens, errorConfirmingLogins); err != nil {
+		return nil, err
+	}
+
 	if canLogInAtAll || errorConfirmingLogins {
 		return attribs, nil
 	}
 
-	// User has been deactivated, disable their tokens.
 	for _, token := range derivedTokenList {
-		var err error
-		switch t := token.(type) {
-		case *apiv3.Token:
-			v3Token := t.DeepCopy()
-			v3Token.Enabled = ptr.To(false)
-			_, err = r.tokenMGR.UpdateToken(v3Token)
-		case *ext.Token:
-			err = r.extTokenStore.Disable(t.GetName())
-		default:
-			err = fmt.Errorf("unable to update token of unknown type %T", token)
-		}
-		if err != nil {
+		if err := r.disableToken(token); err != nil {
 			return nil, fmt.Errorf("error disabling token %s: %w", token.GetName(), err)
 		}
 	}
-	return attribs, err
+
+	return attribs, nil
 }
 
-func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
-	prefix := providerName + "_user://"
-	if providerName == "local" {
+// refreshProvider refreshes a single AuthConfig's state within attribs.
+// It returns whether the user can access the provider and whether there was
+// an error confirming their login (which prevents token cleanup).
+func (r *refresher) refreshProvider(
+	attribs *apiv3.UserAttribute,
+	provider configuredProvider,
+	user *apiv3.User,
+	loginTokens, derivedTokens map[string][]accessor.TokenAccessor,
+	errorConfirmingLogins bool,
+) (canAccess bool, errConfirming bool, err error) {
+	configName, providerName := provider.configName, provider.providerName
+	principalID := GetPrincipalIDForProvider(configName, user)
+
+	providerDisabled, err := r.isDisabledProvider(providerName, configName)
+	if err != nil {
+		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", configName, err)
+		providerDisabled = false
+	}
+
+	if providerDisabled {
+		principalID = ""
+	}
+
+	if principalID == "" {
+		attribs.GroupPrincipals[configName] = apiv3.Principals{}
+		if !errorConfirmingLogins {
+			if err := r.deleteLoginTokens(configName, loginTokens); err != nil {
+				return false, false, err
+			}
+		}
+		return false, false, nil
+	}
+
+	newGroupPrincipals, canRefresh, errConfirming, principalID, err := r.refreshGroupPrincipals(attribs, provider, user.Name, principalID, loginTokens)
+	if err != nil {
+		return false, false, err
+	}
+
+	if len(newGroupPrincipals) == 0 {
+		newGroupPrincipals = nil
+	}
+	attribs.GroupPrincipals[configName] = apiv3.Principals{Items: newGroupPrincipals}
+
+	if principalID != "" && !errorConfirmingLogins && !errConfirming {
+		canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
+		if err != nil {
+			return false, false, err
+		}
+		canAccess = canStillAccess
+	}
+
+	if principalID != "" && canRefresh && (len(loginTokens[configName]) > 0 || (len(derivedTokens[configName]) > 0 && (canAccess || errorConfirmingLogins || errConfirming))) {
+		var token accessor.TokenAccessor
+		if len(loginTokens[configName]) > 0 {
+			token = loginTokens[configName][0]
+		} else {
+			token = derivedTokens[configName][0]
+		}
+		// The token was issued by this config, so its provider is already known.
+		userPrincipal, err := providers.GetPrincipalFromProvider(providerName, principalID, token)
+		if err != nil {
+			return false, false, err
+		}
+		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+		if userExtraInfo != nil {
+			if attribs.ExtraByProvider == nil {
+				attribs.ExtraByProvider = make(map[string]map[string][]string)
+			}
+			if scimconfig.Enabled(r.configMapCache, configName) {
+				// Keep the stored keys the refresh doesn't set, such as SCIM's externalid and email.
+				userExtraInfo = common.MergeUserExtraAttributes(attribs.ExtraByProvider[configName], userExtraInfo)
+			}
+			attribs.ExtraByProvider[configName] = userExtraInfo
+		}
+	}
+
+	if !canAccess && !errorConfirmingLogins && !errConfirming {
+		if err := r.deleteLoginTokens(configName, loginTokens); err != nil {
+			return false, false, err
+		}
+	}
+
+	return canAccess, errConfirming, nil
+}
+
+// refreshGroupPrincipals fetches or preserves group principals for a provider.
+func (r *refresher) refreshGroupPrincipals(
+	attribs *apiv3.UserAttribute,
+	provider configuredProvider,
+	userName string,
+	principalID string,
+	loginTokens map[string][]accessor.TokenAccessor,
+) (groups []apiv3.Principal, canRefresh bool, errConfirming bool, updatedPrincipalID string, err error) {
+	configName, providerName := provider.configName, provider.providerName
+	canRefresh = true
+	updatedPrincipalID = principalID
+	secret := ""
+
+	if providers.ProviderUsesUserSecrets(providerName) {
+		secret, err = r.tokenMGR.GetSecret(userName, configName, loginTokens[configName])
+		if apierrors.IsNotFound(err) {
+			canRefresh = false
+			errConfirming = true
+		} else if err != nil {
+			return nil, false, false, principalID, err
+		}
+	}
+
+	if !providers.ProviderCanRefreshPrincipals(providerName) || !canRefresh {
+		existing := attribs.GroupPrincipals[configName].Items
+		if existing != nil {
+			groups = existing
+		}
+		return groups, canRefresh, errConfirming, updatedPrincipalID, nil
+	}
+
+	groups, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
+	if err == nil {
+		return groups, canRefresh, errConfirming, updatedPrincipalID, nil
+	}
+
+	// Non-transient errors must propagate so the controller can annotate
+	// the UserAttribute and stop requeuing.
+	var nte *common.NonTransientError
+	if errors.As(err, &nte) {
+		return nil, false, false, principalID, err
+	}
+
+	if err.Error() != "no access" {
+		errConfirming = true
+		logrus.Warnf(
+			"Error refreshing token principals for auth config %s, userattribute %s, principal %s, skipping: %v",
+			configName, attribs.Name, principalID, err,
+		)
+		existing := attribs.GroupPrincipals[configName].Items
+		if existing != nil {
+			groups = existing
+		}
+		return groups, canRefresh, errConfirming, updatedPrincipalID, nil
+	}
+
+	// User explicitly cannot log in (e.g. they no longer exist in the IdP).
+	// Blank their principal so login tokens get cleaned up.
+	updatedPrincipalID = ""
+	return nil, canRefresh, errConfirming, updatedPrincipalID, nil
+}
+
+// cleanupDeletedConfigs removes the state left behind by AuthConfigs that no
+// longer exist: their stored groups and extras and, unless a login couldn't
+// be confirmed, their login tokens.
+func (r *refresher) cleanupDeletedConfigs(
+	attribs *apiv3.UserAttribute,
+	configured []configuredProvider,
+	loginTokens map[string][]accessor.TokenAccessor,
+	errorConfirmingLogins bool,
+) error {
+	exists := make(map[string]bool, len(configured))
+	for _, provider := range configured {
+		exists[provider.configName] = true
+	}
+	// The local AuthConfig always exists, so a list without it is incomplete,
+	// for example because the cache hasn't synced. Don't treat every config
+	// as deleted.
+	if !exists[local.Name] {
+		return nil
+	}
+	deleted := func(configName string) bool {
+		return configName != "" && !exists[configName]
+	}
+
+	for configName := range attribs.GroupPrincipals {
+		if deleted(configName) {
+			delete(attribs.GroupPrincipals, configName)
+		}
+	}
+	for configName := range attribs.ExtraByProvider {
+		if deleted(configName) {
+			delete(attribs.ExtraByProvider, configName)
+		}
+	}
+
+	if errorConfirmingLogins {
+		return nil
+	}
+	for configName := range loginTokens {
+		if !deleted(configName) {
+			continue
+		}
+		if err := r.deleteLoginTokens(configName, loginTokens); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *refresher) configuredProviders() ([]configuredProvider, error) {
+	refs, err := common.ConfigRefs(r.authConfigLister)
+	if err != nil {
+		return nil, err
+	}
+
+	configured := make([]configuredProvider, len(refs))
+	for i, ref := range refs {
+		configured[i] = configuredProvider{configName: ref.ConfigName, providerName: ref.ProviderName}
+	}
+	return configured, nil
+}
+
+func GetPrincipalIDForProvider(configName string, user *apiv3.User) string {
+	prefix := configName + "_user://"
+	if configName == "local" {
 		prefix = "local://"
 	}
+
 	principalID := ""
 	for _, id := range user.PrincipalIDs {
 		if strings.HasPrefix(id, prefix) {
@@ -369,5 +559,6 @@ func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
 			break
 		}
 	}
+
 	return principalID
 }

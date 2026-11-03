@@ -52,6 +52,14 @@ type ExponentialBackOffValues struct {
 	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
+// OCIOptions contains options that are only used when the ClusterRepo points to an OCI registry.
+type OCIOptions struct {
+	// DownloadAllTags if set, will download all tags that match TagFilter and not just the latest one.
+	DownloadAllTags bool `json:"downloadAllTags,omitempty"`
+	// TagFilter a semver constraint string used to filter the tags of the charts present in the OCI registry.
+	TagFilter string `json:"tagFilter,omitempty"`
+}
+
 // RepoSpec contains details about the helm repository that needs to be used.
 type RepoSpec struct {
 	// URL is the HTTP or OCI URL of the helm repository to connect to.
@@ -66,12 +74,16 @@ type RepoSpec struct {
 	// GitBranch is the git branch where the helm repository is hosted.
 	GitBranch string `json:"gitBranch,omitempty"`
 
-	// RefreshInterval is the interval at which the Helm repository should be refreshed.
+	// RefreshInterval is the interval, in seconds, at which the Helm repository should be refreshed.
+	// Default value is 1 hour. Using a negative value disables periodic updates completely.
 	RefreshInterval int `json:"refreshInterval,omitempty"`
 
 	// ExponentialBackOffValues are values given to the Rancher manager to handle
 	// 429 TOOMANYREQUESTS response code from the OCI registry.
 	ExponentialBackOffValues *ExponentialBackOffValues `json:"exponentialBackOffValues,omitempty"`
+
+	//OCIOptions contains options that are only used when the ClusterRepo points to an OCI registry.
+	OCIOptions *OCIOptions `json:"OCIOptions,omitempty"`
 
 	// CABundle is a PEM encoded CA bundle which will be used to validate the repo's certificate.
 	// If unspecified, system trust roots will be used.
@@ -110,6 +122,15 @@ type RepoSpec struct {
 	// Defaults to false, which keeps the SameOrigin check enabled. Setting this to true is not recommended
 	// in production environments due to the security implications.
 	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
+
+	// DefaultImagePullSecrets specifies one or more image pull secrets which will be used by default
+	// when deploying charts from this repository. If a chart supports image pull secrets in its values.yaml
+	// in an expected path (.Values.ImagePullSecrets, .Values.global.ImagePullSecrets, or .Values.global.cattle.imagePullSecrets)
+	// the secrets listed in this field will be automatically copied into the charts release namespace. Additionally,
+	// Rancher will inject these secret references into the charts values.yaml if no user provided value is set.
+	// Currently, this field is only honored by the "rancher-charts" repository, and can only copy secrets from the
+	// cattle-system namespace which have the appropriate labels.
+	DefaultImagePullSecrets []SecretReference `json:"defaultImagePullSecrets,omitempty"`
 }
 
 type RepoCondition string

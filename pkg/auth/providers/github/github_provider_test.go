@@ -8,18 +8,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type fakeTokensManager struct {
 	getSecretFunc               func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	createTokenAndSetCookieFunc func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	createTokenAndSetCookieFunc func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error
 }
 
 func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
@@ -29,9 +31,9 @@ func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTo
 	return "", nil
 }
 
-func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error {
 	if m.createTokenAndSetCookieFunc != nil {
-		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
+		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, description, request)
 	}
 	return nil
 }
@@ -130,17 +132,22 @@ func TestSearchPrincipals(t *testing.T) {
 	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(true).AnyTimes()
 
 	config := &apiv3.GithubConfig{
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "github",
+			},
+		},
 		Hostname: srvURL.Host,
 	}
 
 	provider := Provider{
 		githubClient: &GClient{httpClient: srv.Client()},
-		getConfig:    func() (*apiv3.GithubConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
 		tokenMGR:     &fakeTokensManager{},
 	}
 
-	token := apiv3.Token{
+	token := &apiv3.Token{
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "github_user://9253000",
@@ -151,7 +158,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for groups and users.
-	found, err := provider.SearchPrincipals("dev", "", &token)
+	found, err := provider.SearchPrincipals("dev", "", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +202,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for groups only.
-	found, err = provider.SearchPrincipals("dev", "group", &token)
+	found, err = provider.SearchPrincipals("dev", "group", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +220,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for users only.
-	found, err = provider.SearchPrincipals("dev", "user", &token)
+	found, err = provider.SearchPrincipals("dev", "user", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,11 +325,16 @@ func TestSearchPrincipalsExt(t *testing.T) {
 
 	config := &apiv3.GithubConfig{
 		Hostname: srvURL.Host,
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "github",
+			},
+		},
 	}
 
 	provider := Provider{
 		githubClient: &GClient{httpClient: srv.Client()},
-		getConfig:    func() (*apiv3.GithubConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
 		tokenMGR:     &fakeTokensManager{},
 	}
@@ -333,6 +345,7 @@ func TestSearchPrincipalsExt(t *testing.T) {
 				Name:          "github_user://9253000",
 				LoginName:     "developer",
 				PrincipalType: "user",
+				Provider:      config.GetName(),
 			},
 		},
 	}
@@ -411,5 +424,21 @@ func TestSearchPrincipalsExt(t *testing.T) {
 
 	if found[0].LoginName != "developer" {
 		t.Errorf("Unexpected principal %s", found[0].LoginName)
+	}
+}
+
+func TestGetPrincipalRejectsOtherConfig(t *testing.T) {
+	// The provider has no clients configured, so this fails if the principal
+	// is looked up.
+	provider := &Provider{}
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "github-corp_user://1"},
+		},
+	}
+
+	for _, principalID := range []string{"github-it_user://2", "github-it_group://3", "github_user://2"} {
+		_, err := provider.GetPrincipal(principalID, token)
+		assert.True(t, httperror.IsNotFound(err), "expected NotFound for %s, got %v", principalID, err)
 	}
 }

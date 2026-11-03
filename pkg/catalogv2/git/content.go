@@ -10,13 +10,17 @@ import (
 
 	"github.com/rancher/rancher/pkg/catalogv2/chart"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
-	"helm.sh/helm/v3/pkg/repo"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 // Icon will return the icon for a chartName version in a local repository by getting the relative path
 func Icon(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, string, error) {
 	if len(chartVersion.Icon) == 0 {
 		return nil, "", fmt.Errorf("failed to find chartName %s version %s: %w", chartVersion.Name, chartVersion.Version, validation.NotFound)
+	}
+
+	if !IsCheckedOut(name, gitURL) {
+		return nil, "", ErrNotCheckedOut
 	}
 
 	dir := RepoDir(namespace, name, gitURL)
@@ -32,6 +36,10 @@ func Icon(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.R
 }
 
 func Chart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, error) {
+	if !IsCheckedOut(name, gitURL) {
+		return nil, ErrNotCheckedOut
+	}
+
 	dir := RepoDir(namespace, name, gitURL)
 
 	if len(chartVersion.URLs) == 0 {
@@ -65,6 +73,13 @@ func relative(base, publicURL, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = filepath.Rel(baseAbs, fullAbs)
-	return fullAbs, err
+	rel, err := filepath.Rel(baseAbs, fullAbs)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve relative path: %w", err)
+	}
+	if !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("invalid file path [%s]", path)
+	}
+
+	return fullAbs, nil
 }

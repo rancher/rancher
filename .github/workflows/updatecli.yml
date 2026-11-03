@@ -6,6 +6,10 @@ on:
     - cron: '0 12 * * *'
   workflow_dispatch:
     inputs:
+      tag:
+        description: 'Optional Rancher Machine tag; used only by the machine update.'
+        required: false
+        type: string
       target:
         description: 'Select which updatecli workflow to run or `all` to run all updates.'
         required: true
@@ -14,6 +18,7 @@ on:
         options:
           - 'all'
           - 'harvester-docker-machine'
+          - 'machine'
           - 'wins-system-agent'
 
 permissions:
@@ -28,13 +33,14 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        # zizmor: ignore[artipacked] -- this job must retain checkout credentials for authenticated branch cleanup pushes.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install updatecli
-        uses: updatecli/updatecli-action@b846825b298f5351abd80f94c4f9eab63a38a804 # v2.98.0
+        uses: updatecli/updatecli-action@93ae2608256484ef8598e902aa675bbc9e278e4e # v3.10.0
 
       - name: Install Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
 
@@ -58,7 +64,7 @@ jobs:
           done
 
       - name: Get App secrets
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           # We use Renovate's App token, because it has the same permissions
           # needed and serve the same purpose.
@@ -67,16 +73,19 @@ jobs:
             secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
 
       - name: Create App token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Apply updatecli
         env:
           UPDATECLI_GITHUB_ACTOR: ${{ github.actor }}
           UPDATECLI_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          MACHINE_RELEASE_TAG: ${{ inputs.tag }}
         run: |
           # Never use '--debug' or 'manifest show' options, because they will
           # leak the GH token.

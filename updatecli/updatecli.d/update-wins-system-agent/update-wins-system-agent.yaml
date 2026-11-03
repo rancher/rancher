@@ -17,8 +17,8 @@ scms:
         squash: {{ .scm.commitmessage.squash }}
         type: '{{ .wins_system_agent.commitmessage.type }}'
         scope: '{{ .wins_system_agent.commitmessage.scope }}'
-        title: 'Bump versions of Wins and System Agent'
-        body: 'Bump versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+        title: 'Bump versions of {{ source "changed-components" }}'
+        body: 'Bump versions of {{ source "changed-components-with-versions" }}.'
 
 actions:
   rancher-pr:
@@ -30,35 +30,199 @@ actions:
       reviewers:
         - 'rancher/rancher-team-2-hostbusters-dev'
       mergemethod: '{{ .scm.mergemethod }}'
-      title: '[{{ .scm.branch }}] Bump Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
-      description: 'Bump patch versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+      title: '[{{ .scm.branch }}] Bump {{ source "changed-components-with-versions" }}.'
+      description: 'Bump patch versions of {{ source "changed-components-with-versions" }}.'
 
 sources:
+  wins-current-base-version:
+    name: 'Get base wins version (without pre-release suffix) from build.yaml'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'build.yaml'
+      matchpattern: 'winsAgentVersion: \S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+'
+
+  wins-current-version:
+    name: 'Get current wins version (with pre-release suffix) from build.yaml'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'build.yaml'
+      matchpattern: 'winsAgentVersion: \S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+\S*'
+
+  system-agent-current-base-version:
+    name: 'Get base system-agent version (without pre-release suffix) from build.yaml'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'build.yaml'
+      matchpattern: 'systemAgentVersion: \S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+'
+
+  system-agent-current-version:
+    name: 'Get current system-agent version (with pre-release suffix) from build.yaml'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'build.yaml'
+      matchpattern: 'systemAgentVersion: \S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+\S*'
+
   wins-release:
-    name: 'Get latest upstream Wins version'
+    name: 'Get latest upstream wins version'
     kind: githubrelease
+    dependson:
+      - 'wins-current-base-version'
     spec:
       owner: '{{ .repos.wins.owner }}'
       repository: '{{ .repos.wins.repo }}'
       key: tagname
       typefilter:
-        latest: true
+        release: true
+        prerelease: true
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "wins-current-base-version" }}-0'
 
   system-agent-release:
-    name: 'Get latest upstream System Agent version'
+    name: 'Get latest upstream system-agent version'
     kind: githubrelease
+    dependson:
+      - 'system-agent-current-base-version'
     spec:
       owner: '{{ .repos.system_agent.owner }}'
       repository: '{{ .repos.system_agent.repo }}'
       key: tagname
       typefilter:
-        latest: true
+        release: true
+        prerelease: true
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "system-agent-current-base-version" }}-0'
+
+  changed-components:
+    name: 'Compose the list of updated component names'
+    kind: shell
+    dependson:
+      - 'wins-current-version'
+      - 'wins-release'
+      - 'system-agent-current-version'
+      - 'system-agent-release'
+    spec:
+      command: |
+        if [ '{{ source "wins-current-version" }}' != '{{ source "wins-release" }}' ]; then wins_changed=true; else wins_changed=false; fi
+        if [ '{{ source "system-agent-current-version" }}' != '{{ source "system-agent-release" }}' ]; then system_agent_changed=true; else system_agent_changed=false; fi
+        if [ "$wins_changed" = true ] && [ "$system_agent_changed" = false ]; then
+          printf 'wins'
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = true ]; then
+          printf 'system-agent'
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = false ]; then
+          printf 'none'
+        else
+          printf 'wins and system-agent'
+        fi
+
+  changed-components-with-versions:
+    name: 'Compose the list of updated components with their target versions'
+    kind: shell
+    dependson:
+      - 'wins-current-version'
+      - 'wins-release'
+      - 'system-agent-current-version'
+      - 'system-agent-release'
+    spec:
+      command: |
+        if [ '{{ source "wins-current-version" }}' != '{{ source "wins-release" }}' ]; then wins_changed=true; else wins_changed=false; fi
+        if [ '{{ source "system-agent-current-version" }}' != '{{ source "system-agent-release" }}' ]; then system_agent_changed=true; else system_agent_changed=false; fi
+        wins_part='wins to {{ source "wins-release" }}'
+        system_agent_part='system-agent to {{ source "system-agent-release" }}'
+        if [ "$wins_changed" = true ] && [ "$system_agent_changed" = false ]; then
+          printf '%s' "$wins_part"
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = true ]; then
+          printf '%s' "$system_agent_part"
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = false ]; then
+          printf 'none'
+        else
+          printf '%s and %s' "$wins_part" "$system_agent_part"
+        fi
+
+  wins-checksum:
+    name: 'Get sha256 for wins.exe from {{ source "wins-release" }}'
+    kind: shell
+    dependson:
+      - 'wins-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256.txt | grep " wins.exe$" | cut -d " " -f1'
+
+  wins-checksum-install:
+    name: 'Get sha256 for install.ps1 from {{ source "wins-release" }}'
+    kind: shell
+    dependson:
+      - 'wins-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256.txt | grep " install.ps1$" | cut -d " " -f1'
+
+  wins-checksum-uninstall:
+    name: 'Get sha256 for uninstall.ps1 from {{ source "wins-release" }}'
+    kind: shell
+    dependson:
+      - 'wins-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256.txt | grep " uninstall.ps1$" | cut -d " " -f1'
+
+  system-agent-checksum-amd64:
+    name: 'Get sha256 for rancher-system-agent-amd64 from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-amd64$" | cut -d " " -f1'
+
+  system-agent-checksum-arm64:
+    name: 'Get sha256 for rancher-system-agent-arm64 from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-arm64$" | cut -d " " -f1'
+
+  system-agent-checksum-install:
+    name: 'Get sha256 for install.sh from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " install.sh$" | cut -d " " -f1'
+
+  system-agent-checksum-uninstall:
+    name: 'Get sha256 for system-agent-uninstall.sh from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " system-agent-uninstall.sh$" | cut -d " " -f1'
 
 conditions:
+  check-build-yaml-wins-version:
+    name: 'Check if winsAgentVersion is set in build.yaml'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'build.yaml'
+      matchpattern: 'winsAgentVersion: \S+'
+
   check-dockerfile-wins-version:
     name: 'Check if ENV CATTLE_WINS_AGENT_VERSION is set in Dockerfile'
     kind: file
@@ -67,7 +231,17 @@ conditions:
     spec:
       files:
         - 'package/Dockerfile'
-      matchpattern: '(?:ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
+      matchpattern: 'ENV CATTLE_WINS_AGENT_VERSION=\S+'
+
+  check-build-yaml-system-agent-version:
+    name: 'Check if systemAgentVersion is set in build.yaml'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'build.yaml'
+      matchpattern: 'systemAgentVersion: \S+'
 
   check-dockerfile-system-agent-version:
     name: 'Check if ENV CATTLE_SYSTEM_AGENT_VERSION is set in Dockerfile'
@@ -77,45 +251,124 @@ conditions:
     spec:
       files:
         - 'package/Dockerfile'
-      matchpattern: '(?:ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
+      matchpattern: 'ENV CATTLE_SYSTEM_AGENT_VERSION=\S+'
 
 targets:
-  update-dockerfile-wins-release:
-    name: 'Update ENV CATTLE_WINS_AGENT_VERSION to {{ source "wins-release" }} in Dockerfile'
+  update-dockerfile-wins-checksum:
+    name: 'Update ENV CATTLE_WINS_AGENT_CHECKSUM in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-checksum'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_CHECKSUM[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_CHECKSUM={{ source "wins-checksum" }}'
+
+  update-dockerfile-wins-checksum-install:
+    name: 'Update ENV CATTLE_WINS_AGENT_CHECKSUM_install in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-checksum-install'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_CHECKSUM_install[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_CHECKSUM_install={{ source "wins-checksum-install" }}'
+
+  update-dockerfile-wins-checksum-uninstall:
+    name: 'Update ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-checksum-uninstall'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_CHECKSUM_uninstall[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_CHECKSUM_uninstall={{ source "wins-checksum-uninstall" }}'
+
+  update-dockerfile-system-agent-checksum-amd64:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64 in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-amd64'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_amd64[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_amd64={{ source "system-agent-checksum-amd64" }}'
+
+  update-dockerfile-system-agent-checksum-arm64:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64 in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-arm64'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_arm64[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_arm64={{ source "system-agent-checksum-arm64" }}'
+
+  update-dockerfile-system-agent-checksum-install:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-install'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_install[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_install={{ source "system-agent-checksum-install" }}'
+
+  update-dockerfile-system-agent-checksum-uninstall:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-uninstall'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall={{ source "system-agent-checksum-uninstall" }}'
+
+  update-build-yaml-wins-release:
+    name: 'Update winsAgentVersion to {{ source "wins-release" }} in build.yaml'
     kind: file
     scmid: 'default'
     sourceid: 'wins-release'
     spec:
-      file: 'package/Dockerfile'
-      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
-      replacepattern: '$1 CATTLE_WINS_AGENT_VERSION={{ source "wins-release" }}'
+      file: 'build.yaml'
+      matchpattern: 'winsAgentVersion: \S+'
+      replacepattern: 'winsAgentVersion: {{ source "wins-release" }}'
 
-  update-dockerfile-system-agent-release:
-    name: 'Update ENV CATTLE_SYSTEM_AGENT_VERSION to {{ source "system-agent-release" }} in Dockerfile'
+  update-build-yaml-system-agent-release:
+    name: 'Update systemAgentVersion to {{ source "system-agent-release" }} in build.yaml'
     kind: file
     scmid: 'default'
     sourceid: 'system-agent-release'
     spec:
-      file: 'package/Dockerfile'
-      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
-      replacepattern: '$1 CATTLE_SYSTEM_AGENT_VERSION={{ source "system-agent-release" }}'
+      file: 'build.yaml'
+      matchpattern: 'systemAgentVersion: \S+'
+      replacepattern: 'systemAgentVersion: {{ source "system-agent-release" }}'
 
-  update-pkg-settings-wins-release:
-    name: 'Update Wins to {{ source "wins-release" }} in pkg/settings/setting.go'
-    kind: file
+  # Runs only the build.yaml step of go generate. It runs after every go.mod,
+  # go.sum, build.yaml and checksum target so `go run` sees a consistent module.
+  # Checksums are separate targets.
+  regenerate-buildconfig:
+    name: 'Run go generate for build.yaml derived files'
+    kind: shell
     scmid: 'default'
-    sourceid: 'wins-release'
+    disablesourceinput: true
+    dependson:
+      - 'target#update-build-yaml-wins-release'
+      - 'target#update-build-yaml-system-agent-release'
+      - 'target#update-dockerfile-wins-checksum'
+      - 'target#update-dockerfile-wins-checksum-install'
+      - 'target#update-dockerfile-wins-checksum-uninstall'
+      - 'target#update-dockerfile-system-agent-checksum-amd64'
+      - 'target#update-dockerfile-system-agent-checksum-arm64'
+      - 'target#update-dockerfile-system-agent-checksum-install'
+      - 'target#update-dockerfile-system-agent-checksum-uninstall'
     spec:
-      file: 'pkg/settings/setting.go'
-      matchpattern: 'https://raw.githubusercontent.com/rancher/wins/v\S+/install.ps1'
-      replacepattern: 'https://raw.githubusercontent.com/rancher/wins/{{ source "wins-release" }}/install.ps1'
-
-  update-pkg-settings-system-agent-release:
-    name: 'Update System Agent to {{ source "system-agent-release" }} in pkg/settings/setting.go'
-    kind: file
-    scmid: 'default'
-    sourceid: 'system-agent-release'
-    spec:
-      file: 'pkg/settings/setting.go'
-      matchpattern: 'https://github.com/rancher/system-agent/releases/download/v\S+/install.sh'
-      replacepattern: 'https://github.com/rancher/system-agent/releases/download/{{ source "system-agent-release" }}/install.sh'
+      command: 'scripts/generate-buildconfig'
+      changedif:
+        kind: 'file/checksum'
+        spec:
+          files:
+            - 'pkg/buildconfig/constants.go'
+            - 'chart/values.yaml'
+            - 'pkg/apis/management.cattle.io/v3/tools_system_images.go'
+            - 'package/Dockerfile'

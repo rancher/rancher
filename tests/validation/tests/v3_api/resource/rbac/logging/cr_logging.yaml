@@ -1,8 +1,0 @@
-apiVersion: logging.banzaicloud.io/v1beta1
-kind: Logging
-metadata:
-  name: logging-example
-spec:
-  controlNamespace: cattle-logging-system
-  fluentbit: {}
-  fluentd: {}

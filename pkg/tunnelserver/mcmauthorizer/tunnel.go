@@ -16,12 +16,16 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kontainerdriver"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/utils"
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,8 +33,9 @@ import (
 )
 
 const (
-	crtKeyIndex  = "crtKeyIndex"
-	nodeKeyIndex = "nodeKeyIndex"
+	// SecretTokenIndex indexes CRT token secrets by their plaintext token(s).
+	SecretTokenIndex = "crtSecretTokenIndex"
+	nodeKeyIndex     = "nodeKeyIndex"
 
 	Token  = "X-API-Tunnel-Token"
 	Params = "X-API-Tunnel-Params"
@@ -61,7 +66,7 @@ type input struct {
 
 func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	auth := &Authorizer{
-		crtIndexer:            context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+		secretIndexer:         context.Core.Secrets("").Controller().Informer().GetIndexer(),
 		clusterLister:         context.Management.Clusters("").Controller().Lister(),
 		nodeIndexer:           context.Management.Nodes("").Controller().Informer().GetIndexer(),
 		machineLister:         context.Management.Nodes("").Controller().Lister(),
@@ -70,10 +75,15 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		KontainerDriverLister: context.Management.KontainerDrivers("").Controller().Lister(),
 		Secrets:               context.Core.Secrets(""),
 		SecretLister:          context.Core.Secrets("").Controller().Lister(),
+		namespaceLister:       context.Core.Namespaces("").Controller().Lister(),
 	}
-	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
-		crtKeyIndex: auth.crtIndex,
-	})
+	// Registered through wrangler's Cache().AddIndexer (panics via
+	// utilruntime.Must on failure) instead of the raw informer's
+	// AddIndexers, so a registration failure is never silently swallowed.
+	// context.Wrangler.Core.Secret() and context.Core.Secrets("") both resolve
+	// to the same underlying SharedIndexInformer/indexer, since they share
+	// context.Wrangler.ControllerFactory.
+	context.Wrangler.Core.Secret().Cache().AddIndexer(SecretTokenIndex, auth.secretTokenIndex)
 	context.Management.Nodes("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		nodeKeyIndex: auth.nodeIndex,
 	})
@@ -81,7 +91,7 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 }
 
 type Authorizer struct {
-	crtIndexer            cache.Indexer
+	secretIndexer         cache.Indexer
 	clusterLister         v3.ClusterLister
 	nodeIndexer           cache.Indexer
 	machineLister         v3.NodeLister
@@ -90,6 +100,7 @@ type Authorizer struct {
 	KontainerDriverLister v3.KontainerDriverLister
 	Secrets               corev1.SecretInterface
 	SecretLister          corev1.SecretLister
+	namespaceLister       corev1.NamespaceLister
 }
 
 type Client struct {
@@ -102,6 +113,9 @@ type Client struct {
 
 func (t *Authorizer) AuthorizeTunnel(req *http.Request) (string, bool, error) {
 	client, ok, err := t.Authorize(req)
+	if ok && err == nil && client != nil && client.Cluster != nil {
+		tunnelserver.SetSessionCluster(req, client.Cluster.Name, client.Cluster.UID)
+	}
 	if client != nil && client.Node != nil {
 		return client.Cluster.Name + ":" + client.Node.Name, ok, err
 	} else if client != nil && client.Cluster != nil {
@@ -297,7 +311,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		}
 	}
 
-	apiEndpoint := "https://" + inCluster.Address
+	apiEndpoint := "https://" + formatAddress(inCluster.Address)
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
@@ -325,7 +339,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	}
 
 	if changed {
-		_, err = t.clusters.Update(cluster)
+		_, err = t.clusters.UpdateStatus(cluster)
 		if currentSecret != nil {
 			migrator.CleanupKnownSecrets([]*corev1.Secret{currentSecret})
 		}
@@ -382,25 +396,49 @@ func machineName(machine *client.Node) string {
 }
 
 func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
-	keys, err := t.crtIndexer.ByIndex(crtKeyIndex, token)
+	secrets, err := t.secretIndexer.ByIndex(SecretTokenIndex, token)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, obj := range keys {
-		crt := obj.(*v3.ClusterRegistrationToken)
-		return t.clusterLister.Get("", crt.Spec.ClusterName)
+	stale := ""
+	for _, obj := range secrets {
+		secret, ok := obj.(*k8scorev1.Secret)
+		if !ok {
+			continue
+		}
+		// The cluster the token was checked against is the one returned: looking it up again could find a
+		// cluster that has replaced it under the same name.
+		cluster, isStale, err := clusterregistrationtoken.TokenSecretCluster(secret, t.getNamespace, t.getCluster)
+		if err != nil {
+			return nil, err
+		}
+		if isStale {
+			stale = secret.Namespace
+			continue
+		}
+		if cluster == nil {
+			continue
+		}
+		return cluster, nil
 	}
 
+	if stale != "" {
+		return nil, fmt.Errorf("%w: registration token belongs to a previous cluster named %s", ErrClusterNotFound, stale)
+	}
 	return nil, ErrClusterNotFound
 }
 
-func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
-	crt := obj.(*v3.ClusterRegistrationToken)
-	if crt.Status.Token == "" {
-		return nil, nil
-	}
-	return []string{crt.Status.Token}, nil
+func (t *Authorizer) getNamespace(name string) (*k8scorev1.Namespace, error) {
+	return t.namespaceLister.Get("", name)
+}
+
+func (t *Authorizer) getCluster(name string) (*v3.Cluster, error) {
+	return t.clusterLister.Get("", name)
+}
+
+func (t *Authorizer) secretTokenIndex(secret *k8scorev1.Secret) ([]string, error) {
+	return clusterregistrationtoken.SecretTokenIndexValues(secret), nil
 }
 
 func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {
@@ -418,4 +456,29 @@ func (t *Authorizer) toCustomConfig(machine *client.Node) *v32.CustomConfig {
 		return nil
 	}
 	return result
+}
+
+// formatAddress ensures that an address containing a bare IPv6 host (without brackets)
+// is properly formatted with brackets for use in a URL. Addresses that are already
+// bracketed or are IPv4 are returned as-is.
+func formatAddress(address string) string {
+	// Already bracketed
+	if strings.HasPrefix(address, "[") {
+		return address
+	}
+
+	// Find the last colon - for IPv6 addresses there will be multiple colons
+	lastColon := strings.LastIndex(address, ":")
+	if lastColon < 0 {
+		return address
+	}
+
+	host := address[:lastColon]
+	port := address[lastColon+1:]
+
+	if utils.IsPlainIPV6(host) {
+		return "[" + host + "]:" + port
+	}
+
+	return address
 }

@@ -8,6 +8,10 @@ If `Username of the source for this workflow run` is set, the username will be m
 
 If `URL of the source for this workflow run` is set, the URL will be mentioned in the pull request. This was added for automated workflows, where the user and URL can be used to link back to the source of the trigger.
 
-## Replace environment variable in file (`replace-env-value.yml`)
+## Create doc issue (`create-doc-issue.yml`)
 
-Replace environment variable in file can be used to replace an environment variable in any file. It will run `./scripts/replace-env-value-in-file.sh`, commit and create a pull request with the changes. This is mostly used for bumping versions. This workflow should work for `KEY=VALUE` (equal sign separated) values and `KEY VALUE` (space separated) values.
+Organization members can comment `/create-doc-issue` on an issue (not a pull request) to create a documentation issue in the same organization's `rancher-product-docs` repository, or `prime-docs` if the original issue has the `prime` label. The new issue's title is prefixed with `document:`, and its body contains the original issue's link followed by `More information to be added upon request.`
+
+The workflow uses `CREATE_DOCS_PAT`, which needs permission to read organization membership and create issues in both documentation repositories and comment on the original issue. To detect private members, the PAT must belong to an organization member and have the `read:org` scope. If the organization uses SAML SSO, authorize the PAT for the organization. The membership check returns `404` both when the actor is not a member and when the token cannot see a private member, so these requirements are necessary for private members to be detected.
+
+The workflow copies the milestone by matching its title in the target repository and comments on the original issue with the new issue's link. If the milestone is missing in the target repository, it creates the issue without one and notes this in the confirmation comment.

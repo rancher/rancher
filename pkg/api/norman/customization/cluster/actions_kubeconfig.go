@@ -48,6 +48,14 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		}
 	}
 
+	var execUser *kubeconfig.ExecUser
+	if !generateToken && strings.EqualFold(settings.KubeconfigExecGetToken.Get(), "true") {
+		execUser, err = a.execUser(apiContext)
+		if err != nil {
+			return err
+		}
+	}
+
 	host := settings.ServerURL.Get()
 	if host == "" {
 		host = apiContext.Request.Host
@@ -61,12 +69,12 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 	}
 
 	if endpointEnabled {
-		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, nodes, apiContext.ID, host, tokenKey)
+		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, nodes, apiContext.ID, host, tokenKey, execUser)
 		if err != nil {
 			return err
 		}
 	} else {
-		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, host, tokenKey)
+		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, host, tokenKey, execUser)
 		if err != nil {
 			return err
 		}

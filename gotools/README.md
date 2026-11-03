@@ -50,6 +50,11 @@ TOOLNAME=<tool name>
 go get -tool -modfile=gotools/"$TOOLNAME"/go.mod <module>@<new version>
 ```
 
+Some modfiles replace the deprecated `gopkg.in/yaml.v2` and `.v3` modules with
+the maintained `go.yaml.in/yaml` ones. Keep the replacement version different
+from the `go.yaml.in/yaml` version required by the modfile, otherwise Go
+rejects the same version for two module paths.
+
 For example, to update controller-gen to v0.17.3:
 
 ```

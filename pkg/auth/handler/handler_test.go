@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,7 +16,7 @@ import (
 func TestAuthenticationProvidersUnknownAuthConfig(t *testing.T) {
 	fc := newFakeUnstructuredClient(map[string]*runtimetesting.Unstructured{})
 	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	srv.RegisterOIDCProviderHandlers(router)
 	testSrv := httptest.NewServer(router)
 	t.Cleanup(func() {
@@ -66,7 +65,7 @@ func TestAuthenticationProviders(t *testing.T) {
 		},
 	})
 	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	srv.RegisterOIDCProviderHandlers(router)
 	testSrv := httptest.NewServer(router)
 	t.Cleanup(func() {
@@ -116,7 +115,7 @@ func TestAuthenticationProvidersWithPKCE(t *testing.T) {
 		},
 	})
 	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	srv.RegisterOIDCProviderHandlers(router)
 	testSrv := httptest.NewServer(router)
 	t.Cleanup(func() {
@@ -175,7 +174,7 @@ func TestAuthenticationProvidersInvalidPKCEMethodType(t *testing.T) {
 		},
 	})
 	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	srv.RegisterOIDCProviderHandlers(router)
 	testSrv := httptest.NewServer(router)
 	t.Cleanup(func() {
@@ -221,7 +220,7 @@ func TestAuthenticationProvidersUnsupportedPKCEMethod(t *testing.T) {
 		},
 	})
 	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	srv.RegisterOIDCProviderHandlers(router)
 	testSrv := httptest.NewServer(router)
 	t.Cleanup(func() {
@@ -266,7 +265,7 @@ func TestAuthenticationProvidersDisabledProvider(t *testing.T) {
 		},
 	})
 	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	srv.RegisterOIDCProviderHandlers(router)
 	testSrv := httptest.NewServer(router)
 	t.Cleanup(func() {

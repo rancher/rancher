@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -12,6 +12,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -19,14 +20,15 @@ const (
 	grbByRoleIndex = "management.cattle.io/grb-by-role"
 )
 
-func newClusterHandler(workload *config.UserContext) v3.ClusterHandlerFunc { //*clusterHandler {
+func newClusterHandler(workload *config.UserContext) func(key string, obj *v32.Cluster) (*v32.Cluster, error) {
 	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
 
 	ch := &clusterHandler{
 		clusterName: workload.ClusterName,
+		clusterUID:  workload.ClusterUID,
 		grbIndexer:  informer.GetIndexer(),
 		// Management level resources
-		clusters: workload.Management.Management.Clusters(""),
+		clusters: workload.Management.Wrangler.Mgmt.Cluster(),
 		// User context resources
 		userCRB:       workload.RBACw.ClusterRoleBinding(),
 		userCRBLister: workload.RBACw.ClusterRoleBinding().Cache(),
@@ -36,22 +38,24 @@ func newClusterHandler(workload *config.UserContext) v3.ClusterHandlerFunc { //*
 
 type clusterHandler struct {
 	clusterName string
+	clusterUID  types.UID
 	grbIndexer  cache.Indexer
 	// Management level resources
-	clusters v3.ClusterInterface
+	clusters mgmtcontrollers.ClusterClient
 	// User context resources
 	userCRB       wrbacv1.ClusterRoleBindingController
 	userCRBLister wrbacv1.ClusterRoleBindingCache
 }
 
-func (h *clusterHandler) sync(key string, obj *v32.Cluster) (runtime.Object, error) {
+func (h *clusterHandler) sync(key string, obj *v32.Cluster) (*v32.Cluster, error) {
 	// We receive clusters with no data, when that happens no checks will work so just ignore them
 	if key == "" || obj == nil || obj.Name == "" {
 		return nil, nil
 	}
 
-	// Don't operate on a cluster this handler isn't created for
-	if h.clusterName != obj.Name {
+	// Don't operate on a cluster this handler isn't created for, including a cluster created again under the
+	// same name
+	if h.clusterName != obj.Name || !config.MatchesClusterUID(h.clusterUID, obj) {
 		return nil, nil
 	}
 
@@ -60,7 +64,7 @@ func (h *clusterHandler) sync(key string, obj *v32.Cluster) (runtime.Object, err
 		if err != nil {
 			return nil, err
 		}
-		return h.clusters.Update(obj)
+		return h.clusters.UpdateStatus(obj)
 	}
 	return obj, nil
 }

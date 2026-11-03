@@ -3,25 +3,21 @@ description: "Install dependencies, pull files and build the Rancher chart"
 runs:
   using: "composite"
   steps:
-    # git is assumed to be installed because it is a requirement to run from the same repo
     - name: install dependencies
       shell: bash
-      run: zypper install -y jq awk aws-cli
+      run: zypper install -y aws-cli
     - name: Setup Tag Env Variables
-      uses: ./.github/actions/setup-tag-env
+      uses: $/.github/actions/setup-tag-env
     - id: env
       name: Setup Dependencies Env Variables
-      uses: ./.github/actions/setup-build-env
+      uses: $/.github/actions/setup-build-env
     - name: Install Helm dependencies
       env:
-        HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
-        HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
+         HELM_UNITTEST_GIT_COMMIT_SHA: ${{ steps.env.outputs.HELM_UNITTEST_GIT_COMMIT_SHA }}
       shell: bash
       run: |
-        curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
-        mv /tmp/helm /usr/bin/helm_v3 && \
-        chmod +x /usr/bin/helm_v3
-        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
+        set -ex
+        helm plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_GIT_COMMIT_SHA} --verify=false
     - name: Build
       shell: bash
       run: ./scripts/chart/build chart
@@ -34,3 +30,17 @@ runs:
     - name: Package
       shell: bash
       run: ./scripts/chart/package
+    - name: Prepare for upload
+      shell: bash
+      run: |
+        set -e
+        source scripts/version
+        cp bin/chart/${CHART_REPO}/rancher-${CHART_VERSION}.tgz /tmp/rancher-chart.tgz
+    - name: Upload chart
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: "rancher-chart"
+        path: /tmp/rancher-chart.tgz
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false

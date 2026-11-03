@@ -48,7 +48,7 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 	}
 
 	var (
-		s3Cred s3Credential
+		s3Cred S3Credential
 	)
 
 	controlPlaneEtcdS3NotNil := controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil
@@ -151,7 +151,7 @@ func generateEndpointCAFileIfPathMatches(controlPlane *rkev1.RKEControlPlane, ex
 	return nil
 }
 
-type s3Credential struct {
+type S3Credential struct {
 	AccessKey     string
 	SecretKey     string
 	Region        string
@@ -162,7 +162,7 @@ type s3Credential struct {
 	Folder        string
 }
 
-func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name string) (result s3Credential, _ error) {
+func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name string) (result S3Credential, _ error) {
 	if name == "" {
 		return result, nil
 	}
@@ -178,7 +178,7 @@ func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name st
 		data[k] = v
 	}
 
-	return s3Credential{
+	return S3Credential{
 		AccessKey:     string(data["accessKey"]),
 		SecretKey:     string(data["secretKey"]),
 		Region:        string(data["defaultRegion"]),

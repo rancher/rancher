@@ -3,13 +3,16 @@ package client
 const (
 	PingConfigType                     = "pingConfig"
 	PingConfigFieldAccessMode          = "accessMode"
+	PingConfigFieldAllowIdpInitiated   = "allowIdpInitiated"
 	PingConfigFieldAllowedPrincipalIDs = "allowedPrincipalIds"
 	PingConfigFieldAnnotations         = "annotations"
 	PingConfigFieldCreated             = "created"
 	PingConfigFieldCreatorID           = "creatorId"
+	PingConfigFieldDisplayName         = "displayName"
 	PingConfigFieldDisplayNameField    = "displayNameField"
 	PingConfigFieldEnabled             = "enabled"
 	PingConfigFieldEntityID            = "entityID"
+	PingConfigFieldForceAuthn          = "forceAuthn"
 	PingConfigFieldGroupsField         = "groupsField"
 	PingConfigFieldIDPMetadataContent  = "idpMetadataContent"
 	PingConfigFieldLabels              = "labels"
@@ -17,9 +20,11 @@ const (
 	PingConfigFieldLogoutAllForced     = "logoutAllForced"
 	PingConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	PingConfigFieldName                = "name"
+	PingConfigFieldNameIDFormat        = "nameIDFormat"
 	PingConfigFieldOwnerReferences     = "ownerReferences"
 	PingConfigFieldRancherAPIHost      = "rancherApiHost"
 	PingConfigFieldRemoved             = "removed"
+	PingConfigFieldSignatureMethod     = "signatureMethod"
 	PingConfigFieldSpCert              = "spCert"
 	PingConfigFieldSpKey               = "spKey"
 	PingConfigFieldStatus              = "status"
@@ -31,13 +36,16 @@ const (
 
 type PingConfig struct {
 	AccessMode          string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	AllowIdpInitiated   bool              `json:"allowIdpInitiated,omitempty" yaml:"allowIdpInitiated,omitempty"`
 	AllowedPrincipalIDs []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName         string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DisplayNameField    string            `json:"displayNameField,omitempty" yaml:"displayNameField,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EntityID            string            `json:"entityID,omitempty" yaml:"entityID,omitempty"`
+	ForceAuthn          *bool             `json:"forceAuthn,omitempty" yaml:"forceAuthn,omitempty"`
 	GroupsField         string            `json:"groupsField,omitempty" yaml:"groupsField,omitempty"`
 	IDPMetadataContent  string            `json:"idpMetadataContent,omitempty" yaml:"idpMetadataContent,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -45,9 +53,11 @@ type PingConfig struct {
 	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NameIDFormat        string            `json:"nameIDFormat,omitempty" yaml:"nameIDFormat,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SignatureMethod     string            `json:"signatureMethod,omitempty" yaml:"signatureMethod,omitempty"`
 	SpCert              string            `json:"spCert,omitempty" yaml:"spCert,omitempty"`
 	SpKey               string            `json:"spKey,omitempty" yaml:"spKey,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`

@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/sirupsen/logrus"
 )
@@ -15,7 +15,7 @@ import (
 var cookieUnsetTimestamp = time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC)
 
 type tokenManager interface {
-	GetToken(token string) (*v3.Token, int, error)
+	GetToken(token string) (accessor.TokenAccessor, int, error)
 	DeleteTokenByName(name string) (int, error)
 }
 
@@ -42,13 +42,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	isSecure := r.URL.Scheme == "https"
 
-	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName} {
+	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie} {
 		tokenCookie := &http.Cookie{
 			Name:     cookieName,
 			Value:    "",
 			Secure:   isSecure,
 			Path:     "/",
 			HttpOnly: true,
+			// Lax is the default in most browsers; setting it
+			// explicitly is a good security measure.
+			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 			Expires:  cookieUnsetTimestamp,
 		}
@@ -87,9 +90,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.tokenMgr.DeleteTokenByName(storedToken.Name)
+	_, err = h.tokenMgr.DeleteTokenByName(storedToken.GetFullName())
 	if err != nil { // NotFound is already handled by DeleteTokenByName.
-		logrus.Errorf("logout: deleting session token %s: %v", storedToken.Name, err)
+		logrus.Errorf("logout: deleting session token %s: %v", storedToken.GetFullName(), err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }

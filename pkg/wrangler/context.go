@@ -14,7 +14,6 @@ import (
 	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/lasso/pkg/metrics"
@@ -37,6 +36,8 @@ import (
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io"
 	projectv3 "github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io"
@@ -46,9 +47,11 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io"
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
-	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
+	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
+	namespaceclients "github.com/rancher/rancher/pkg/namespace/clients"
 	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/remotedialer"
@@ -148,15 +151,18 @@ type Context struct {
 	MultiClusterManager MultiClusterManager
 	TunnelServer        *remotedialer.Server
 	TunnelAuthorizer    *tunnelserver.Authorizers
+	TunnelSessions      *tunnelserver.SessionTracker
 	PeerManager         peermanager.PeerManager
 	Provisioning        provisioningv1.Interface
 	RBAC                rbacv1.Interface
 	Core                corev1.Interface
 	API                 apiregv1.Interface
 	CRD                 crdv1.Interface
-	K8s                 *namespace.Clientset
-	Plan                plancontrolers.Interface
+	K8s                 *namespaceclients.Clientset
+	Upgrade             upgradev1.Interface
 	Telemetry           telemetryv1.Interface
+	Plan                planv1alpha1.Interface
+	Operation           operationcontrollers.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -181,11 +187,13 @@ type Context struct {
 	fleet        *fleet.Factory
 	provisioning *provisioning.Factory
 	batch        *batch.Factory
-	core         *namespace.WranglerFactory
+	core         *namespaceclients.WranglerFactory
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
-	plan         *upgrade.Factory
+	upgrade      *upgrade.Factory
 	telemetry    *telemetry.Factory
+	plan         *plan.Factory
+	operation    *operation.Factory
 
 	started bool
 }
@@ -318,7 +326,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		*restConfigCopy = *w.RESTConfig
 		restConfigCopy.UserAgent = userAgent
 	}
-	k8sClientWithAgent, err := namespace.NewForConfig(restConfigCopy)
+	k8sClientWithAgent, err := namespaceclients.NewForConfig(restConfigCopy)
 	if err != nil {
 		logrus.Debugf("failed to set agent [%s] on k8s client: %v", userAgent, err)
 	}
@@ -346,7 +354,8 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.Core = wContextCopy.core.WithAgent(userAgent).V1()
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
-	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
+	wContextCopy.Upgrade = wContextCopy.upgrade.WithAgent(userAgent).V1()
+	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1alpha1()
 
 	return &wContextCopy
 }
@@ -373,14 +382,6 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
-	sharedOpts.CacheOptions = &cache.SharedCacheFactoryOptions{
-		// Due to a bug in a previous Rancher's extension apiserver for the token and kubeconfig APIs, we
-		// must disable the WatchList features for those APIs.
-		KindDisableWatchList: map[schema.GroupVersionKind]bool{
-			extv1api.SchemeGroupVersion.WithKind("Kubeconfig"): true,
-			extv1api.SchemeGroupVersion.WithKind("Token"):      true,
-		},
-	}
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
 		return nil, err
@@ -400,7 +401,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	plan, err := upgrade.NewFactoryFromConfigWithOptions(restConfig, opts)
+	upgrade, err := upgrade.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +460,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	if err != nil {
 		return nil, err
 	}
-	core := namespace.NewWranglerFactory(rCore)
+	core := namespaceclients.NewWranglerFactory(rCore)
 
 	api, err := apiregistration.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
@@ -476,7 +477,17 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	k8s, err := namespace.NewForConfig(restConfig)
+	plan, err := plan.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	operation, err := operation.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	k8s, err := namespaceclients.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +510,8 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac.Rbac().V1(),
 		content,
 		core.Core().V1().Pod(),
-		core.Core().V1().Node())
+		core.Core().V1().Node(),
+		core.Core().V1().Secret())
 
 	cache := memory.NewMemCacheClient(k8s.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
@@ -519,7 +531,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 
 	tunnelAuth := &tunnelserver.Authorizers{}
 	tunnelServer := remotedialer.New(tunnelAuth.Authorize, tunnelserver.ErrorWriter)
-	peerManager, err := tunnelserver.NewPeerManager(ctx, core.Core().V1().Endpoints(), tunnelServer)
+	peerManager, err := tunnelserver.NewPeerManager(ctx, core.Core().V1().Endpoints(), core.Core().V1().Service(), tunnelServer)
 	if err != nil {
 		return nil, err
 	}
@@ -565,8 +577,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
-		Plan:                    plan.Upgrade().V1(),
+		TunnelSessions:          tunnelserver.NewSessionTracker(),
+		Upgrade:                 upgrade.Upgrade().V1(),
 		Telemetry:               telemetry.Telemetry().V1(),
+		Plan:                    plan.Plan().V1alpha1(),
+		Operation:               operation.Operation().V1alpha1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -581,8 +596,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		crd:          crd,
 		rke:          rke,
 		rbac:         rbac,
-		plan:         plan,
+		upgrade:      upgrade,
 		telemetry:    telemetry,
+		plan:         plan,
+		operation:    operation,
 	}
 
 	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(wContext), "deferred-capi")

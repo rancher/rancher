@@ -15,10 +15,8 @@ const (
 	NodeStatusFieldInfo               = "info"
 	NodeStatusFieldLimits             = "limits"
 	NodeStatusFieldNodeAnnotations    = "nodeAnnotations"
-	NodeStatusFieldNodeConfig         = "rkeNode"
 	NodeStatusFieldNodeLabels         = "nodeLabels"
 	NodeStatusFieldNodeName           = "nodeName"
-	NodeStatusFieldNodePlan           = "nodePlan"
 	NodeStatusFieldNodeTaints         = "nodeTaints"
 	NodeStatusFieldRequested          = "requested"
 	NodeStatusFieldRuntimeHandlers    = "runtimeHandlers"
@@ -40,10 +38,8 @@ type NodeStatus struct {
 	Info               *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`
 	Limits             map[string]string         `json:"limits,omitempty" yaml:"limits,omitempty"`
 	NodeAnnotations    map[string]string         `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
-	NodeConfig         *RKEConfigNode            `json:"rkeNode,omitempty" yaml:"rkeNode,omitempty"`
 	NodeLabels         map[string]string         `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
 	NodeName           string                    `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
-	NodePlan           *NodePlan                 `json:"nodePlan,omitempty" yaml:"nodePlan,omitempty"`
 	NodeTaints         []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
 	Requested          map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
 	RuntimeHandlers    []NodeRuntimeHandler      `json:"runtimeHandlers,omitempty" yaml:"runtimeHandlers,omitempty"`

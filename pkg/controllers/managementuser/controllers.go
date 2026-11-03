@@ -6,11 +6,13 @@ import (
 
 	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/machinerole"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/machineroletaint"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
@@ -19,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotextrametadata"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
@@ -26,6 +29,8 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -46,14 +51,17 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	// For other clusters, we still need to wait for CAPI to be ready because
 	// registerProvV2 requires CAPI resources.
 	if cluster.ClusterName == "local" {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			nodesyncer.Register(ctx, cluster, nil, kubeConfigGetter)
 			return nil
 		})()
 	}
 
 	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		// The starter cannot block this goroutine, so it starts the controllers in the background.
+		// Failures are retried there and, if they persist, reported through
+		// UserContext.OnDeferredStartError.
+		cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			// For non-local clusters, register nodesyncer with CAPI context
 			if cluster.ClusterName != "local" {
 				nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
@@ -82,7 +90,11 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if err != nil {
 			return err
 		}
-		clusterauthtoken.Register(ctx, cluster)
+		secretsCache, err := clusterauthtoken.RegisterFactory(cluster)
+		if err != nil {
+			return fmt.Errorf("registering clusterauthtoken factory: %w", err)
+		}
+		clusterauthtoken.Register(ctx, cluster, secretsCache)
 	}
 
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
@@ -94,20 +106,56 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	}
 
 	// Just register the snapshot controller if the cluster is administrated by rancher.
-	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if pkgcluster.IsAdministrated(clusterRec) {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 			cluster.K3s = k3s.New(cluster.ControllerFactory)
-			snapshotbackpopulate.Register(ctx, cluster, capi)
+			snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
 		}
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,
 			cluster.ClusterName,
-			cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
+			cluster.ClusterUID,
+			cluster.Management.Wrangler.Mgmt.Cluster().Cache(),
 			cluster.Catalog.V1().App(),
-			cluster.Plan.V1().Plan(),
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
+	} else {
+		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+			resources, err := cluster.K8sClient.Discovery().ServerResourcesForGroupVersion("k3s.cattle.io/v1")
+			if apierrors.IsNotFound(err) {
+				logrus.Tracef("refusing to start snapshotbackpopulate controller for non RKE2/K3s cluster")
+			} else if err != nil {
+				logrus.Errorf("failed to find k3s server resources: %v", err)
+			} else if resources == nil || len(resources.APIResources) == 0 {
+				logrus.Tracef("skipping snapshotbackpopulate controller because k3s.cattle.io/v1 returned no resources")
+			} else {
+				found := false
+				for _, resource := range resources.APIResources {
+					if resource.Kind == "ETCDSnapshotFile" {
+						cluster.K3s = k3s.New(cluster.ControllerFactory)
+						snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
+						// Publish the extra metadata ConfigMap so snapshots taken from here carry
+						// the resources/restoreModes payload the restore modes resolve against.
+						//
+						// Deliberately not registered for rancher-administrated (v2prov) clusters:
+						// pkg/capr/planner/manifests.go already writes a ConfigMap of the same name
+						// there as an auto-deploy manifest, carrying the legacy
+						// provisioning-cluster-spec key, and this controller replaces Data
+						// wholesale. Until the two writers are reconciled, v2prov keeps using the
+						// legacy payload.
+						snapshotextrametadata.Register(ctx, cluster, capi)
+						found = true
+						break
+					}
+				}
+				if !found {
+					logrus.Tracef("skipping snapshotbackpopulate controller because ETCDSnapshotFile is not served downstream")
+				}
+			}
+		}
 	}
-	machinerole.Register(ctx, cluster)
+
+	machinerole.Register(ctx, cluster, capi)
+	machineroletaint.Register(ctx, cluster, capi, clusterRec)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {
@@ -131,7 +179,7 @@ func registerCaches(cluster *config.UserContext) {
 
 // PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start
 // the functions should return an error if they fail, and the start of the controllers will be blocked until all of them succeed
-func PreBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+func PreBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) error {
 	if cluster.ClusterName == "local" {
 		return nil
 	}

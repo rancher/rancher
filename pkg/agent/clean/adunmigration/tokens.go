@@ -2,6 +2,7 @@ package adunmigration
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -58,6 +59,11 @@ func updateToken(tokenInterface v3norman.TokenInterface, userToken v3.Token, new
 	latestToken.UserPrincipal.LoginName = targetPrincipal.LoginName
 	latestToken.UserPrincipal.DisplayName = targetPrincipal.DisplayName
 	latestToken.UserID = targetUser.Name
+	// A token moved to a local principal now belongs to the local provider.
+	if strings.HasPrefix(newPrincipalID, localPrefix) {
+		latestToken.AuthProvider = localName
+		latestToken.UserPrincipal.Provider = localName
+	}
 
 	// If we get an internal error during any of these ops, there's a good chance the webhook is overwhelmed.
 	// We'll take the opportunity to rate limit ourselves and try again a few times.

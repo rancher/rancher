@@ -1,6 +1,7 @@
 package logstream
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -106,4 +107,21 @@ func (l *loggerStream) Close() {
 	lock.Lock()
 	delete(logs, l.id)
 	lock.Unlock()
+}
+
+// contextKey is an unexported type for context keys in this package
+type contextKey struct{}
+
+// LoggerKey is the exported key for storing/retrieving a logger in context
+var loggerKey = contextKey{}
+
+// SetLogger stores a Logger in the context
+func SetLogger(ctx context.Context, logger Logger) context.Context {
+	return context.WithValue(ctx, loggerKey, logger)
+}
+
+// GetLogger retrieves a Logger from the context, returns nil if not found
+func GetLogger(ctx context.Context) Logger {
+	logger, _ := ctx.Value(loggerKey).(Logger)
+	return logger
 }

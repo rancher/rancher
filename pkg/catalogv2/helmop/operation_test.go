@@ -1,11 +1,11 @@
 package helmop
 
 import (
-	"fmt"
-	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
-	corev1 "k8s.io/api/core/v1"
 	"strings"
 	"testing"
+
+	"github.com/rancher/rancher/pkg/settings"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +22,6 @@ type createPodTestCase struct {
 	expected      *corev1.Pod
 	failMsg       string
 	secretData    map[string][]byte
-	kustomize     bool
 	imageOverride string
 	tolerations   []corev1.Toleration
 }
@@ -42,29 +41,10 @@ func Test_Render(t *testing.T) {
 			commands: Commands{
 				Command{
 					Operation:   "upgrade",
-					ChartFile:   "test-chart-v1.1.0.tgz",
-					Chart:       []byte("test-chart"),
-					Kustomize:   true,
-					ReleaseName: "test1",
-				},
-			},
-			expected: map[string][]byte{
-				"operation000":          []byte(strings.Join([]string{"upgrade", "--post-renderer=/home/shell/kustomize.sh", "test1", "/home/shell/helm-run/test-chart-v1.1.0.tgz"}, "\x00")),
-				"kustomization000.yaml": []byte(fmt.Sprintf(kustomization, "000")),
-				"transform000.yaml":     []byte(fmt.Sprintf(transform, "test1")),
-				"test-chart-v1.1.0.tgz": []byte("test-chart"),
-			},
-			failMsg: "kustomize enabled test case failed",
-		},
-		{
-			commands: Commands{
-				Command{
-					Operation:   "upgrade",
 					ValuesFile:  "values-test-chart-v1.1.0.yaml",
 					Values:      []byte("{\"a\":\"a\"}"),
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test2",
 				},
 			},
@@ -81,7 +61,6 @@ func Test_Render(t *testing.T) {
 					Operation:   "upgrade",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test3",
 				},
 			},
@@ -97,7 +76,6 @@ func Test_Render(t *testing.T) {
 					Operation:   "install",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test4",
 				},
 			},
@@ -113,7 +91,6 @@ func Test_Render(t *testing.T) {
 					Operation:   "uninstall",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test5",
 				},
 			},
@@ -126,35 +103,204 @@ func Test_Render(t *testing.T) {
 		{
 			commands: Commands{
 				Command{
-					Operation:   "upgrade",
+					Operation:   "install",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   true,
 					ReleaseName: "test6",
-					ArgObjects: []interface{}{types.ChartInstallAction{
-						OperationTolerations: []corev1.Toleration{
-							{
-								Key:      "foo",
-								Operator: "equals",
-								Value:    "bar",
-								Effect:   "NoSchedule",
-							},
-							{
-								Key:      "foo2",
-								Operator: "equals",
-								Value:    "bar2",
-								Effect:   "NoSchedule",
-							}},
-					}},
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"skipSchemaValidation": true,
+						},
+					},
 				},
 			},
 			expected: map[string][]byte{
-				"operation000":          []byte(strings.Join([]string{"upgrade", "--post-renderer=/home/shell/kustomize.sh", "test6", "/home/shell/helm-run/test-chart-v1.1.0.tgz"}, "\x00")),
-				"kustomization000.yaml": []byte(fmt.Sprintf(kustomization, "000")),
-				"transform000.yaml":     []byte(fmt.Sprintf(transform, "test6")),
+				"operation000":          []byte(strings.Join([]string{"install", "--skip-schema-validation=true", "test6", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
 				"test-chart-v1.1.0.tgz": []byte("test-chart"),
 			},
-			failMsg: "operation toleration test case failed",
+			failMsg: "skip schema validation test case failed",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test7",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--force-conflicts=true", "--server-side=true", "--take-ownership=true", "test7", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "take ownership test case failed",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test8",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--take-ownership=false", "test8", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "take ownership false should not add force-conflicts or server-side",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test9",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"serverSide": false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--server-side=false", "test9", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "serverSide false should add --server-side=false",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test10",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"serverSide": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--server-side=true", "test10", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "serverSide true should add --server-side=true",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test11",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": true,
+							"serverSide":    false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--force-conflicts=true", "--server-side=true", "--take-ownership=true", "test11", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "takeOwnership true should force server-side even if serverSide is false",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test12",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": true,
+							"serverSide":    true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--force-conflicts=true", "--server-side=true", "--take-ownership=true", "test12", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "takeOwnership true and serverSide true should resolve correctly to server-side=true without duplication",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test-wait-true",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"wait": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--wait=watcher", "test-wait-true", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "wait true should translate to --wait=watcher for Helm v4",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test-wait-false",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"wait": false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "test-wait-false", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "wait false should omit --wait flag, allowing Helm v4 to use its default (hookOnly)",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test-wait-omitted",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"namespace": "default",
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--namespace=default", "test-wait-omitted", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "wait field omitted should not add --wait flag, allowing Helm v4 to use its default (hookOnly)",
 		},
 	}
 
@@ -262,9 +408,41 @@ func Test_CreatePod(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		actual, _ := testCase.operation.createPod(testCase.secretData, testCase.kustomize, testCase.imageOverride, testCase.tolerations)
+		actual, _ := testCase.operation.createPod(testCase.secretData, testCase.imageOverride, testCase.tolerations)
 		asserts.ElementsMatch(testCase.expected.Spec.Tolerations, actual.Spec.Tolerations, testCase.failMsg)
 	}
+}
+
+func Test_CreatePod_ImagePullSecrets(t *testing.T) {
+	asserts := assert.New(t)
+
+	// Set up global registry with pull secrets
+	withSettings(t, "registry.example.com", "pull-secret-a,pull-secret-b")
+
+	operation := Operations{
+		namespace: "test-ns",
+	}
+
+	actual, _ := operation.createPod(nil, "", nil)
+	expectedPullSecrets := []corev1.LocalObjectReference{
+		{Name: "pull-secret-a"},
+		{Name: "pull-secret-b"},
+	}
+	asserts.Equal(expectedPullSecrets, actual.Spec.ImagePullSecrets, "Pod should have imagePullSecrets when global registry pull secrets are configured")
+}
+
+func Test_CreatePod_NoImagePullSecrets(t *testing.T) {
+	asserts := assert.New(t)
+
+	// Ensure no registry is configured
+	withSettings(t, "", "")
+
+	operation := Operations{
+		namespace: "test-ns",
+	}
+
+	actual, _ := operation.createPod(nil, "", nil)
+	asserts.Nil(actual.Spec.ImagePullSecrets, "Pod should not have imagePullSecrets when no global registry is configured")
 }
 
 func Test_mergeTolerations(t *testing.T) {
@@ -326,4 +504,15 @@ func Test_mergeTolerations(t *testing.T) {
 		resp := mergeTolerations(t.tolerations, t.newTolerations)
 		asserts.ElementsMatch(resp, t.expected, t.name)
 	}
+}
+
+func withSettings(t *testing.T, sdr, pullSecrets string) {
+	curSdr := settings.SystemDefaultRegistry.Get()
+	curSdrPull := settings.SystemDefaultRegistryPullSecrets.Get()
+	settings.SystemDefaultRegistry.Set(sdr)
+	settings.SystemDefaultRegistryPullSecrets.Set(pullSecrets)
+	t.Cleanup(func() {
+		settings.SystemDefaultRegistry.Set(curSdr)
+		settings.SystemDefaultRegistryPullSecrets.Set(curSdrPull)
+	})
 }

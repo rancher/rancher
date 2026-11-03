@@ -52,6 +52,8 @@ var (
 		"content-length":          true,
 		"x-api-auth-header":       true,
 		"x-api-cattleauth-header": true,
+		"authorization":           true,
+		"cookie":                  true,
 		"cf-connecting-ip":        true,
 		"cf-ray":                  true,
 	}
@@ -139,14 +141,34 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
 	}
 
-	return &httputil.ReverseProxy{
-		Director: func(req *http.Request) {
-			if err := p.proxy(req); err != nil {
-				logrus.Infof("Failed to proxy: %v", err)
-			}
-		},
+	return stripInheritedCSP(newHandler(&p)), nil
+}
+
+// newHandler rewrites the request and hands it to the reverse proxy, or responds
+// with 502 if the rewrite fails.
+func newHandler(p *proxy) http.Handler {
+	rp := &httputil.ReverseProxy{
+		Director:       func(*http.Request) {},
 		ModifyResponse: setModifiedHeaders,
-	}, nil
+	}
+
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if err := p.proxy(req); err != nil {
+			logrus.Infof("Failed to proxy: %v", err)
+			http.Error(rw, "Bad Gateway", http.StatusBadGateway)
+			return
+		}
+
+		rp.ServeHTTP(rw, req)
+	})
+}
+
+// stripInheritedCSP drops the inherited Content-Security-Policy so that the one setModifiedHeaders sets is the only one sent.
+func stripInheritedCSP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Del(CSP)
+		next.ServeHTTP(rw, req)
+	})
 }
 
 func setModifiedHeaders(res *http.Response) error {
@@ -213,6 +235,9 @@ func (p *proxy) proxy(req *http.Request) error {
 	req.URL = destURL
 	req.Header = headerCopy
 
+	// Runs before the branches below, some of which return early.
+	replaceCookies(req)
+
 	if auth != "" { // non-empty AuthHeader is noop
 		req.Header.Set(AuthHeader, auth)
 	} else if cAuth != "" {
@@ -224,8 +249,6 @@ func (p *proxy) proxy(req *http.Request) error {
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
-
-	replaceCookies(req)
 
 	return nil
 }

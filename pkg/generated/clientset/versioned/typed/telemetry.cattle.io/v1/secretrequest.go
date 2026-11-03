@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	telemetrycattleiov1 "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1"
+	applyconfigurationtelemetrycattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/telemetry.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type SecretRequestInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*telemetrycattleiov1.SecretRequestList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *telemetrycattleiov1.SecretRequest, err error)
+	Apply(ctx context.Context, secretRequest *applyconfigurationtelemetrycattleiov1.SecretRequestApplyConfiguration, opts metav1.ApplyOptions) (result *telemetrycattleiov1.SecretRequest, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, secretRequest *applyconfigurationtelemetrycattleiov1.SecretRequestApplyConfiguration, opts metav1.ApplyOptions) (result *telemetrycattleiov1.SecretRequest, err error)
 	SecretRequestExpansion
 }
 
 // secretRequests implements SecretRequestInterface
 type secretRequests struct {
-	*gentype.ClientWithList[*telemetrycattleiov1.SecretRequest, *telemetrycattleiov1.SecretRequestList]
+	*gentype.ClientWithListAndApply[*telemetrycattleiov1.SecretRequest, *telemetrycattleiov1.SecretRequestList, *applyconfigurationtelemetrycattleiov1.SecretRequestApplyConfiguration]
 }
 
 // newSecretRequests returns a SecretRequests
 func newSecretRequests(c *TelemetryV1Client) *secretRequests {
 	return &secretRequests{
-		gentype.NewClientWithList[*telemetrycattleiov1.SecretRequest, *telemetrycattleiov1.SecretRequestList](
+		gentype.NewClientWithListAndApply[*telemetrycattleiov1.SecretRequest, *telemetrycattleiov1.SecretRequestList, *applyconfigurationtelemetrycattleiov1.SecretRequestApplyConfiguration](
 			"secretrequests",
 			c.RESTClient(),
 			scheme.ParameterCodec,

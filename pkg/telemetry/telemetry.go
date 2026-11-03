@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	v3ctrl "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -55,6 +56,7 @@ type RancherManagerTelemetry interface {
 
 	LocalNodeCount() int
 	LocalClusterTelemetry() ClusterTelemetry
+	IsNVIDIAPresent() bool
 
 	// RancherVersionTelemetry exposes versioning related metadata
 	RancherVersionTelemetry
@@ -140,17 +142,22 @@ func (n *nodeTelemetryImpl) KernelVersion() string {
 }
 
 type rancherTelemetryImpl struct {
-	rancherVersion string
-	gitHash        string
-	installUUID    string
-	clusterUUID    string
-	serverURL      string
+	rancherVersion  string
+	gitHash         string
+	installUUID     string
+	clusterUUID     string
+	serverURL       string
+	isNVIDIAPresent bool
 
 	localCluster *v3.Cluster
 	localNodes   []*v3.Node
 
 	managedClusters []*v3.Cluster
 	managedNodes    map[ClusterID][]*v3.Node
+}
+
+func (r *rancherTelemetryImpl) IsNVIDIAPresent() bool {
+	return r.isNVIDIAPresent
 }
 
 var _ RancherManagerTelemetry = (*rancherTelemetryImpl)(nil)
@@ -256,18 +263,27 @@ type TelemetryGatherer struct {
 	clusterUUID    string
 	serverURL      string
 
-	nodeCache    v3ctrl.NodeCache
 	clusterCache v3ctrl.ClusterCache
+	secretCache  wcorev1.SecretCache
+	nodeCache    v3ctrl.NodeCache
 }
 
 func NewTelemetryGatherer(
 	clusterCache v3ctrl.ClusterCache,
 	nodeCache v3ctrl.NodeCache,
+	secretCache wcorev1.SecretCache,
 ) TelemetryGatherer {
 	return TelemetryGatherer{
 		clusterCache: clusterCache,
 		nodeCache:    nodeCache,
+		secretCache:  secretCache,
 	}
+}
+
+// isNVIDIAPresent checks if the nvidia-registry secret is created in the SUSE AI Factory namespace
+func (t *TelemetryGatherer) isNVIDIAPresent() bool {
+	_, err := t.secretCache.Get("aif-operator", "nvidia-registry")
+	return err == nil
 }
 
 func (t *TelemetryGatherer) visitWithInitInfo(info initcond.InitInfo) {
@@ -317,6 +333,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 		t.installUUID,
 		t.clusterUUID,
 		t.serverURL,
+		t.isNVIDIAPresent(),
 		localCluster,
 		localNodes,
 		managedCls,
@@ -330,6 +347,7 @@ func newTelemetryImpl(
 	installUUID,
 	clusterUUID string,
 	serverURL string,
+	isNVIDIAPresent bool,
 	localCluster *v3.Cluster,
 	localNodes []*v3.Node,
 	clList []*v3.Cluster,
@@ -345,6 +363,7 @@ func newTelemetryImpl(
 		localNodes:      localNodes,
 		managedClusters: clList,
 		managedNodes:    nodeMap,
+		isNVIDIAPresent: isNVIDIAPresent,
 	}
 }
 

@@ -25,6 +25,7 @@ import (
 var (
 	agentImage        = os.Getenv("CATTLE_AGENT_IMAGE")
 	bootstrapPassword = os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
+	rancherHost       = os.Getenv("CATTLE_RANCHER_HOST")
 )
 
 const (
@@ -35,8 +36,12 @@ const (
 func main() {
 	rancherConfig := new(rancherClient.Config)
 
-	ipAddress := getOutboundIP()
-	hostURL := fmt.Sprintf("%s:443", ipAddress.String())
+	var hostURL string
+	if rancherHost != "" {
+		hostURL = rancherHost
+	} else {
+		hostURL = fmt.Sprintf("%s:443", getOutboundIP().String())
+	}
 
 	var userToken *management.Token
 	logrus.Infof("CATTLE AGENT IS %s", agentImage)
@@ -64,6 +69,7 @@ func main() {
 	rancherConfig.Host = hostURL
 	rancherConfig.Cleanup = &cleanup
 	rancherConfig.ClusterName = clusterName
+	rancherConfig.AdminPassword = bootstrapPassword
 
 	if err := defaults.Set(rancherConfig); err != nil {
 		logrus.Fatalf("error with setting up config file: %v", err)
@@ -84,7 +90,6 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("error creating and importing a k3d cluster: %v", err)
 	}
-
 }
 
 // Get preferred outbound ip of this machine

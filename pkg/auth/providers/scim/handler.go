@@ -3,7 +3,7 @@ package scim
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -18,10 +18,12 @@ type SCIMServer struct {
 	userAttributeCache v3.UserAttributeCache
 	userAttributes     v3.UserAttributeClient
 	userMGR            user.Manager
+	getConfig          func(provider string) scimconfig.Config
 }
 
 // NewHandler instantiates [SCIMServer] and returns an [http.Handler] that serves SCIM API endpoints.
 func NewHandler(scaledContext *config.ScaledContext) http.Handler {
+	configMapCache := scaledContext.Wrangler.Core.ConfigMap().Cache()
 	srv := &SCIMServer{
 		groups:             scaledContext.Wrangler.Mgmt.Group(),
 		groupsCache:        scaledContext.Wrangler.Mgmt.Group().Cache(),
@@ -30,32 +32,45 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 		userAttributeCache: scaledContext.Wrangler.Mgmt.UserAttribute().Cache(),
 		userAttributes:     scaledContext.Wrangler.Mgmt.UserAttribute(),
 		userMGR:            scaledContext.UserManager,
+		getConfig: func(provider string) scimconfig.Config {
+			return scimconfig.Get(configMapCache, provider)
+		},
 	}
 
-	authenticator := NewTokenAuthenticator(scaledContext.Wrangler)
+	authenticator := NewTokenAuthenticator(scaledContext)
+	rateLimiter := newRateLimiter(func(provider string) (int, int) {
+		cfg := srv.getConfig(provider)
+		return cfg.RateLimitRequestsPerSecond, cfg.RateLimitBurst
+	})
 
-	r := mux.NewRouter().UseEncodedPath().StrictSlash(true)
-	r.Use(authenticator.Authenticate)
-	// Discovery.
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/ServiceProviderConfig").HandlerFunc(srv.GetServiceProviderConfig)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/ResourceTypes").HandlerFunc(srv.ListResourceTypes)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/ResourceTypes/{id}").HandlerFunc(srv.GetResourceType)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Schemas").HandlerFunc(srv.ListSchemas)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Schemas/{id}").HandlerFunc(srv.GetSchema)
-	// Users.
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Users").HandlerFunc(srv.ListUsers)
-	r.Methods(http.MethodPost).Path(URLPrefix + "/{provider}/Users").HandlerFunc(srv.CreateUser)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.GetUser)
-	r.Methods(http.MethodPut).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.UpdateUser)
-	r.Methods(http.MethodPatch).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.PatchUser)
-	r.Methods(http.MethodDelete).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.DeleteUser)
-	// Groups.
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Groups").HandlerFunc(srv.ListGroups)
-	r.Methods(http.MethodPost).Path(URLPrefix + "/{provider}/Groups").HandlerFunc(srv.CreateGroup)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.GetGroup)
-	r.Methods(http.MethodPut).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.UpdateGroup)
-	r.Methods(http.MethodPatch).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.PatchGroup)
-	r.Methods(http.MethodDelete).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.DeleteGroup)
+	r := http.NewServeMux()
+
+	middlewares := func(h http.HandlerFunc) http.HandlerFunc {
+		return authenticator.Authenticate(rateLimiter.Wrap(h)).ServeHTTP
+	}
+
+	// Discovery endpoints
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ServiceProviderConfig", middlewares(srv.GetServiceProviderConfig))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes", middlewares(srv.ListResourceTypes))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes/{id}", middlewares(srv.GetResourceType))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas", middlewares(srv.ListSchemas))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas/{id}", middlewares(srv.GetSchema))
+
+	// User endpoints
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users", middlewares(srv.ListUsers))
+	r.HandleFunc("POST "+URLPrefix+"/{provider}/Users", middlewares(srv.CreateUser))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.GetUser))
+	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.UpdateUser))
+	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.PatchUser))
+	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.DeleteUser))
+
+	// Group endpoints
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups", middlewares(srv.ListGroups))
+	r.HandleFunc("POST "+URLPrefix+"/{provider}/Groups", middlewares(srv.CreateGroup))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.GetGroup))
+	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.UpdateGroup))
+	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.PatchGroup))
+	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.DeleteGroup))
 
 	return r
 }

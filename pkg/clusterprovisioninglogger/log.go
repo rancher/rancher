@@ -24,17 +24,15 @@ const (
 
 type logger struct {
 	Cluster    *v3.Cluster
-	Clusters   v3.ClusterInterface
 	ConfigMaps v1.ConfigMapInterface
 	done       chan struct{}
 	buffer     bytes.Buffer
 	bufferLock sync.Mutex
 }
 
-func NewLogger(clusters v3.ClusterInterface, configMaps v1.ConfigMapInterface, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
+func NewLogger(configMaps v1.ConfigMapInterface, cluster *v3.Cluster, cond condition.Cond) (context.Context, io.Closer) {
 	l := &logger{
 		Cluster:    cluster,
-		Clusters:   clusters,
 		ConfigMaps: configMaps,
 		done:       make(chan struct{}),
 	}

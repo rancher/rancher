@@ -18,6 +18,7 @@ const (
 	PodFieldDescription                   = "description"
 	PodFieldEnableServiceLinks            = "enableServiceLinks"
 	PodFieldEphemeralContainers           = "ephemeralContainers"
+	PodFieldEvictionResponders            = "evictionResponders"
 	PodFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	PodFieldFsgid                         = "fsgid"
 	PodFieldGids                          = "gids"
@@ -50,6 +51,7 @@ const (
 	PodFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	PodFieldScheduling                    = "scheduling"
 	PodFieldSchedulingGates               = "schedulingGates"
+	PodFieldSchedulingGroup               = "schedulingGroup"
 	PodFieldSeccompProfile                = "seccompProfile"
 	PodFieldServiceAccountName            = "serviceAccountName"
 	PodFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
@@ -69,7 +71,6 @@ const (
 	PodFieldWindowsOptions                = "windowsOptions"
 	PodFieldWorkloadID                    = "workloadId"
 	PodFieldWorkloadMetrics               = "workloadMetrics"
-	PodFieldWorkloadRef                   = "workloadRef"
 )
 
 type Pod struct {
@@ -86,6 +87,7 @@ type Pod struct {
 	Description                   string                         `json:"description,omitempty" yaml:"description,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -118,6 +120,7 @@ type Pod struct {
 	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
 	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
@@ -137,7 +140,6 @@ type Pod struct {
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
 	WorkloadID                    string                         `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type PodCollection struct {

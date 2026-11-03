@@ -7,7 +7,6 @@ import (
 	"time"
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/mux"
 	v3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -71,17 +70,18 @@ func TestIsTokenExpired(t *testing.T) {
 func TestServiceAccountAuthAuthenticate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name                  string
-		startUser             string
-		expectedUser          string
-		settingEnabled        bool
-		token                 string
-		tokenReviewAuthStatus bool
-		downstreamRequest     *http.Request
-		clusterID             string
-		isAuthenticated       bool
-		expectedError         bool
-		omitProxyConfig       bool
+		name                   string
+		startUser              string
+		expectedUser           string
+		settingEnabled         bool
+		token                  string
+		tokenReviewAuthStatus  bool
+		tokenReviewStatusError string
+		downstreamRequest      *http.Request
+		clusterID              string
+		isAuthenticated        bool
+		expectedError          bool
+		omitProxyConfig        bool
 	}{
 		{
 			name: "everything valid auth succeeds secure mode",
@@ -224,6 +224,43 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 			isAuthenticated:       true,
 			expectedError:         false,
 		},
+		// A successful HTTP response from the downstream cluster can still carry a
+		// non-empty Status.Error. The authenticator should treat this as a failure
+		// and return unauthenticated, not trust the Status.User or Status.Authenticated fields.
+		{
+			name: "token review status error should not authenticate",
+			token: makeJWT(jwtv5.MapClaims{
+				"sub": "system:serviceaccount:vault:token-reviewer",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			}),
+			startUser:              "system:cattle:error",
+			expectedUser:           "system:cattle:error",
+			settingEnabled:         true,
+			tokenReviewAuthStatus:  false,
+			tokenReviewStatusError: "token has been revoked",
+			downstreamRequest:      generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:              "testclusterid",
+			isAuthenticated:        false,
+			expectedError:          false,
+		},
+		{
+			name: "token review status error with authenticated true should not authenticate",
+			// Kubernetes should never set Authenticated=true alongside a non-empty
+			// Error, but a defensive implementation must handle this edge case.
+			token: makeJWT(jwtv5.MapClaims{
+				"sub": "system:serviceaccount:vault:token-reviewer",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			}),
+			startUser:              "system:cattle:error",
+			expectedUser:           "system:cattle:error",
+			settingEnabled:         true,
+			tokenReviewAuthStatus:  true,
+			tokenReviewStatusError: "token lookup failed",
+			downstreamRequest:      generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:              "testclusterid",
+			isAuthenticated:        false,
+			expectedError:          false,
+		},
 	}
 
 	for _, test := range tests {
@@ -266,6 +303,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 							},
 							Status: v1.TokenReviewStatus{
 								Authenticated: test.tokenReviewAuthStatus,
+								Error:         test.tokenReviewStatusError,
 								Audiences:     []string{},
 								User: v1.UserInfo{
 									Username: test.expectedUser,
@@ -286,7 +324,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 			}
 			currentContext := req.Context()
 			req = req.WithContext(k8sRequest.WithUser(currentContext, startUserInfo))
-			req = mux.SetURLVars(req, map[string]string{"clusterID": test.clusterID})
+			req.SetPathValue("clusterID", test.clusterID)
 			user, isAuthenticated, err := auth.Authenticate(req.WithContext(req.Context()))
 
 			if test.expectedError {

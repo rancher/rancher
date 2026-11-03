@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
@@ -39,6 +40,7 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		apiRequest.WriteError(validation.Unauthorized)
 		return
 	}
+
 	var tokenKey string
 	var err error
 	generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
@@ -47,6 +49,22 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		if err != nil {
 			apiRequest.WriteError(err)
 			return
+		}
+	}
+
+	var execUser *kubeconfig.ExecUser
+	execGetToken := strings.EqualFold(settings.KubeconfigExecGetToken.Get(), "true")
+	if !generateToken && execGetToken {
+		authToken, err := k.authToken.TokenFromRequest(req)
+		if err != nil {
+			apiRequest.WriteError(err)
+			return
+		}
+		// Tokens that belong to no AuthConfig leave the CLI to ask for one.
+		configName, _ := common.ConfigNameFromToken(authToken)
+		execUser = &kubeconfig.ExecUser{
+			ID:         userName.GetName(),
+			ConfigName: configName,
 		}
 	}
 
@@ -61,7 +79,7 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			host = apiRequest.Request.Host
 		}
 	}
-	cfg, err := kubeconfig.ForTokenBased(apiRequest.Name, apiRequest.Name, host, tokenKey)
+	cfg, err := kubeconfig.ForTokenBased(apiRequest.Name, apiRequest.Name, host, tokenKey, execUser)
 	if err != nil {
 		apiRequest.WriteError(err)
 		return
@@ -91,7 +109,6 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
-		AuthProvider:  authToken.GetAuthProvider(),
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
 		UserPrincipal: authToken.GetUserPrincipal(),

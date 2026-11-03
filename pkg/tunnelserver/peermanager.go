@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	gonet "net"
 	"os"
 	"strings"
 	"sync"
@@ -21,13 +22,13 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
-func NewPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
-	return startPeerManager(ctx, endpoints, dialer)
+func NewPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, services corecontrollers.ServiceController, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
+	return startPeerManager(ctx, endpoints, services, dialer)
 }
 
 type peerManager struct {
@@ -84,7 +85,7 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 	return secret.Data[v1.ServiceAccountTokenKey], nil
 }
 
-func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {
+func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, services corecontrollers.ServiceController, server *remotedialer.Server) (peermanager.PeerManager, error) {
 	tokenBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if os.IsNotExist(err) || settings.Namespace.Get() == "" || settings.PeerServices.Get() == "" {
 		logrus.Infof("Running in single server mode, will not peer connections")
@@ -98,7 +99,12 @@ func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsCo
 		return nil, err
 	}
 
-	ip, err := net.ChooseHostInterface()
+	primaryFamily := detectPrimaryIPFamily(services, settings.Namespace.Get(), settings.PeerServices.Get())
+	if primaryFamily != "" {
+		logrus.Infof("Detected primary IP family %s from peer service", primaryFamily)
+	}
+
+	ip, err := choosePeerIP(primaryFamily)
 	if err != nil {
 		return nil, errors.Wrap(err, "choosing interface IP")
 	}
@@ -230,4 +236,40 @@ func (p *peerManager) Leader() {
 
 	p.leader = true
 	p.notify()
+}
+
+// detectPrimaryIPFamily queries the Kubernetes Service for the peer service
+// to determine the primary IP address family used for Endpoints.
+// Returns v1.IPv6Protocol if the Service's primary IP family is IPv6,
+// v1.IPv4Protocol if IPv4, or empty string if detection fails.
+func detectPrimaryIPFamily(services corecontrollers.ServiceController, namespace string, peerServices string) v1.IPFamily {
+	for _, svc := range strings.Split(peerServices, ",") {
+		svcName := strings.TrimSpace(svc)
+		if svcName == "" {
+			continue
+		}
+		service, err := services.Get(namespace, svcName, metav1.GetOptions{})
+		if err != nil {
+			logrus.Debugf("Could not get service %s/%s to detect IP family: %v", namespace, svcName, err)
+			continue
+		}
+		if len(service.Spec.IPFamilies) > 0 {
+			return service.Spec.IPFamilies[0]
+		}
+	}
+	return ""
+}
+
+// choosePeerIP selects the local IP address to use as the peer ID.
+// If the primary family is IPv6, it attempts to resolve an IPv6 address.
+// Otherwise, it falls back to the default behavior (IPv4 preference).
+func choosePeerIP(family v1.IPFamily) (gonet.IP, error) {
+	if family == v1.IPv6Protocol {
+		ip, err := utilnet.ResolveBindAddress(gonet.IPv6unspecified)
+		if err == nil {
+			return ip, nil
+		}
+		logrus.Warnf("Failed to resolve IPv6 bind address, falling back to default: %v", err)
+	}
+	return utilnet.ChooseHostInterface()
 }

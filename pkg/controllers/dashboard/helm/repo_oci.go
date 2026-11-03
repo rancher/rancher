@@ -24,8 +24,8 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,8 +121,8 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	var index *repo.IndexFile
 
 	// If repo is disabled, then don't update the clusterrepo
-	if clusterRepo.Spec.Enabled != nil && !*clusterRepo.Spec.Enabled {
-		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
+	if isDisabled(clusterRepo) {
+		return setErrorCondition(clusterRepo, nil, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)

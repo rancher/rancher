@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/rancher/internal/http/route"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/customization/aks"
 	"github.com/rancher/rancher/pkg/api/norman/customization/alibaba"
@@ -45,8 +46,14 @@ import (
 func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
-		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
-		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
+		connectHandler = scaledContext.Wrangler.TunnelSessions.Handler(scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer)
+		clusterImport  = clusterregistrationtokens.ClusterImport{
+			Clusters:     scaledContext.Management.Clusters(""),
+			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
+			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
+			SecretIndexer:   scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
+			NamespaceLister: scaledContext.Core.Namespaces("").Controller().Lister(),
+		}
 	)
 
 	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
@@ -80,8 +87,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 
 	supportConfigGenerator := supportconfigs.NewHandler(scaledContext)
 	// Unauthenticated routes
-	unauthed := mux.NewRouter()
-	unauthed.UseEncodedPath()
+	unauthed := http.NewServeMux()
 
 	publicLimit, err := settings.APIBodyLimit.GetQuantityAsInt64(1024 * 1024)
 	if err != nil {
@@ -90,83 +96,140 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	logrus.Infof("Configuring public API body limit to %v bytes", publicLimit)
 	limitingHandler := utils.APIBodyLimitingHandler(publicLimit)
 
-	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
-	unauthed.Handle("/v3/connect", connectHandler)
-	unauthed.Handle("/v3/connect/register", connectHandler)
-	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
-	unauthed.Handle("/v3/settings/cacerts", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/first-login", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-banners", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-brand", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/rancherversion", version.NewVersionHandler())
-	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
-	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
-	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
-	if features.V3Public.Enabled() {
-		unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
-	}
-	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
-	if features.SCIM.Enabled() {
-		unauthed.PathPrefix(scim.URLPrefix).Handler(scim.NewHandler(scaledContext))
-	}
+	handler := sar.NewSubjectAccessReview(
+		scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews())
+	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, handler)
 
-	// Authenticated routes
-	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))
 	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
 	accessControlHandler := rbac.NewAccessControlHandler()
 
-	saauthed := mux.NewRouter()
-	saauthed.UseEncodedPath()
-	saauthed.PathPrefix("/k8s/clusters/{clusterID}").Handler(k8sProxy)
-	saauthed.PathPrefix("/k8s/proxy/{clusterID}").Handler(k8sProxy)
-	saauthed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth.ImpersonationMiddleware)))
-	saauthed.Use(mux.MiddlewareFunc(accessControlHandler))
-	saauthed.Use(requests.NewAuthenticatedFilter)
+	// Setup middlewares for the service account authenticated routes.
+	saAuthedMW := func(h http.Handler) http.Handler {
+		h = requests.NewAuthenticatedFilter(h)
+		h = accessControlHandler(h)
+		h = saAuth.Chain(impersonatingAuth.ImpersonationMiddleware)(h)
+		return h
+	}
+	saAuthed := http.NewServeMux()
+	route.HandleSubtree(saAuthed, "/k8s/clusters/{clusterID}", saAuthedMW(k8sProxy))
+	route.HandleSubtree(saAuthed, "/k8s/proxy/{clusterID}", saAuthedMW(k8sProxy))
 
-	authed := mux.NewRouter()
-	authed.UseEncodedPath()
+	unauthed.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" && parse.MatchNotBrowser(r) {
+			managementAPI.ServeHTTP(w, r)
+			return
+		}
+		saAuthed.ServeHTTP(w, r)
+	}))
+	unauthed.Handle("/v3/connect", connectHandler)
+	unauthed.Handle("/v3/connect/register", connectHandler)
+	unauthed.HandleFunc("/v3/import/{filename}", func(w http.ResponseWriter, r *http.Request) {
+		filename := r.PathValue("filename")
+		// Match pattern: {token}_{clusterId}.yaml
+		if strings.Contains(filename, "_") && strings.HasSuffix(filename, ".yaml") {
+			clusterImport.ClusterImportHandler(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+	unauthed.Handle("GET /v3/settings/cacerts", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/first-login", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-banners", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-issues", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-pl", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-brand", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-default-landing", readOnly(managementAPI))
+	unauthed.Handle("/rancherversion", version.NewVersionHandler())
+	unauthed.Handle("/v1-k3s-release/", channelserver)
+	unauthed.Handle("/v1-rke2-release/", channelserver)
+	route.HandleSubtree(unauthed, "/v1-saml", saml.AuthHandler())
+	if features.V3Public.Enabled() {
+		route.HandleSubtree(unauthed, "/v3-public", v3PublicAPI)
+	}
+	route.HandleSubtree(unauthed, "/v1-public", v1PublicAPI)
+	if features.SCIM.Enabled() {
+		route.HandleSubtree(unauthed, scim.URLPrefix, scim.NewHandler(scaledContext))
+	}
 
-	authed.Use(impersonatingAuth.ImpersonationMiddleware)
-	authed.Use(mux.MiddlewareFunc(accessControlHandler))
-	authed.Use(requests.NewAuthenticatedFilter)
-
-	authed.Path("/meta/{resource:aks.+}").Handler(aks.NewAKSHandler(scaledContext))
-	authed.Path("/meta/{resource:gke.+}").Handler(gke.NewGKEHandler(scaledContext))
-	authed.Path("/meta/{resource:alibaba.+}").Handler(alibaba.NewAlibabaHandler(scaledContext))
-	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
-	authed.Path("/meta/vsphere/{field}").Methods(http.MethodGet).Handler(vsphere.NewVsphereHandler(scaledContext))
-	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
-	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
-	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
-	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
-	authed.PathPrefix("/v3/token").Handler(tokenAPI)
-	authed.PathPrefix("/v3").Handler(managementAPI)
-	authed.Methods(http.MethodPost).Path("/v1/logout").Handler(logout)
-
-	// Metrics authenticated route
-	metricsAuthed := mux.NewRouter()
-	metricsAuthed.UseEncodedPath()
+	// Setup middlewares for the metrics route.
 	tokenReviewAuth := auth.ToMiddleware(requests.NewTokenReviewAuth(scaledContext.K8sClient.AuthenticationV1()))
-	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth.ImpersonationMiddleware)))
-	metricsAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
-	metricsAuthed.Use(requests.NewAuthenticatedFilter)
-	metricsAuthed.Use(metrics.NewMetricsHandler(scaledContext.K8sClient))
-	metricsAuthed.Path("/metrics").Handler(promhttp.Handler())
+	metricsMW := func(h http.Handler) http.Handler {
+		h = metrics.NewMetricsHandler(scaledContext.K8sClient)(h)
+		h = requests.NewAuthenticatedFilter(h)
+		h = accessControlHandler(h)
+		h = tokenReviewAuth.Chain(impersonatingAuth.ImpersonationMiddleware)(h)
+		return h
+	}
+	metricsAuthed := http.NewServeMux()
+	metricsAuthed.Handle("/metrics", metricsMW(promhttp.Handler()))
 
-	unauthed.NotFoundHandler = saauthed
-	saauthed.NotFoundHandler = authed
-	authed.NotFoundHandler = metricsAuthed
+	// Setup middlewares for authenticated routes.
+	authedMW := func(h http.Handler) http.Handler {
+		h = requests.NewAuthenticatedFilter(h)
+		h = accessControlHandler(h)
+		h = impersonatingAuth.ImpersonationMiddleware(h)
+		return h
+	}
+
+	authed := http.NewServeMux()
+	authed.Handle("/meta/{resource}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resource := r.PathValue("resource")
+		var h http.Handler
+		if strings.HasPrefix(resource, "aks") {
+			h = authedMW(aks.NewAKSHandler(scaledContext))
+		} else if strings.HasPrefix(resource, "gke") {
+			h = authedMW(gke.NewGKEHandler(scaledContext))
+		} else if strings.HasPrefix(resource, "alibaba") {
+			h = authedMW(alibaba.NewAlibabaHandler(scaledContext))
+		} else {
+			metricsAuthed.ServeHTTP(w, r)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	authed.Handle("/meta/oci/{resource}", authedMW(oci.NewOCIHandler(scaledContext)))
+	authed.Handle("GET /meta/vsphere/{field}", authedMW(vsphere.NewVsphereHandler(scaledContext)))
+	authed.Handle("POST /v3/tokenreview", authedMW(&webhook.TokenReviewer{}))
+	authed.Handle(supportconfigs.Endpoint, authedMW(&supportConfigGenerator))
+	authed.Handle("/meta/proxy/", authedMW(metaProxy))
+	route.HandleSubtree(authed, "/v3", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/v3/identit") || strings.HasPrefix(r.URL.Path, "/v3/token") {
+			tokenAPI.ServeHTTP(w, r)
+		} else {
+			managementAPI.ServeHTTP(w, r)
+		}
+	})))
+	// The auth server registers this route too, and serves it when MCM is
+	// disabled. Keep the two in sync.
+	authed.Handle("POST /v1/logout", authedMW(logout))
+	saAuthed.Handle("/", authed)
+	authed.Handle("/", metricsAuthed)
+
+	var nextHandler http.Handler
+	metricsAuthed.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if nextHandler != nil {
+			nextHandler.ServeHTTP(w, r)
+		}
+	}))
 
 	return func(next http.Handler) http.Handler {
-		metricsAuthed.NotFoundHandler = next
+		nextHandler = next
 		return limitingHandler(unauthed)
 	}, nil
 }
 
-// onlyGet will match only GET but will not return a 405 like route.Methods and instead just not match
-func onlyGet(req *http.Request, m *mux.RouteMatch) bool {
-	return req.Method == http.MethodGet
+// readOnly strips Norman's method-override query params (_method and
+// action=remove) before delegating to h. These routes are served without any
+// authentication or access-control middleware, so they must never be
+// reinterpreted as a write regardless of query string or request body.
+func readOnly(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Has("_method") || q.Get("action") == "remove" {
+			q.Del("_method")
+			q.Del("action")
+			r.URL.RawQuery = q.Encode()
+		}
+		h.ServeHTTP(w, r)
+	})
 }

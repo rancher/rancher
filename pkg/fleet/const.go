@@ -11,4 +11,8 @@ const (
 
 	ClustersDefaultNamespace = "fleet-default"
 	ClustersLocalNamespace   = "fleet-local"
+
+	// KubeConfigReferenceableFromLabel names the one namespace whose Fleet
+	// Clusters may use a kubeconfig secret from the secret's namespace.
+	KubeConfigReferenceableFromLabel = "fleet.cattle.io/kubeconfig-referenceable-from"
 )

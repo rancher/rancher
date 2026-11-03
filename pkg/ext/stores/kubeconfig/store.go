@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +18,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	extcommon "github.com/rancher/rancher/pkg/ext/common"
@@ -24,19 +27,19 @@ import (
 	kconfig "github.com/rancher/rancher/pkg/kubeconfig"
 	v3node "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	extapi "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -44,12 +47,15 @@ import (
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/features"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 const (
@@ -67,13 +73,15 @@ const (
 
 // List of fields that hold Kubeconfig data.
 const (
-	ClustersField         = "clusters"
-	CurrentContextField   = "current-context"
-	DescriptionField      = "description"
-	TTLField              = "ttl"
-	StatusConditionsField = "status-conditions"
-	StatusSummaryField    = "status-summary"
-	StatusTokensField     = "status-tokens"
+	ClustersField            = "clusters"
+	CurrentContextField      = "current-context"
+	DescriptionField         = "description"
+	TTLField                 = "ttl"
+	IncludeDefaultEntryField = "include-default-entry"
+	PreferRancherProxyField  = "prefer-rancher-proxy"
+	StatusConditionsField    = "status-conditions"
+	StatusSummaryField       = "status-summary"
+	StatusTokensField        = "status-tokens"
 )
 
 // List of statuses.
@@ -94,10 +102,26 @@ const (
 
 var gvr = ext.SchemeGroupVersion.WithResource(ext.KubeconfigResourceName)
 
-// tokenCreator abstracts [tokens.Manager].
+// kindRequirement filters ConfigMaps to those that back Kubeconfig resources.
+// It is built once at init time rather than per request.
+var kindRequirement = mustRequirement(KindLabel, selection.Equals, KindLabelValue)
+
+// tokenFetcher abstracts the ext token store operations needed by the kubeconfig store.
+type tokenFetcher interface {
+	Fetch(tokenID string) (accessor.TokenAccessor, error)
+	GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+}
+
+// tokenCreator abstracts ext.Token creation for the kubeconfig store.
 type tokenCreator interface {
-	EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error)
-	EnsureToken(input user.TokenInput) (string, runtime.Object, error)
+	CreateToken(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error)
+}
+
+type extTokenCreator struct{ store *exttokens.SystemStore }
+
+func (e *extTokenCreator) CreateToken(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+	return e.store.Create(ctx, gvr.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
 }
 
 // +k8s:openapi-gen=false
@@ -112,19 +136,24 @@ type Store struct {
 	nsCache             v1.NamespaceCache
 	nsClient            v1.NamespaceClient
 	nodeCache           ctrlv3.NodeCache
-	tokenCache          ctrlv3.TokenCache
-	tokens              ctrlv3.TokenClient
+	tokenStore          tokenFetcher
+	v3Tokens            ctrlv3.TokenClient
 	userCache           ctrlv3.UserCache
 	tokenMgr            tokenCreator
 	getCACert           func() string
 	getDefaultTTL       func() (*int64, error)
+	getMaxTTL           func() (int64, error)
 	getServerURL        func() string
 	shouldGenerateToken func() bool
-	tableConverter      rest.TableConvertor
+	shouldExecGetToken  func() bool
+	// shouldPreferRancherProxy returns the value of the kubeconfig-prefer-rancher-proxy setting.
+	shouldPreferRancherProxy func() bool
+	tableConverter           rest.TableConvertor
 }
 
 // New creates a new instance of [Store].
 func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
+	extTokenStore := exttokens.NewSystemFromWrangler(wranglerContext, authorizer)
 	store := &Store{
 		mcmEnabled:      mcmEnabled,
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
@@ -132,16 +161,23 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		clusterCache:    wranglerContext.Mgmt.Cluster().Cache(),
 		nsCache:         wranglerContext.Core.Namespace().Cache(),
 		nsClient:        wranglerContext.Core.Namespace(),
-		tokenCache:      wranglerContext.Mgmt.Token().Cache(),
-		tokens:          wranglerContext.Mgmt.Token(),
+		tokenStore:      extTokenStore,
+		v3Tokens:        wranglerContext.Mgmt.Token(),
 		userCache:       wranglerContext.Mgmt.User().Cache(),
-		tokenMgr:        tokens.NewManager(wranglerContext),
+		tokenMgr:        &extTokenCreator{store: extTokenStore},
 		authorizer:      authorizer,
 		getCACert:       settings.CACerts.Get,
 		getDefaultTTL:   tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds,
+		getMaxTTL:       tokens.GetKubeconfigMaxTokenTTLInMilliSeconds,
 		getServerURL:    settings.ServerURL.Get,
 		shouldGenerateToken: func() bool {
 			return strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
+		},
+		shouldExecGetToken: func() bool {
+			return strings.EqualFold(settings.KubeconfigExecGetToken.Get(), "true")
+		},
+		shouldPreferRancherProxy: func() bool {
+			return strings.EqualFold(settings.KubeconfigPreferRancherProxy.Get(), "true")
 		},
 		tableConverter: printerstorage.TableConvertor{
 			TableGenerator: printers.NewTableGenerator().With(printHandler),
@@ -186,6 +222,12 @@ func (s *Store) userFrom(ctx context.Context, verb string) (k8suser.Info, bool, 
 		return nil, false, false, fmt.Errorf("missing user info")
 	}
 
+	// Resource: "*" is a deliberate superuser heuristic, matching the pattern
+	// used by the sibling token and useractivity stores. Scoping this check to
+	// ext.KubeconfigResourceName would make every default Rancher user an admin
+	// because the built-in User/User Base GlobalRoles grant all verbs on
+	// ext.cattle.io/kubeconfigs, which would bypass per-user scoping in
+	// Get/List/Watch/Delete/Update.
 	decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 		User:            userInfo,
 		Verb:            verb,
@@ -222,7 +264,7 @@ func (s *Store) Create(
 ) (runtime.Object, error) {
 	userInfo, _, isRancherUser, err := s.userFrom(ctx, "create")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	if !isRancherUser {
@@ -236,9 +278,9 @@ func (s *Store) Create(
 		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("missing request token ID"))
 	}
 
-	authToken, err := s.tokenCache.Get(authTokenID)
+	authToken, err := s.tokenStore.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
+		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("error getting request token %s: %v", authTokenID, err))
 	}
 
 	kubeconfig, ok := obj.(*ext.Kubeconfig)
@@ -248,10 +290,7 @@ func (s *Store) Create(
 
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, err
-			}
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("create validation failed for kubeconfig: %s", err))
+			return nil, validationError(err, "create", "")
 		}
 	}
 
@@ -259,21 +298,34 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest("spec.clusters must be unique")
 	}
 
-	defaultTTL, err := s.getDefaultTTL()
-	if err != nil {
-		return nil, fmt.Errorf("error getting default token TTL: %w", err)
+	if !includeDefaultEntry(&kubeconfig.Spec) && len(kubeconfig.Spec.Clusters) == 0 {
+		return nil, apierrors.NewBadRequest("at least one cluster is required when includeDefaultEntry is false")
 	}
-	defaultTTLSeconds := *defaultTTL / 1000
+
+	defaultTTLPtr, err := s.getDefaultTTL()
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %w", err))
+	}
+	maxTTL, err := s.getMaxTTL()
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting max token TTL: %w", err))
+	}
+	defaultTTL := exttokens.ClampToMaxTTL(exttokens.DefaultTTL(*defaultTTLPtr, maxTTL), maxTTL)
+	defaultTTLSeconds := defaultTTL / 1000
 
 	ttlMilliseconds := kubeconfig.Spec.TTL * 1000
 	switch {
 	case ttlMilliseconds < 0:
-		return nil, apierrors.NewBadRequest("spec.ttl can't be negative")
+		return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite)")
 	case ttlMilliseconds == 0:
-		ttlMilliseconds = *defaultTTL
+		if defaultTTL < 0 {
+			return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite), please fix the default")
+		}
+		ttlMilliseconds = defaultTTL
 		kubeconfig.Spec.TTL = defaultTTLSeconds
-	case ttlMilliseconds > *defaultTTL:
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max ttl %d", kubeconfig.Spec.TTL, defaultTTLSeconds))
+	case maxTTL >= 1 && ttlMilliseconds > maxTTL:
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max ttl %d", kubeconfig.Spec.TTL, maxTTL/1000))
+	case maxTTL < 1: // max is infinity, valid ttl
 	default: // Valid TTL.
 	}
 
@@ -300,7 +352,7 @@ func (s *Store) Create(
 
 	localCluster, err := s.clusterCache.Get("local")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %v", err))
 	}
 
 	if len(kubeconfig.Spec.Clusters) > 0 {
@@ -308,7 +360,7 @@ func (s *Store) Create(
 			// The first id in the spec.clusters "*" means all clusters.
 			clusters, err = s.clusterCache.List(labels.Everything())
 			if err != nil {
-				return nil, apierrors.NewInternalError(fmt.Errorf("error listing clusters: %w", err))
+				return nil, apierrors.NewInternalError(fmt.Errorf("error listing clusters: %v", err))
 			}
 		} else {
 			// Individually listed clusters.
@@ -323,7 +375,7 @@ func (s *Store) Create(
 					if apierrors.IsNotFound(err) {
 						return nil, apierrors.NewBadRequest(fmt.Sprintf("cluster %s not found", clusterID))
 					}
-					return nil, apierrors.NewInternalError(fmt.Errorf("error getting cluster %s: %w", clusterID, err))
+					return nil, apierrors.NewInternalError(fmt.Errorf("error getting cluster %s: %v", clusterID, err))
 				}
 
 				clusters = append(clusters, cluster)
@@ -347,7 +399,7 @@ func (s *Store) Create(
 			Name:            clusters[i].Name,
 		})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %w", userInfo.GetName(), clusters[i].Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %v", userInfo.GetName(), clusters[i].Name, err))
 		}
 
 		if decision != authorizer.DecisionAllow {
@@ -373,8 +425,31 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid currentContext %s", kubeconfig.Spec.CurrentContext))
 	}
 
+	includeDefault := includeDefaultEntry(&kubeconfig.Spec)
+
+	preferRancherProxy := ptr.Deref(kubeconfig.Spec.PreferRancherProxy, s.shouldPreferRancherProxy())
+	kubeconfig.Spec.PreferRancherProxy = &preferRancherProxy
+
+	needsSharedToken := includeDefault
+	if !needsSharedToken {
+		for _, c := range clusters {
+			if !c.Spec.LocalClusterAuthEndpoint.Enabled {
+				needsSharedToken = true
+				break
+			}
+		}
+	}
+
 	dryRun := options != nil && len(options.DryRun) > 0
 	generateToken := s.shouldGenerateToken()
+
+	// Tokens are created from the request token's principal. Reject a
+	// principal without name or provider before anything is written.
+	if generateToken {
+		if p := authToken.GetUserPrincipal(); p.Name == "" || p.Provider == "" {
+			return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("request token %s has no user principal", authTokenID))
+		}
+	}
 
 	kubeconfigToStore := kubeconfig.DeepCopy()
 	kubeconfigToStore.Name = ""         // We generate the kubeconfig's name automatically.
@@ -388,7 +463,7 @@ func (s *Store) Create(
 
 	configMap, err := s.toConfigMap(kubeconfigToStore)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig to configmap: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig to configmap: %v", err))
 	}
 	configMap.GenerateName = namePrefix
 
@@ -398,42 +473,26 @@ func (s *Store) Create(
 		configMap.Name = kubeConfigID
 	} else {
 		if err = s.ensureNamespace(); err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w", namespace, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %v", namespace, err))
 		}
 
 		configMap, err = s.configMapClient.Create(configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error creating configmap for kubeconfig: %w", err))
+			return nil, mapBackingError(err, namePrefix)
 		}
 		kubeConfigID = configMap.Name
 	}
 
 	kubeconfigToStore, err = s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", kubeConfigID, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", kubeConfigID, err))
 	}
 
 	var (
 		sharedTokenKey string
-		sharedToken    runtime.Object
 		ownerRefs      []metav1.OwnerReference
 		v1Config       string
 	)
-
-	ownerReferenceFrom := func(obj runtime.Object) (metav1.OwnerReference, error) {
-		objMeta, err := meta.Accessor(obj)
-		if err != nil {
-			return metav1.OwnerReference{}, err
-		}
-
-		ref := metav1.OwnerReference{
-			APIVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
-			Kind:       obj.GetObjectKind().GroupVersionKind().Kind,
-			Name:       objMeta.GetName(),
-			UID:        objMeta.GetUID(),
-		}
-		return ref, nil
-	}
 
 	caCert := kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(s.getCACert())))
 	data := kconfig.KubeConfig{
@@ -442,14 +501,29 @@ func (s *Store) Create(
 			CreationTimestamp: configMap.CreationTimestamp.Format(time.RFC3339),
 			TTL:               strconv.FormatInt(kubeconfig.Spec.TTL, 10),
 		},
-		CurrentContext: defaultClusterName,
+		CurrentContext: func() string {
+			if includeDefault {
+				return defaultClusterName
+			}
+			return ""
+		}(),
+	}
+
+	if s.shouldExecGetToken() {
+		// User entries without a token, including those of a dry run, run "rancher auth get-token".
+		// Tokens that belong to no AuthConfig leave the CLI to ask for one.
+		configName, _ := common.ConfigNameFromToken(authToken)
+		data.ExecUser = &kconfig.ExecUser{
+			ID:         userInfo.GetName(),
+			ConfigName: configName,
+		}
 	}
 
 	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
 		// Generate a shared token for the default and non-ACE clusters.
-		if !dryRun && generateToken {
-			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-			sharedTokenKey, sharedToken, err = s.tokenMgr.EnsureToken(input)
+		if !dryRun && generateToken && needsSharedToken {
+			extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, "", kubeConfigID)
+			sharedToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 			if err != nil {
 				conditions = append(conditions, metav1.Condition{
 					Type:               FailedToCreateTokenCond,
@@ -459,48 +533,56 @@ func (s *Store) Create(
 					LastTransitionTime: metav1.NewTime(time.Now()),
 				})
 
-				return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
+				return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %v", err))
 			}
 
-			ownerRef, err := ownerReferenceFrom(sharedToken)
+			sharedTokenKey = sharedToken.Status.BearerToken
+			// Note the token down before anything else can go wrong. Both the
+			// stored record and the cleanup below work off tokenIDs, so a token
+			// that never gets added to it can no longer be deleted.
+			tokenIDs = append(tokenIDs, sharedToken.Name)
+
+			ownerRef, err := s.secretOwnerRef(sharedToken.Name)
 			if err != nil {
-				return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %w", err))
+				return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %v", err))
 			}
 			ownerRefs = append(ownerRefs, ownerRef)
-			tokenIDs = append(tokenIDs, ownerRef.Name)
 
 			conditions = append(conditions, metav1.Condition{
 				Type:               TokenCreatedCond,
 				Status:             metav1.ConditionTrue,
 				Reason:             TokenCreatedCond,
-				Message:            ownerRef.Name,
+				Message:            sharedToken.Name,
 				LastTransitionTime: metav1.NewTime(time.Now()),
 			})
 		}
 
-		// The default entry that points to the Rancher URL.
-		// Even a base user without access to any cluster should be able to use a kubeconfig
-		// to interact with Rancher via Public API.
-		data.Clusters = append(data.Clusters, kconfig.Cluster{
-			Name:   defaultClusterName,
-			Server: "https://" + host,
-			Cert:   caCert,
-		})
-		data.Users = append(data.Users, kconfig.User{
-			Name:  defaultClusterName,
-			Token: sharedTokenKey,
-		})
-		data.Contexts = append(data.Contexts, kconfig.Context{
-			Name:    defaultClusterName,
-			Cluster: defaultClusterName,
-			User:    defaultClusterName,
-		})
+		if includeDefault {
+			data.Clusters = append(data.Clusters, kconfig.Cluster{
+				Name:   defaultClusterName,
+				Server: "https://" + host,
+				Cert:   caCert,
+			})
+			data.Users = append(data.Users, kconfig.User{
+				Name:  defaultClusterName,
+				Token: sharedTokenKey,
+				Host:  host,
+			})
+			data.Contexts = append(data.Contexts, kconfig.Context{
+				Name:    defaultClusterName,
+				Cluster: defaultClusterName,
+				User:    defaultClusterName,
+			})
+		} else if needsSharedToken {
+			data.Users = append(data.Users, kconfig.User{
+				Name:  defaultClusterName,
+				Token: sharedTokenKey,
+				Host:  host,
+			})
+		}
 
 		for _, cluster := range clusters {
-			var (
-				tokenKey string
-				token    runtime.Object
-			)
+			var tokenKey string
 
 			clusterName := cluster.Name
 			if name := cluster.Spec.DisplayName; name != "" {
@@ -535,8 +617,8 @@ func (s *Store) Create(
 
 			// Generate a cluster-scoped token for the ACE cluster.
 			if !dryRun && generateToken {
-				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-				tokenKey, token, err = s.tokenMgr.EnsureClusterToken(cluster.Name, input)
+				extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, cluster.Name, kubeConfigID)
+				clusterToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 				if err != nil {
 					conditions = append(conditions, metav1.Condition{
 						Type:               FailedToCreateTokenCond,
@@ -546,21 +628,23 @@ func (s *Store) Create(
 						LastTransitionTime: metav1.NewTime(time.Now()),
 					})
 
-					return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
+					return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %v", cluster.Name, err))
 				}
 
-				ownerRef, err := ownerReferenceFrom(token)
+				tokenKey = clusterToken.Status.BearerToken
+				tokenIDs = append(tokenIDs, clusterToken.Name) // See the shared token above.
+
+				ownerRef, err := s.secretOwnerRef(clusterToken.Name)
 				if err != nil {
-					return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %w", err))
+					return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %v", err))
 				}
 				ownerRefs = append(ownerRefs, ownerRef)
-				tokenIDs = append(tokenIDs, ownerRef.Name)
 
 				conditions = append(conditions, metav1.Condition{
 					Type:               TokenCreatedCond,
 					Status:             metav1.ConditionTrue,
 					Reason:             TokenCreatedCond,
-					Message:            ownerRef.Name,
+					Message:            clusterToken.Name,
 					LastTransitionTime: metav1.NewTime(time.Now()),
 				})
 			}
@@ -571,8 +655,10 @@ func (s *Store) Create(
 				User:    clusterName,
 			})
 			data.Users = append(data.Users, kconfig.User{
-				Name:  clusterName,
-				Token: tokenKey,
+				Name:      clusterName,
+				Token:     tokenKey,
+				Host:      host,
+				ClusterID: cluster.Name,
 			})
 
 			if s.mcmEnabled { // Nodes are only available if MCM is enabled.
@@ -590,7 +676,7 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if currentContext == cluster.Name {
+					if !preferRancherProxy && currentContext == cluster.Name {
 						data.CurrentContext = fqdnName
 					}
 
@@ -608,7 +694,7 @@ func (s *Store) Create(
 						LastTransitionTime: metav1.NewTime(time.Now()),
 					})
 
-					return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
+					return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %v", cluster.Name, err))
 				}
 
 				clusterCerts := kconfig.FormatCertString(cluster.Status.CACert) // Already base64 encoded.
@@ -630,8 +716,8 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if !isCurrentContextSet && currentContext == cluster.Name {
-						data.CurrentContext = nodeName // Set the current context to the first control plane node.
+					if !preferRancherProxy && !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
+						data.CurrentContext = nodeName // Set the current context to the first ready control plane node.
 						isCurrentContextSet = true
 					}
 				}
@@ -648,7 +734,7 @@ func (s *Store) Create(
 				LastTransitionTime: metav1.NewTime(time.Now()),
 			}}
 
-			return apierrors.NewInternalError(fmt.Errorf("error generating kubeconfig content: %w", err))
+			return apierrors.NewInternalError(fmt.Errorf("error generating kubeconfig content: %v", err))
 		}
 
 		return nil
@@ -664,31 +750,47 @@ func (s *Store) Create(
 	kubeconfigToStore.Status.Tokens = tokenIDs
 	kubeconfigToStore.OwnerReferences = append(kubeconfigToStore.OwnerReferences, ownerRefs...)
 
-	var convertErr error
-	configMap, convertErr = s.toConfigMap(kubeconfigToStore)
-	if convertErr == nil {
-		if !dryRun {
-			var updateErr error
-			configMap, updateErr = s.configMapClient.Update(configMap)
-			if updateErr != nil {
-				if err == nil {
-					err = apierrors.NewInternalError(fmt.Errorf("error updating configmap for kubeconfig %s: %w", kubeConfigID, updateErr))
-				} // else preserve the original error.
-			}
-		}
-	} else {
+	// What the kubeconfig ended up as, a failed attempt included, is saved back
+	// to the ConfigMap created above. Keeping a failed one is on purpose: it
+	// lists the tokens that were created, so the user can still delete the
+	// kubeconfig and have those tokens deleted with it. That only works if this
+	// last save succeeds, which is what recorded tracks.
+	recorded := dryRun
+
+	desiredConfigMap, convertErr := s.toConfigMap(kubeconfigToStore)
+	switch {
+	case convertErr != nil:
 		if err == nil {
-			err = apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", kubeConfigID, convertErr))
+			err = apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %v", kubeConfigID, convertErr))
 		} // else preserve the original error.
+	case dryRun:
+		configMap = desiredConfigMap
+	default:
+		finalized, finalizeErr := s.finalizeConfigMap(configMap, desiredConfigMap)
+		if finalizeErr != nil {
+			if err == nil {
+				err = mapBackingError(finalizeErr, kubeConfigID)
+			} // else preserve the original error.
+			break
+		}
+		configMap, recorded = finalized, true
 	}
 
 	if err != nil {
+		if !recorded {
+			// Nothing points at the tokens that were created: their IDs never
+			// reached the ConfigMap, so deleting the kubeconfig later won't
+			// delete them either. Remove them here along with the unfinished
+			// record, so that a create which reports a failure doesn't leave
+			// working credentials behind.
+			s.cleanupIncompleteKubeconfig(kubeConfigID, tokenIDs)
+		}
 		return nil, err
 	}
 
 	kubeconfig, err = s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig after saving: %w", kubeConfigID, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig after saving: %v", kubeConfigID, err))
 	}
 
 	// Note: Status.Value contains tokens' secret keys and mustn't be persisted.
@@ -728,6 +830,14 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 	configMap.Data[DescriptionField] = kubeconfig.Spec.Description
 	configMap.Data[TTLField] = strconv.FormatInt(kubeconfig.Spec.TTL, 10)
 
+	if kubeconfig.Spec.IncludeDefaultEntry != nil {
+		configMap.Data[IncludeDefaultEntryField] = strconv.FormatBool(*kubeconfig.Spec.IncludeDefaultEntry)
+	}
+
+	if kubeconfig.Spec.PreferRancherProxy != nil {
+		configMap.Data[PreferRancherProxyField] = strconv.FormatBool(*kubeconfig.Spec.PreferRancherProxy)
+	}
+
 	// Note: Value should never be persisted!
 	configMap.Data[StatusSummaryField] = kubeconfig.Status.Summary
 	if len(kubeconfig.Status.Conditions) > 0 {
@@ -753,6 +863,153 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 	}
 
 	return configMap, nil
+}
+
+// finalizeConfigMap saves the finished kubeconfig into the ConfigMap that
+// [Store.Create] already made for it.
+//
+// Create is a two-phase write. The first phase stores an empty record and gets
+// back the generated name, which the tokens need. The second phase, done here,
+// saves the tokens and the rest of the finished kubeconfig. Only the store knows
+// about the first phase: the client never sees the resourceVersion it produced,
+// and retrying the request would make a whole new ConfigMap and a whole new set
+// of tokens rather than repeat this one write. So when something else changes
+// the ConfigMap in between - another controller adding a label to it, for
+// example - the request must not fail. Read the ConfigMap again instead and
+// write the fields the store owns onto the version that is now stored.
+func (s *Store) finalizeConfigMap(created, desired *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	var (
+		latest    = created
+		finalized *corev1.ConfigMap
+	)
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if latest == nil {
+			refreshed, err := s.configMapClient.Get(namespace, created.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			latest = refreshed
+		}
+
+		updated, err := s.configMapClient.Update(mergeConfigMap(latest, desired))
+		if err != nil {
+			latest = nil // Read the ConfigMap again before the next attempt.
+			return err
+		}
+
+		finalized = updated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return finalized, nil
+}
+
+// mergeConfigMap copies the fields the store owns onto the ConfigMap as it is
+// currently stored, leaving whatever anything else wrote there in place. The
+// result has the current resourceVersion and can be sent as an update.
+//
+// Data and metadata are handled differently on purpose. Every key under data
+// belongs to the store, so the whole map is replaced and a key the store has
+// stopped writing goes away. Labels and annotations are shared with anything
+// else that touches the ConfigMap, so a key the store doesn't write is far more
+// likely to belong to someone else than to be one of the store's own left over
+// from an earlier version. Those are only added or overwritten, never removed,
+// which means dropping a label or an annotation the store used to set needs an
+// explicit delete here.
+func mergeConfigMap(latest, desired *corev1.ConfigMap) *corev1.ConfigMap {
+	merged := latest.DeepCopy()
+	// Cloned rather than shared: desired is built once and reused for every
+	// attempt, so it must not end up pointing at a map that was handed to the
+	// client.
+	merged.Data = maps.Clone(desired.Data)
+
+	if merged.Labels == nil && len(desired.Labels) > 0 {
+		merged.Labels = make(map[string]string, len(desired.Labels))
+	}
+	maps.Copy(merged.Labels, desired.Labels)
+
+	if merged.Annotations == nil && len(desired.Annotations) > 0 {
+		merged.Annotations = make(map[string]string, len(desired.Annotations))
+	}
+	maps.Copy(merged.Annotations, desired.Annotations)
+
+	merged.OwnerReferences = mergeOwnerReferences(merged.OwnerReferences, desired.OwnerReferences)
+
+	// ManagedFields are left as the API server reported them: it works them out
+	// again on every update and ignores whatever the request carries.
+
+	return merged
+}
+
+// mergeOwnerReferences returns the two lists of owner references combined,
+// matching entries up by UID. Where the same UID is in both lists, the entry
+// from desired is the one kept.
+//
+// Both lists have to survive, which is why this isn't a plain replace like
+// [mergeConfigMap] does for data. The references the store writes are what makes
+// Kubernetes delete the ConfigMap once the tokens it points at are gone, so
+// losing them would leave the record behind forever. A reference that only the
+// stored ConfigMap has was put there by something else between the two writes,
+// and dropping it would break whatever that something else is relying on.
+//
+// It isn't a plain concatenation either. The desired list is built from the
+// ConfigMap the first write returned, so the references that were already on it
+// are in both lists, and appending would list them twice.
+func mergeOwnerReferences(existing, desired []metav1.OwnerReference) []metav1.OwnerReference {
+	if len(desired) == 0 {
+		return existing
+	}
+
+	merged := make([]metav1.OwnerReference, 0, len(existing)+len(desired))
+	indexByUID := make(map[types.UID]int, len(existing)+len(desired))
+
+	for _, refs := range [][]metav1.OwnerReference{existing, desired} {
+		for _, ref := range refs {
+			if i, ok := indexByUID[ref.UID]; ok {
+				merged[i] = ref
+				continue
+			}
+			indexByUID[ref.UID] = len(merged)
+			merged = append(merged, ref)
+		}
+	}
+
+	return merged
+}
+
+// cleanupIncompleteKubeconfig removes what a failed [Store.Create] left behind:
+// the tokens it had already created and the ConfigMap still holding the
+// unfinished record. Create is already returning an error, so anything that
+// goes wrong here is logged rather than reported.
+func (s *Store) cleanupIncompleteKubeconfig(name string, tokenIDs []string) {
+	for _, tokenID := range tokenIDs {
+		if err := s.deleteToken(tokenID, &metav1.DeleteOptions{}); err != nil {
+			logrus.Errorf("kubeconfig: error deleting token %s of incomplete kubeconfig %s: %v", tokenID, name, err)
+		}
+	}
+
+	if err := s.configMapClient.Delete(namespace, name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		logrus.Errorf("kubeconfig: error deleting configmap of incomplete kubeconfig %s: %v", name, err)
+	}
+}
+
+// deleteToken removes one of a kubeconfig's tokens, falling back to the v3 token
+// client for tokens created before the ext token store existed. A token that is
+// already gone is not an error.
+func (s *Store) deleteToken(name string, options *metav1.DeleteOptions) error {
+	err := s.tokenStore.Delete(name, options)
+	if apierrors.IsNotFound(err) {
+		err = s.v3Tokens.Delete(name, options)
+	}
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+
+	return err
 }
 
 // fromConfigMap converts a ConfigMap object to a Kubeconfig object.
@@ -789,6 +1046,22 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 		}
 	}
 
+	if v, ok := configMap.Data[IncludeDefaultEntryField]; ok {
+		boolVal, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing includeDefaultEntry for %s: %w", configMap.Name, err)
+		}
+		kubeconfig.Spec.IncludeDefaultEntry = &boolVal
+	}
+
+	if v, ok := configMap.Data[PreferRancherProxyField]; ok {
+		boolVal, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing preferRancherProxy for %s: %w", configMap.Name, err)
+		}
+		kubeconfig.Spec.PreferRancherProxy = &boolVal
+	}
+
 	kubeconfig.Status.Summary = configMap.Data[StatusSummaryField]
 
 	if serialized := configMap.Data[StatusConditionsField]; serialized != "" {
@@ -814,6 +1087,10 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 	return kubeconfig, nil
 }
 
+func includeDefaultEntry(spec *ext.KubeconfigSpec) bool {
+	return spec.IncludeDefaultEntry == nil || *spec.IncludeDefaultEntry
+}
+
 // first returns the first element of a slice of strings, or an empty string if the slice is empty.
 func first(values []string) string {
 	if len(values) > 0 {
@@ -822,41 +1099,79 @@ func first(values []string) string {
 	return ""
 }
 
-// createTokenInput is a helper that builds [user.TokenInput] for a kubeconfig token.
-func (s *Store) createTokenInput(kubeConfigID, userName string, authToken *apiv3.Token, ttl *int64) user.TokenInput {
-	return user.TokenInput{
-		TokenName:     "kubeconfig-" + userName,
-		Description:   "Kubeconfig token",
-		Kind:          "kubeconfig",
-		UserName:      userName,
-		AuthProvider:  authToken.AuthProvider,
-		TTL:           ttl,
-		Randomize:     true,
-		UserPrincipal: authToken.UserPrincipal,
-		Labels: map[string]string{
-			tokens.TokenKubeconfigIDLabel: kubeConfigID,
+// buildExtToken builds an [ext.Token] for a kubeconfig token.
+func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor, ttl int64, clusterID, kubeConfigID string) *ext.Token {
+	return &ext.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				tokens.TokenKubeconfigIDLabel: kubeConfigID,
+			},
+		},
+		Spec: ext.TokenSpec{
+			UserID:        userName,
+			UserPrincipal: toExtTokenPrincipal(authToken.GetUserPrincipal()),
+			Kind:          exttokens.KindKubeconfig,
+			Description:   "Kubeconfig token",
+			TTL:           ttl,
+			ClusterName:   clusterID,
 		},
 	}
 }
 
-// tokenSelector builds a label selector for kubeconfig tokens.
-func tokenSelector(isAdmin bool, userID, kubeconfigID string) (labels.Selector, error) {
-	set := labels.Set{
-		tokens.TokenKindLabel: KindLabelValue,
+// toExtTokenPrincipal converts a [apiv3.Principal] to an [ext.TokenPrincipal].
+func toExtTokenPrincipal(p apiv3.Principal) ext.TokenPrincipal {
+	return ext.TokenPrincipal{
+		Name:           p.Name,
+		DisplayName:    p.DisplayName,
+		LoginName:      p.LoginName,
+		ProfilePicture: p.ProfilePicture,
+		ProfileURL:     p.ProfileURL,
+		PrincipalType:  p.PrincipalType,
+		Provider:       p.Provider,
+		ExtraInfo:      p.ExtraInfo,
 	}
-
-	if kubeconfigID != "" {
-		set = labels.Merge(set, labels.Set{tokens.TokenKubeconfigIDLabel: kubeconfigID})
-	}
-
-	if !isAdmin {
-		set = labels.Merge(set, labels.Set{tokens.UserIDLabel: userID})
-	}
-
-	return set.AsSelector(), nil
 }
 
-// getConfigMap retrieves a ConfigMap by name, optionally using the cache.
+// secretOwnerRef returns a [metav1.OwnerReference] pointing to the backing v1/Secret for an ext token.
+// Kubernetes GC only follows native resource owner references; using the Secret ensures proper cleanup.
+func (s *Store) secretOwnerRef(tokenName string) (metav1.OwnerReference, error) {
+	secret, err := s.tokenStore.GetSecret(tokenName, &metav1.GetOptions{}, false)
+	if err != nil {
+		return metav1.OwnerReference{}, fmt.Errorf("error getting backing secret for token %s: %w", tokenName, err)
+	}
+	return metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       secret.Name,
+		UID:        secret.UID,
+	}, nil
+}
+
+// isTokenOwnerRef reports whether the owner reference names one of the given
+// tokens and is of a kind that backs a kubeconfig token: the Secret behind an
+// ext token, or a v3 Token recorded before the migration to ext tokens. The
+// garbage collector resolves both, so it deletes the ConfigMap once such an
+// owner is gone. An ext token's backing Secret is named after the token, and a
+// v3 Token owner reference names the token itself, so a token ID and its owner
+// reference name are the same string.
+func isTokenOwnerRef(ref metav1.OwnerReference, tokenIDs []string) bool {
+	isTokenKind := (ref.APIVersion == "v1" && ref.Kind == "Secret") ||
+		(ref.APIVersion == "management.cattle.io/v3" && ref.Kind == "Token")
+	return isTokenKind && slices.Contains(tokenIDs, ref.Name)
+}
+
+// ownedByToken reports whether one of the given tokens owns the ConfigMap.
+func ownedByToken(configMap *corev1.ConfigMap, tokenIDs []string) bool {
+	for _, ref := range configMap.OwnerReferences {
+		if isTokenOwnerRef(ref, tokenIDs) {
+			return true
+		}
+	}
+	return false
+}
+
+// getConfigMap retrieves a ConfigMap by name, optionally using the cache. Any
+// error is an [apierrors.APIStatus] scoped to the Kubeconfig resource.
 func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache bool) (*corev1.ConfigMap, error) {
 	var (
 		configMap *corev1.ConfigMap
@@ -869,10 +1184,7 @@ func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache b
 		configMap, err = s.configMapClient.Get(namespace, name, *options)
 	}
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-		return nil, fmt.Errorf("error getting configmap %s: %w", name, err)
+		return nil, mapBackingError(err, name)
 	}
 
 	if configMap.Labels[KindLabel] != KindLabelValue {
@@ -890,7 +1202,7 @@ func (s *Store) Get(
 ) (runtime.Object, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "get")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	var emptyGetOptions metav1.GetOptions
@@ -908,7 +1220,7 @@ func (s *Store) Get(
 
 	kubeconfig, err := s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", name, err))
 	}
 
 	return kubeconfig, nil
@@ -919,27 +1231,39 @@ func (s *Store) NewList() runtime.Object {
 	return &ext.KubeconfigList{}
 }
 
+func mustRequirement(key string, op selection.Operator, val string) labels.Requirement {
+	r, err := labels.NewRequirement(key, op, []string{val})
+	if err != nil {
+		panic(fmt.Sprintf("kubeconfig: invalid label requirement %s %s %s: %v", key, op, val, err))
+	}
+	return *r
+}
+
 func toListOptions(options *metainternalversion.ListOptions, userInfo k8suser.Info, isAdmin bool) (*metav1.ListOptions, error) {
 	listOptions, err := extapi.ConvertListOptions(options)
 	if err != nil {
 		return nil, fmt.Errorf("error converting list options: %w", err)
 	}
 
-	labelSet, err := labels.ConvertSelectorToLabelsMap(listOptions.LabelSelector)
-	if err != nil {
-		return nil, fmt.Errorf("error converting label selector: %w", err)
+	selector := labels.Everything()
+	if listOptions.LabelSelector != "" {
+		parsed, err := labels.Parse(listOptions.LabelSelector)
+		if err != nil {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid label selector: %s", err))
+		}
+		selector = parsed
 	}
 
-	configMapLabels := labels.Set{
-		KindLabel: KindLabelValue,
-	}
-
+	reqs := []labels.Requirement{kindRequirement}
 	if !isAdmin {
-		configMapLabels[UserIDLabel] = userInfo.GetName()
+		userReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userInfo.GetName()})
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("user ID %q is not a valid label value: %v", userInfo.GetName(), err))
+		}
+		reqs = append(reqs, *userReq)
 	}
-
-	labelSet = labels.Merge(labelSet, configMapLabels)
-	listOptions.LabelSelector = labelSet.AsSelector().String()
+	selector = selector.Add(reqs...)
+	listOptions.LabelSelector = selector.String()
 
 	return listOptions, nil
 }
@@ -951,12 +1275,12 @@ func (s *Store) List(
 ) (runtime.Object, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "list")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	configMapList, err := s.configMapClient.List(namespace, *listOptions)
@@ -964,7 +1288,7 @@ func (s *Store) List(
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %v", err))
 	}
 
 	list := &ext.KubeconfigList{
@@ -978,7 +1302,7 @@ func (s *Store) List(
 	for _, configMap := range configMapList.Items {
 		kubeconfig, err := s.fromConfigMap(&configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", configMap.Name, err))
 		}
 
 		list.Items = append(list.Items, *kubeconfig)
@@ -994,12 +1318,12 @@ func (s *Store) Watch(
 ) (watch.Interface, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "watch")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	if !features.FeatureGates().Enabled(features.WatchListClient) {
@@ -1010,11 +1334,12 @@ func (s *Store) Watch(
 	configMapWatch, err := s.configMapClient.Watch(namespace, *listOptions)
 	if err != nil {
 		logrus.Errorf("kubeconfig: watch: error starting watch: %s", err)
-		return nil, apierrors.NewInternalError(fmt.Errorf("kubeconfig: watch: error starting watch: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("kubeconfig: watch: error starting watch: %v", err))
 	}
 
 	kubeconfigWatch := &watcher{
-		ch: make(chan watch.Event, 100),
+		ch:   make(chan watch.Event, 100),
+		done: make(chan struct{}),
 	}
 
 	go func() {
@@ -1038,12 +1363,25 @@ func (s *Store) Watch(
 						continue
 					}
 
-					obj = &ext.Kubeconfig{
-						ObjectMeta: metav1.ObjectMeta{
-							ResourceVersion: configMap.ResourceVersion,
-							Annotations:     configMap.Annotations,
-						},
+					// Rebuild the bookmark's metadata as an allowlist instead of
+					// copying the backing ConfigMap's annotations: passing them
+					// through leaked internal bookkeeping (the cattle.io/uid
+					// annotation) that every other event type strips, and a
+					// copy-and-delete approach would silently leak any internal
+					// annotation added later. Only two things are justified on a
+					// bookmark: the resourceVersion resume point, and the
+					// k8s.io/initial-events-end marker that tells a WatchList
+					// (sendInitialEvents) client the initial-state replay is
+					// complete — dropping the marker would leave such a client
+					// waiting forever.
+					anns := map[string]string{}
+					if v, ok := configMap.Annotations["k8s.io/initial-events-end"]; ok {
+						anns["k8s.io/initial-events-end"] = v
 					}
+					obj = &ext.Kubeconfig{ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: configMap.ResourceVersion,
+						Annotations:     anns,
+					}}
 				case watch.Error:
 					// Pass through the errors e.g. 410 Expired.
 					obj = event.Object
@@ -1059,7 +1397,8 @@ func (s *Store) Watch(
 						logrus.Errorf("kubeconfig: watch: error converting configmap %s to kubeconfig: %s", configMap.Name, err)
 						continue
 					}
-				default: // watch.Error
+				default:
+					// watch.EventType is an open string type; unknown types pass through untranslated.
 					obj = event.Object
 				}
 
@@ -1078,22 +1417,26 @@ func (s *Store) Watch(
 
 // watcher implements [watch.Interface].
 type watcher struct {
-	mu     sync.RWMutex
-	closed bool
-	ch     chan watch.Event
+	mu       sync.RWMutex
+	closed   bool
+	ch       chan watch.Event
+	done     chan struct{}
+	stopOnce sync.Once
 }
 
 // Stop tells the producer that the consumer is done watching, so the
 // producer should stop sending events and close the result channel.
 func (w *watcher) Stop() {
+	// Close done BEFORE taking the write lock: a blocked add holds RLock
+	// until done closes, so taking Lock first would deadlock — the exact
+	// bug this change fixes.
+	w.stopOnce.Do(func() { close(w.done) })
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	// no operation if called multiple times.
 	if w.closed {
 		return
 	}
-
 	close(w.ch)
 	w.closed = true
 }
@@ -1107,13 +1450,15 @@ func (w *watcher) ResultChan() <-chan watch.Event {
 func (w *watcher) add(event watch.Event) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-
 	if w.closed {
 		return false
 	}
-
-	w.ch <- event
-	return true
+	select {
+	case w.ch <- event:
+		return true
+	case <-w.done:
+		return false
+	}
 }
 
 // translateTimestampSince returns the elapsed time since timestamp in
@@ -1159,7 +1504,7 @@ func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOption
 
 	var ownedTokenCount int
 	for _, ref := range kubeconfig.OwnerReferences {
-		if ref.Kind == "Token" && ref.APIVersion == "management.cattle.io/v3" {
+		if isTokenOwnerRef(ref, kubeconfig.Status.Tokens) {
 			ownedTokenCount++
 		}
 	}
@@ -1202,12 +1547,12 @@ func (s *Store) DeleteCollection(
 ) (runtime.Object, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "delete")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	lOptions, err := toListOptions(listOptions, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	configMapList, err := s.configMapClient.List(namespace, *lOptions)
@@ -1215,7 +1560,7 @@ func (s *Store) DeleteCollection(
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %v", err))
 	}
 
 	list := &ext.KubeconfigList{
@@ -1228,22 +1573,33 @@ func (s *Store) DeleteCollection(
 	}
 
 	for _, configMap := range configMapList.Items {
-		tokenSelector, err := tokenSelector(isAdmin, userInfo.GetName(), configMap.Name)
+		// Convert to Kubeconfig first and run deleteValidation against it directly.
+		// Any error from deleteValidation (including a NotFound-classified one) is
+		// provably from the caller's validation logic, not from a concurrent delete,
+		// so it aborts the whole collection and is surfaced verbatim.
+		kubeconfig, err := s.fromConfigMap(&configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(err)
+			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", configMap.Name, err))
 		}
-
-		obj, _, err := s.delete(ctx, &configMap, tokenSelector, deleteValidation, options)
+		if deleteValidation != nil {
+			if err := deleteValidation(ctx, kubeconfig); err != nil {
+				return nil, validationError(err, "delete", configMap.Name)
+			}
+		}
+		// Pass nil deleteValidation: validation already ran above, so an IsNotFound
+		// from s.delete is provably the backing concurrent-delete race.
+		obj, _, err := s.delete(ctx, kubeconfig, &configMap, nil, options)
+		if apierrors.IsNotFound(err) {
+			continue // backing ConfigMap was concurrently deleted — skip
+		}
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting kubeconfig %s: %w", configMap.Name, err))
+			return nil, err // already Kubeconfig-scoped via mapBackingError
 		}
-
-		kubeconfig, ok := obj.(*ext.Kubeconfig)
-		if !ok { // Sanity check.
+		kc, ok := obj.(*ext.Kubeconfig)
+		if !ok {
 			return nil, apierrors.NewInternalError(fmt.Errorf("expected kubeconfig object, got %T", obj))
 		}
-
-		list.Items = append(list.Items, *kubeconfig)
+		list.Items = append(list.Items, *kc)
 	}
 
 	return list, nil
@@ -1258,7 +1614,7 @@ func (s *Store) Delete(
 ) (runtime.Object, bool, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "delete")
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	useCache := false
@@ -1273,91 +1629,122 @@ func (s *Store) Delete(
 		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
-	tokenSelector, err := tokenSelector(isAdmin, userInfo.GetName(), name)
+	kubeconfig, err := s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(err)
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", configMap.Name, err))
 	}
+	return s.delete(ctx, kubeconfig, configMap, deleteValidation, options)
+}
 
-	return s.delete(ctx, configMap, tokenSelector, deleteValidation, options)
+// checkPreconditions verifies the caller's UID and ResourceVersion preconditions
+// against the stored values. It returns a Conflict if a check fails and nil when
+// all checks pass or preconditions is nil.
+//
+// The UID precondition passes if the submitted UID equals ANY of the accepted
+// UIDs: callers may pass both the Kubeconfig's virtual UID and the backing
+// ConfigMap's real UID so a client holding either identity can enforce uniqueness.
+//
+// Note: the default apiserver UpdatedObjectInfo only ever populates the UID
+// precondition; the ResourceVersion branch is defensive for non-default
+// rest.UpdatedObjectInfo implementations, but kept for the standard
+// Preconditions contract.
+func checkPreconditions(preconditions *metav1.Preconditions, name, rv string, uids ...types.UID) error {
+	if preconditions == nil {
+		return nil
+	}
+	if preconditions.UID != nil {
+		var matched bool
+		for _, uid := range uids {
+			if *preconditions.UID == uid {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			var recordUID types.UID
+			if len(uids) > 0 {
+				recordUID = uids[0]
+			}
+			return apierrors.NewConflict(gvr.GroupResource(), name,
+				fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s)",
+					*preconditions.UID, recordUID))
+		}
+	}
+	if preconditions.ResourceVersion != nil && *preconditions.ResourceVersion != rv {
+		return apierrors.NewConflict(gvr.GroupResource(), name,
+			fmt.Errorf("the ResourceVersion in the precondition (%s) does not match the ResourceVersion in record (%s)",
+				*preconditions.ResourceVersion, rv))
+	}
+	return nil
 }
 
 // delete a kubeconfig's configmap and associated tokens.
+// kubeconfig must be the already-converted form of configMap (callers convert once).
 func (s *Store) delete(
 	ctx context.Context,
+	kubeconfig *ext.Kubeconfig,
 	configMap *corev1.ConfigMap,
-	tokenSelector labels.Selector,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions,
 ) (runtime.Object, bool, error) {
-	kubeconfig, err := s.fromConfigMap(configMap)
-	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
-	}
-
 	if deleteValidation != nil {
-		err := deleteValidation(ctx, kubeconfig)
-		if err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, false, err
-			}
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
+		if err := deleteValidation(ctx, kubeconfig); err != nil {
+			return nil, false, validationError(err, "delete", configMap.Name)
 		}
 	}
 
-	tokenList, err := s.tokenCache.List(tokenSelector)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
-		}
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfig %s: %w", configMap.Name, err))
+	// Enforce the client's preconditions before any destructive step, so a
+	// failing precondition leaves both the tokens and the ConfigMap untouched.
+	// The backing ConfigMap delete below re-enforces them authoritatively; the
+	// window between the token loop and that delete is the inherent
+	// non-transactional gap of this multi-object design. On this gap: if the
+	// backing delete returns a Conflict after tokens have been deleted, the
+	// caller receives a Conflict that explicitly names this state — signaling
+	// that the delete is safe to retry (the tokens are gone; only the ConfigMap
+	// record remains to be removed).
+	if err := checkPreconditions(options.Preconditions, configMap.Name, configMap.ResourceVersion, kubeconfig.UID, configMap.UID); err != nil {
+		return nil, false, err
+	}
+	if options.Preconditions != nil && options.Preconditions.UID != nil {
+		// Rewrite to the ConfigMap UID so the backing delete can enforce
+		// it — on a copy, so a caller retrying with the same DeleteOptions
+		// still submits its original precondition.
+		preconditions := *options.Preconditions
+		preconditions.UID = &configMap.UID
+		optionsCopy := *options
+		optionsCopy.Preconditions = &preconditions
+		options = &optionsCopy
 	}
 
-	if options.Preconditions != nil {
-		// If the UID precondition matches the kubeconfig's UID, we need
-		// to replace it with the corresponding configmap's UID.
-		if options.Preconditions.UID != nil && *options.Preconditions.UID == kubeconfig.UID {
-			options.Preconditions.UID = &configMap.UID
-		}
-	}
-
-	err = s.configMapClient.Delete(namespace, configMap.Name, options)
-	switch {
-	case err == nil:
-	case apierrors.IsNotFound(err):
-		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
-	case apierrors.IsConflict(err):
-		// Massage the err details to refer to Kubeconfigs instead of ConfigMaps.
-		var errMessage string
-		conflictErr, ok := err.(*apierrors.StatusError)
-		if ok {
-			_, errMessage, ok = strings.Cut(conflictErr.ErrStatus.Message, `ConfigMap "`+configMap.Name+`": `)
-			if !ok {
-				errMessage = ""
-			}
-		}
-		return nil, false, apierrors.NewConflict(gvr.GroupResource(), configMap.Name, errors.New(errMessage))
-	default:
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
-	}
-
-	var tokenNames []string
-	for _, token := range tokenList {
-		tokenNames = append(tokenNames, token.Name)
-	}
-
-	for _, tokenName := range tokenNames {
+	// Delete tokens first so the ConfigMap (which holds the token ID list)
+	// survives a partial failure and the whole delete stays retryable.
+	tokensDeleteAttempted := len(options.DryRun) == 0 && len(kubeconfig.Status.Tokens) > 0
+	for _, tokenName := range kubeconfig.Status.Tokens {
 		delOptions := &metav1.DeleteOptions{
 			GracePeriodSeconds: options.GracePeriodSeconds,
 			PropagationPolicy:  options.PropagationPolicy,
-			DryRun:             options.DryRun, // Pass through the dry run flag instead of handling it explicitly.
+			DryRun:             options.DryRun,
 		}
-
-		err := s.tokens.Delete(tokenName, delOptions)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
+		if err := s.deleteToken(tokenName, delOptions); err != nil {
+			return nil, false, mapBackingError(err, configMap.Name)
 		}
 	}
 
+	err := s.configMapClient.Delete(namespace, configMap.Name, options)
+	if err != nil {
+		mapped := mapBackingError(err, configMap.Name)
+		if apierrors.IsNotFound(mapped) && tokensDeleteAttempted && ownedByToken(configMap, kubeconfig.Status.Tokens) {
+			// Deleting the tokens above also lets the garbage collector remove the
+			// ConfigMap they own. If it did so before this call, the kubeconfig is
+			// already gone and the delete has succeeded.
+			return kubeconfig, true, nil
+		}
+		if apierrors.IsConflict(mapped) && tokensDeleteAttempted {
+			return nil, false, apierrors.NewConflict(gvr.GroupResource(), configMap.Name,
+				fmt.Errorf("%s; this attempt has already revoked the kubeconfig's tokens and the delete should be retried to remove the record", genericregistry.OptimisticLockErrorMsg))
+		}
+		return nil, false, mapped
+	}
 	return kubeconfig, true, nil
 }
 
@@ -1374,7 +1761,7 @@ func (s *Store) Update(
 ) (runtime.Object, bool, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "update")
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	useCache := false
@@ -1391,12 +1778,14 @@ func (s *Store) Update(
 
 	oldKubeconfig, err := s.fromConfigMap(oldConfigMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", name, err))
 	}
 
 	newObj, err := objInfo.UpdatedObject(ctx, oldKubeconfig)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object for kubeconfig %s: %w", name, err))
+		// For a PATCH the apiserver applies the patch and runs admission in
+		// here, so the error may already carry a client-facing status code.
+		return nil, false, apiStatusOrInternalError(err)
 	}
 
 	newKubeconfig, ok := newObj.(*ext.Kubeconfig)
@@ -1404,13 +1793,18 @@ func (s *Store) Update(
 		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", newObj))
 	}
 
+	// Enforce a UID or ResourceVersion precondition supplied by the caller via
+	// objInfo.Preconditions(). This mirrors the Delete path and must run before
+	// any write so dry-run also predicts the conflict outcome.
+	if prec := objInfo.Preconditions(); prec != nil {
+		if err := checkPreconditions(prec, name, oldKubeconfig.ResourceVersion, oldKubeconfig.UID, oldConfigMap.UID); err != nil {
+			return nil, false, err
+		}
+	}
+
 	if updateValidation != nil {
-		err = updateValidation(ctx, newKubeconfig, oldKubeconfig)
-		if err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, false, err
-			}
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("update validation for kubeconfig %s failed: %s", name, err))
+		if err := updateValidation(ctx, newKubeconfig, oldKubeconfig); err != nil {
+			return nil, false, validationError(err, "update", name)
 		}
 	}
 
@@ -1423,6 +1817,20 @@ func (s *Store) Update(
 	if oldKubeconfig.Spec.TTL != newKubeconfig.Spec.TTL {
 		return nil, false, apierrors.NewBadRequest("spec.ttl is immutable")
 	}
+	if newKubeconfig.Spec.IncludeDefaultEntry == nil {
+		// A request without the field keeps the stored value, so older clients can still update.
+		newKubeconfig.Spec.IncludeDefaultEntry = oldKubeconfig.Spec.IncludeDefaultEntry
+	}
+	if !reflect.DeepEqual(oldKubeconfig.Spec.IncludeDefaultEntry, newKubeconfig.Spec.IncludeDefaultEntry) {
+		return nil, false, apierrors.NewBadRequest("spec.includeDefaultEntry is immutable")
+	}
+	if newKubeconfig.Spec.PreferRancherProxy == nil {
+		// A request without the field keeps the stored value, so older clients can still update.
+		newKubeconfig.Spec.PreferRancherProxy = oldKubeconfig.Spec.PreferRancherProxy
+	}
+	if !reflect.DeepEqual(oldKubeconfig.Spec.PreferRancherProxy, newKubeconfig.Spec.PreferRancherProxy) {
+		return nil, false, apierrors.NewBadRequest("spec.preferRancherProxy is immutable")
+	}
 
 	newKubeconfig.UID = oldKubeconfig.UID // Make sure UID is preserved.
 
@@ -1432,30 +1840,45 @@ func (s *Store) Update(
 	newKubeconfig.Labels[UserIDLabel] = oldKubeconfig.Labels[UserIDLabel]
 	newKubeconfig.Status = oldKubeconfig.Status // Carry over the status.
 
-	newKubeconfig.Status.Conditions = append(newKubeconfig.Status.Conditions, metav1.Condition{
-		Type:               UpdatedCond,
-		Status:             metav1.ConditionTrue,
-		Reason:             UpdatedCond,
-		LastTransitionTime: metav1.NewTime(time.Now()),
+	meta.SetStatusCondition(&newKubeconfig.Status.Conditions, metav1.Condition{
+		Type:   UpdatedCond,
+		Status: metav1.ConditionTrue,
+		Reason: UpdatedCond,
 	})
+	// Updated records the time of the latest modification, not a status transition.
+	// Advance LastTransitionTime unconditionally so clients can use it as a
+	// last-modified timestamp — restoring the observable behavior from before the
+	// single-condition upsert was introduced.
+	if c := meta.FindStatusCondition(newKubeconfig.Status.Conditions, UpdatedCond); c != nil {
+		c.LastTransitionTime = metav1.NewTime(time.Now())
+	}
 
 	// Note: [Store.toConfigMap] takes care of enforcing [KindLabel] label and [UIDAnnotation] annotation.
 	newConfigMap, err := s.toConfigMap(newKubeconfig)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %v", name, err))
 	}
 
 	dryRun := options != nil && len(options.DryRun) > 0
+
+	// Enforce the client's resourceVersion precondition even on dry-run, so a
+	// preview predicts the real conflict outcome.
+	if newKubeconfig.ResourceVersion != "" &&
+		newKubeconfig.ResourceVersion != oldKubeconfig.ResourceVersion {
+		return nil, false, apierrors.NewConflict(gvr.GroupResource(), name,
+			errors.New(genericregistry.OptimisticLockErrorMsg))
+	}
+
 	if !dryRun {
 		newConfigMap, err = s.configMapClient.Update(newConfigMap)
 		if err != nil {
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("error updating configmap for kubeconfig %s: %w", name, err))
+			return nil, false, mapBackingError(err, name)
 		}
 	}
 
 	newKubeconfig, err = s.fromConfigMap(newConfigMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", name, err))
 	}
 
 	return newKubeconfig, false, nil
@@ -1507,27 +1930,36 @@ var (
 
 	pathCMLabelKind = fieldpath.MakePathOrDie("metadata", "labels", KindLabel)
 
-	pathKConfigClustersField       = fieldpath.MakePathOrDie("spec", "clusters")
-	pathKConfigCurrentContextField = fieldpath.MakePathOrDie("spec", "currentContext")
-	pathKConfigDescriptionField    = fieldpath.MakePathOrDie("spec", "description")
-	pathKConfigTTLField            = fieldpath.MakePathOrDie("spec", "ttl")
+	pathKConfigClustersField            = fieldpath.MakePathOrDie("spec", "clusters")
+	pathKConfigCurrentContextField      = fieldpath.MakePathOrDie("spec", "currentContext")
+	pathKConfigDescriptionField         = fieldpath.MakePathOrDie("spec", "description")
+	pathKConfigTTLField                 = fieldpath.MakePathOrDie("spec", "ttl")
+	pathKConfigIncludeDefaultEntryField = fieldpath.MakePathOrDie("spec", "includeDefaultEntry")
+	pathKConfigPreferRancherProxyField  = fieldpath.MakePathOrDie("spec", "preferRancherProxy")
+
+	pathCMIncludeDefaultEntryField = fieldpath.MakePathOrDie("data", "include-default-entry")
+	pathCMPreferRancherProxyField  = fieldpath.MakePathOrDie("data", "prefer-rancher-proxy")
 
 	mapFromConfigMap = extcommon.MapSpec{
-		pathCMData.String():                  nil,
-		pathCMClustersField.String():         pathKConfigClustersField,
-		pathCMCurrentContextField.String():   pathKConfigCurrentContextField,
-		pathCMDescriptionField.String():      pathKConfigDescriptionField,
-		pathCMTTLField.String():              pathKConfigTTLField,
-		pathCMStatusConditionsField.String(): nil,
-		pathCMStatusSummaryField.String():    nil,
-		pathCMStatusTokensField.String():     nil,
-		pathCMLabelKind.String():             nil,
+		pathCMData.String():                     nil,
+		pathCMClustersField.String():            pathKConfigClustersField,
+		pathCMCurrentContextField.String():      pathKConfigCurrentContextField,
+		pathCMDescriptionField.String():         pathKConfigDescriptionField,
+		pathCMTTLField.String():                 pathKConfigTTLField,
+		pathCMIncludeDefaultEntryField.String(): pathKConfigIncludeDefaultEntryField,
+		pathCMPreferRancherProxyField.String():  pathKConfigPreferRancherProxyField,
+		pathCMStatusConditionsField.String():    nil,
+		pathCMStatusSummaryField.String():       nil,
+		pathCMStatusTokensField.String():        nil,
+		pathCMLabelKind.String():                nil,
 	}
 
 	mapFromKubeconfig = extcommon.MapSpec{
-		pathKConfigClustersField.String():       pathCMClustersField,
-		pathKConfigCurrentContextField.String(): pathCMCurrentContextField,
-		pathKConfigDescriptionField.String():    pathCMDescriptionField,
-		pathKConfigTTLField.String():            pathCMTTLField,
+		pathKConfigClustersField.String():            pathCMClustersField,
+		pathKConfigCurrentContextField.String():      pathCMCurrentContextField,
+		pathKConfigDescriptionField.String():         pathCMDescriptionField,
+		pathKConfigTTLField.String():                 pathCMTTLField,
+		pathKConfigIncludeDefaultEntryField.String(): pathCMIncludeDefaultEntryField,
+		pathKConfigPreferRancherProxyField.String():  pathCMPreferRancherProxyField,
 	}
 )

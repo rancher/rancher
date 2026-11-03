@@ -4,12 +4,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path"
-	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -33,7 +33,10 @@ type Retriever struct {
 }
 
 func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1.RKEControlPlane) ([]plan.File, error) {
-	shouldDo, _ := r.preBootstrapCluster(controlPlane)
+	shouldDo, err := r.preBootstrapCluster(controlPlane)
+	if err != nil {
+		return nil, err
+	}
 	if !shouldDo {
 		return nil, nil
 	}
@@ -43,21 +46,24 @@ func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1
 		return nil, err
 	}
 
-	if len(tokens) == 0 {
-		return nil, fmt.Errorf("no cluster registration token found")
-	}
-
-	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i].Name < tokens[j].Name
-	})
-
 	mgmtCluster, err := r.mgmtClusterCache.Get(controlPlane.Spec.ManagementClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mgmt Cluster %v: %w", controlPlane.Spec.ManagementClusterName, err)
 	}
 
+	// The same token as the agent clusterDeploy deploys once the pre-bootstrap agent has connected.
+	registrationToken, err := planner.ClusterAgentRegistrationToken(mgmtCluster, tokens)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := crt.GetTokenFromSecret(r.secretCache, registrationToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token for CRT %s/%s: %w", registrationToken.Namespace, registrationToken.Name, err)
+	}
+
 	// passing in nil for taints since prebootstrapping involves specific taints to uninitialized nodes
-	data, err := systemtemplate.ForCluster(mgmtCluster, tokens[0].Status.Token, nil, r.secretCache)
+	data, err := systemtemplate.ForCluster(mgmtCluster, token, nil, r.secretCache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate pre-bootstrap cluster-agent manifest: %w", err)
 	}
@@ -77,5 +83,5 @@ func (r *Retriever) preBootstrapCluster(cp *rkev1.RKEControlPlane) (bool, error)
 		return false, fmt.Errorf("failed to get mgmt Cluster %v: %w", cp.Spec.ManagementClusterName, err)
 	}
 
-	return capr.PreBootstrap(mgmtCluster), nil
+	return capr.ShouldPreBootstrap(mgmtCluster), nil
 }

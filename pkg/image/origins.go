@@ -13,7 +13,7 @@ import (
 // no longer used by Rancher. The keys of this map should
 // mirror the images listed in rancher-images.txt.
 // Some net-new images may be resolved via the check-origins script
-// (dapper check-origins).
+// (`make check-origins`).
 
 // images should be double-checked and confirmed
 // by the team which owns the image.
@@ -22,30 +22,31 @@ var OriginMap = map[string]string{
 	"ali-operator":                                            "https://github.com/rancher/ali-operator",
 	"aci-containers-controller":                               "https://github.com/noironetworks/aci-containers",
 	"aci-containers-host":                                     "https://github.com/noironetworks/aci-containers",
-	"appco-alertmanager":                                      "https://github.com/prometheus/alertmanager",
-	"appco-grafana":                                           "https://github.com/grafana/grafana",
+	"appco-curl":                                              "https://apps.rancher.io/applications/curl",
+	"appco-alertmanager":                                      "https://apps.rancher.io/applications/alertmanager",
+	"appco-grafana":                                           "https://apps.rancher.io/applications/grafana",
 	"appco-kubernetes-cluster-autoscaler":                     "https://apps.rancher.io/applications/kubernetes-cluster-autoscaler",
-	"appco-k8s-sidecar":                                       "https://github.com/kiwigrid/k8s-sidecar",
-	"appco-kube-rbac-proxy":                                   "https://github.com/brancz/kube-rbac-proxy",
-	"appco-kube-state-metrics":                                "https://github.com/kubernetes/kube-state-metrics",
-	"appco-node-exporter":                                     "https://github.com/prometheus/node_exporter",
-	"appco-redis":                                             "https://github.com/redis/redis",
-	"appco-thanos":                                            "https://github.com/thanos-io/thanos",
+	"appco-k8s-sidecar":                                       "https://apps.rancher.io/applications/k8s-sidecar",
+	"appco-kube-rbac-proxy":                                   "https://apps.rancher.io/applications/kube-rbac-proxy",
+	"appco-kube-state-metrics":                                "https://apps.rancher.io/applications/kube-state-metrics",
+	"appco-node-exporter":                                     "https://apps.rancher.io/applications/node-exporter",
+	"appco-redis":                                             "https://apps.rancher.io/applications/redis",
+	"appco-thanos":                                            "https://apps.rancher.io/applications/thanos",
 	"aks-operator":                                            "https://github.com/rancher/aks-operator",
-	"azureserviceoperator":                                    "https://github.com/rancher-sandbox/azure-service-operator",
+	"azureserviceoperator":                                    "https://github.com/rancher/azure-service-operator",
 	"backup-restore-operator":                                 "https://github.com/rancher/backup-restore-operator",
 	"cnideploy":                                               "https://github.com/containernetworking/plugins",
 	"coreos-kube-state-metrics":                               "https://github.com/kubernetes/kube-state-metrics",
 	"coreos-prometheus-config-reloader":                       "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"coreos-prometheus-operator":                              "https://github.com/prometheus-operator/prometheus-operator",
-	"cluster-api-controller":                                  "https://github.com/rancher-sandbox/cluster-api",
-	"cluster-api-addon-provider-fleet":                        "https://github.com/rancher/cluster-api-addon-provider-fleet",
-	"cluster-api-aws-controller":                              "https://github.com/rancher-sandbox/cluster-api-provider-aws",
-	"cluster-api-azure-controller":                            "https://github.com/rancher-sandbox/cluster-api-provider-azure",
-	"cluster-api-gcp-controller":                              "https://github.com/rancher-sandbox/cluster-api-provider-gcp",
+	"cluster-api-controller":                                  "https://github.com/rancher/cluster-api",
+	"cluster-api-aws-controller":                              "https://github.com/rancher/cluster-api-provider-aws",
+	"cluster-api-azure-controller":                            "https://github.com/rancher/cluster-api-provider-azure",
+	"cluster-api-gcp-controller":                              "https://github.com/rancher/cluster-api-provider-gcp",
 	"cluster-api-provider-rke2-bootstrap":                     "https://github.com/rancher/cluster-api-provider-rke2",
 	"cluster-api-provider-rke2-controlplane":                  "https://github.com/rancher/cluster-api-provider-rke2",
-	"cluster-api-vsphere-controller":                          "https://github.com/rancher-sandbox/cluster-api-provider-vsphere",
+	"cluster-api-provider-rke2-extension":                     "https://github.com/rancher/cluster-api-provider-rke2",
+	"cluster-api-vsphere-controller":                          "https://github.com/rancher/cluster-api-provider-vsphere",
 	"eks-operator":                                            "https://github.com/rancher/eks-operator",
 	"externalip-webhook":                                      "https://github.com/rancher/externalip-webhook",
 	"fleet":                                                   "https://github.com/rancher/fleet",
@@ -88,11 +89,11 @@ var OriginMap = map[string]string{
 	"istio-kubectl":                                           "https://github.com/istio/istio",
 	"jimmidyson-configmap-reload":                             "https://github.com/jimmidyson/configmap-reload",
 	"k3s-upgrade":                                             "https://github.com/rancher/k3s-upgrade",
-	"klipper-helm":                                            "https://github.com/rancher/klipper-helm",
-	"klipper-lb":                                              "https://github.com/rancher/klipper-lb",
+	"klipper-helm":                                            "https://github.com/k3s-io/klipper-helm",
+	"klipper-lb":                                              "https://github.com/k3s-io/klipper-lb",
 	"kube-api-auth":                                           "https://github.com/rancher/kube-api-auth",
-	"kubeadm-bootstrap-controller":                            "https://github.com/rancher-sandbox/cluster-api",
-	"kubeadm-control-plane-controller":                        "https://github.com/rancher-sandbox/cluster-api",
+	"kubeadm-bootstrap-controller":                            "https://github.com/rancher/cluster-api",
+	"kubeadm-control-plane-controller":                        "https://github.com/rancher/cluster-api",
 	"kubectl":                                                 "https://github.com/rancher/kubectl",
 	"kubelet-pause":                                           "https://github.com/kubernetes/kubernetes",
 	"library-nginx":                                           "https://github.com/nginx/nginx",
@@ -107,8 +108,7 @@ var OriginMap = map[string]string{
 	"mirrored-appscode-kubed":                                 "https://github.com/kubeops/config-syncer",
 	"mirrored-banzaicloud-fluentd":                            "https://github.com/fluent/fluentd",
 	"mirrored-banzaicloud-logging-operator":                   "https://github.com/banzaicloud/logging-operator",
-	"mirrored-bci-busybox":                                    "https://build.opensuse.org/package/show/devel:BCI:SLE-15-SP6/busybox-image",
-	"mirrored-bci-micro":                                      "https://build.opensuse.org/package/show/devel:BCI:SLE-15-SP6/micro-image",
+	"mirrored-bci-micro":                                      "https://build.opensuse.org/package/show/devel:BCI:16.0/micro-image",
 	"mirrored-calico-apiserver":                               "https://github.com/projectcalico/calico/tree/master/apiserver",
 	"mirrored-calico-cni":                                     "https://github.com/projectcalico/calico",
 	"mirrored-calico-csi":                                     "https://github.com/projectcalico/calico",
@@ -141,7 +141,6 @@ var OriginMap = map[string]string{
 	"mirrored-cloud-provider-vsphere-csi-release-driver":      "https://github.com/kubernetes-sigs/vsphere-csi-driver",
 	"mirrored-cloud-provider-vsphere-csi-release-syncer":      "https://github.com/kubernetes-sigs/vsphere-csi-driver/tree/master/pkg/syncer",
 	"mirrored-cloud-provider-vsphere":                         "https://github.com/kubernetes/cloud-provider-vsphere",
-	"mirrored-cluster-api-controller":                         "https://github.com/kubernetes-sigs/cluster-api",
 	"mirrored-coredns-coredns":                                "https://github.com/coredns/coredns",
 	"mirrored-coreos-prometheus-config-reloader":              "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"mirrored-coreos-prometheus-operator":                     "https://github.com/prometheus-operator/prometheus-operator",
@@ -172,6 +171,7 @@ var OriginMap = map[string]string{
 	"mirrored-jetstack-cert-manager-controller":               "https://github.com/cert-manager/cert-manager",
 	"mirrored-jimmidyson-configmap-reload":                    "https://github.com/jimmidyson/configmap-reload",
 	"mirrored-jkroepke-kube-webhook-certgen":                  "https://github.com/jkroepke/kube-webhook-certgen",
+	"kube-webhook-certgen":                                    "https://github.com/rancher/ingress-nginx",
 	"mirrored-k8scsi-csi-node-driver-registrar":               "https://github.com/kubernetes-csi/node-driver-registrar",
 	"mirrored-k8scsi-csi-resizer":                             "https://github.com/kubernetes-csi/external-resizer",
 	"mirrored-k8scsi-livenessprobe":                           "https://github.com/kubernetes-csi/livenessprobe",
@@ -261,12 +261,14 @@ var OriginMap = map[string]string{
 	"pushprox":                                                "https://github.com/rancher/PushProx",
 	"rancher":                                                 "https://github.com/rancher/rancher",
 	"rancher-agent":                                           "https://github.com/rancher/rancher",
+	"rancher-assets":                                          "https://github.com/rancher/rancher-assets",
 	"rancher-csp-adapter":                                     "https://github.com/rancher/csp-adapter",
 	"rancher-webhook":                                         "https://github.com/rancher/webhook",
 	"remotedialer-proxy":                                      "https://github.com/rancher/remotedialer",
 	"rke2-cloud-provider":                                     "https://github.com/rancher/image-build-rke2-cloud-provider",
 	"rke2-runtime":                                            "https://github.com/rancher/rke2",
 	"rke2-upgrade":                                            "https://github.com/rancher/rke2-upgrade",
+	"rke2-security-responder":                                 "https://github.com/rancher/rke2-security-responder",
 	"supportability-review":                                   "https://github.com/rancher/supportability-review",
 	"supportability-review-app-frontend":                      "https://github.com/rancher/supportability-review",
 	"supportability-review-internal":                          "https://github.com/rancher/supportability-review",
@@ -292,6 +294,8 @@ var OriginMap = map[string]string{
 	"kuberlr-kubectl":                                         "https://github.com/rancher/kuberlr-kubectl",
 	"compliance-operator":                                     "https://github.com/rancher/compliance-operator",
 	"helm-controller":                                         "https://github.com/k3s-io/helm-controller",
+	"rancher-ai-agent":                                        "https://github.com/rancher/rancher-ai-agent",
+	"rancher-ai-mcp":                                          "https://github.com/rancher/rancher-ai-mcp",
 }
 
 const (
@@ -327,7 +331,7 @@ func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages
 		return fmt.Errorf("could not create %s file: %w", imageOriginFileName, err)
 	}
 
-	originsFile.Chmod(0755)
+	originsFile.Chmod(0o755)
 	originsFile.WriteString(fileContents)
 	return originsFile.Close()
 }

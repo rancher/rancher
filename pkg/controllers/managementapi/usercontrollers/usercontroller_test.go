@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,10 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 )
 
-func newMockUserControllersController(t *testing.T, starter *simpleControllerStarter) (*userControllersController, *fake.MockNonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList]) {
+func newMockUserControllersController(t *testing.T, starter *simpleControllerStarter) (*userControllersController, *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]) {
 	ctrl := gomock.NewController(t)
 	clusterLister := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
-	clusterClient := fake.NewMockNonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList](ctrl)
+	clusterClient := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
 	return &userControllersController{
 		starter:       starter,
 		clusterLister: clusterLister,
@@ -29,6 +30,12 @@ func newMockUserControllersController(t *testing.T, starter *simpleControllerSta
 type simpleControllerStarter struct {
 	startCalled bool
 	stopCalled  bool
+	stopped     []*v3.Cluster
+	state       clustermanager.ControllersState
+}
+
+func (s *simpleControllerStarter) ControllersState(*v3.Cluster) clustermanager.ControllersState {
+	return s.state
 }
 
 func (s *simpleControllerStarter) Start(_ context.Context, c *v3.Cluster, _ bool) error {
@@ -39,8 +46,9 @@ func (s *simpleControllerStarter) Start(_ context.Context, c *v3.Cluster, _ bool
 	return nil
 }
 
-func (s *simpleControllerStarter) Stop(_ *v3.Cluster) {
+func (s *simpleControllerStarter) Stop(c *v3.Cluster) {
 	s.stopCalled = true
+	s.stopped = append(s.stopped, c)
 }
 
 func TestAnnotationFailsToBeSaved(t *testing.T) {

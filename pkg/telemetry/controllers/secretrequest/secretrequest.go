@@ -80,9 +80,12 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 	if !incomingObj.HasCondition(v1.ResourceConditionProgressing) {
 		preparedObj := incomingObj.DeepCopy()
 		v1.ResourceConditionProgressing.True(preparedObj)
-		_, err := h.secretRequests.UpdateStatus(preparedObj)
+		updated, err := h.secretRequests.UpdateStatus(preparedObj)
+		if err != nil {
+			return incomingObj, err
+		}
 
-		return incomingObj, err
+		return updated, nil
 	}
 
 	if isValid, err := h.isValidSecretRequest(incomingObj); !isValid {
@@ -91,14 +94,14 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 		v1.ResourceConditionFailure.True(preparedObj)
 		v1.ResourceConditionProgressing.False(preparedObj)
 		v1.ResourceConditionDone.True(preparedObj)
-		_, updateErr := h.secretRequests.UpdateStatus(preparedObj)
+		updated, updateErr := h.secretRequests.UpdateStatus(preparedObj)
 
 		if updateErr != nil {
 			newErr := fmt.Errorf("error validating secret request: %w; and additional error updating secret request: %w", err, updateErr)
 			return nil, newErr
 		}
 
-		return incomingObj, err
+		return updated, err
 	}
 
 	uniqueName := exporterIdFromObj(incomingObj)
@@ -128,7 +131,7 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 		return incomingObj, fmt.Errorf("error updating secret request '%s': %w", incomingObj.Spec.TargetSecretRef, updateErr)
 	}
 	logrus.Debugf("Updated secret request '%v'", updated)
-	return incomingObj, nil
+	return updated, nil
 }
 
 func (h *handler) isValidSecretRequest(secretRequest *v1.SecretRequest) (bool, error) {

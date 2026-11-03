@@ -40,14 +40,14 @@ func (sh *serviceHandler) Sync(_ string, service *corev1.Service) (*corev1.Servi
 	return nil, sh.npmgr.nodePortsUpdateHandler(service, sh.clusterNamespace)
 }
 
-func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterNamespace string) error {
-	systemNamespaces, _, err := npmgr.getSystemNSInfo(clusterNamespace)
+func (n *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterNamespace string) error {
+	systemNamespaces, _, err := n.getSystemNSInfo(clusterNamespace)
 	if err != nil {
 		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
 	}
 	policyName := getNodePortsPolicyName(service)
 	if _, ok := systemNamespaces[service.Namespace]; ok {
-		npmgr.delete(service.Namespace, policyName)
+		n.delete(service.Namespace, policyName)
 		return nil
 	}
 	np := generateServiceNetworkPolicy(service, policyName)
@@ -71,7 +71,7 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterN
 	})
 	if hasNodePorts {
 		logrus.Debugf("netpolMgr: nodePortsUpdateHandler: service=%+v has node ports, hence programming np=%+v", *service, *np)
-		return npmgr.program(np)
+		return n.program(np)
 	}
 
 	return nil

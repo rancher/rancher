@@ -14,11 +14,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/dynamiclistener"
 	"github.com/rancher/dynamiclistener/cert"
+	"github.com/rancher/dynamiclistener/factory"
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/lasso/pkg/metrics"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/apps"
@@ -66,7 +68,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 
 	if httpsPort != 0 {
-		opts, err = SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
+		opts, err = SetupListener(ctx, core.Core().V1().Secret(), core.Core().V1().Pod(), acmeDomains, noCACerts)
 		if err != nil {
 			return errors.Wrap(err, "failed to setup TLS listener")
 		}
@@ -122,12 +124,32 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return err
 	}
 
+	// Always include localhost, 127.0.0.1, and the in-cluster DNS names
+	// (short and FQDN forms) for the rancher-internal Service as default
+	// SANs, alongside the dynamic pod/cluster IPs below. These are
+	// admin-controlled Config.SANs (short-circuited by dynamiclistener's
+	// allowDefaultSANs before FilterCN ever runs), so they're always
+	// present regardless of what the pod-IP/Service-allowlist filter
+	// would otherwise decide -- and unlike those IPs, they don't change
+	// across restarts.
+	internalSvcName := apiservice.RancherInternalServiceName + "." + namespace.System + ".svc"
+	hostIPs = append(hostIPs, "localhost", "127.0.0.1", internalSvcName, internalSvcName+".cluster.local")
+
 	if clusterIP != "" {
 		hostIPs = append(hostIPs, clusterIP)
 	}
 	if len(hostIPs) > 0 {
 		serverOptions.TLSListenerConfig = dynamiclistener.Config{
-			SANs: hostIPs,
+			SANs:           hostIPs,
+			MaxSANs:        30,
+			FilterCN:       newRancherPodIPFilter(ctx, core.Core().V1().Pod(), "rancher-podip-tls-internal-filter"),
+			FilterExisting: true,
+		}
+	}
+
+	if clusterIP != "" {
+		if err := ensureInternalCertSANs(core.Core().V1().Secret(), clusterIP); err != nil {
+			return err
 		}
 	}
 
@@ -193,8 +215,8 @@ func migrateConfig(ctx context.Context, restConfig *rest.Config, opts *server.Li
 	}
 }
 
-func SetupListener(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
-	caForAgent, noCACerts, opts, err := readConfig(secrets, acmeDomains, noCACerts)
+func SetupListener(ctx context.Context, secrets corev1controllers.SecretController, pods corev1controllers.PodController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
+	caForAgent, noCACerts, opts, err := readConfig(ctx, secrets, pods, acmeDomains, noCACerts)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +256,7 @@ func SetupListener(secrets corev1controllers.SecretController, acmeDomains []str
 // - bool: The value of the noCACerts flag.
 // - *server.ListenOpts: The listener options for dynamiclistener.
 // - error: An error if the configuration is invalid.
-func readConfig(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (string, bool, *server.ListenOpts, error) {
+func readConfig(ctx context.Context, secrets corev1controllers.SecretController, pods corev1controllers.PodController, acmeDomains []string, noCACerts bool) (string, bool, *server.ListenOpts, error) {
 	var (
 		ca  string
 		err error
@@ -271,7 +293,8 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 			TLSConfig:             tlsConfig,
 			ExpirationDaysCheck:   expiration,
 			SANs:                  sans,
-			FilterCN:              filterCN,
+			FilterCN:              newServingCertFilterCN(newRancherPodIPFilter(ctx, pods, "rancher-podip-serving-cert-filter")),
+			FilterExisting:        true,
 			CloseConnOnCertChange: true,
 		},
 	}
@@ -406,7 +429,9 @@ func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, 
 	return nodeIPs, nil
 }
 
-func filterCN(cns ...string) []string {
+// serverURLFilterCN restricts dynamic CNs to the settings.ServerURL hostname
+// (or passes everything through pre-bootstrap / on a parse error).
+func serverURLFilterCN(cns ...string) []string {
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
 		return cns
@@ -421,6 +446,40 @@ func filterCN(cns ...string) []string {
 		return []string{host}
 	}
 	return cns
+}
+
+// newServingCertFilterCN builds the FilterCN closure for the :443 serving
+// cert: MCMAgent rejects all dynamic CNs outright; otherwise a CN is kept if
+// it matches the server-url hostname or is a live rancher pod IP.
+func newServingCertFilterCN(podIPFilter func(...string) []string) func(...string) []string {
+	return func(cns ...string) []string {
+		if features.MCMAgent.Enabled() {
+			return nil
+		}
+		return unionFilterCN(serverURLFilterCN, podIPFilter)(cns...)
+	}
+}
+
+// unionFilterCN keeps primary's accepted CNs, giving anything it rejects a
+// second chance against allowlist.
+func unionFilterCN(primary, allowlist func(...string) []string) func(...string) []string {
+	return func(cns ...string) []string {
+		allowed := primary(cns...)
+		allowedSet := make(map[string]struct{}, len(allowed))
+		for _, cn := range allowed {
+			allowedSet[cn] = struct{}{}
+		}
+		var rejected []string
+		for _, cn := range cns {
+			if _, ok := allowedSet[cn]; !ok {
+				rejected = append(rejected, cn)
+			}
+		}
+		if len(rejected) == 0 {
+			return allowed
+		}
+		return append(allowed, allowlist(rejected...)...)
+	}
 }
 
 func fileExists(path string) bool {
@@ -439,4 +498,51 @@ func readPEM(path string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+// ensureInternalCertSANs checks whether the existing tls-rancher-internal secret
+// has clusterIP recorded in its dynamiclistener SAN annotations. If not, the
+// secret is deleted so that dynamiclistener will regenerate it with the correct
+// SANs when the internal listener starts.
+//
+// Static (user-provided) secrets are never deleted.
+// A NotFound error on delete is silently ignored (another HA pod beat us to it).
+// A no-op when clusterIP is already present — safe on stable upgrades.
+func ensureInternalCertSANs(secrets corev1controllers.SecretController, clusterIP string) error {
+	if clusterIP == "" {
+		return nil
+	}
+
+	secret, err := secrets.Get(namespace.System, "tls-rancher-internal", metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		// No pre-existing secret — dynamiclistener will create a fresh one with correct SANs.
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed checking tls-rancher-internal for SAN mismatch: %w", err)
+	}
+
+	// Never touch user-provided (static) certificates.
+	if factory.IsStatic(secret) {
+		return nil
+	}
+
+	// If the clusterIP is already recorded in the SAN annotations, nothing to do.
+	// NeedsUpdate became a *TLS method with the dynamiclistener bump. The
+	// zero-value receiver is safe here because maxSANs is 0 and the only
+	// receiver-dependent logic is wildcard coverage, which is not relevant to a
+	// valid literal ClusterIP.
+	if !(&factory.TLS{}).NeedsUpdate(0, secret, clusterIP) {
+		return nil
+	}
+
+	// The secret exists but does not include clusterIP — delete it so dynamiclistener
+	// regenerates it with the correct SANs before the internal listener starts.
+	logrus.Infof("tls: tls-rancher-internal certificate does not include ClusterIP %s, deleting to force regeneration", clusterIP)
+	err = secrets.Delete(namespace.System, "tls-rancher-internal", &metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		// Another HA pod already deleted it — that's fine.
+		return nil
+	}
+	return err
 }

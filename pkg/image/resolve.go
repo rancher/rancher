@@ -9,7 +9,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/buildconfig"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/settings"
 )
 
@@ -48,7 +49,7 @@ func Resolve(image string) string {
 // It will use the cluster level registry if one is found, or the system default registry if no cluster level registry is found.
 // If either is not found, it returns the image.
 func ResolveWithCluster(image string, cluster *apisv3.Cluster) string {
-	reg := util.GetPrivateRegistryURL(cluster)
+	reg := pkgcluster.GetPrivateRegistryURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		// Images from Dockerhub Library repo, we add rancher prefix when using private registry
 		if !strings.Contains(image, "/") {
@@ -137,13 +138,14 @@ func IsValidSemver(version string) bool {
 
 func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) {
 	if osType == Linux {
-		addSourceToImage(imagesSet, settings.SCCOperatorImage.Get(), imageSourceCore)
-		addSourceToImage(imagesSet, settings.ShellImage.Get(), imageSourceCore)
+		addSourceToImage(imagesSet, buildconfig.DefaultAssetsImage, imageSourceCore)
+		addSourceToImage(imagesSet, buildconfig.DefaultSccOperatorImage, imageSourceCore)
+		addSourceToImage(imagesSet, buildconfig.DefaultShellVersion, imageSourceCore)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), imageSourceCore)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.6.24.2", imageSourceCore)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:15.6.24.2", imageSourceCore)
+		// Used by Audit Log feature - sourced from build.yaml
+		addSourceToImage(imagesSet, buildconfig.ChartAuditLogImage, imageSourceCore)
 		// kube-api-auth is required for ACE.
-		addSourceToImage(imagesSet, apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth, imageSourceSystem)
+		addSourceToImage(imagesSet, buildconfig.DefaultKubeAPIAuthImage, imageSourceSystem)
 	}
 }
 

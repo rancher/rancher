@@ -10,6 +10,7 @@ const (
 	ReplicationControllerSpecFieldDNSPolicy                     = "dnsPolicy"
 	ReplicationControllerSpecFieldEnableServiceLinks            = "enableServiceLinks"
 	ReplicationControllerSpecFieldEphemeralContainers           = "ephemeralContainers"
+	ReplicationControllerSpecFieldEvictionResponders            = "evictionResponders"
 	ReplicationControllerSpecFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	ReplicationControllerSpecFieldFsgid                         = "fsgid"
 	ReplicationControllerSpecFieldGids                          = "gids"
@@ -38,6 +39,7 @@ const (
 	ReplicationControllerSpecFieldScale                         = "scale"
 	ReplicationControllerSpecFieldScheduling                    = "scheduling"
 	ReplicationControllerSpecFieldSchedulingGates               = "schedulingGates"
+	ReplicationControllerSpecFieldSchedulingGroup               = "schedulingGroup"
 	ReplicationControllerSpecFieldSeccompProfile                = "seccompProfile"
 	ReplicationControllerSpecFieldSelector                      = "selector"
 	ReplicationControllerSpecFieldServiceAccountName            = "serviceAccountName"
@@ -51,7 +53,6 @@ const (
 	ReplicationControllerSpecFieldUid                           = "uid"
 	ReplicationControllerSpecFieldVolumes                       = "volumes"
 	ReplicationControllerSpecFieldWindowsOptions                = "windowsOptions"
-	ReplicationControllerSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicationControllerSpec struct {
@@ -63,6 +64,7 @@ type ReplicationControllerSpec struct {
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -91,6 +93,7 @@ type ReplicationControllerSpec struct {
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      map[string]string              `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -104,5 +107,4 @@ type ReplicationControllerSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

@@ -12,8 +12,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
-	"helm.sh/helm/v3/pkg/repo"
+	"go.yaml.in/yaml/v2"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"

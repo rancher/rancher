@@ -75,6 +75,20 @@ func (mr *MockAuthProviderMockRecorder) CanAccessWithGroupProviders(userPrincipa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanAccessWithGroupProviders", reflect.TypeOf((*MockAuthProvider)(nil).CanAccessWithGroupProviders), userPrincipalID, groups)
 }
 
+// CanRefreshPrincipals mocks base method.
+func (m *MockAuthProvider) CanRefreshPrincipals() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CanRefreshPrincipals")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// CanRefreshPrincipals indicates an expected call of CanRefreshPrincipals.
+func (mr *MockAuthProviderMockRecorder) CanRefreshPrincipals() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanRefreshPrincipals", reflect.TypeOf((*MockAuthProvider)(nil).CanRefreshPrincipals))
+}
+
 // CustomizeSchema mocks base method.
 func (m *MockAuthProvider) CustomizeSchema(schema *types.Schema) {
 	m.ctrl.T.Helper()
@@ -131,18 +145,18 @@ func (mr *MockAuthProviderMockRecorder) GetUserExtraAttributes(userPrincipal any
 }
 
 // IsDisabledProvider mocks base method.
-func (m *MockAuthProvider) IsDisabledProvider() (bool, error) {
+func (m *MockAuthProvider) IsDisabledProvider(arg0 string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsDisabledProvider")
+	ret := m.ctrl.Call(m, "IsDisabledProvider", arg0)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsDisabledProvider indicates an expected call of IsDisabledProvider.
-func (mr *MockAuthProviderMockRecorder) IsDisabledProvider() *gomock.Call {
+func (mr *MockAuthProviderMockRecorder) IsDisabledProvider(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDisabledProvider", reflect.TypeOf((*MockAuthProvider)(nil).IsDisabledProvider))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDisabledProvider", reflect.TypeOf((*MockAuthProvider)(nil).IsDisabledProvider), arg0)
 }
 
 // Logout mocks base method.
@@ -216,4 +230,18 @@ func (m *MockAuthProvider) TransformToAuthProvider(authConfig map[string]any) (m
 func (mr *MockAuthProviderMockRecorder) TransformToAuthProvider(authConfig any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransformToAuthProvider", reflect.TypeOf((*MockAuthProvider)(nil).TransformToAuthProvider), authConfig)
+}
+
+// UsesUserSecrets mocks base method.
+func (m *MockAuthProvider) UsesUserSecrets() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UsesUserSecrets")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// UsesUserSecrets indicates an expected call of UsesUserSecrets.
+func (mr *MockAuthProviderMockRecorder) UsesUserSecrets() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UsesUserSecrets", reflect.TypeOf((*MockAuthProvider)(nil).UsesUserSecrets))
 }

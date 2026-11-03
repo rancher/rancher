@@ -15,6 +15,7 @@ const (
 	DaemonSetSpecFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetSpecFieldEnableServiceLinks            = "enableServiceLinks"
 	DaemonSetSpecFieldEphemeralContainers           = "ephemeralContainers"
+	DaemonSetSpecFieldEvictionResponders            = "evictionResponders"
 	DaemonSetSpecFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	DaemonSetSpecFieldFsgid                         = "fsgid"
 	DaemonSetSpecFieldGids                          = "gids"
@@ -42,6 +43,7 @@ const (
 	DaemonSetSpecFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	DaemonSetSpecFieldScheduling                    = "scheduling"
 	DaemonSetSpecFieldSchedulingGates               = "schedulingGates"
+	DaemonSetSpecFieldSchedulingGroup               = "schedulingGroup"
 	DaemonSetSpecFieldSeccompProfile                = "seccompProfile"
 	DaemonSetSpecFieldSelector                      = "selector"
 	DaemonSetSpecFieldServiceAccountName            = "serviceAccountName"
@@ -55,7 +57,6 @@ const (
 	DaemonSetSpecFieldUid                           = "uid"
 	DaemonSetSpecFieldVolumes                       = "volumes"
 	DaemonSetSpecFieldWindowsOptions                = "windowsOptions"
-	DaemonSetSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type DaemonSetSpec struct {
@@ -68,6 +69,7 @@ type DaemonSetSpec struct {
 	DaemonSetConfig               *DaemonSetConfig               `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -95,6 +97,7 @@ type DaemonSetSpec struct {
 	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -108,5 +111,4 @@ type DaemonSetSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

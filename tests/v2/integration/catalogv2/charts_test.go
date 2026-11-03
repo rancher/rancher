@@ -14,10 +14,11 @@ import (
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/kube"
+	release "helm.sh/helm/v4/pkg/release/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -733,6 +734,116 @@ func (w *ChartsTest) TestUninstallChartWithCustomTolerationOnTaintedCPNode() {
 	w.updateTaintOnNode(ctx, taint, taints.RemoveTaint)
 }
 
+// TestInstallChartWithSkipSchemaValidation tests the installation of a chart with skipSchemaValidation enabled
+func (w *ChartsTest) TestInstallChartWithSkipSchemaValidation() {
+	ctx := context.Background()
+
+	w.Require().NoError(w.catalogClient.InstallChart(&types.ChartInstallAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.System,
+		DisableOpenAPIValidation: false,
+		SkipSchemaValidation:     true,
+		Charts: []types.ChartInstall{{
+			ChartName:   "rancher-aks-operator-crd",
+			Version:     "104.0.2+up1.9.0",
+			ReleaseName: "rancher-aks-operator-crd",
+			Description: "rancher aks operator crd",
+		}},
+	}, "charts-small-fork"))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "rancher-aks-operator-crd", 0))
+
+	operationList, err := w.catalogClient.Operations(namespace.System).List(ctx, metav1.ListOptions{})
+	w.Require().NoError(err)
+	sort.Slice(operationList.Items, func(i, j int) bool {
+		return !operationList.Items[i].CreationTimestamp.Before(&operationList.Items[j].CreationTimestamp)
+	})
+
+	var op rv1.Operation
+	for _, item := range operationList.Items {
+		if item.Status.Release == "rancher-aks-operator-crd" {
+			op = item
+			break
+		}
+	}
+
+	w.Require().Contains(op.Status.Command, "--skip-schema-validation=true")
+
+	//uninstall chart
+	w.Require().NoError(w.catalogClient.UninstallChart("rancher-aks-operator-crd", namespace.System, &types.ChartUninstallAction{
+		DisableHooks: false,
+		Timeout:      &metav1.Duration{Duration: 60 * time.Second},
+	}))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusUninstalled, "rancher-aks-operator-crd", 1))
+}
+
+// TestUpgradeChartWithSkipSchemaValidation tests the upgrade of a chart with skipSchemaValidation enabled
+func (w *ChartsTest) TestUpgradeChartWithSkipSchemaValidation() {
+	ctx := context.Background()
+
+	// Install initial version of the chart
+	w.Require().NoError(w.catalogClient.InstallChart(&types.ChartInstallAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.System,
+		DisableOpenAPIValidation: false,
+		Charts: []types.ChartInstall{{
+			ChartName:   "rancher-aks-operator-crd",
+			Version:     "104.0.2+up1.9.0",
+			ReleaseName: "rancher-aks-operator-crd",
+			Description: "rancher aks operator crd",
+		}},
+	}, "charts-small-fork"))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "rancher-aks-operator-crd", 0))
+
+	// Upgrade the chart with SkipSchemaValidation set to true
+	w.Require().NoError(w.catalogClient.UpgradeChart(&types.ChartUpgradeAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.System,
+		DisableOpenAPIValidation: false,
+		SkipSchemaValidation:     true,
+		Charts: []types.ChartUpgrade{{
+			ChartName:   "rancher-aks-operator-crd",
+			Version:     "104.0.2+up1.9.0",
+			ReleaseName: "rancher-aks-operator-crd",
+			Description: "rancher aks operator crd upgrade",
+		}},
+	}, "charts-small-fork"))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "rancher-aks-operator-crd", 1))
+
+	operationList, err := w.catalogClient.Operations(namespace.System).List(ctx, metav1.ListOptions{})
+	w.Require().NoError(err)
+	sort.Slice(operationList.Items, func(i, j int) bool {
+		return !operationList.Items[i].CreationTimestamp.Before(&operationList.Items[j].CreationTimestamp)
+	})
+
+	var op rv1.Operation
+	for _, item := range operationList.Items {
+		if item.Status.Release == "rancher-aks-operator-crd" {
+			op = item
+			break
+		}
+	}
+
+	w.Require().Contains(op.Status.Command, "--skip-schema-validation=true")
+
+	//uninstall chart
+	w.Require().NoError(w.catalogClient.UninstallChart("rancher-aks-operator-crd", namespace.System, &types.ChartUninstallAction{
+		DisableHooks: false,
+		Timeout:      &metav1.Duration{Duration: 60 * time.Second},
+	}))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusUninstalled, "rancher-aks-operator-crd", 2))
+}
+
 func (w *ChartsTest) waitForChart(status rv1.Status, name string, previousVersion int) error {
 	var app *rv1.App
 	err := kwait.Poll(500*time.Millisecond, 360*time.Second, func() (done bool, err error) {
@@ -758,7 +869,7 @@ func (w *ChartsTest) waitForChart(status rv1.Status, name string, previousVersio
 
 func (w *ChartsTest) uninstallApp(namespace, chartName string) error {
 	var cfg action.Configuration
-	if err := cfg.Init(w.restClientGetter, namespace, "", logrus.Infof); err != nil {
+	if err := cfg.Init(w.restClientGetter, namespace, ""); err != nil {
 		return err
 	}
 	l := action.NewList(&cfg)
@@ -769,18 +880,20 @@ func (w *ChartsTest) uninstallApp(namespace, chartName string) error {
 		return fmt.Errorf("failed to fetch all releases in the %s namespace: %w", namespace, err)
 	}
 	for _, r := range releases {
-		if r.Chart.Name() == chartName {
-			err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
-				act := action.NewUninstall(&cfg)
-				act.Wait = true
-				act.Timeout = time.Minute
-				if _, err = act.Run(r.Name); err != nil {
-					return false, nil
-				}
-				return true, nil
-			})
-			w.Require().NoError(err)
+		rel, ok := r.(*release.Release)
+		if !ok || rel.Chart.Name() != chartName {
+			continue
 		}
+		err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
+			act := action.NewUninstall(&cfg)
+			act.WaitStrategy = kube.StatusWatcherStrategy
+			act.Timeout = time.Minute
+			if _, err = act.Run(rel.Name); err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
+		w.Require().NoError(err)
 	}
 	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/oracle/oci-go-sdk/common"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -77,7 +76,7 @@ func (handler *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 	provider := common.NewRawConfigurationProvider(creds.Tenancy, creds.User, creds.Region, creds.FingerPrint,
 		creds.PrivateKey, &creds.PrivateKeyPassphrase)
 
-	resourceType := mux.Vars(req)["resource"]
+	resourceType := req.PathValue("resource")
 
 	var serialized []byte
 

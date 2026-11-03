@@ -3,6 +3,8 @@ package authprovisioningv2
 import (
 	"fmt"
 	"reflect"
+	"slices"
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -11,18 +13,54 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	capiResourcesCleanupFinalizer = "auth.cattle.io/capi-resources-cleanup"
 )
 
 // OnCluster creates the roles required for users to be able to see/manage the
-// provisioning cluster resource
+// provisioning cluster resource. It also manages a finalizer to ensure that
+// cluster-indexed resources (e.g. AWSMachineTemplate) can be cleaned up by users
+// before the scoped RBAC roles are garbage-collected along with the cluster.
 func (h *handler) OnCluster(key string, cluster *v1.Cluster) (*v1.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}
 
+	// Ensure the finalizer is present on all non-deleting provisioning clusters
+	if cluster.DeletionTimestamp == nil && !slices.Contains(cluster.Finalizers, capiResourcesCleanupFinalizer) {
+		clusterCopy := cluster.DeepCopy()
+		clusterCopy.Finalizers = append(clusterCopy.Finalizers, capiResourcesCleanupFinalizer)
+		return h.clusterController.Update(clusterCopy)
+	}
+
 	if cluster.DeletionTimestamp != nil {
-		return cluster, h.cleanClusterAdminRoleBindings(cluster)
+		// Cluster is being deleted, check if any cluster-indexed resources still exist
+		blocking, err := h.blockingClusterIndexedResources(cluster)
+		if err != nil {
+			return cluster, err
+		}
+		if len(blocking) > 0 {
+			h.clusterController.EnqueueAfter(cluster.Namespace, cluster.Name, reenqueueTime)
+			return cluster, nil
+		}
+
+		// No cluster-indexed resources remain — safe to proceed with deletion
+		if err := h.cleanClusterAdminRoleBindings(cluster); err != nil {
+			return cluster, err
+		}
+
+		// Remove the finalizer to unblock GC
+		if slices.Contains(cluster.Finalizers, capiResourcesCleanupFinalizer) {
+			clusterCopy := cluster.DeepCopy()
+			clusterCopy.Finalizers = slices.DeleteFunc(clusterCopy.Finalizers,
+				func(f string) bool { return f == capiResourcesCleanupFinalizer })
+			return h.clusterController.Update(clusterCopy)
+		}
 	}
 
 	return cluster, h.createClusterViewRole(cluster)
@@ -131,4 +169,51 @@ func (h *handler) enqueueRoleTemplateBindings(cluster *v1.Cluster) error {
 	}
 
 	return nil
+}
+
+// blockingClusterIndexedResources returns a sorted list of references to the cluster-indexed
+// resources (across all registered GVKs) which still exist for the given cluster and which the
+// cluster does not own.
+//
+// Resources owned by the cluster are excluded because Kubernetes garbage collection deletes them
+// as soon as the cluster object itself is removed, which cannot happen while this handler's
+// finalizer is in place. Waiting on them would deadlock: the finalizer blocks the GC that would
+// satisfy the finalizer. S3 ETCDSnapshots and rke machine configs are both owned by the
+// provisioning cluster and hit exactly this case.
+//
+// Ownership is matched on UID rather than name so that a cluster which was deleted and recreated
+// under the same name does not adopt the previous cluster's leftovers.
+func (h *handler) blockingClusterIndexedResources(cluster *v1.Cluster) ([]string, error) {
+	var blocking []string
+	for _, candidate := range h.candidateTypes() {
+		// Skip the provisioning cluster GVK itself — the cluster being deleted
+		// is still in the index (blocked by our finalizer), which would cause
+		// a self-referential deadlock preventing the finalizer from ever being removed.
+		if candidate.GVK == h.provisioningClusterGVK {
+			continue
+		}
+		objs, err := h.indexGetter.GetByIndex(candidate.GVK, clusterIndexed, clusterIndexKey(cluster))
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range objs {
+			objMeta, err := meta.Accessor(obj)
+			if err != nil {
+				return nil, err
+			}
+			if ownedBy(objMeta, cluster.UID) {
+				continue
+			}
+			blocking = append(blocking, fmt.Sprintf("%s %s/%s", candidate.GVK.Kind, objMeta.GetNamespace(), objMeta.GetName()))
+		}
+	}
+	sort.Strings(blocking)
+	return blocking, nil
+}
+
+// ownedBy reports whether obj has an owner reference to the object with the given UID.
+func ownedBy(obj metav1.Object, ownerUID types.UID) bool {
+	return slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return ref.UID == ownerUID
+	})
 }

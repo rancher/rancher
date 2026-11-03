@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,8 +16,10 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	ctrlv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
@@ -62,22 +65,24 @@ func RegisterIndexer(wContext *wrangler.Context) error {
 
 func NewManager(wContext *wrangler.Context) *Manager {
 	return &Manager{
-		tokenCache:   wContext.Mgmt.Token().Cache(),
-		tokens:       wContext.Mgmt.Token(),
-		tokenIndexer: wContext.Mgmt.Token().Informer().GetIndexer(),
-		userCache:    wContext.Mgmt.User().Cache(),
-		secrets:      wContext.Core.Secret(),
-		secretCache:  wContext.Core.Secret().Cache(),
+		tokenCache:    wContext.Mgmt.Token().Cache(),
+		tokens:        wContext.Mgmt.Token(),
+		tokenIndexer:  wContext.Mgmt.Token().Informer().GetIndexer(),
+		userCache:     wContext.Mgmt.User().Cache(),
+		secrets:       wContext.Core.Secret(),
+		secretCache:   wContext.Core.Secret().Cache(),
+		extTokenStore: exttokenstore.NewSystemFromWrangler(wContext),
 	}
 }
 
 type Manager struct {
-	tokens       tokenClient
-	tokenCache   ctrlv3.TokenCache
-	tokenIndexer cache.Indexer
-	userCache    ctrlv3.UserCache
-	secrets      ctrlv1.SecretClient
-	secretCache  ctrlv1.SecretCache
+	tokens        tokenClient
+	tokenCache    ctrlv3.TokenCache
+	tokenIndexer  cache.Indexer
+	userCache     ctrlv3.UserCache
+	secrets       ctrlv1.SecretClient
+	secretCache   ctrlv1.SecretCache
+	extTokenStore *exttokenstore.SystemStore
 }
 
 func userPrincipalIndexer(obj any) ([]string, error) {
@@ -98,19 +103,20 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return apiv3.Token{}, "", http.StatusUnauthorized, err
 	}
 
-	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	// Tokens created here have no kind and get the limits of derived tokens.
+	tokenTTL, err := exttokenstore.IngestTTL(int64(jsonInput.TTLMillis), "")
 	if err != nil {
-		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating max-ttl %v", err)
+		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating ttl against default and max: %w", err)
 	}
 
 	var unhashedTokenKey string
 	derivedToken := &apiv3.Token{
-		UserPrincipal: token.UserPrincipal,
+		UserPrincipal: token.GetUserPrincipal(),
 		IsDerived:     true,
-		TTLMillis:     tokenTTL.Milliseconds(),
-		UserID:        token.UserID,
-		AuthProvider:  token.AuthProvider,
-		ProviderInfo:  token.ProviderInfo,
+		TTLMillis:     v3TTL(tokenTTL),
+		UserID:        token.GetUserID(),
+		AuthProvider:  authProviderForPrincipal(token.GetUserPrincipal()),
+		ProviderInfo:  token.GetProviderInfo(),
 		Description:   jsonInput.Description,
 		ClusterName:   jsonInput.ClusterID,
 	}
@@ -153,8 +159,31 @@ func (m *Manager) updateToken(token *apiv3.Token) (*apiv3.Token, error) {
 	return m.tokens.Update(token)
 }
 
-func (m *Manager) GetToken(tokenAuthValue string) (*apiv3.Token, int, error) {
+func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
+
+	if tokenName == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no name present")
+	}
+	if tokenKey == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no key present")
+	}
+
+	// Support ext tokens
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		ext, err := m.extTokenStore.Get(extTokenID, "", &metav1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("failed to retrieve auth ext token %q, error: %#v", tokenName, err)
+			return nil, http.StatusNotFound, fmt.Errorf("%s", http.StatusText(http.StatusNotFound))
+		}
+
+		if code, err := ExtVerifyToken(ext, extTokenID, tokenKey); err != nil {
+			return nil, code, err
+		}
+
+		return ext, 0, nil
+	}
+
 	var lookupUsingClient bool
 
 	objs, err := m.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
@@ -162,7 +191,7 @@ func (m *Manager) GetToken(tokenAuthValue string) (*apiv3.Token, int, error) {
 		if apierrors.IsNotFound(err) {
 			lookupUsingClient = true
 		} else {
-			return nil, 404, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
+			return nil, http.StatusNotFound, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
 		}
 	} else if len(objs) == 0 {
 		lookupUsingClient = true
@@ -172,7 +201,7 @@ func (m *Manager) GetToken(tokenAuthValue string) (*apiv3.Token, int, error) {
 	if lookupUsingClient {
 		storedToken, err = m.tokens.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
-			return nil, 404, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
+			return nil, http.StatusNotFound, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
 		}
 	} else {
 		storedToken = objs[0].(*apiv3.Token)
@@ -185,16 +214,19 @@ func (m *Manager) GetToken(tokenAuthValue string) (*apiv3.Token, int, error) {
 	return storedToken, 0, nil
 }
 
-// GetTokens will list all (login and derived, and even expired) tokens of the authenticated user
+// getTokens will list all (login and derived, and even expired) tokens of the
+// authenticated user - BEWARE that while the session token identified by
+// `tokenAuthValue` is allowed to be an ext token, the returned tokens will
+// always be legacy tokens, as that is what is managed here.
 func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 	tokens := make([]apiv3.Token, 0)
 
 	storedToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
-		return tokens, 401, err
+		return tokens, http.StatusUnauthorized, err
 	}
 
-	userID := storedToken.UserID
+	userID := storedToken.GetUserID()
 	set := labels.Set(map[string]string{UserIDLabel: userID})
 	tokenList, err := m.tokens.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
@@ -211,18 +243,38 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 }
 
 func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
-	err := m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
+	// Support ext tokens
+	var err error
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		err = m.extTokenStore.Delete(extTokenID, &metav1.DeleteOptions{})
+	} else {
+		// Legacy token
+		err = m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
+	}
 	if err != nil {
+		// A `token not found` is intentionally treated as success.
+		// Not doing so will cause multiple concurrent deletes of the
+		// same token to throw an error (except the first) in a
+		// fundamentally benign situation.
+		//
+		// Regarding the overall issue fixed here this behaviour was
+		// only contributory, by making the main issue invisible, which
+		// was the misrouting of tokens by the caller. Adding logging is
+		// enough to address that.
 		if apierrors.IsNotFound(err) {
+			logrus.Debugf("token to delete (%s) not found", tokenName)
 			return 0, nil
 		}
-		return 500, fmt.Errorf("failed to delete token")
+		return http.StatusInternalServerError, fmt.Errorf("failed to delete token")
 	}
 	logrus.Debug("Deleted Token")
 	return 0, nil
 }
 
-// getToken will get the token by ID
+// getToken will get the token by ID - BEWARE that while the session token
+// identified by `tokenAuthValue` is allowed to be an ext token, the token
+// referenced by `tokenID` has to be a legacy token, as that is what is managed
+// here.
 func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (apiv3.Token, int, error) {
 	logrus.Debug("GET Token Invoked")
 	token := &apiv3.Token{}
@@ -237,7 +289,7 @@ func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (apiv3.Tok
 		return apiv3.Token{}, http.StatusNotFound, err
 	}
 
-	if token.UserID != storedToken.UserID {
+	if token.UserID != storedToken.GetUserID() {
 		return apiv3.Token{}, http.StatusNotFound, fmt.Errorf("%s not found", tokenID)
 	}
 
@@ -314,7 +366,7 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 
 	tokensFromStore := []map[string]any{}
 	for _, token := range tokens {
-		token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
+		token.Current = currentAuthToken.GetName() == token.Name && !currentAuthToken.GetIsDerived()
 		tokenData, err := ConvertTokenResource(request.Schema, token)
 		if err != nil {
 			return err
@@ -349,7 +401,7 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		switch status {
 		case 0:
 			status = http.StatusInternalServerError
-		case 410:
+		case http.StatusGone:
 			status = http.StatusNotFound
 		default:
 		}
@@ -357,7 +409,7 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
+	token.Current = currentAuthToken.GetName() == token.Name && !currentAuthToken.GetIsDerived()
 	tokenData, err := ConvertTokenResource(request.Schema, token)
 	if err != nil {
 		return err
@@ -380,7 +432,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 	//getToken
 	t, status, err := m.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
-		if status != 410 {
+		if status != http.StatusGone {
 			logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)
 			if status == 0 {
 				status = http.StatusInternalServerError
@@ -394,7 +446,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 		return err
 	}
 
-	if currentAuthToken.Name == t.Name && !currentAuthToken.IsDerived {
+	if currentAuthToken.GetName() == t.Name && !currentAuthToken.GetIsDerived() {
 		return httperror.NewAPIErrorLong(http.StatusBadRequest, util.GetHTTPErrorCode(http.StatusBadRequest), "Cannot delete token for current session. Use logout instead")
 	}
 
@@ -468,14 +520,25 @@ func (m *Manager) UpdateSecret(userID, provider, secret string) error {
 	return err
 }
 
-// PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
+// PerUserCacheProviders is a set of provider names for which the token manager
+// creates and stores a per-user OAuth secret during login. The read-side
+// equivalent is AuthProvider.UsesUserSecrets(); these two must agree on which
+// providers use per-user secrets. They are maintained separately because the
+// tokens package cannot import providers (circular dependency).
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
+	// The secret is keyed by the AuthConfig name so that multiple configs of
+	// the same provider don't overwrite each other.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
-		err := m.CreateSecret(userID, provider, providerToken)
+		configName, _, _, err := common.SplitPrincipalID(userPrincipal.Name)
+		if err != nil {
+			return nil, "", err
+		}
+
+		err = m.CreateSecret(userID, configName, providerToken)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create secret: %s", err)
 		}
@@ -500,8 +563,14 @@ func (m *Manager) UpdateToken(token *apiv3.Token) (*apiv3.Token, error) {
 	return m.updateToken(token)
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
-	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error {
+	ttl, err := exttokenstore.ParseTTLToMilliseconds(settings.AuthUserSessionTTLMinutes)
+	if err != nil {
+		logrus.Errorf("Failed creating token with error: %v", err)
+		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
+	}
+
+	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, ttl, description)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
@@ -518,6 +587,9 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Pri
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(request.Response, tokenCookie)
 	request.WriteResponse(http.StatusOK, nil)
@@ -545,7 +617,7 @@ func (m *Manager) TokenStreamTransformer(
 		return nil, httperror.NewAPIErrorLong(code, http.StatusText(code), fmt.Sprintf("[TokenStreamTransformer] failed: %s", err.Error()))
 	}
 
-	userID := storedToken.UserID
+	userID := storedToken.GetUserID()
 
 	return convert.Chan(data, func(data map[string]any) map[string]any {
 		labels, _ := data["labels"].(map[string]any)
@@ -555,7 +627,7 @@ func (m *Manager) TokenStreamTransformer(
 
 		name, _ := data["name"].(string)
 		isDerived, _ := data["isDerived"].(bool)
-		data["current"] = name == storedToken.Name && !isDerived
+		data["current"] = name == storedToken.GetName() && !isDerived
 
 		return data
 	}), nil
@@ -613,14 +685,14 @@ func (m *Manager) EnsureClusterToken(clusterName string, input user.TokenInput) 
 		TTLMillis:     0,
 		Description:   input.Description,
 		UserID:        input.UserName,
-		AuthProvider:  input.AuthProvider,
+		AuthProvider:  authProviderForPrincipal(input.UserPrincipal),
 		UserPrincipal: input.UserPrincipal,
 		IsDerived:     true,
 		Token:         key,
 		ClusterName:   clusterName,
 	}
 	if input.TTL != nil {
-		token.TTLMillis = *input.TTL
+		token.TTLMillis = v3TTL(*input.TTL)
 	}
 	if input.Randomize {
 		token.ObjectMeta.Name = ""
@@ -652,6 +724,14 @@ func (m *Manager) EnsureClusterToken(clusterName string, input user.TokenInput) 
 	return token.Name + ":" + key, token, nil
 }
 
+// authProviderForPrincipal returns the value of the deprecated
+// Token.AuthProvider for a token issued for the principal: the principal's
+// provider, or local for the tokens Rancher issues for its own controllers,
+// which have no principal.
+func authProviderForPrincipal(principal apiv3.Principal) string {
+	return cmp.Or(principal.Provider, "local")
+}
+
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *Manager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (string, error) {
 	tokenTTL, err := GetKubeconfigDefaultTokenTTLInMilliSeconds()
@@ -664,7 +744,6 @@ func (m *Manager) newTokenForKubeconfig(clusterName, tokenName, description, kin
 		Description:   description,
 		Kind:          kind,
 		UserName:      userName,
-		AuthProvider:  userPrincipal.Provider,
 		TTL:           tokenTTL,
 		Randomize:     true,
 		UserPrincipal: userPrincipal,
@@ -736,46 +815,29 @@ func (m *Manager) GetKubeconfigToken(clusterName, tokenName, description, kind, 
 	return token, createdTokenValue, nil
 }
 
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
-	}
-	return dur, nil
-}
-
-// ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
-func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
-	}
-	if maxTTL == 0 {
-		return ttl, nil
-	}
-	if ttl == 0 {
-		return maxTTL, nil
-	}
-	// return min(ttl, maxTTL)
-	if ttl <= maxTTL {
-		return ttl, nil
-	}
-	return maxTTL, nil
-}
-
-// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
+// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for
+// kubeconfig tokens, in milliseconds, and clamped to the associated max.
+// A negative value means the token never expires.
 func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
-	defaultTokenTTL, err := ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	ttlMillis, err := exttokenstore.IngestTTL(0, exttokenstore.KindKubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
+		return nil, err
 	}
+	return &ttlMillis, nil
+}
 
-	tokenTTL, err := ClampToMaxTTL(defaultTokenTTL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate token ttl: %w", err)
+// GetKubeconfigMaxTokenTTLInMilliSeconds will return the maximum TTL for
+// kubeconfig tokens, in milliseconds. A value below 1 means no limit.
+func GetKubeconfigMaxTokenTTLInMilliSeconds() (int64, error) {
+	_, maxTTL, err := exttokenstore.TTLLimits(exttokenstore.KindKubeconfig)
+	return maxTTL, err
+}
+
+// v3TTL converts a TTL in the ext token convention, where a negative value means never expires, to
+// the v3 token convention, where 0 means never expires.
+func v3TTL(ttl int64) int64 {
+	if ttl < 0 {
+		return 0
 	}
-	ttlMilli := tokenTTL.Milliseconds()
-	return &ttlMilli, nil
+	return ttl
 }

@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/cspadaptercharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/hostedcluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/privateregistry"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/webhookchart"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/proxysettings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
+	"github.com/rancher/rancher/pkg/controllers/operations"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -40,20 +42,27 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		clients.Admission.ValidatingWebhookConfiguration(),
 		clients.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, clients)
-	if err := systemcharts.Register(ctx, clients, registryOverride); err != nil {
+	if err := webhookchart.Register(ctx, clients, registryOverride); err != nil {
 		return err
 	}
-
-	if err := cspadaptercharts.Register(ctx, clients); err != nil {
+	if err := systemcharts.Register(ctx, clients, registryOverride); err != nil {
 		return err
 	}
 
 	clusterconnected.Register(ctx, clients)
 
+	if features.SCIM.Enabled() {
+		// Registered here, not with the management controllers, because SCIM is served without MCM too.
+		scim.RegisterTokenExpiry(ctx, clients.Core.Secret(), clients.Mgmt.Setting())
+	}
+
 	if features.MCM.Enabled() {
 		hostedcluster.Register(ctx, clients)
 		// Automatically enable / disable built-in ProxyEndpoints via settings
 		proxysettings.Register(ctx, clients)
+		// Automatically handle global private registry pull secrets
+		// in the local and downstream imported / hosted clusters.
+		privateregistry.Register(ctx, clients)
 	}
 
 	if features.Fleet.Enabled() {
@@ -62,14 +71,8 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		}
 	}
 
-	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
-		clusterregistrationtoken.Register(ctx, clients)
-	}
-
 	if features.ProvisioningV2.Enabled() {
 		kubeconfigManager := kubeconfig.New(clients)
-		clusterindex.Register(ctx, clients)
-
 		provisioningv2.EarlyRegister(ctx, clients, kubeconfigManager)
 		if features.RKE2.Enabled() {
 			if err := capr.EarlyRegister(ctx, clients); err != nil {
@@ -79,12 +82,17 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 		// defer registration of controllers which have CAPI clients or use CAPI caches
 		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
-			provisioningv2.Register(ctx, clients, kubeconfigManager)
+			err := provisioningv2.Register(ctx, clients, kubeconfigManager)
+			if err != nil {
+				return fmt.Errorf("failed to register deferred provv2 controllers: %w", err)
+			}
+
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
 					return fmt.Errorf("failed to register deferred capr controllers: %w", err)
 				}
 			}
+			operations.Register(ctx, clients)
 			return nil
 		})
 	}
@@ -96,9 +104,9 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
 		rkecontrolplanecondition.Register(ctx,
 			"local",
-			clients.Provisioning.Cluster().Cache(),
+			"",
+			nil,
 			clients.Catalog.App(),
-			clients.Plan.Plan(),
 			clients.RKE.RKEControlPlane())
 	}
 
@@ -110,4 +118,12 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	}
 
 	return nil
+}
+
+// RegisterPostMigration registers controllers that should only start after boot-time
+// migrations (see pkg/rancher/migrations.go) have completed. This avoids redundant or conflicting work on startup.
+func RegisterPostMigration(ctx context.Context, clients *wrangler.Context) {
+	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
+		clusterregistrationtoken.Register(ctx, clients)
+	}
 }

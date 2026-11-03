@@ -4,19 +4,19 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
@@ -41,20 +41,23 @@ const (
 )
 
 var (
-	tokenIndex = "tokenIndex"
+	tokenIndex    = "tokenIndex"
+	crtTokenIndex = "crtTokenIndex"
 )
 
 type RKE2ConfigServer struct {
-	clusterTokenCache        mgmtcontroller.ClusterRegistrationTokenCache
 	clusterTokens            mgmtcontroller.ClusterRegistrationTokenController
+	mgmtClusterCache         mgmtcontroller.ClusterCache
 	serviceAccountsCache     corecontrollers.ServiceAccountCache
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
 	secrets                  corecontrollers.SecretController
 	machineCache             capicontrollers.MachineCache
 	machines                 capicontrollers.MachineClient
+	capiClusterCache         capicontrollers.ClusterCache
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
+	namespaceCache           corecontrollers.NamespaceCache
 	k8s                      kubernetes.Interface
 
 	capiAvailable bool
@@ -69,20 +72,20 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		return nil, nil
 	})
 
-	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(tokenIndex,
-		func(obj *v3.ClusterRegistrationToken) ([]string, error) {
-			return []string{obj.Status.Token}, nil
-		})
+	clients.Core.Secret().Cache().AddIndexer(crtTokenIndex, func(obj *corev1.Secret) ([]string, error) {
+		return crt.SecretTokenIndexValues(obj), nil
+	})
 
 	configSrv := &RKE2ConfigServer{
 		serviceAccountsCache:     clients.Core.ServiceAccount().Cache(),
 		serviceAccounts:          clients.Core.ServiceAccount(),
 		secretsCache:             clients.Core.Secret().Cache(),
 		secrets:                  clients.Core.Secret(),
-		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
+		mgmtClusterCache:         clients.Mgmt.Cluster().Cache(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
+		namespaceCache:           clients.Core.Namespace().Cache(),
 		k8s:                      clients.K8s,
 	}
 
@@ -94,16 +97,17 @@ func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
 	clients.DeferredCAPIRegistration.DeferFunc(func(clients *wrangler.CAPIContext) {
 		r.machineCache = clients.CAPI.Machine().Cache()
 		r.machines = clients.CAPI.Machine()
+		r.capiClusterCache = clients.CAPI.Cluster().Cache()
 		r.capiAvailable = true
-		logrus.Debug("[rke2configserver] Initialized CAPI clients after deferred func execution")
+		logrus.Info("[rke2configserver] Initialized CAPI clients after deferred func execution")
 	})
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !r.capiAvailable {
-		logrus.Debug("[rke2configserver] CAPI not ready yet")
-		rw.WriteHeader(http.StatusServiceUnavailable)
+		logrus.Warn("[rke2configserver] CAPI not ready yet")
 		rw.Header().Set("Retry-After", "5")
+		http.Error(rw, "CAPI not ready yet", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -119,6 +123,9 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	planSecret, secret, err := r.findSA(req)
 	if apierrors.IsNotFound(err) {
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	} else if errors.Is(err, errRetrievalInvalidated) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	} else if err != nil {
@@ -139,7 +146,7 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 }
 
-func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
+func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *corev1.Secret, rw http.ResponseWriter, req *http.Request) {
 	var ca []byte
 	url, pem := settings.ServerURL.Get(), settings.CACerts.Get()
 	if strings.TrimSpace(pem) != "" {
@@ -240,10 +247,10 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
-	rw.Write(jsonContent)
+	_, _ = rw.Write(jsonContent)
 }
 
-func (r *RKE2ConfigServer) connectClusterInfo(secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
+func (r *RKE2ConfigServer) connectClusterInfo(secret *corev1.Secret, rw http.ResponseWriter, req *http.Request) {
 	headers := dataFromHeaders(req)
 
 	// expecting -H "X-Cattle-Field: kubernetesversion" -H "X-Cattle-Field: name"
@@ -279,7 +286,7 @@ func (r *RKE2ConfigServer) connectClusterInfo(secret *v1.Secret, rw http.Respons
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
-	rw.Write(jsonContent)
+	_, _ = rw.Write(jsonContent)
 }
 
 func (r *RKE2ConfigServer) infoKubernetesVersion(machineID, ns string) (string, error) {
@@ -316,48 +323,53 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 		return "", nil, nil
 	}
 
-	machineNamespace, machineName, err := r.findMachineByProvisioningSA(req)
+	ref, err := r.findMachineByProvisioningSA(req)
 	if err != nil {
 		return "", nil, err
 	}
-	logrus.Debugf("[rke2configserver] Got %s/%s machine from provisioning SA", machineNamespace, machineName)
-	if machineName == "" {
-		machineNamespace, machineName, err = r.findMachineByClusterToken(req)
+
+	if ref == nil {
+		ref, err = r.findMachineByClusterToken(req)
 		if err != nil {
 			return "", nil, err
 		}
-		logrus.Debugf("[rke2configserver] Got %s/%s machine from cluster token", machineNamespace, machineName)
+
+		if ref == nil {
+			return "", nil, fmt.Errorf("machine not found by request")
+		}
+
+		logrus.Debugf("[rke2configserver] Got %s/%s machine from cluster token", ref.Namespace, ref.Name)
+	} else {
+		logrus.Debugf("[rke2configserver] Got %s/%s machine from provisioning SA", ref.Namespace, ref.Name)
 	}
 
-	if machineName == "" || machineNamespace == "" {
-		return "", nil, fmt.Errorf("machine not found by request")
-	}
-
-	if err := r.setOrUpdateMachineID(machineNamespace, machineName, machineID); err != nil {
+	if err := r.setOrUpdateMachineID(ref, machineID); err != nil {
 		return "", nil, err
 	}
 
-	planSAs, err := r.serviceAccountsCache.List(machineNamespace, labels.SelectorFromSet(map[string]string{
-		capr.MachineNameLabel: machineName,
+	planSAs, err := r.serviceAccountsCache.List(ref.Namespace, labels.SelectorFromSet(map[string]string{
+		capr.MachineNameLabel: ref.Name,
 		capr.RoleLabel:        capr.RolePlan,
 	}))
 	if err != nil {
 		return "", nil, err
 	}
 
-	logrus.Debugf("[rke2configserver] %s/%s listed %d planSAs", machineNamespace, machineName, len(planSAs))
+	logrus.Debugf("[rke2configserver] %s/%s listed %d planSAs", ref.Namespace, ref.Name, len(planSAs))
 
 	for _, planSA := range planSAs {
-		if err := capr.PlanSACheck(r.bootstrapCache, machineName, planSA); err != nil {
-			logrus.Errorf("[rke2configserver] error encountered when searching for checking planSA %s/%s against machine %s: %v", planSA.Namespace, planSA.Name, machineName, err)
-			continue
+		if ref.APIVersion == capi.GroupVersion.String() {
+			if err := capr.PlanSACheck(r.bootstrapCache, ref.Name, planSA); err != nil {
+				logrus.Errorf("[rke2configserver] error encountered when searching for checking planSA %s/%s against machine %s: %v", planSA.Namespace, planSA.Name, ref.Name, err)
+				continue
+			}
 		}
 		planSecret, err := capr.GetPlanSecretName(planSA)
 		if err != nil {
 			logrus.Errorf("[rke2configserver] error encountered when searching for plan secret name for planSA %s/%s: %v", planSA.Namespace, planSA.Name, err)
 			continue
 		}
-		logrus.Debugf("[rke2configserver] %s/%s plan secret was %s", machineNamespace, machineName, planSecret)
+		logrus.Debugf("[rke2configserver] %s/%s plan secret was %s", ref.Namespace, ref.Name, planSecret)
 		if planSecret == "" {
 			continue
 		}
@@ -367,18 +379,18 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 			continue
 		}
 		if tokenSecret == nil {
-			logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s was nil", machineNamespace, machineName, planSecret)
+			logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s was nil", ref.Namespace, ref.Name, planSecret)
 			continue
 		}
-		logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent", machineNamespace, machineName, machineID, planSecret, tokenSecret.Namespace, tokenSecret.Name)
+		logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent", ref.Namespace, ref.Name, machineID, planSecret, tokenSecret.Namespace, tokenSecret.Name)
 		return planSecret, tokenSecret, err
 	}
 
-	logrus.Debugf("[rke2configserver] %s/%s watching for plan secret to become ready for consumption", machineNamespace, machineName)
+	logrus.Debugf("[rke2configserver] %s/%s watching for plan secret to become ready for consumption", ref.Namespace, ref.Name)
 
 	// The plan service account will likely not exist yet -- the plan service account is created by the bootstrap controller.
-	respSA, err := r.serviceAccounts.Watch(machineNamespace, metav1.ListOptions{
-		LabelSelector: capr.MachineNameLabel + "=" + machineName + "," + capr.RoleLabel + "=" + capr.RolePlan,
+	respSA, err := r.serviceAccounts.Watch(ref.Namespace, metav1.ListOptions{
+		LabelSelector: capr.MachineNameLabel + "=" + ref.Name + "," + capr.RoleLabel + "=" + capr.RolePlan,
 	})
 	if err != nil {
 		return "", nil, err
@@ -399,32 +411,34 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	for event := range respSA.ResultChan() {
 		var ok bool
 		if planSA, ok = event.Object.(*corev1.ServiceAccount); ok {
-			if err := capr.PlanSACheck(r.bootstrapCache, machineName, planSA); err != nil {
-				logrus.Errorf("[rke2configserver] error encountered when searching for checking planSA %s/%s against machine %s: %v", planSA.Namespace, planSA.Name, machineName, err)
-				continue
+			if ref.APIVersion == capi.GroupVersion.String() {
+				if err := capr.PlanSACheck(r.bootstrapCache, ref.Name, planSA); err != nil {
+					logrus.Errorf("[rke2configserver] error encountered when searching for checking planSA %s/%s against machine %s: %v", planSA.Namespace, planSA.Name, ref.Name, err)
+					continue
+				}
 			}
 			planSecret, err = capr.GetPlanSecretName(planSA)
 			if err != nil {
 				logrus.Errorf("[rke2configserver] error encountered when searching for plan secret name for planSA %s/%s: %v", planSA.Namespace, planSA.Name, err)
 				continue
 			}
-			logrus.Debugf("[rke2configserver] %s/%s plan secret was %s", machineNamespace, machineName, planSecret)
+			logrus.Debugf("[rke2configserver] %s/%s plan secret was %s", ref.Namespace, ref.Name, planSecret)
 			if planSecret == "" {
 				continue
 			}
 			tokenSecret, watchable, err := capr.GetPlanServiceAccountTokenSecret(r.secrets, r.k8s, planSA)
 			if err != nil || tokenSecret == nil {
-				logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s was nil or error received", machineNamespace, machineName, planSecret)
+				logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s was nil or error received", ref.Namespace, ref.Name, planSecret)
 				if err != nil {
 					logrus.Errorf("[rke2configserver] error encountered when searching for token secret for planSA %s/%s: %v", planSA.Namespace, planSA.Name, err)
 				}
 				if watchable {
-					logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s is watchable, starting secret watch to wait for token to populate", machineNamespace, machineName, planSecret)
+					logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s is watchable, starting secret watch to wait for token to populate", ref.Namespace, ref.Name, planSecret)
 					break
 				}
 				continue
 			}
-			logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent from plan service account watch", machineNamespace, machineName, machineID, planSecret, tokenSecret.Namespace, tokenSecret.Name)
+			logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent from plan service account watch", ref.Namespace, ref.Name, machineID, planSecret, tokenSecret.Namespace, tokenSecret.Name)
 			return planSecret, tokenSecret, nil
 		}
 	}
@@ -433,9 +447,9 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 		return "", nil, fmt.Errorf("could not start secret watch for token secret")
 	}
 
-	logrus.Debugf("[rke2configserver] %s/%s starting token secret watch for planSA %s/%s", machineNamespace, machineName, planSA.Namespace, planSA.Name)
+	logrus.Debugf("[rke2configserver] %s/%s starting token secret watch for planSA %s/%s", ref.Namespace, ref.Name, planSA.Namespace, planSA.Name)
 	// start watch for the planSA corresponding secret, using a label selector.
-	respSecret, err := r.secrets.Watch(machineNamespace, metav1.ListOptions{
+	respSecret, err := r.secrets.Watch(ref.Namespace, metav1.ListOptions{
 		LabelSelector: labels.Set{
 			serviceaccounttoken.ServiceAccountSecretLabel: planSA.Name,
 		}.String(),
@@ -452,7 +466,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}()
 	for event := range respSecret.ResultChan() {
 		if secret, ok := event.Object.(*corev1.Secret); ok {
-			logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent from secret watch", machineNamespace, machineName, machineID, planSecret, secret.Namespace, secret.Name)
+			logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent from secret watch", ref.Namespace, ref.Name, machineID, planSecret, secret.Namespace, secret.Name)
 			return planSecret, secret, nil
 		}
 	}
@@ -460,7 +474,18 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	return "", nil, fmt.Errorf("timeout waiting for plan")
 }
 
-func (r *RKE2ConfigServer) setOrUpdateMachineID(machineNamespace, machineName, machineID string) error {
+func (r *RKE2ConfigServer) setOrUpdateMachineID(ref *corev1.ObjectReference, machineID string) error {
+	if ref == nil {
+		return nil
+	}
+
+	// Only update CAPI Machines; no-op for other kinds (e.g., management Nodes).
+	if ref.APIVersion != capi.GroupVersion.String() || ref.Kind != "Machine" {
+		return nil
+	}
+
+	machineNamespace, machineName := ref.Namespace, ref.Name
+
 	machine, err := r.machineCache.Get(machineNamespace, machineName)
 	if err != nil {
 		return err
@@ -481,14 +506,14 @@ func (r *RKE2ConfigServer) setOrUpdateMachineID(machineNamespace, machineName, m
 	return err
 }
 
-func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*v1.Secret, error) {
+func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*corev1.Secret, error) {
 	backoff := wait.Backoff{
 		Duration: 500 * time.Millisecond,
 		Factor:   2,
 		Steps:    10,
 		Cap:      2 * time.Second,
 	}
-	var secret *v1.Secret
+	var secret *corev1.Secret
 	return secret, wait.ExponentialBackoff(backoff, func() (bool, error) {
 		var err error
 		secret, err = r.secretsCache.Get(name, ns)

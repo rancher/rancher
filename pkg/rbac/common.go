@@ -13,7 +13,6 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/wrangler/pkg/name"
 	k8srbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
@@ -26,33 +25,63 @@ import (
 )
 
 const (
-	NamespaceID                         = "namespaceId"
-	ProjectID                           = "projectId"
-	ClusterID                           = "clusterId"
-	GlobalAdmin                         = "admin"
-	GlobalAdminCRBPrefix                = "globaladmin-"
-	GlobalRestrictedAdmin               = "restricted-admin"
-	ClusterCRDsClusterRole              = "cluster-crd-clusterRole"
-	RestrictedAdminClusterRoleBinding   = "restricted-admin-rb-cluster"
-	ProjectCRDsClusterRole              = "project-crd-clusterRole"
-	RestrictedAdminProjectRoleBinding   = "restricted-admin-rb-project"
-	RestrictedAdminCRForClusters        = "restricted-admin-cr-clusters"
-	RestrictedAdminCRBForClusters       = "restricted-admin-crb-clusters"
-	CrtbOwnerLabel                      = "authz.cluster.cattle.io/crtb-owner"
-	PrtbOwnerLabel                      = "authz.cluster.cattle.io/prtb-owner"
-	AggregationLabel                    = "management.cattle.io/aggregates"
-	ClusterRoleOwnerLabel               = "authz.cluster.cattle.io/clusterrole-owner"
-	aggregatorSuffix                    = "aggregator"
-	promotedSuffix                      = "promoted"
-	namespaceSuffix                     = "namespaces"
-	clusterManagementPlaneSuffix        = "cluster-mgmt"
-	projectManagementPlaneSuffix        = "project-mgmt"
-	ClusterAdminRoleName                = "cluster-admin"
+	NamespaceID                       = "namespaceId"
+	ProjectID                         = "projectId"
+	ClusterID                         = "clusterId"
+	GlobalAdmin                       = "admin"
+	GlobalAdminCRBPrefix              = "globaladmin-"
+	GlobalRestrictedAdmin             = "restricted-admin"
+	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
+	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
+	ProjectCRDsClusterRole            = "project-crd-clusterRole"
+	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
+	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
+	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
+	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
+	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
+	AggregationLabel                  = "management.cattle.io/aggregates"
+	ClusterRoleOwnerLabel             = "authz.cluster.cattle.io/clusterrole-owner"
+	aggregatorSuffix                  = "aggregator"
+	promotedSuffix                    = "promoted"
+	clusterScopedSuffix               = "cluster-scoped"
+	namespaceSuffix                   = "namespaces"
+	clusterManagementPlaneSuffix      = "cluster-mgmt"
+	projectManagementPlaneSuffix      = "project-mgmt"
+	ClusterAdminRoleName              = "cluster-admin"
+	HelmProvisioningReaderRole        = "cattle-helm-provisioning-reader"
+
+	// Index names for PRTB/CRTB caches, registered by pkg/controllers/management/auth/roletemplates.
+	PRTBByRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-roletemplate-name"
+	CRTBByRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-roletemplate-name"
+	// Cluster-scoped variants of the indexes above, keyed by <cluster-name>/<roletemplate-name> (see
+	// RoleTemplateClusterIndexKey). Used by the per-cluster owner-plane enqueuers so that a RoleTemplate
+	// change only fetches the bindings belonging to that cluster, instead of every binding referencing
+	// the RoleTemplate across all clusters.
+	PRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-cluster-and-roletemplate-name"
+	CRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-cluster-and-roletemplate-name"
+	// PRTBByProjectNameIndex keys PRTBs by their ProjectName (<cluster-id>:<project-id>), which
+	// matches the field.cattle.io/projectId annotation on namespaces. Used by the aggregation
+	// namespace enqueuer to reconcile the PRTBs of a project when one of its namespaces changes.
+	PRTBByProjectNameIndex = "auth.management.cattle.io/prtb-by-project-name"
+	// PRTBByRTBLabelIndex keys PRTBs by GetRTBLabel, the key of a legacy project ClusterRoleBinding owner label.
+	// Registered by pkg/controllers/managementuser/rbac.RegisterIndexers.
+	PRTBByRTBLabelIndex = "authz.cluster.cattle.io/rtb-owner-updated"
+	// LegacyProjectCRBOwnerValue is the label value legacy RBAC sets on project cluster-wide ClusterRoleBindings
+	// (create-ns, <project>-namespaces-*, *-promoted). The label key is the owning PRTB's GetRTBLabel.
+	LegacyProjectCRBOwnerValue          = "owner-user"
 	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
 	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
 	AggregationManagementFeatureLabel   = "management.cattle.io/roletemplate-aggregation-mgmt"
 	AggregationFeatureLabel             = "management.cattle.io/roletemplate-aggregation"
+	// GRDownstreamNSIndex is the cache index name for looking up GlobalRoles by the namespaces in InheritedNamespacedRules.
+	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
+	// GRBGlobalRoleIndex is the cache index name for looking up GlobalRoleBindings by the GlobalRole they reference.
+	GRBGlobalRoleIndex = "mgmt-auth-grb-gr-idex"
+	// GrOwnerLabel marks resources created for a GlobalRole with the SafeConcatName of the owning GlobalRole.
+	GrOwnerLabel = "authz.management.cattle.io/gr-owner"
+	// GrbOwnerLabel marks resources created for a GlobalRoleBinding with the SafeConcatName of the owning GlobalRoleBinding.
+	GrbOwnerLabel = "authz.management.cattle.io/grb-owner"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -217,6 +246,17 @@ func NameForClusterRoleBinding(role rbacv1.RoleRef, subject rbacv1.Subject) stri
 	return nm
 }
 
+// NameForClusterRoleBindingWithOwner returns a deterministic name for a ClusterRoleBinding with the provided roleName, subject, and owner.
+// The owner name is included in the hash so that different owners can have distinct ClusterRoleBindings for the same role and subject.
+func NameForClusterRoleBindingWithOwner(role rbacv1.RoleRef, subject rbacv1.Subject, owner string) string {
+	var name strings.Builder
+	name.WriteString("crb-")
+	name.WriteString(getBindingHash(owner, role, subject))
+	nm := name.String()
+	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s owner=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, owner, nm)
+	return nm
+}
+
 // getBindingHash returns a hash created from the passed in arguments
 // uses base32 encoding for hash, since all characters in encoding scheme are valid in k8s resource names
 // probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 (sufficiently low)
@@ -360,32 +400,31 @@ func IsAdminGlobalRole(gr *v3.GlobalRole) bool {
 // CreateOrUpdateResource creates or updates the given non-namespaced resource
 //   - obj is the resource to create or update.
 //   - client is the Wrangler client to use to get/create/update resource.
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
-//     T is an updated version of the resource.
-func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
-	kind := obj.GetObjectKind().GroupVersionKind().Kind
+//   - areResourcesTheSame is a func that compares two resources and returns true if they are equal, and false otherwise.
+func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](desiredObj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) bool) error {
+	kind := desiredObj.GetObjectKind().GroupVersionKind().Kind
 	// attempt to get the resource
-	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
+	existingObject, err := client.Get(desiredObj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get %s %s: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to get %s %s: %w", kind, desiredObj.GetName(), err)
 		}
-		logrus.Infof("%s %s is being created", kind, obj.GetName())
+		logrus.Infof("%s %s is being created", kind, desiredObj.GetName())
 		// resource doesn't exist, create it
-		_, err = client.Create(obj)
+		_, err = client.Create(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to create %s %s: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to create %s %s: %w", kind, desiredObj.GetName(), err)
 		}
 		return nil
 	}
 
 	// check that the existing resource is the same as the one we want
-	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
-		logrus.Infof("%s %s needs to be updated", kind, obj.GetName())
+	if !areResourcesTheSame(existingObject, desiredObj) {
+		logrus.Infof("%s %s needs to be updated", kind, desiredObj.GetName())
 		// if it has changed, update it to the correct version
-		_, err := client.Update(updatedResource)
+		_, err := client.Update(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to update %s %s: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to update %s %s: %w", kind, desiredObj.GetName(), err)
 		}
 	}
 	return nil
@@ -394,74 +433,67 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 // CreateOrUpdateNamespacedResource creates or updates the given namespaced resource.
 //   - obj is the resource to create or update.
 //   - client is the Wrangler client to use to get/create/update resource.
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
-//     T is an updated version of the resource.
-func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
-	kind := obj.GetObjectKind().GroupVersionKind().Kind
-	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
+//   - areResourcesTheSame is a func that compares two resources and returns true if they are equal, and false otherwise.
+func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](desiredObj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) bool) (T, error) {
+	var returnObj T
+	kind := desiredObj.GetObjectKind().GroupVersionKind().Kind
+	existingObj, err := client.Get(desiredObj.GetNamespace(), desiredObj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return returnObj, fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
-		logrus.Infof("%s %s is being created in namespace %s", kind, obj.GetName(), obj.GetNamespace())
+		logrus.Infof("%s %s is being created in namespace %s", kind, desiredObj.GetName(), desiredObj.GetNamespace())
 		// resource doesn't exist, create it
-		_, err = client.Create(obj)
+		returnObj, err = client.Create(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to create %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return returnObj, fmt.Errorf("failed to create %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
-		return nil
+		return returnObj, nil
 	}
 
 	// check that the existing resource is the same as the one we want
-	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
-		logrus.Infof("%s %s in namespace %s needs to be updated", kind, obj.GetName(), obj.GetNamespace())
+	if !areResourcesTheSame(existingObj, desiredObj) {
+		logrus.Infof("%s %s in namespace %s needs to be updated", kind, desiredObj.GetName(), desiredObj.GetNamespace())
 		// if it has changed, update it to the correct version
-		_, err := client.Update(updatedResource)
+		returnObj, err = client.Update(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return returnObj, fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
+		return returnObj, nil
 	}
-	return nil
+	// if the resource was not updated, return the existing version since this was a no-op
+	return existingObj, nil
 }
 
 // AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.
-// If not, it also updates the current ClusterRole fields to match the desired ClusterRole.
 // The fields it checks are:
 //
 //   - Rules or AggregationRule
 //   - Cluster role owner label
 //   - Aggregation label
-func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1.ClusterRole) {
-	same := true
-
+func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) bool {
 	if wantedCR.AggregationRule == nil {
 		if currentCR.AggregationRule != nil {
-			same = false
-			currentCR.AggregationRule = nil
+			return false
 		}
 		if !equality.Semantic.DeepEqual(currentCR.Rules, wantedCR.Rules) {
-			same = false
-			currentCR.Rules = wantedCR.Rules
+			return false
 		}
 	} else {
 		if !equality.Semantic.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
-			same = false
-			currentCR.AggregationRule = wantedCR.AggregationRule
+			return false
 		}
 		if len(currentCR.Rules) > 0 {
-			same = false
-			currentCR.Rules = nil
+			return false
 		}
 	}
-	if got, want := currentCR.Labels[ClusterRoleOwnerLabel], wantedCR.Labels[ClusterRoleOwnerLabel]; got != want {
-		same = false
-		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, ClusterRoleOwnerLabel, want)
+	if currentCR.Labels[ClusterRoleOwnerLabel] != wantedCR.Labels[ClusterRoleOwnerLabel] {
+		return false
 	}
-	if got, want := currentCR.Labels[AggregationLabel], wantedCR.Labels[AggregationLabel]; got != want {
-		same = false
-		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, AggregationLabel, want)
+	if currentCR.Labels[AggregationLabel] != wantedCR.Labels[AggregationLabel] {
+		return false
 	}
-	return same, currentCR
+	return true
 }
 
 // DeleteResource deletes a non namespaced resource
@@ -637,32 +669,37 @@ func IsRoleBindingContentSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName
 func ClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s)
+	return wranglerName.SafeConcatName(s)
 }
 
 // PromotedClusterRoleNameFor appends the promoted suffix to a string safely (ie <= 63 characters)
 func PromotedClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, promotedSuffix)
+	return wranglerName.SafeConcatName(s, promotedSuffix)
 }
 
 // NamespaceClusterRoleNameFor appends the namespace suffix to a string safely (ie <= 63 characters)
 func NamespaceClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, namespaceSuffix)
+	return wranglerName.SafeConcatName(s, namespaceSuffix)
+}
+
+// ClusterScopedClusterRoleNameFor appends the cluster scoped suffix to a string safely (ie <= 63 characters)
+func ClusterScopedClusterRoleNameFor(s string) string {
+	return wranglerName.SafeConcatName(s, clusterScopedSuffix)
 }
 
 // AggregatedClusterRoleNameFor appends the aggregation suffix to a string safely (ie <= 63 characters)
 func AggregatedClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, aggregatorSuffix)
+	return wranglerName.SafeConcatName(s, aggregatorSuffix)
 }
 
 // ClusterManagementPlaneClusterRoleNameFor appends the cluster management plane suffix to a string safely (ie <= 63 characters)
 func ClusterManagementPlaneClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, clusterManagementPlaneSuffix)
+	return wranglerName.SafeConcatName(s, clusterManagementPlaneSuffix)
 }
 
 // ProjectManagementPlaneClusterRoleNameFor appends the project management plane suffix to a string safely (ie <= 63 characters)
 func ProjectManagementPlaneClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, projectManagementPlaneSuffix)
+	return wranglerName.SafeConcatName(s, projectManagementPlaneSuffix)
 }
 
 // GetAuthV2OwnerLabel creates the owner label for the RoleTemplateBinding in the style used in pkg/controllers/management/authprovisioningv2.
@@ -684,14 +721,14 @@ func GetAuthV2OwnerLabel(rtb metav1.Object) string {
 // The label is always authz.cluster.cattle.io/prtb-owner-<prtb.name>: "true"
 // The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetPRTBOwnerLabel(s string) string {
-	return name.SafeConcatName(PrtbOwnerLabel, s)
+	return wranglerName.SafeConcatName(PrtbOwnerLabel, s)
 }
 
 // GetCRTBOwnerLabel gets the owner label for a CRTB.
 // The label is always authz.cluster.cattle.io/crtb-owner-<crtb.name>: "true"
 // The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetCRTBOwnerLabel(s string) string {
-	return name.SafeConcatName(CrtbOwnerLabel, s)
+	return wranglerName.SafeConcatName(CrtbOwnerLabel, s)
 }
 
 // GetClusterRoleOwnerLabel gets the owner label for a ClusterRole.
@@ -704,4 +741,11 @@ func GetClusterRoleOwnerLabel(s string) string {
 func GetClusterAndProjectNameFromPRTB(prtb *v3.ProjectRoleTemplateBinding) (string, string) {
 	cluster, project, _ := strings.Cut(prtb.ProjectName, ":")
 	return cluster, project
+}
+
+// RoleTemplateClusterIndexKey builds the cache index key used by the cluster-scoped
+// PRTBByClusterAndRoleTemplateNameIndex / CRTBByClusterAndRoleTemplateNameIndex indexes. Producers
+// (indexer funcs) and consumers (per-cluster enqueuers) must use this helper so their keys match.
+func RoleTemplateClusterIndexKey(clusterName, roleTemplateName string) string {
+	return clusterName + "/" + roleTemplateName
 }

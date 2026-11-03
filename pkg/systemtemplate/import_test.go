@@ -2,36 +2,27 @@ package systemtemplate
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
+	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-
-	appsv1 "k8s.io/api/apps/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
-var (
-	mockSecrets = make(map[string]*corev1.Secret)
-)
-
-func resetMockSecrets() {
-	mockSecrets = make(map[string]*corev1.Secret)
-}
+var update = flag.Bool("update", false, "update snapshot files with current test outputs")
 
 func TestSystemTemplate_systemtemplate(t *testing.T) {
 	mockSecrets := map[string]*corev1.Secret{}
@@ -54,6 +45,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		pcExists       bool
 		agentImage     string
 		authImage      string
+		assetsImage    string
 		namespace      string
 		token          string
 		url            string
@@ -61,23 +53,16 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		features       map[string]bool
 		taints         []corev1.Taint
 		mutator        namespace.Mutator
+		secrets        map[string]*corev1.Secret
 
-		secrets                           map[string]*corev1.Secret
-		expectedDeploymentHashes          map[string]string
-		expectedDaemonSetHashes           map[string]string
-		expectedClusterRoleHashes         map[string]string
-		expectedClusterRoleBindingHashes  map[string]string
-		expectedNamespaceHashes           map[string]string
-		expectedServiceHashes             map[string]string
-		expectedServiceAccountHashes      map[string]string
-		expectedSecretHashes              map[string]string
-		expectedPodDisruptionBudgetHashes map[string]string
+		expectedError string
 	}{
 		{
 			name: "test-provisioned-import",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -88,49 +73,29 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
+			// deliberately out of order: the rendered tolerations must come out
+			// sorted, otherwise the pod template changes on every reconcile and
+			// the agent is rolled out endlessly
 			taints: []corev1.Taint{
+				{
+					Key:    "key2",
+					Effect: corev1.TaintEffectPreferNoSchedule,
+				},
 				{
 					Key:       "key1",
 					Value:     "value1",
 					Effect:    corev1.TaintEffectNoSchedule,
 					TimeAdded: &metav1.Time{}, // this should be stripped from tolerations
 				},
-				{
-					Key:    "key2",
-					Effect: corev1.TaintEffectPreferNoSchedule,
-				},
-			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "026d73c819a0667fbbd50ca10a4f4215624f5c3d448a1324b24c5f9f8ae99cb3",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
 			},
 		},
 		{
 			name:     "test-provisioned-import with scheduling customization, initial registration",
 			pcExists: false,
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -153,41 +118,15 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Driver:   "imported",
 					Provider: "rke2",
 				},
-			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "0ced645edfc4a11bdbf1731fc97ea76c69d5da0f691a395293df4cc6b6ce9e8c",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
-			},
-			expectedPodDisruptionBudgetHashes: map[string]string{
-				"cattle-cluster-agent-pod-disruption-budget": "20b6f53d3abf11951c4cca848ef12e27d3cb46f8f619f2ca2205e2111bc86ee7",
 			},
 		},
 		{
 			name:     "test-provisioned-import with scheduling customization, cluster deploy creation",
 			pcExists: true,
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -211,39 +150,13 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "04e8f9817b3d89a8b7302329bc4447fa70eb43d19051f4bc068bd47e26fa4e61",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
-			},
-			expectedPodDisruptionBudgetHashes: map[string]string{
-				"cattle-cluster-agent-pod-disruption-budget": "20b6f53d3abf11951c4cca848ef12e27d3cb46f8f619f2ca2205e2111bc86ee7",
-			},
 		},
 		{
 			name: "test-provisioned-import-custom-agent",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "testing-rke2",
@@ -256,39 +169,17 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
-			url:        "some-dummy-url",
-			token:      "some-dummy-token",
-			agentImage: "my/agent:image",
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "b4ffce8a1fc601ce95f599332de597de478a2244fc6bac3b7dc6204416dfb550",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-d23bc3c633": "17d3bba8f79a57797638bedb21c08c0d0349a27899932cb6e07e107f067b2897",
-			},
+			url:         "some-dummy-url",
+			token:       "some-dummy-token",
+			agentImage:  "my/agent:image",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+				Name: "test-namespace-options",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -308,36 +199,15 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					"baz": "quz",
 				},
 			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "5bbbf41e0dcb41ed586e26899d0de6eb474c7d6c309cfac9355a3ee4651b6b3d",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "b759ef69ef6dc6a10cdba8b2d5f2d0635c28eb4a7ceb0f2cd362b906d238b363",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
-			},
+			agentImage:  "my/agent:image",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled-no-labels",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+				Name: "test-namespace-options",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -355,36 +225,15 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 				Labels: map[string]string{},
 			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "c7193972923103ae418b609b0fae682322ea9b3b59b00e9a526561d388b2c500",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "c5318858de92544775dc8807b81dc1d68b9481ff01825a9810dc16e795f46246",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
-			},
+			agentImage:  "my/agent:image",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled-no-annotations",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+				Name: "test-namespace-options",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -396,41 +245,181 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			mutator: namespace.Mutator{
-				Enabled: true,
+				Enabled:     true,
+				Annotations: map[string]string{},
 				Labels: map[string]string{
 					"baz": "quz",
 				},
 			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "098ff7fd84702264e219dd843e1e39a73b09535beb08f13c5922e285e5b189cf",
+			agentImage:  "my/agent:image",
+			assetsImage: "rancher/assets:charts",
+		},
+		{
+			name: "imported cluster with pull secrets renders imagePullSecrets and secret resources",
+			cluster: &apimgmtv3.Cluster{
+				Name: "c-abc12", // matches MgmtNameRegexp
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName: "test-imported-pull-secrets",
+					ImportedConfig: &apimgmtv3.ImportedConfig{
+						PrivateRegistryURL:         "my-registry.example.com",
+						PrivateRegistryPullSecrets: []string{"my-pull-secret"},
+					},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
-				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
+			agentImage:  "rancher/rancher-agent:v2.8.0",
+			assetsImage: "rancher/assets:charts",
+			token:       "test-token",
+			url:         "https://rancher.example.com",
+			secrets: map[string]*corev1.Secret{
+				"fleet-default:my-pull-secret": {
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "fleet-default",
+						Name:      "my-pull-secret",
+					},
+					Type: corev1.SecretTypeBasicAuth,
+					Data: map[string][]byte{
+						"username": []byte("testuser"),
+						"password": []byte("testpass"),
+					},
+				},
 			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
-				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
+		},
+		{
+			name: "provisioned cluster name does not get system default pull secrets env var",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "c-m-abc12", // does NOT match MgmtNameRegexp
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName: "test-prov-no-system-secrets",
+					ImportedConfig: &apimgmtv3.ImportedConfig{
+						PrivateRegistryURL:         "my-registry.example.com",
+						PrivateRegistryPullSecrets: []string{"my-pull-secret-rancher-managed-pull-secret"},
+					},
+				},
 			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "f44417a05ad2a7421c4726189eab84d74663e21b00b1b6401e969588a87a4431",
+			agentImage:  "rancher-agent:v2.8.0",
+			assetsImage: "rancher/assets:charts",
+			token:       "test-token",
+			url:         "https://rancher.example.com",
+			secrets: map[string]*corev1.Secret{
+				"fleet-default:my-pull-secret-rancher-managed-pull-secret": {
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "fleet-default",
+						Name:      "my-pull-secret-rancher-managed-pull-secret",
+					},
+					Type: corev1.SecretTypeBasicAuth,
+					Data: map[string][]byte{
+						"username": []byte("testuser"),
+						"password": []byte("testpass"),
+					},
+				},
 			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
+		},
+		{
+			name: "imported cluster with multiple pull secrets",
+			cluster: &apimgmtv3.Cluster{
+				Name: "c-xyz99", // matches MgmtNameRegexp
+
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName: "test-multi-secrets",
+					ImportedConfig: &apimgmtv3.ImportedConfig{
+						PrivateRegistryURL:         "my-registry.example.com",
+						PrivateRegistryPullSecrets: []string{"secret-one", "secret-two"},
+					},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
+			agentImage:  "rancher-agent:v2.8.0",
+			assetsImage: "rancher/assets:charts",
+			token:       "test-token",
+			url:         "https://rancher.example.com",
+			secrets: map[string]*corev1.Secret{
+				"fleet-default:secret-one": {
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "fleet-default",
+						Name:      "secret-one",
+					},
+					Type: corev1.SecretTypeBasicAuth,
+					Data: map[string][]byte{
+						"username": []byte("user1"),
+						"password": []byte("pass1"),
+					},
+				},
+				"fleet-default:secret-two": {
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "fleet-default",
+						Name:      "secret-two",
+					},
+					Type: corev1.SecretTypeBasicAuth,
+					Data: map[string][]byte{
+						"username": []byte("user2"),
+						"password": []byte("pass2"),
+					},
+				},
 			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
+		},
+		{
+			name: "pull secret lookup failure returns error",
+			cluster: &apimgmtv3.Cluster{
+				Name: "c-abc12",
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName: "test-secret-failure",
+					ImportedConfig: &apimgmtv3.ImportedConfig{
+						PrivateRegistryURL:         "my-registry.example.com",
+						PrivateRegistryPullSecrets: []string{"nonexistent-secret"},
+					},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
+			agentImage:    "my-registry.example.com/rancher/rancher-agent:v2.8.0",
+			assetsImage:   "rancher/assets:charts",
+			token:         "test-token",
+			url:           "https://rancher.example.com",
+			expectedError: "\"fleet-default:nonexistent-secret\" not found",
+		},
+		{
+			name: "pre-bootstrap renders bootstrap deployment with hostNetwork",
+			cluster: &apimgmtv3.Cluster{
+				Name: "test-preboot",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "test-preboot",
+					ImportedConfig: &apimgmtv3.ImportedConfig{},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
+			},
+			agentImage:     "rancher/rancher-agent:v2.8.0",
+			assetsImage:    "rancher/assets:charts",
+			token:          "test-token",
+			url:            "https://rancher.example.com",
+			isPreBootstrap: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer resetMockSecrets()
 
 			mockSecrets = tt.secrets
 			var b bytes.Buffer
@@ -438,96 +427,112 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				tt.agentImage = image.ResolveWithCluster(tt.agentImage, tt.cluster)
 			}
 
-			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists, tt.mutator)
+			err := SystemTemplate(&b, &TemplateOps{
+				AgentImage:     tt.agentImage,
+				AuthImage:      tt.authImage,
+				AssetsImage:    tt.assetsImage,
+				Namespace:      tt.namespace,
+				Token:          tt.token,
+				URL:            tt.url,
+				IsPreBootstrap: tt.isPreBootstrap,
+				Cluster:        tt.cluster,
+				AgentFeatures:  tt.features,
+				Taints:         tt.taints,
+				SecretLister:   secretLister,
+				PcExists:       tt.pcExists,
+				Mutator:        tt.mutator,
+			})
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
 			assert.NoError(t, err)
 
-			decoder := scheme.Codecs.UniversalDeserializer()
-			for _, r := range strings.Split(b.String(), "---") {
-				if len(r) == 0 {
-					continue
-				}
+			// Snapshot-based assertions
+			actual := b.String()
+			snapshotFile := filepath.Join(".", "testdata", sanitizeName(tt.name)+".yaml")
 
-				obj, groupVersionKind, err := decoder.Decode(
-					[]byte(r),
-					nil,
-					nil)
-				if err != nil {
-					continue
+			if *update {
+				// Write snapshot file
+				err := os.MkdirAll(filepath.Dir(snapshotFile), 0755)
+				if !assert.NoError(t, err) {
+					return
 				}
-
-				switch groupVersionKind.Kind {
-				case "Deployment":
-					deployment := obj.(*appsv1.Deployment)
-					b, err := json.Marshal(deployment)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedDeploymentHashes[deployment.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, deployment.Name))
-				case "ClusterRole":
-					clusterrole := obj.(*rbacv1.ClusterRole)
-					b, err := json.Marshal(clusterrole)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedClusterRoleHashes[clusterrole.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, clusterrole.Name))
-				case "ClusterRoleBinding":
-					crb := obj.(*rbacv1.ClusterRoleBinding)
-					b, err := json.Marshal(crb)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedClusterRoleBindingHashes[crb.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, crb.Name))
-				case "Namespace":
-					ns := obj.(*corev1.Namespace)
-					b, err := json.Marshal(ns)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedNamespaceHashes[ns.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, ns.Name))
-				case "DaemonSet":
-					ds := obj.(*appsv1.DaemonSet)
-					b, err := json.Marshal(ds)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedDaemonSetHashes[ds.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, ds.Name))
-				case "Service":
-					svc := obj.(*corev1.Service)
-					b, err := json.Marshal(svc)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedServiceHashes[svc.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, svc.Name))
-				case "ServiceAccount":
-					svcacct := obj.(*corev1.ServiceAccount)
-					b, err := json.Marshal(svcacct)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedServiceAccountHashes[svcacct.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, svcacct.Name))
-				case "Secret":
-					secret := obj.(*corev1.Secret)
-					b, err := json.Marshal(secret)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedSecretHashes[secret.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, secret.Name))
-				case "PodDisruptionBudget":
-					pdb := obj.(*policyv1.PodDisruptionBudget)
-					b, err := json.Marshal(pdb)
-					if err != nil {
-						assert.FailNow(t, err.Error())
-					}
-					assert.Equal(t, tt.expectedPodDisruptionBudgetHashes[pdb.Name], getHash(b), fmt.Sprintf("%s/%s", groupVersionKind.Kind, pdb.Name))
-				default:
-					assert.FailNow(t, fmt.Sprintf("unexpected Kind for GVK: %s", groupVersionKind.String()))
-				}
+				err = os.WriteFile(snapshotFile, []byte(actual), 0644)
+				assert.NoError(t, err)
+				return
 			}
+
+			// Read expected output
+			expected, err := os.ReadFile(snapshotFile)
+			if !assert.NoError(t, err, "snapshot file not found: %s", snapshotFile) {
+				return
+			}
+
+			// Compare
+			assert.Equal(t, string(expected), actual)
 		})
 	}
 }
 
-func getHash(b []byte) string {
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
+func sanitizeName(name string) string {
+	// Convert test name to valid filename
+	name = strings.ToLower(name)
+	name = strings.ReplaceAll(name, " ", "-")
+	name = strings.ReplaceAll(name, ",", "")
+	return name
+}
+
+func TestSystemTemplate_quotedValues(t *testing.T) {
+	secretLister := &corefakes.SecretListerMock{
+		GetFunc: func(namespace string, name string) (*corev1.Secret, error) {
+			return nil, apierror.NewNotFound(schema.GroupResource{}, name)
+		},
+	}
+	payload := "x\"\n          - name: EXTRA\n            value: \"y"
+
+	cluster := &apimgmtv3.Cluster{
+		Name: "test-quoted",
+		Spec: apimgmtv3.ClusterSpec{
+			DisplayName:    "test",
+			ImportedConfig: &apimgmtv3.ImportedConfig{PrivateRegistryURL: payload},
+		},
+		Status: apimgmtv3.ClusterStatus{Driver: "imported"},
+	}
+
+	var b bytes.Buffer
+	err := SystemTemplate(&b, &TemplateOps{
+		AgentImage:   payload,
+		AuthImage:    payload,
+		AssetsImage:  payload,
+		Token:        "token",
+		URL:          "https://rancher.example",
+		Cluster:      cluster,
+		SecretLister: secretLister,
+		Mutator:      namespace.GetMutator(),
+	})
+	assert.NoError(t, err)
+
+	var found bool
+	for r := range strings.SplitSeq(b.String(), "\n---\n") {
+		obj, gvk, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(r), nil, nil)
+		if err != nil || gvk.Kind != "Deployment" {
+			continue
+		}
+		found = true
+		container := obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0]
+		assert.Equal(t, payload, container.Image)
+		for _, ic := range obj.(*appsv1.Deployment).Spec.Template.Spec.InitContainers {
+			assert.Equal(t, payload, ic.Image)
+		}
+		for _, env := range container.Env {
+			assert.NotEqual(t, "EXTRA", env.Name)
+			if env.Name == "CATTLE_SYSTEM_DEFAULT_REGISTRY" {
+				assert.Equal(t, payload, env.Value)
+			}
+		}
+	}
+	assert.True(t, found, "cattle-cluster-agent deployment not rendered")
 }

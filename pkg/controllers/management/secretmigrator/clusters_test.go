@@ -12,7 +12,9 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +40,8 @@ func resetMockClusters() {
 }
 
 func newTestHandler(t *testing.T) *handler {
+	ctrl := gomock.NewController(t)
+
 	secrets := corefakes.SecretInterfaceMock{
 		CreateFunc: func(secret *corev1.Secret) (*corev1.Secret, error) {
 			if secret.GenerateName != "" {
@@ -114,35 +118,60 @@ func newTestHandler(t *testing.T) *handler {
 			return list, nil
 		},
 	}
-	return &handler{
-		clusters: &v3fakes.ClusterInterfaceMock{
-			CreateFunc: func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
-				mockClusters[cluster.Name] = cluster.DeepCopy()
-				mockClusters[cluster.Name].ObjectMeta.ResourceVersion = "0"
-				return mockClusters[cluster.Name], nil
-			},
-			UpdateFunc: func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
-				if _, ok := mockClusters[cluster.Name]; !ok {
-					return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("cluster [%s]", cluster.Name))
-				}
-				if reflect.DeepEqual(mockClusters[cluster.Name], cluster) {
-					assert.Fail(t, "update called with no changes")
-				}
-				mockClusters[cluster.Name] = cluster.DeepCopy()
-				rv, _ := strconv.Atoi(mockClusters[cluster.Name].ObjectMeta.ResourceVersion)
-				rv++
-				mockClusters[cluster.Name].ObjectMeta.ResourceVersion = strconv.Itoa(rv)
-				return mockClusters[cluster.Name].DeepCopy(), nil
-			},
-			GetFunc: func(name string, opts metav1.GetOptions) (*apimgmtv3.Cluster, error) {
-				cluster, ok := mockClusters[name]
-				if !ok {
-					gvk := cluster.GroupVersionKind()
-					return nil, apierror.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
-				}
-				return cluster.DeepCopy(), nil
-			},
+
+	// Create wrangler mock for ClusterClient
+	clusterClient := fake.NewMockNonNamespacedClientInterface[*apimgmtv3.Cluster, *apimgmtv3.ClusterList](ctrl)
+
+	clusterClient.EXPECT().Create(gomock.Any()).DoAndReturn(
+		func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+			mockClusters[cluster.Name] = cluster.DeepCopy()
+			mockClusters[cluster.Name].ObjectMeta.ResourceVersion = "0"
+			return mockClusters[cluster.Name], nil
 		},
+	).AnyTimes()
+
+	clusterClient.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+			if _, ok := mockClusters[cluster.Name]; !ok {
+				return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("cluster [%s]", cluster.Name))
+			}
+			if reflect.DeepEqual(mockClusters[cluster.Name], cluster) {
+				assert.Fail(t, "update called with no changes")
+			}
+			mockClusters[cluster.Name] = cluster.DeepCopy()
+			rv, _ := strconv.Atoi(mockClusters[cluster.Name].ObjectMeta.ResourceVersion)
+			rv++
+			mockClusters[cluster.Name].ObjectMeta.ResourceVersion = strconv.Itoa(rv)
+			return mockClusters[cluster.Name].DeepCopy(), nil
+		},
+	).AnyTimes()
+
+	clusterClient.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
+		func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+			if _, ok := mockClusters[cluster.Name]; !ok {
+				return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("cluster [%s]", cluster.Name))
+			}
+			// UpdateStatus should only update status fields and increment resource version
+			mockClusters[cluster.Name].Status = cluster.Status
+			rv, _ := strconv.Atoi(mockClusters[cluster.Name].ObjectMeta.ResourceVersion)
+			rv++
+			mockClusters[cluster.Name].ObjectMeta.ResourceVersion = strconv.Itoa(rv)
+			return mockClusters[cluster.Name].DeepCopy(), nil
+		},
+	).AnyTimes()
+
+	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(name string, opts metav1.GetOptions) (*apimgmtv3.Cluster, error) {
+			cluster, ok := mockClusters[name]
+			if !ok {
+				return nil, apierror.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "clusters"}, name)
+			}
+			return cluster.DeepCopy(), nil
+		},
+	).AnyTimes()
+
+	return &handler{
+		clusters:      clusterClient,
 		migrator:      NewMigrator(&secretLister, &secrets),
 		projectLister: projectLister,
 	}
@@ -196,7 +225,7 @@ func TestSync(t *testing.T) {
 	got, err := h.sync("", testCluster)
 	assert.Nil(t, err)
 	assert.True(t, apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(got))
-	testClusterCopy := got.(*apimgmtv3.Cluster).DeepCopy()
+	testClusterCopy := got.DeepCopy()
 	got, err = h.sync("", testClusterCopy)
 
 	assert.Nil(t, err)

@@ -53,7 +53,7 @@ func (d *DynamicDriver) Install() error {
 		return nil
 	}
 
-	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIPath.Get(), d.DriverName))
+	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIDashboardPath.Get(), d.DriverName))
 }
 
 func (d *BaseDriver) copyTo(dest string) error {

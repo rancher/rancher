@@ -57,7 +57,16 @@ func TestSync(t *testing.T) {
 			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
 			return userAttribute, nil
 		},
-	)
+	).AnyTimes()
+	userAttributesMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+			userAttribute, ok := userAttributes[name]
+			if ok {
+				return userAttribute, nil
+			}
+			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+		},
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
@@ -72,9 +81,11 @@ func TestSync(t *testing.T) {
 	).AnyTimes()
 
 	testTokenController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: tokensMock,
+		userAttrRefresher: UserAttributeRefresher{
+			userAttributes:       userAttributesMock,
+			userAttributesLister: userAttributesListerMock,
+		},
 	}
 
 	testCases := populateTestCases(tokens, userAttributes)
@@ -100,7 +111,7 @@ func TestSync(t *testing.T) {
 		if testcase.inputUserAttribute == nil {
 			continue
 		}
-		returnUserAttribute, _ := testTokenController.userAttributesLister.Get(testcase.inputUserAttribute.Name)
+		returnUserAttribute, _ := testTokenController.userAttrRefresher.userAttributesLister.Get(testcase.inputUserAttribute.Name)
 		assert.Equalf(t, testcase.expectedOutputUserAttribute, returnUserAttribute, "%s: %s", testErr, testcase.inputUserAttribute.Name)
 	}
 
@@ -144,9 +155,11 @@ func TestSync(t *testing.T) {
 	).AnyTimes()
 
 	testTokenErrorUpdateController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: tokensMock,
+		userAttrRefresher: UserAttributeRefresher{
+			userAttributes:       userAttributesMock,
+			userAttributesLister: userAttributesListerMock,
+		},
 	}
 	genericTestToken := &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
@@ -184,7 +197,16 @@ func TestSync(t *testing.T) {
 		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
 			return nil, errors.NewServiceUnavailable("test reason")
 		},
-	)
+	).AnyTimes()
+	userAttributesMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+			userAttribute, ok := userAttributes[name]
+			if ok {
+				return userAttribute, nil
+			}
+			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+		},
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
@@ -199,9 +221,11 @@ func TestSync(t *testing.T) {
 	).AnyTimes()
 
 	testUserAttributeErrorUpdateController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: tokensMock,
+		userAttrRefresher: UserAttributeRefresher{
+			userAttributes:       userAttributesMock,
+			userAttributesLister: userAttributesListerMock,
+		},
 	}
 
 	genericTestToken = &v3.Token{
@@ -259,9 +283,11 @@ func TestSync(t *testing.T) {
 	)
 
 	testUserAttributeErrorGetController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: tokensMock,
+		userAttrRefresher: UserAttributeRefresher{
+			userAttributes:       userAttributesMock,
+			userAttributesLister: userAttributesListerMock,
+		},
 	}
 
 	genericTestToken = &v3.Token{
@@ -311,9 +337,11 @@ func TestSync(t *testing.T) {
 	)
 
 	testUserAttributeErrorGetController = TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: tokensMock,
+		userAttrRefresher: UserAttributeRefresher{
+			userAttributes:       userAttributesMock,
+			userAttributesLister: userAttributesListerMock,
+		},
 	}
 
 	genericTestToken = &v3.Token{
@@ -357,7 +385,7 @@ func populateTestCases(tokens map[string]*v3.Token, userAttributes map[string]*v
 				},
 			},
 			description: "Tests that the \"controller.cattle.io/cat-token-controller\" finalizer is not removed if the token does" +
-				"not have a deltion timestamp.",
+				"not have a deletion timestamp.",
 		},
 		{
 			inputToken: &v3.Token{
@@ -389,6 +417,7 @@ func populateTestCases(tokens map[string]*v3.Token, userAttributes map[string]*v
 				TTLMillis: 300,
 				ExpiresAt: timeNow.Add(300 * time.Millisecond).UTC().Format(time.RFC3339),
 			},
+			description: "demonstrate update of the ExpiresAt field",
 		},
 		{
 			inputToken:          &v3.Token{UserID: "testuser"},
@@ -436,7 +465,7 @@ func populateTestCases(tokens map[string]*v3.Token, userAttributes map[string]*v
 				Token: hashedToken,
 			},
 			enableHashing: true,
-			description:   "",
+			description:   "Test that token key hashing is done if necessary",
 		},
 	}
 	for index, testCase := range testCases {

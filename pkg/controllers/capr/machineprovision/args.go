@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
@@ -62,6 +63,7 @@ type driverArgs struct {
 
 	DriverName          string
 	ImageName           string
+	ImagePullSecrets    []corev1.LocalObjectReference
 	CapiMachineName     string
 	MachineName         string
 	MachineNamespace    string
@@ -176,6 +178,12 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 
 	cmd = append(cmd, instanceName)
 
+	var pullSecrets []corev1.LocalObjectReference
+	registry, _ := cluster.GetPrivateRegistry(nil)
+	if registry != nil && len(registry.PullSecrets) > 0 {
+		pullSecrets = registry.PullSecretsAsObjectReferences()
+	}
+
 	return driverArgs{
 		DriverName:          driver,
 		CapiMachineName:     machineName,
@@ -184,6 +192,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		MachineGVK:          infra.obj.GetObjectKind().GroupVersionKind(),
 		ImageName:           settings.PrefixPrivateRegistry(settings.MachineProvisionImage.Get()),
 		ImagePullPolicy:     settings.GetMachineProvisionImagePullPolicy(),
+		ImagePullSecrets:    pullSecrets,
 		EnvSecret:           envSecret,
 		FilesSecret:         filesSecret,
 		CertsSecret:         certsSecret,
@@ -207,9 +216,11 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	}
 
 	bootstrap, err := external.GetObjectFromContractVersionedRef(h.ctx, h.client, machine.Spec.Bootstrap.ConfigRef, machine.Namespace)
-	if apierrors.IsNotFound(err) {
-		return "", nil
-	} else if err != nil {
+	if err != nil {
+		if apierrors.IsNotFound(err) || strings.Contains(err.Error(), "not found") {
+			logrus.Debugf("[machineprovision] Infrastructure reference for machine %s already pruned, skipping config secret lookup", machine.Name)
+			return "", nil
+		}
 		return "", err
 	}
 
@@ -351,7 +362,7 @@ func getDriverDownloadURL(nd *mgmtv3.NodeDriver) (string, string, error) {
 		driverName = drivers.DockerMachineDriverPrefix + driverName
 	}
 
-	path := filepath.Join(settings.UIPath.Get(), "assets", driverName)
+	path := filepath.Join(settings.UIDashboardPath.Get(), "assets", driverName)
 	if _, err := os.Stat(path); err != nil {
 		return nd.Spec.URL, nd.Spec.Checksum, nil
 	}

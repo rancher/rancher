@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 )
 
 var roles = map[string]*v3.RoleTemplate{
@@ -870,6 +872,292 @@ func Test_gatherRoleTemplates(t *testing.T) {
 			} else {
 				assert.NoError(t, err, fmt.Sprintf("expected no error, got: %v", err))
 				assert.Equal(t, tt.want, got, "expected roles to be %v, got: %v", tt.want, got)
+			}
+		})
+	}
+}
+
+// TestGrantManagementPlanePrivilegesSkipsCRTTokenReaderRoleBinding verifies that the
+// crt-token-reader RoleBinding (managed independently in crtb_handler.go) is never deleted as
+// undesired here, while other stale RoleBindings still are.
+func TestGrantManagementPlanePrivilegesSkipsCRTTokenReaderRoleBinding(t *testing.T) {
+	const bindingUID = types.UID("test-uid")
+
+	binding := &v3.ClusterRoleTemplateBinding{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "crtb1",
+			Namespace: "ns1",
+			UID:       bindingUID,
+		},
+		RoleTemplateName: "test-rt",
+	}
+	ownerRef := v1.OwnerReference{UID: bindingUID}
+	subject := rbacv1.Subject{Name: "test-user"}
+
+	crtTokenReaderRB := &rbacv1.RoleBinding{
+		ObjectMeta: v1.ObjectMeta{
+			Name:            crtTokenReaderRoleBindingName("ns1", subject),
+			Namespace:       "ns1",
+			OwnerReferences: []v1.OwnerReference{ownerRef},
+		},
+		RoleRef: rbacv1.RoleRef{Kind: "Role", Name: "crt-token-reader"},
+	}
+	staleRB := &rbacv1.RoleBinding{
+		ObjectMeta: v1.ObjectMeta{
+			Name:            "crtb1-old-role",
+			Namespace:       "ns1",
+			OwnerReferences: []v1.OwnerReference{ownerRef},
+		},
+		RoleRef: rbacv1.RoleRef{Kind: "Role", Name: "old-role"},
+	}
+
+	rbIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		rbByOwnerIndex: func(obj interface{}) ([]string, error) {
+			return rbByOwner(obj.(*rbacv1.RoleBinding))
+		},
+	})
+	require.NoError(t, rbIndexer.Add(crtTokenReaderRB))
+	require.NoError(t, rbIndexer.Add(staleRB))
+
+	var deletedNames []string
+	rbClientMock := &rbacFakes.RoleBindingInterfaceMock{
+		DeleteNamespacedFunc: func(namespace, name string, options *v1.DeleteOptions) error {
+			deletedNames = append(deletedNames, name)
+			return nil
+		},
+	}
+	nsListerMock := &normanFakes.NamespaceListerMock{
+		GetFunc: func(namespace, name string) (*corev1.Namespace, error) {
+			return &corev1.Namespace{Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive}}, nil
+		},
+	}
+
+	m := &manager{
+		rtLister: &fakes.RoleTemplateListerMock{
+			GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+				return &v3.RoleTemplate{ObjectMeta: v1.ObjectMeta{Name: name}}, nil
+			},
+		},
+		rbIndexer:  rbIndexer,
+		rbClient:   rbClientMock,
+		nsLister:   nsListerMock,
+		controller: "test",
+	}
+
+	// No management-plane resources requested, so no new desired RoleBindings are computed here;
+	// this isolates the currentRBs filtering/deletion behavior under test.
+	err := m.grantManagementPlanePrivileges("test-rt", map[string]string{}, subject, binding)
+	require.NoError(t, err)
+
+	assert.NotContains(t, deletedNames, crtTokenReaderRB.Name, "crt-token-reader RoleBinding should not be deleted by grantManagementPlanePrivileges")
+	assert.Contains(t, deletedNames, staleRB.Name, "stale RoleBinding not owned by crt-token-reader should still be deleted")
+}
+
+// TestGrantManagementPlanePrivilegesCustomRoleTemplateNamedCRTTokenReader verifies that a custom
+// RoleTemplate literally named "crt-token-reader" is not mistaken for the real reserved
+// crt-token-reader binding (whose RoleBinding uses a hashed name, not the normal
+// "<binding>-<role>" name). Its RoleBinding must go through normal reconcile - deleted once
+// undesired (not permanently orphaned), and left alone while still desired (not churned/recreated
+// every sync).
+func TestGrantManagementPlanePrivilegesCustomRoleTemplateNamedCRTTokenReader(t *testing.T) {
+	tests := []struct {
+		name  string
+		rules []rbacv1.PolicyRule // rules on the colliding "crt-token-reader" RoleTemplate
+	}{
+		{
+			name:  "RoleTemplate no longer grants access - RoleBinding is deleted, not orphaned",
+			rules: nil,
+		},
+		{
+			name: "RoleTemplate still grants access - RoleBinding is left alone, not churned",
+			rules: []rbacv1.PolicyRule{
+				{APIGroups: []string{"management.cattle.io"}, Resources: []string{"clusterregistrationtokens"}, Verbs: []string{"get"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const bindingUID = types.UID("test-uid")
+
+			binding := &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "crtb1",
+					Namespace: "ns1",
+					UID:       bindingUID,
+				},
+				RoleTemplateName: "crt-token-reader",
+			}
+			ownerRef := v1.OwnerReference{UID: bindingUID}
+
+			// Named via the normal "<binding>-<role>" convention, not the hashed name used by the
+			// real reserved crt-token-reader binding.
+			collidingRB := &rbacv1.RoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:            "crtb1-crt-token-reader",
+					Namespace:       "ns1",
+					OwnerReferences: []v1.OwnerReference{ownerRef},
+				},
+				RoleRef: rbacv1.RoleRef{Kind: "Role", Name: "crt-token-reader"},
+			}
+
+			rbIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+				rbByOwnerIndex: func(obj interface{}) ([]string, error) {
+					return rbByOwner(obj.(*rbacv1.RoleBinding))
+				},
+			})
+			require.NoError(t, rbIndexer.Add(collidingRB))
+
+			var deletedNames, createdNames []string
+			rbClientMock := &rbacFakes.RoleBindingInterfaceMock{
+				DeleteNamespacedFunc: func(namespace, name string, options *v1.DeleteOptions) error {
+					deletedNames = append(deletedNames, name)
+					return nil
+				},
+				CreateFunc: func(rb *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+					createdNames = append(createdNames, rb.Name)
+					return rb, nil
+				},
+			}
+			nsListerMock := &normanFakes.NamespaceListerMock{
+				GetFunc: func(namespace, name string) (*corev1.Namespace, error) {
+					return &corev1.Namespace{Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive}}, nil
+				},
+			}
+
+			m := &manager{
+				rtLister: &fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+						return &v3.RoleTemplate{ObjectMeta: v1.ObjectMeta{Name: name}, Rules: tt.rules}, nil
+					},
+				},
+				rLister: &rbacFakes.RoleListerMock{
+					GetFunc: func(namespace, name string) (*rbacv1.Role, error) {
+						return nil, errors.NewNotFound(schema.GroupResource{}, name)
+					},
+				},
+				rClient: &rbacFakes.RoleInterfaceMock{
+					CreateFunc: func(r *rbacv1.Role) (*rbacv1.Role, error) { return r, nil },
+				},
+				rbIndexer:  rbIndexer,
+				rbClient:   rbClientMock,
+				nsLister:   nsListerMock,
+				controller: "test",
+			}
+
+			err := m.grantManagementPlanePrivileges("crt-token-reader", map[string]string{"clusterregistrationtokens": "management.cattle.io"}, rbacv1.Subject{Name: "test-user"}, binding)
+			require.NoError(t, err)
+
+			if tt.rules == nil {
+				assert.Contains(t, deletedNames, collidingRB.Name, "RoleBinding for a custom RoleTemplate named crt-token-reader should be deleted once its RoleTemplate no longer grants access, not permanently orphaned")
+			} else {
+				assert.NotContains(t, deletedNames, collidingRB.Name, "RoleBinding for a custom RoleTemplate named crt-token-reader should not be deleted while its RoleTemplate still grants access")
+				assert.NotContains(t, createdNames, collidingRB.Name, "RoleBinding already exists and matches desired state, so it should not be recreated (churn)")
+			}
+		})
+	}
+}
+
+// TestGrantManagementPlanePrivilegesPRTBWithProjectRoleTemplateNamedCRTTokenReader is the PRTB
+// equivalent of the above: grantManagementPlanePrivileges is also called for PRTBs, using the
+// project's backing namespace. A project RoleTemplate named "crt-token-reader" must get the same
+// normal reconcile treatment there too - deleted once undesired, left alone (not churned) while
+// still desired.
+func TestGrantManagementPlanePrivilegesPRTBWithProjectRoleTemplateNamedCRTTokenReader(t *testing.T) {
+	tests := []struct {
+		name  string
+		rules []rbacv1.PolicyRule // rules on the colliding "crt-token-reader" RoleTemplate
+	}{
+		{
+			name:  "RoleTemplate no longer grants access - RoleBinding is deleted, not orphaned",
+			rules: nil,
+		},
+		{
+			name: "RoleTemplate still grants access - RoleBinding is left alone, not churned",
+			rules: []rbacv1.PolicyRule{
+				{APIGroups: []string{"management.cattle.io"}, Resources: []string{"clusterregistrationtokens"}, Verbs: []string{"get"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const bindingUID = types.UID("test-uid")
+			const projectNamespace = "p-abc123"
+
+			binding := &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "prtb1",
+					Namespace: projectNamespace,
+					UID:       bindingUID,
+				},
+				RoleTemplateName: "crt-token-reader",
+			}
+			ownerRef := v1.OwnerReference{UID: bindingUID}
+
+			// Named via the normal "<binding>-<role>" convention, not the hashed name used by the
+			// real reserved crt-token-reader binding (which is never created in project namespaces).
+			collidingRB := &rbacv1.RoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:            "prtb1-crt-token-reader",
+					Namespace:       projectNamespace,
+					OwnerReferences: []v1.OwnerReference{ownerRef},
+				},
+				RoleRef: rbacv1.RoleRef{Kind: "Role", Name: "crt-token-reader"},
+			}
+
+			rbIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+				rbByOwnerIndex: func(obj interface{}) ([]string, error) {
+					return rbByOwner(obj.(*rbacv1.RoleBinding))
+				},
+			})
+			require.NoError(t, rbIndexer.Add(collidingRB))
+
+			var deletedNames, createdNames []string
+			rbClientMock := &rbacFakes.RoleBindingInterfaceMock{
+				DeleteNamespacedFunc: func(namespace, name string, options *v1.DeleteOptions) error {
+					deletedNames = append(deletedNames, name)
+					return nil
+				},
+				CreateFunc: func(rb *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+					createdNames = append(createdNames, rb.Name)
+					return rb, nil
+				},
+			}
+			nsListerMock := &normanFakes.NamespaceListerMock{
+				GetFunc: func(namespace, name string) (*corev1.Namespace, error) {
+					return &corev1.Namespace{Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive}}, nil
+				},
+			}
+
+			m := &manager{
+				rtLister: &fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+						return &v3.RoleTemplate{ObjectMeta: v1.ObjectMeta{Name: name}, Rules: tt.rules}, nil
+					},
+				},
+				rLister: &rbacFakes.RoleListerMock{
+					GetFunc: func(namespace, name string) (*rbacv1.Role, error) {
+						return nil, errors.NewNotFound(schema.GroupResource{}, name)
+					},
+				},
+				rClient: &rbacFakes.RoleInterfaceMock{
+					CreateFunc: func(r *rbacv1.Role) (*rbacv1.Role, error) { return r, nil },
+				},
+				rbIndexer:  rbIndexer,
+				rbClient:   rbClientMock,
+				nsLister:   nsListerMock,
+				controller: "test",
+			}
+
+			err := m.grantManagementPlanePrivileges("crt-token-reader", map[string]string{"clusterregistrationtokens": "management.cattle.io"}, rbacv1.Subject{Name: "test-user"}, binding)
+			require.NoError(t, err)
+
+			if tt.rules == nil {
+				assert.Contains(t, deletedNames, collidingRB.Name, "RoleBinding for a project RoleTemplate named crt-token-reader should be deleted once its RoleTemplate no longer grants access, not permanently orphaned in the project's backing namespace")
+			} else {
+				assert.NotContains(t, deletedNames, collidingRB.Name, "RoleBinding for a project RoleTemplate named crt-token-reader should not be deleted while its RoleTemplate still grants access")
+				assert.NotContains(t, createdNames, collidingRB.Name, "RoleBinding already exists and matches desired state, so it should not be recreated (churn)")
 			}
 		})
 	}

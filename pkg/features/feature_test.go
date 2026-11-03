@@ -54,10 +54,12 @@ func TestInitializeFeatures(t *testing.T) {
 		featureMock func() managementv3.FeatureClient
 		features    map[string]*Feature
 	}{
-		"delete external-rules feature is called": {
+		"delete removed feature flags is called": {
 			featureMock: func() managementv3.FeatureClient {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 
 				return mock
 			},
@@ -67,6 +69,8 @@ func TestInitializeFeatures(t *testing.T) {
 			featureMock: func() managementv3.FeatureClient {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 				mock.EXPECT().Get("locked-feature", gomock.Any()).Return(nil, fmt.Errorf("not found"))
 				mock.EXPECT().Create(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
 					assert.Equal(t, "locked-feature", feature.Name)
@@ -93,6 +97,8 @@ func TestInitializeFeatures(t *testing.T) {
 			featureMock: func() managementv3.FeatureClient {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 				mock.EXPECT().Get("unlocked-feature", gomock.Any()).Return(nil, fmt.Errorf("not found"))
 				mock.EXPECT().Create(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
 					assert.Equal(t, "unlocked-feature", feature.Name)
@@ -118,6 +124,8 @@ func TestInitializeFeatures(t *testing.T) {
 			featureMock: func() managementv3.FeatureClient {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 
 				existingFeature := &v3.Feature{
 					ObjectMeta: metav1.ObjectMeta{
@@ -158,6 +166,8 @@ func TestInitializeFeatures(t *testing.T) {
 			featureMock: func() managementv3.FeatureClient {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 
 				existingFeature := &v3.Feature{
 					ObjectMeta: metav1.ObjectMeta{
@@ -479,4 +489,43 @@ func TestRequireRestartsNonPrimeBuild(t *testing.T) {
 	// Toggling a prime feature on a non-prime build never requires restart
 	// because the feature is unconditionally disabled.
 	assert.False(t, RequireRestarts(feat, featureObj))
+}
+
+func TestSCIMIsPrimeFeature(t *testing.T) {
+	assert.True(t, SCIM.Prime())
+
+	SCIM.Set(true)
+	t.Cleanup(SCIM.Unset)
+
+	t.Setenv(primeEnv, "")
+	assert.False(t, SCIM.Enabled())
+
+	t.Setenv(primeEnv, "prime")
+	assert.True(t, SCIM.Enabled())
+}
+
+func TestADFSLDAPSearchIsPrimeFeature(t *testing.T) {
+	assert.True(t, ADFSLDAPSearch.Prime())
+
+	ADFSLDAPSearch.Set(true)
+	t.Cleanup(ADFSLDAPSearch.Unset)
+
+	t.Setenv(primeEnv, "")
+	assert.False(t, ADFSLDAPSearch.Enabled())
+
+	t.Setenv(primeEnv, "prime")
+	assert.True(t, ADFSLDAPSearch.Enabled())
+}
+
+func TestMultiAuthProvidersPrimeFeature(t *testing.T) {
+	assert.True(t, MultiAuthProviders.Prime())
+
+	MultiAuthProviders.Set(true)
+	t.Cleanup(MultiAuthProviders.Unset)
+
+	t.Setenv(primeEnv, "")
+	assert.False(t, MultiAuthProviders.Enabled())
+
+	t.Setenv(primeEnv, "prime")
+	assert.True(t, MultiAuthProviders.Enabled())
 }

@@ -1,6 +1,3 @@
-config:
-  versions: 'updatecli/values.d/versions.yaml'
-
 scm:
   user: 'github-actions[bot]'
   email: '41898282+github-actions[bot]@users.noreply.github.com'
@@ -22,12 +19,9 @@ repos:
   harvester_docker_machine:
     owner: 'harvester'
     repo: 'docker-machine-driver-harvester'
-  k3s:
-    owner: 'k3s-io'
-    repo: 'k3s'
-  k8s:
-    owner: 'kubernetes'
-    repo: 'kubernetes'
+  machine:
+    owner: 'rancher'
+    repo: 'machine'
   system_agent:
     owner: 'rancher'
     repo: 'system-agent'
@@ -42,15 +36,15 @@ harvester_docker_machine:
     type: 'deps'
     scope: 'harvester-docker-machine'
 
-k8s_k3s:
-  manifest: 'Update K8s and K3s patch versions'
-  pipelineid: 'update-k8s-k3s-versions'
+machine:
+  manifest: 'Update Rancher Machine version'
+  pipelineid: 'update-machine-version'
   commitmessage:
     type: 'deps'
-    scope: 'k8s and k3s'
+    scope: 'machine'
 
 wins_system_agent:
-  manifest: 'Update Wins and System Agent patch versions'
+  manifest: 'Update wins and system-agent patch versions'
   pipelineid: 'update-wins-system-agent-version'
   commitmessage:
     type: 'deps'

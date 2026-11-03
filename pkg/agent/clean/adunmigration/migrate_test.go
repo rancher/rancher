@@ -1,12 +1,24 @@
 package adunmigration
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/sirupsen/logrus"
+	logrusTest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	restclient "k8s.io/client-go/rest"
 )
 
 func TestWorkUnitContainsName(t *testing.T) {
@@ -374,6 +386,75 @@ func TestWorkUnitConnectionFailures(t *testing.T) {
 			assert.Equal(t, test.wantUsersToMigrate, len(usersToMigrate), "unexpected count for users to migrate")
 			assert.Equal(t, test.wantMissingUsers, len(missingUsers), "unexpected count for missing users")
 			assert.Equal(t, test.wantSkippedUsers, len(skippedUsers), "unexpected count for skipped users")
+		})
+	}
+}
+
+// stubPrepareClientContexts replaces prepareClientContextsFunc for the
+// duration of the test. Tests using it must not be run in parallel.
+func stubPrepareClientContexts(t *testing.T, f func(*restclient.Config) (*config.ScaledContext, *v3.ActiveDirectoryConfig, error)) {
+	t.Helper()
+	original := prepareClientContextsFunc
+	t.Cleanup(func() { prepareClientContextsFunc = original })
+	prepareClientContextsFunc = f
+}
+
+func TestUnmigrateAdGUIDUsersAuthConfigNotFound(t *testing.T) {
+	hook := logrusTest.NewGlobal()
+	stubPrepareClientContexts(t, func(*restclient.Config) (*config.ScaledContext, *v3.ActiveDirectoryConfig, error) {
+		return nil, nil, apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "authconfigs"}, activeDirectoryName)
+	})
+
+	err := UnmigrateAdGUIDUsers(&restclient.Config{}, true, true)
+
+	require.NoError(t, err)
+	require.NotNil(t, hook.LastEntry())
+	assert.Equal(t, logrus.InfoLevel, hook.LastEntry().Level)
+	assert.Contains(t, hook.LastEntry().Message, "activedirectory auth config not found, nothing to unmigrate")
+}
+
+func TestUnmigrateAdGUIDUsersPrepareClientContextsError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secrets.EXPECT().Get("cattle-global-data", "activedirectoryconfig-serviceaccountpassword", gomock.Any()).
+		Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, "activedirectoryconfig-serviceaccountpassword")).AnyTimes()
+	authConfigs := &fakeAuthConfigClient{obj: &unstructured.Unstructured{Object: map[string]interface{}{
+		"metadata":               map[string]interface{}{"name": activeDirectoryName},
+		"enabled":                true,
+		"serviceAccountPassword": "cattle-global-data:activedirectoryconfig-serviceaccountpassword",
+	}}}
+
+	tests := []struct {
+		name    string
+		prepare func(*restclient.Config) (*config.ScaledContext, *v3.ActiveDirectoryConfig, error)
+		wantErr string
+	}{
+		{
+			name: "generic error",
+			prepare: func(*restclient.Config) (*config.ScaledContext, *v3.ActiveDirectoryConfig, error) {
+				return nil, nil, errors.New("failed to create scaled context")
+			},
+			wantErr: "failed to create scaled context",
+		},
+		{
+			// The error produced by loadADConfiguration when the service account
+			// Secret is missing must not be swallowed as a missing AuthConfig.
+			name: "missing service account secret",
+			prepare: func(*restclient.Config) (*config.ScaledContext, *v3.ActiveDirectoryConfig, error) {
+				adConfig, err := loadADConfiguration(authConfigs, secrets)
+				return nil, adConfig, err
+			},
+			wantErr: "activedirectoryconfig-serviceaccountpassword",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stubPrepareClientContexts(t, tt.prepare)
+
+			err := UnmigrateAdGUIDUsers(&restclient.Config{}, false, false)
+
+			require.ErrorContains(t, err, tt.wantErr)
 		})
 	}
 }

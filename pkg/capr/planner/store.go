@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -190,11 +189,25 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	probes := secret.Data["probe-statuses"]
 	failureCount := secret.Data["failure-count"]
 
-	if probesPassed, ok := secret.Annotations[capr.PlanProbesPassedAnnotation]; ok && probesPassed != "" {
+	// Read plan-state field and if absent: fall back to checksum-based state inference (for backward compatibility).
+	if rawState := secret.Data[planapi.PlanStateKey]; len(rawState) > 0 {
+		result.PlanState = planapi.PlanState(rawState)
+	}
+
+	// Read plan-revision counter written by the agent on each new execution.
+	if rawRevision := secret.Data[planapi.PlanRevisionKey]; len(rawRevision) > 0 {
+		revision, err := strconv.Atoi(string(rawRevision))
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s value %q: %w", planapi.PlanRevisionKey, rawRevision, err)
+		}
+		result.PlanRevision = revision
+	}
+
+	if probesPassed, ok := secret.Annotations[planapi.PlanProbesPassedAnnotation]; ok && probesPassed != "" {
 		result.ProbesUsable = true
 	}
 
-	if len(failureCount) > 0 && PlanHash(planData) == failedChecksum {
+	if len(failureCount) > 0 && planapi.PlanHash(planData) == failedChecksum {
 		failureCount, err := strconv.Atoi(string(failureCount))
 		if err != nil {
 			return nil, err
@@ -218,7 +231,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 
 	if len(probes) > 0 {
-		probeStatuses, healthy, err := ParseProbeStatuses(probes)
+		probeStatuses, healthy, err := planapi.ParseProbeStatuses(probes)
 		if err != nil {
 			return nil, err
 		}
@@ -276,30 +289,24 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		}
 	}
 
-	result.InSync = bytes.Equal(planData, appliedPlanData)
+	// When the agent writes a terminal or in-progress plan-state, it is the authoritative
+	// source of truth for convergence.  For "pending" (and for secrets where the key is
+	// absent entirely) fall back to checksum comparison so that older agents which apply
+	// the plan and update applied-checksum without ever writing plan-state are still
+	// recognised as InSync.
+	switch result.PlanState {
+	case planapi.PlanStateSucceeded:
+		result.InSync = true
+	case planapi.PlanStateFailed:
+		result.Failed = true
+	case planapi.PlanStateInProgress:
+		// Agent is actively applying, so not yet InSync.
+		result.InSync = false
+	default:
+		// Empty or "pending": use checksum comparison (backward compatibility + new-agent pre-start).
+		result.InSync = bytes.Equal(planData, appliedPlanData)
+	}
 	return result, nil
-}
-
-func ParseProbeStatuses(probeStatuses []byte) (*map[string]plan.ProbeStatus, bool, error) {
-	healthy := true
-	if len(probeStatuses) == 0 {
-		return nil, false, fmt.Errorf("probe status length was 0")
-	}
-	probeStatusMap := map[string]plan.ProbeStatus{}
-	if err := json.Unmarshal(probeStatuses, &probeStatusMap); err != nil {
-		return nil, false, err
-	}
-	for _, status := range probeStatusMap {
-		if !status.Healthy {
-			healthy = false
-		}
-	}
-	return &probeStatusMap, healthy, nil
-}
-
-func PlanHash(plan []byte) string {
-	result := sha256.Sum256(plan)
-	return hex.EncodeToString(result[:])
 }
 
 // getPlanSecrets retrieves the plan secrets for the given list of machines
@@ -389,14 +396,16 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, join
 		entry.Metadata.Annotations[capr.JoinedToAnnotation] = ""
 	}
 
-	entry.Metadata.Annotations[capr.PlanUpdatedTimeAnnotation] = time.Now().UTC().Format(time.RFC3339)
-	entry.Metadata.Annotations[capr.PlanProbesPassedAnnotation] = ""
+	entry.Metadata.Annotations[planapi.PlanLastUpdatedAnnotation] = time.Now().UTC().Format(time.RFC3339)
+	entry.Metadata.Annotations[planapi.PlanProbesPassedAnnotation] = ""
 
 	capr.CopyPlanMetadataToSecret(secret, entry.Metadata)
 
 	// If the plan is being updated, then delete the probe-statuses so their healthy status will be reported as healthy only when they pass.
 	delete(secret.Data, "probe-statuses")
 
+	// Set plan-state to pending so the agent knows new plan content has been written.
+	secret.Data[planapi.PlanStateKey] = []byte(planapi.PlanStatePending)
 	secret.Data["plan"] = data
 	if maxFailures > 0 || maxFailures == -1 {
 		secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))

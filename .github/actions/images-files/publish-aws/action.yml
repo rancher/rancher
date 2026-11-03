@@ -8,8 +8,7 @@ runs:
       run: |
         set -ex
         source scripts/artifacts-list.sh
-        ARTIFACTS+=("$CHECKSUM_FILE")
 
-        for artifact in "${ARTIFACTS[@]}"; do
-          aws s3 cp "./$ARTIFACTS_BASE_DIR/$artifact" "s3://${{ env.ARTIFACTS_BUCKET_NAME }}/rancher/${{ env.TAG }}/$artifact"
+        for artifact in "${ARTIFACTS_WITH_CHECKSUM[@]}"; do
+          aws s3 cp "./${ARTIFACTS_BASE_DIR}/${artifact}" "s3://${ARTIFACTS_BUCKET_NAME}/rancher/${TAG}/${artifact}"
         done

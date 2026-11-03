@@ -21,9 +21,10 @@ import (
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -183,14 +184,23 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	clusterRepo, err = w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
+
+	prevDownloadTime := clusterRepo.Status.DownloadTime
+
 	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
 	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
-	app, _, err = w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", app.Spec.Version)
-	w.Require().NoError(err)
+	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", prevDownloadTime))
 
-	w.Assert().Equal(originalLatestVersion, app.Spec.Chart.Metadata.Version)
+	err = kwait.Poll(2*time.Second, 3*time.Minute, func() (done bool, err error) {
+		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), "rancher-aks-operator", metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return app.Spec.Info.Status == rv1.StatusDeployed && app.Spec.Chart.Metadata.Version == originalLatestVersion, nil
+	})
+	w.Require().NoError(err)
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 }
@@ -240,17 +250,28 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
 	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
+
 	clusterRepo, err = w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
+
+	prevDownloadTime := clusterRepo.Status.DownloadTime
+
 	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
 	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
-	app, _, err = w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
+	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", prevDownloadTime))
+
+	err = kwait.Poll(2*time.Second, 3*time.Minute, func() (done bool, err error) {
+		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), "rancher-aks-operator", metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return app.Spec.Info.Status == rv1.StatusDeployed && app.Spec.Chart.Metadata.Version == latestVersion, nil
+	})
 	w.Require().NoError(err)
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
-	w.Assert().Equal(latestVersion, app.Spec.Chart.Metadata.Version)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
@@ -448,18 +469,22 @@ func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) {
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
 func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) error {
+	var r *rv1.ClusterRepo
 	err := kwait.Poll(PollInterval, time.Minute, func() (done bool, err error) {
-		clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), ClusterRepoName, metav1.GetOptions{})
+		r, err = w.catalogClient.ClusterRepos().Get(context.TODO(), ClusterRepoName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		w.Require().NoError(err)
-		if clusterRepo.Name != ClusterRepoName {
+		if r.Name != ClusterRepoName {
 			return false, nil
 		}
 
-		return clusterRepo.Status.DownloadTime != prevDownloadTime, nil
+		return r.Status.DownloadTime != prevDownloadTime, nil
 	})
+	if err != nil {
+		logrus.Errorf("Error while downloading ClusterRepo %s from catalog: %v. \n CR: \n %v", ClusterRepoName, err, r)
+	}
 	return err
 }
 

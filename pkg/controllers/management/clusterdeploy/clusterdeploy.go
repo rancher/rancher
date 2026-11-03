@@ -3,6 +3,8 @@ package clusterdeploy
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -10,21 +12,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/namespace"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	rancherFeatures "github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -41,8 +43,9 @@ import (
 )
 
 const (
-	AgentForceDeployAnn = "io.cattle.agent.force.deploy"
-	clusterImage        = "clusterImage"
+	AgentRegistrationTokenHash = "io.cattle.agent.registration-token-hash"
+	clusterImage               = "clusterImage"
+	tokenNotReadyRequeueDelay  = 5 * time.Second
 )
 
 var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
@@ -69,6 +72,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 		secretLister:         management.Core.Secrets("").Controller().Lister(),
+		crtLister:            management.Management.ClusterRegistrationTokens("").Controller().Lister(),
 		ctx:                  ctx,
 	}
 
@@ -83,6 +87,7 @@ type clusterDeploy struct {
 	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
 	secretLister         v1.SecretLister
+	crtLister            v3.ClusterRegistrationTokenLister
 	ctx                  context.Context
 }
 
@@ -104,14 +109,47 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 	cluster = original.DeepCopy()
 
 	err = cd.doSync(cluster)
-	if cluster != nil && !reflect.DeepEqual(cluster, original) {
-		logrus.Tracef("clusterDeploy: sync: cluster changed, calling Update on cluster [%s]", cluster.Name)
-		_, updateErr = cd.clusters.Update(cluster)
+
+	modified := cluster
+	var toUpdate *apimgmtv3.Cluster
+	if !reflect.DeepEqual(modified.Spec, original.Spec) || !reflect.DeepEqual(modified.ObjectMeta, original.ObjectMeta) {
+		toUpdate, updateErr = cd.clusters.Update(modified)
+		if updateErr != nil {
+			if err != nil {
+				return nil, err
+			}
+			return nil, updateErr
+		}
+	}
+
+	// copy only owned fields in status update
+	if cluster != nil && !reflect.DeepEqual(modified.Status, original.Status) {
+		if toUpdate == nil {
+			toUpdate, err = cd.clusters.Get(cluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+		}
+		toUpdate.Status.AgentImage = modified.Status.AgentImage
+		toUpdate.Status.AgentFeatures = modified.Status.AgentFeatures
+		toUpdate.Status.AuthImage = modified.Status.AuthImage
+		toUpdate.Status.AssetsImage = modified.Status.AssetsImage
+		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
+		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
+		toUpdate.Status.AppliedClusterAgentImagePullSecretsHash = modified.Status.AppliedClusterAgentImagePullSecretsHash
+		if !modified.Spec.Internal {
+			toUpdate.Status.AppliedWebhookDeploymentCustomization = modified.Status.AppliedWebhookDeploymentCustomization
+		}
+		// Copy conditions this controller owns
+		pkgcluster.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
+		pkgcluster.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
+		_, updateErr = cd.clusters.UpdateStatus(toUpdate)
 	}
 
 	if err != nil {
 		return nil, err
 	}
+
 	return nil, updateErr
 }
 
@@ -130,6 +168,7 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	if err != nil {
 		return err
 	}
+
 	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient.CoreV1().Namespaces()); err != nil {
 		logrus.Tracef("clusterDeploy: doSync: cannot connect to API for cluster [%s]", cluster.Name)
 		return ErrCantConnectToAPI
@@ -145,13 +184,14 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 		return nil
 	}
 
-	_, err = apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	obj, err := apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
 		return err
 	}
+	cluster = obj.(*apimgmtv3.Cluster)
 
 	if cluster.Status.AgentImage != "" && !agentImagesCached(cluster.Name) {
 		if err := cd.cacheAgentImages(cluster.Name); err != nil {
@@ -167,6 +207,10 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	err = cd.managePodDisruptionBudget(cluster)
 	if err != nil {
+		return err
+	}
+
+	if err = cd.manageWebhookConfig(cluster); err != nil {
 		return err
 	}
 
@@ -197,13 +241,14 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
+func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desiredCharts string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
-	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
-	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
+
+	forceDeploy := cluster.Annotations[apimgmtv3.ClusterAgentForceDeployAnnotation] == "true"
+	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth || cluster.Status.AssetsImage != desiredCharts
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
 
 	if forceDeploy || imageChange || agentFeaturesChanged {
@@ -212,6 +257,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 			agentFeaturesChanged)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AssetsImage [%s], desiredCharts: [%s]", cluster.Status.AssetsImage, desiredCharts)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentFeatures [%v], desiredFeatures: [%v]", cluster.Status.AgentFeatures, desiredFeatures)
 		return true
 	}
@@ -244,12 +290,12 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
-	if pdbChanged, _ := util.AgentSchedulingPodDisruptionBudgetChanged(cluster); pdbChanged {
+	if pdbChanged, _ := pkgcluster.AgentSchedulingPodDisruptionBudgetChanged(cluster); pdbChanged {
 		logrus.Infof("clusterDeploy: redeployAgent: will redeploy Rancher agent due to Pod Disruption Budget configuration changed for [%s],", cluster.Name)
 		return true
 	}
 
-	if util.AgentDeploymentCustomizationChanged(cluster) {
+	if pkgcluster.AgentDeploymentCustomizationChanged(cluster) {
 		logrus.Infof("clusterDeploy: redeployAgent: will redeploy Rancher agent due to agent deployment customization changed for [%s],", cluster.Name)
 		return true
 	}
@@ -265,7 +311,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 // This is required to ensure that unwanted pod disruption budgets are not left behind in downstream clusters, as simply omitting
 // the object from the agent manifest does not guarantee that the object will be removed.
 func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) error {
-	_, pdbDeleted := util.AgentSchedulingPodDisruptionBudgetChanged(cluster)
+	_, pdbDeleted := pkgcluster.AgentSchedulingPodDisruptionBudgetChanged(cluster)
 	if !pdbDeleted {
 		return nil
 	}
@@ -292,11 +338,53 @@ func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) e
 	// any resources later omitted from that manifest must be manually removed.
 	o, err := kubectl.Delete(pdbYaml, kubeConfig)
 	if err != nil {
-		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", util.PodDisruptionBudgetName)) {
+		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", pkgcluster.PodDisruptionBudgetName)) {
 			return fmt.Errorf("could not delete existing pod disruption budget: %w", err)
 		}
 	}
 
+	return nil
+}
+
+// manageWebhookConfig pushes webhook deployment customization to a downstream cluster's
+// rancher-config ConfigMap so the embedded systemcharts controller can configure the
+// rancher-webhook chart without bouncing the cluster-agent. When the customization is
+// cleared, a ConfigMap with an empty value is applied so the chart reverts to defaults.
+// This follows the same pattern as managePriorityClass: detect change → get kubeconfig →
+// kubectl.Apply() the resource directly.
+func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
+	if cluster.Spec.Internal {
+		return nil
+	}
+
+	if !pkgcluster.WebhookDeploymentCustomizationChanged(cluster) {
+		return nil
+	}
+
+	logrus.Infof("clusterDeploy: manageWebhookConfig: webhook deployment customization changed for cluster [%s], pushing ConfigMap", cluster.Name)
+
+	cmYAML, err := systemtemplate.WebhookConfigMapTemplate(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to generate webhook ConfigMap for cluster [%s]: %w", cluster.Name, err)
+	}
+
+	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to get kubeconfig for cluster [%s]: %w", cluster.Name, err)
+	}
+	defer func() {
+		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
+
+	output, err := kubectl.Apply(cmYAML, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to apply webhook ConfigMap to cluster [%s]: %s: %w", cluster.Name, string(output), err)
+	}
+
+	logrus.Infof("clusterDeploy: manageWebhookConfig: successfully applied webhook ConfigMap to cluster [%s]", cluster.Name)
+	pkgcluster.UpdateAppliedWebhookDeploymentCustomization(cluster)
 	return nil
 }
 
@@ -305,7 +393,7 @@ func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) e
 // a kubeConfig will be generated, the downstream priority class will be deleted and recreated, and a boolean indicating the type of update will be returned.
 // If the priority class is being created or deleted, the agent deployment manifest must update the priorityClassName field accordingly.
 func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, bool, bool, error) {
-	pcChanged, pcCreated, pcRemovedFromCluster := util.AgentSchedulingPriorityClassChanged(cluster)
+	pcChanged, pcCreated, pcRemovedFromCluster := pkgcluster.AgentSchedulingPriorityClassChanged(cluster)
 	if !pcChanged && !pcRemovedFromCluster && !pcCreated {
 		return pcChanged, pcCreated, pcRemovedFromCluster, nil
 	}
@@ -332,7 +420,7 @@ func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, 
 	// the object to update it
 	o, err := kubectl.Delete(pcYaml, kubeConfig)
 	if err != nil {
-		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", util.PriorityClassName)) {
+		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", pkgcluster.PriorityClassName)) {
 			return pcChanged, pcCreated, pcRemovedFromCluster, fmt.Errorf("could not delete existing priority class : %w", err)
 		}
 	}
@@ -353,19 +441,19 @@ func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, 
 // If the downstream object is missing, it will be recreated using the priority class configuration set on the apimgmtv3.Cluster object.
 // A boolean is returned to indicate if the priority class exists on the downstream cluster, as well as any errors encountered.
 func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeConfig *clientcmdapi.Config) (bool, error) {
-	pcEnabled, _ := util.AgentSchedulingCustomizationEnabled(cluster)
+	pcEnabled, _ := pkgcluster.AgentSchedulingCustomizationEnabled(cluster)
 	if !pcEnabled {
 		return false, nil
 	}
 
-	schedulingStatus := util.GetAgentSchedulingCustomizationStatus(cluster)
+	schedulingStatus := pkgcluster.GetAgentSchedulingCustomizationStatus(cluster)
 	if schedulingStatus == nil || schedulingStatus.PriorityClass == nil {
 		return false, nil
 	}
 
 	logrus.Debugf("clusterDeploy: deployAgent: ensuring that downstream priority class exists for [%s]", cluster.Name)
 
-	out, err := kubectl.GetNonNamespacedResource(kubeConfig, util.PriorityClassKind, util.PriorityClassName)
+	out, err := kubectl.GetNonNamespacedResource(kubeConfig, pkgcluster.PriorityClassKind, pkgcluster.PriorityClassName)
 	if err == nil {
 		return true, nil
 	}
@@ -389,6 +477,43 @@ func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeCon
 	return false, fmt.Errorf("clusterDeploy: error encountered querying downstream priority class: %w", err)
 }
 
+// manageImagePullSecretHash generates a hash of the image pull secrets configured
+// on the cluster and compares it to the hash stored in the cluster status. A change
+// in the hash indicates when one or more secrets used by the cluster need to be copied
+// downstream to stay up to date with the version in the local cluster.
+// The value is generated using the secrets name, namespace, and the observed resource version.
+func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (string, bool, error) {
+	if !pkgcluster.MgmtNameRegexp.MatchString(cluster.Name) {
+		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
+	}
+
+	registry, _ := pkgcluster.GetPrivateRegistry(cluster)
+	// since provisioned clusters don't use pull secrets we don't need to track the hash. This also helps
+	// reduce unneeded agent redeployments.
+	if registry == nil || len(registry.PullSecrets) == 0 {
+		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
+	}
+
+	var secretReferences []string
+	for _, pullSecret := range registry.PullSecrets {
+		s, err := cd.secretLister.Get(pullSecret.Namespace, pullSecret.Name)
+		if err != nil {
+			logrus.Errorf("clusterDeploy: manageImagePullSecretHash: failed to retrieve secret [%s]: %v", pullSecret.Name, err)
+			return "", false, err
+		}
+		secretReferences = append(secretReferences, fmt.Sprintf("%s:%s=%s", s.Namespace, s.Name, s.ResourceVersion))
+	}
+
+	hashBytes := sha256.Sum256([]byte(strings.Join(secretReferences, ",")))
+	hash := hex.EncodeToString(hashBytes[:])
+	if hash != cluster.Status.AppliedClusterAgentImagePullSecretsHash {
+		logrus.Debugf("clusterDeploy: manageImagePullSecretHash: returning true due to secret resource version hash change")
+		return hash, true, nil
+	}
+
+	return hash, false, nil
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
@@ -396,6 +521,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
 	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
+	desiredAssets := systemtemplate.GetDesiredAssetsImage(cluster)
 	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
@@ -411,8 +537,26 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
-	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
-	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated
+	pullSecretHash, hashChanged, err := cd.manageImagePullSecretHash(cluster)
+	if err != nil {
+		return err
+	}
+
+	tokenHashChanged, err := cd.registrationTokenHashChanged(cluster)
+	if errors.Is(err, crt.ErrTokenNotReady) {
+		// Deploying now would render the agent with an empty token, which can never authenticate,
+		// so wait for the token to be stored in its Secret.
+		logrus.Debugf("clusterDeploy: deployAgent: waiting for system registration token of cluster [%s]: %v", cluster.Name, err)
+		cd.clusters.Controller().EnqueueAfter("", cluster.Name, tokenNotReadyRequeueDelay)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredAssets, desiredFeatures, desiredTaints)
+	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated || hashChanged || tokenHashChanged
+
 	if !agentManifestChanged && !pcChanged {
 		return nil
 	}
@@ -439,7 +583,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			logrus.Errorf("clusterDeploy: failed to rollout cattle-cluster-agent deployment: %s: %v", output, err)
 			return err
 		}
-		util.UpdateAppliedAgentDeploymentCustomization(cluster)
+		pkgcluster.UpdateAppliedAgentDeploymentCustomization(cluster)
 		return nil
 	}
 
@@ -457,13 +601,13 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, pcExists)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredAssets, desiredFeatures, desiredTaints, pcExists)
 		if err != nil {
 			return cluster, err
 		}
 		logrus.Tracef("clusterDeploy: deployAgent: agent YAML: %v", string(yaml))
 		var output []byte
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			// This will fail almost always the first time because when we create the namespace in the file it won't have privileges.
 			// This allows for 5*5 seconds for the cluster to be ready to apply the agent YAML before erroring out
 			logrus.Tracef("clusterDeploy: deployAgent: applying agent YAML for cluster [%s], try #%d: %v", cluster.Name, i+1, string(output))
@@ -510,13 +654,22 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.DesiredAuthImage == "fixed" {
 		cluster.Spec.DesiredAuthImage = desiredAuth
 	}
-	if cluster.Annotations[AgentForceDeployAnn] == "true" {
-		cluster.Annotations[AgentForceDeployAnn] = "false"
+	cluster.Status.AssetsImage = desiredAssets
+	if cluster.Spec.DesiredAssetsImage == "fixed" {
+		cluster.Spec.DesiredAssetsImage = desiredAssets
+	}
+
+	if cluster.Annotations[apimgmtv3.ClusterAgentForceDeployAnnotation] == "true" {
+		cluster.Annotations[apimgmtv3.ClusterAgentForceDeployAnnotation] = "false"
+	}
+	if tokenHashChanged {
+		cd.updateRegistrationTokenHash(cluster)
 	}
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
+	cluster.Status.AppliedClusterAgentImagePullSecretsHash = pullSecretHash
 
-	util.UpdateAppliedAgentDeploymentCustomization(cluster)
+	pkgcluster.UpdateAppliedAgentDeploymentCustomization(cluster)
 
 	return nil
 }
@@ -538,9 +691,10 @@ func (cd *clusterDeploy) getKubeConfig(cluster *apimgmtv3.Cluster) (*clientcmdap
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage, assetsImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
+	logrus.Tracef("clusterDeploy: getYAML: Desired charts assets image is [%s] for cluster [%s]", assetsImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired taints are [%v] for cluster [%s]", taints, cluster.Name)
 
@@ -555,11 +709,24 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		return nil, fmt.Errorf("waiting for server-url setting to be set")
 	}
 
-	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
-		token, url, capr.PreBootstrap(cluster), cluster, features,
-		taints, cd.secretLister, priorityClassExists, namespace.GetMutator())
+	ops := &systemtemplate.TemplateOps{
+		AgentImage:     agentImage,
+		AuthImage:      authImage,
+		AssetsImage:    assetsImage,
+		Namespace:      cluster.Name,
+		Token:          token,
+		URL:            url,
+		IsPreBootstrap: capr.ShouldPreBootstrap(cluster),
+		Cluster:        cluster,
+		AgentFeatures:  features,
+		Taints:         taints,
+		SecretLister:   cd.secretLister,
+		PcExists:       priorityClassExists,
+		Mutator:        namespace.GetMutator(),
+	}
 
+	buf := &bytes.Buffer{}
+	err = systemtemplate.SystemTemplate(buf, ops)
 	return buf.Bytes(), err
 }
 
@@ -678,7 +845,7 @@ func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, err
 		if controlPlaneLabelFound {
 			toAdd, _ := taints.GetToDiffTaints(allTaints, node.Spec.InternalNodeSpec.Taints)
 			for _, taintStr := range toAdd {
-				if !strings.HasPrefix(taintStr.Key, "node.kubernetes.io") {
+				if !taints.IsTransient(taintStr) {
 					logrus.Debugf("clusterDeploy: getControlPlaneTaints: toAdd: %v", toAdd)
 					allTaints = append(allTaints, taintStr)
 					continue
@@ -687,6 +854,7 @@ func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, err
 			}
 		}
 	}
+	taints.Sort(allTaints)
 	logrus.Debugf("clusterDeploy: getControlPlaneTaints: allTaints: %v", allTaints)
 
 	return allTaints, nil
@@ -702,4 +870,49 @@ func formatKubectlApplyOutput(log string) string {
 		log = strings.Replace(log, token[1], "REDACTED", 1)
 	}
 	return log
+}
+
+func (cd *clusterDeploy) getSystemCRTToken(clusterName string) (string, error) {
+	systemCRT, err := cd.crtLister.Get(clusterName, "system")
+	if apierrors.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return crt.GetTokenFromSecret(cd.secretLister, systemCRT)
+}
+
+func (cd *clusterDeploy) registrationTokenHashChanged(cluster *apimgmtv3.Cluster) (bool, error) {
+	token, err := cd.getSystemCRTToken(cluster.Name)
+	if err != nil {
+		return false, err
+	}
+	if token == "" {
+		return false, nil
+	}
+
+	hash := sha256.Sum256([]byte(token))
+	desired := hex.EncodeToString(hash[:])[:10]
+	current := cluster.Annotations[AgentRegistrationTokenHash]
+
+	if current == desired {
+		return false, nil
+	}
+
+	logrus.Infof("clusterDeploy: registration token hash changed for cluster [%s]: was [%s], now [%s]", cluster.Name, current, desired)
+	return true, nil
+}
+
+func (cd *clusterDeploy) updateRegistrationTokenHash(cluster *apimgmtv3.Cluster) {
+	token, err := cd.getSystemCRTToken(cluster.Name)
+	if err != nil || token == "" {
+		return
+	}
+
+	hash := sha256.Sum256([]byte(token))
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[AgentRegistrationTokenHash] = hex.EncodeToString(hash[:])[:10]
 }

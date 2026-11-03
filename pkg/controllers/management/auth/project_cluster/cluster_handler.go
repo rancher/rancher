@@ -4,12 +4,14 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"time"
 
 	"encoding/json"
 	"fmt"
 
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
@@ -31,6 +33,10 @@ const (
 	ClusterCreateController = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
 	// The name of the cluster remove controller
 	ClusterRemoveController = "mgmt-cluster-rbac-remove"
+
+	// namespaceRemovedRequeue is how often a cluster being removed is checked again while it waits for its
+	// namespace to be gone.
+	namespaceRemovedRequeue = 10 * time.Second
 )
 
 var (
@@ -101,12 +107,15 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		cluster := obj.(*apisv3.Cluster)
-		_, err = l.clusterClient.Update(cluster)
-		if err != nil {
-			return nil, err
+	var cluster *apisv3.Cluster
+	if obj != nil {
+		cluster = obj.(*apisv3.Cluster)
+		if !reflect.DeepEqual(orig.Annotations, cluster.Annotations) {
+			cluster, err = l.clusterClient.Update(cluster)
+			if err != nil {
+				return nil, err
+			}
+			obj = cluster
 		}
 	}
 
@@ -119,13 +128,25 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		return nil, err
 	}
 
-	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		cluster := obj.(*apisv3.Cluster)
-		_, err = l.clusterClient.Update(cluster)
-		if err != nil {
-			return nil, err
+	// update status if it has changed
+	if obj != nil {
+		cluster = obj.(*apisv3.Cluster)
+		if !reflect.DeepEqual(orig.Status.Conditions, cluster.Status.Conditions) {
+			logrus.Infof("[%s] Updating cluster status %s", ClusterCreateController, orig.Name)
+			toUpdate, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			// Copy conditions this controller owns
+			pkgcluster.CopyCondition(apisv3.NamespaceBackedResource, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.ClusterConditionDefaultProjectCreated, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.ClusterConditionSystemProjectCreated, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.CreatorMadeOwner, cluster, toUpdate)
+			pkgcluster.CopyCondition(apisv3.ClusterConditionInitialRolesPopulated, cluster, toUpdate)
+			_, err = l.clusterClient.UpdateStatus(toUpdate)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -153,7 +174,21 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 		l.deleteSystemProject(obj, ClusterRemoveController),
 		deleteNamespace(ClusterRemoveController, obj.Name, l.nsClient),
 	)
-	return obj, returnErr
+	if returnErr != nil {
+		return obj, returnErr
+	}
+
+	// Wait for the namespace to be gone, with everything in it: a cluster created again under the same name
+	// must not find the old cluster's registration tokens, bindings and projects there.
+	if _, err := l.nsClient.Get(obj.Name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+		if err != nil {
+			return obj, err
+		}
+		logrus.Infof("[%s] Waiting for namespace %s of cluster %s to be removed", ClusterRemoveController, obj.Name, obj.Name)
+		l.clusterClient.EnqueueAfter(obj.Name, namespaceRemovedRequeue)
+		return obj, generic.ErrSkip
+	}
+	return obj, nil
 }
 
 func (l *clusterLifecycle) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
@@ -357,7 +392,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			}
 
 			if principalName := cluster.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
-				if !strings.HasPrefix(principalName, "local") {
+				if !strings.HasPrefix(principalName, "local://") {
 					// Setting UserPrincipalName only makes sense for non-local users.
 					crtb.UserPrincipalName = principalName
 					crtb.UserName = ""
@@ -381,14 +416,22 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 
 		updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
-		err = l.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
+		cluster, err = l.updateClusterAnnotation(cluster, string(d))
+		if err != nil {
+			return obj, err
+		}
+		// obj has all the conditions set so far and will be persisted with UpdateStatus at the end of Sync.
+		if updateCondition {
+			apisv3.ClusterConditionInitialRolesPopulated.True(obj)
+		}
 
 		return obj, err
 	})
 }
 
-func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, annotation string, updateCondition bool) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+func (l *clusterLifecycle) updateClusterAnnotation(cluster *apisv3.Cluster, annotation string) (*apisv3.Cluster, error) {
+	var updated *apisv3.Cluster
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		c, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -396,19 +439,8 @@ func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.C
 
 		c.Annotations[roleTemplatesRequiredAnnotation] = annotation
 
-		if updateCondition {
-			apisv3.ClusterConditionInitialRolesPopulated.True(c)
-		}
-
-		_, err = l.clusterClient.Update(c)
-		if err != nil {
-			return err
-		}
-		// Only log if we successfully updated the cluster
-		if updateCondition {
-			logrus.Infof("[%s] Setting InitialRolesPopulated condition on cluster %s", ClusterCreateController, cluster.Name)
-		}
-
-		return nil
+		updated, err = l.clusterClient.Update(c)
+		return err
 	})
+	return updated, err
 }

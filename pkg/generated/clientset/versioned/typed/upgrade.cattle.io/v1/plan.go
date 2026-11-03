@@ -21,6 +21,7 @@ package v1
 import (
 	context "context"
 
+	applyconfigurationupgradecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/upgrade.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	upgradecattleiov1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,18 +48,21 @@ type PlanInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*upgradecattleiov1.PlanList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *upgradecattleiov1.Plan, err error)
+	Apply(ctx context.Context, plan *applyconfigurationupgradecattleiov1.PlanApplyConfiguration, opts metav1.ApplyOptions) (result *upgradecattleiov1.Plan, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, plan *applyconfigurationupgradecattleiov1.PlanApplyConfiguration, opts metav1.ApplyOptions) (result *upgradecattleiov1.Plan, err error)
 	PlanExpansion
 }
 
 // plans implements PlanInterface
 type plans struct {
-	*gentype.ClientWithList[*upgradecattleiov1.Plan, *upgradecattleiov1.PlanList]
+	*gentype.ClientWithListAndApply[*upgradecattleiov1.Plan, *upgradecattleiov1.PlanList, *applyconfigurationupgradecattleiov1.PlanApplyConfiguration]
 }
 
 // newPlans returns a Plans
 func newPlans(c *UpgradeV1Client, namespace string) *plans {
 	return &plans{
-		gentype.NewClientWithList[*upgradecattleiov1.Plan, *upgradecattleiov1.PlanList](
+		gentype.NewClientWithListAndApply[*upgradecattleiov1.Plan, *upgradecattleiov1.PlanList, *applyconfigurationupgradecattleiov1.PlanApplyConfiguration](
 			"plans",
 			c.RESTClient(),
 			scheme.ParameterCodec,

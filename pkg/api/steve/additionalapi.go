@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/github"
@@ -13,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/capr/configserver"
 	"github.com/rancher/rancher/pkg/capr/installer"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/oidc/provider"
 	"github.com/rancher/rancher/pkg/settings"
@@ -23,15 +23,20 @@ import (
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
 	if features.RKE2.Enabled() {
 		connectHandler := configserver.New(config)
-		mux := gmux.NewRouter()
-		mux.UseEncodedPath()
+		mux := http.NewServeMux()
 		mux.Handle(configserver.ConnectAgent, connectHandler)
 		mux.Handle(configserver.ConnectConfigYamlPath, connectHandler)
 		mux.Handle(configserver.ConnectClusterInfo, connectHandler)
 		mux.Handle(installer.SystemAgentInstallPath, installer.Handler)
 		mux.Handle(installer.WindowsRke2InstallPath, installer.Handler)
+		var nextHandler http.Handler
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if nextHandler != nil {
+				nextHandler.ServeHTTP(w, r)
+			}
+		}))
 		return func(next http.Handler) http.Handler {
-			mux.NotFoundHandler = next
+			nextHandler = next
 			return mux
 		}
 	}
@@ -55,26 +60,36 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 		return nil, err
 	}
 
-	mux := gmux.NewRouter()
-	mux.UseEncodedPath()
+	mux := http.NewServeMux()
 	if features.UIExtension.Enabled() {
 		catalog.RegisterUIPluginHandlers(mux)
 	}
-	mux.Handle("/v1/github{path:.*}", githubHandler)
+	mux.Handle("/v1/github/{path...}", githubHandler)
 	mux.Handle("/v3/connect", Tunnel(config))
 
 	health.Register(mux)
 
 	if features.OIDCProvider.Enabled() {
-		p, err := provider.NewProvider(ctx, config.Mgmt.Token().Cache(), config.Mgmt.Token(), config.Mgmt.User().Cache(), config.Mgmt.UserAttribute().Cache(), config.Core.Secret().Cache(), config.Core.Secret(), config.Mgmt.OIDCClient().Cache(), config.Mgmt.OIDCClient(), config.Core.Namespace())
+		p, err := provider.NewProvider(ctx, exttokenstore.NewSystemFromWrangler(config),
+			config.Mgmt.Token().Cache(), config.Mgmt.Token(),
+			config.Mgmt.User().Cache(), config.Mgmt.UserAttribute().Cache(),
+			config.Core.Secret().Cache(), config.Core.Secret(),
+			config.Mgmt.OIDCClient().Cache(), config.Mgmt.OIDCClient(),
+			config.Core.Namespace())
 		if err != nil {
 			return nil, err
 		}
 		p.RegisterOIDCProviderHandles(mux)
 	}
 
+	var nextHandler http.Handler
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if nextHandler != nil {
+			nextHandler.ServeHTTP(w, r)
+		}
+	}))
 	return func(next http.Handler) http.Handler {
-		mux.NotFoundHandler = clusterAPI(next)
+		nextHandler = clusterAPI(next)
 		return mux
 	}, nil
 }
@@ -82,5 +97,5 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 func Tunnel(config *wrangler.Context) http.Handler {
 	config.TunnelAuthorizer.Add(proxy.NewAuthorizer(config))
 	config.TunnelAuthorizer.Add(aggregation.New(config))
-	return config.TunnelServer
+	return config.TunnelSessions.Handler(config.TunnelServer)
 }

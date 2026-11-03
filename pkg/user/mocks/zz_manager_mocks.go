@@ -209,3 +209,22 @@ func (mr *MockManagerMockRecorder) UserAttributeCreateOrUpdate(userID, provider,
 	varargs := append([]any{userID, provider, groupPrincipals, userExtraInfo}, loginTime...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserAttributeCreateOrUpdate", reflect.TypeOf((*MockManager)(nil).UserAttributeCreateOrUpdate), varargs...)
 }
+
+// UserAttributeCreateOrUpdateNoGroups mocks base method.
+func (m *MockManager) UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	m.ctrl.T.Helper()
+	varargs := []any{userID, provider, userExtraInfo}
+	for _, a := range loginTime {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UserAttributeCreateOrUpdateNoGroups", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UserAttributeCreateOrUpdateNoGroups indicates an expected call of UserAttributeCreateOrUpdateNoGroups.
+func (mr *MockManagerMockRecorder) UserAttributeCreateOrUpdateNoGroups(userID, provider, userExtraInfo any, loginTime ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{userID, provider, userExtraInfo}, loginTime...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserAttributeCreateOrUpdateNoGroups", reflect.TypeOf((*MockManager)(nil).UserAttributeCreateOrUpdateNoGroups), varargs...)
+}

@@ -83,6 +83,21 @@ func TestServeHTTP(t *testing.T) {
 			wantHeader: map[string][]string{},
 			wantErr:    "can't create token",
 		},
+		"get impersonation token - disconnected error": {
+			header: map[string][]string{},
+			ctx: func() context.Context {
+				ctx := context.TODO()
+				return request.WithUser(ctx, &user.DefaultInfo{
+					Name: "user",
+					UID:  "user",
+				})
+			},
+			impersonatorAccountTokenGetter: func(_ user.Info, _ ClusterContextGetter, _ string) (string, error) {
+				return "", errors.New("cluster agent disconnected")
+			},
+			wantHeader: map[string][]string{},
+			wantErr:    "cluster agent disconnected",
+		},
 		"impersonate sa - create token error": {
 			tokenCreator: func(ctx context.Context, getter ClusterContextGetter, s string, s2 string) (string, error) {
 				return "", errors.New("can't create token")

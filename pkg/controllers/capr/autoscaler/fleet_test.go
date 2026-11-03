@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -168,11 +170,31 @@ func (s *autoscalerSuite) expectHelmOpDelete(namespace, name string, err error) 
 	s.helmOp.EXPECT().Delete(namespace, name, &metav1.DeleteOptions{}).Return(err)
 }
 
+// expectManageHelmOpSecrets sets up the mock expectations that manageHelmOpSecrets produces
+// when the cluster has no per-cluster registry auth configured (the common test scenario).
+func (s *autoscalerSuite) expectManageHelmOpSecrets(clusterName, clusterNamespace string) {
+	provCluster := &provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNamespace}}
+	s.clusterCache.EXPECT().Get(clusterNamespace, clusterName).Return(provCluster, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	// cleanupClusterScopedSecrets
+	s.secretClient.EXPECT().Delete(clusterNamespace, helmOpSecretName(clusterName), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNamespace, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
+	// ensureRootHelmOpSecrets — no global registry → attempt to delete both root secrets
+	s.secretClient.EXPECT().Delete("fleet-default", autoscalerHelmSecretResourceName, gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete("fleet-default", autoscalerChartImagePullSecretName, gomock.Any()).Return(notFound)
+}
+
+func (s *autoscalerSuite) expectCleanupFleetProvisioningClusterNotFound(clusterNamespace, clusterName string) {
+	s.clusterCache.EXPECT().Get(clusterNamespace, clusterName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "cluster"))
+}
+
 // Test cases for ensureFleetHelmOp method
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_CreateNewHelmOp() {
 	cluster := s.createTestCluster("test-cluster", "default")
 
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.expectHelmOpCreate()
 
@@ -195,6 +217,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp()
 		},
 	}
 
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
 	s.expectHelmOpUpdate("default", "cluster-autoscaler-test-cluster")
 
@@ -204,6 +227,8 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp()
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 	cluster := s.createTestCluster("test-cluster", "default")
+	repository, err := s.h.getChartRepository(cluster)
+	s.Require().NoError(err)
 
 	existingHelmOp := &fleet.HelmOp{
 		ObjectMeta: metav1.ObjectMeta{
@@ -220,14 +245,14 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 				BundleDeploymentOptions: fleet.BundleDeploymentOptions{
 					DefaultNamespace: "kube-system",
 					Helm: &fleet.HelmOptions{
-						Chart:       getChartName(),
-						Version:     buildconfig.ClusterAutoscalerChartVersion,
-						Repo:        settings.ClusterAutoscalerChartRepository.Get(),
+						Chart:       getChartName(repository),
+						Version:     s.h.chartVersionsForCluster(cluster).chartVersion,
+						Repo:        repository,
 						ReleaseName: "cluster-autoscaler",
 						Values: &fleet.GenericMap{
 							Data: map[string]any{
 								"replicaCount": 3,
-								"image":        s.h.getChartImageSettings(cluster),
+								"image":        s.h.getChartImageSettings(cluster, ""),
 								"autoDiscovery": map[string]any{
 									"clusterName": cluster.Name,
 									"namespace":   cluster.Namespace,
@@ -255,10 +280,11 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 		},
 	}
 
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
 	s.helmOp.EXPECT().Update(gomock.Any()).Times(0)
 
-	err := s.h.ensureFleetHelmOp(cluster, "v1", 3)
+	err = s.h.ensureFleetHelmOp(cluster, "v1", 3)
 	s.NoError(err)
 }
 
@@ -269,21 +295,11 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 
 	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
-	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("1.34.0-3.4", result)
+	result := s.h.chartVersionsForCluster(cluster)
+	s.Equal("1.34.5-15.1", result.imageTag)
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
-	// Temporarily modify the imageTagVersions map to test unknown version
-	originalMap := imageTagVersions
-	imageTagVersions = map[int]string{
-		99: "1.99.0-9.9", // Use a version that's not in the original map
-	}
-
-	defer func() {
-		imageTagVersions = originalMap // Restore original map
-	}()
-
 	cluster := &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-cluster",
@@ -291,8 +307,8 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 		},
 	}
 
-	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("", result) // Should return empty string for unknown version
+	result := s.h.chartVersionsForCluster(cluster)
+	s.Equal(defaultChartVersionConfigs.imageTag, result.imageTag)
 }
 
 // Test cases for getChartImageSettings method
@@ -300,26 +316,144 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_NoOverride() {
 	cluster := s.createTestCluster("test-cluster", "default")
 
-	result := s.h.getChartImageSettings(cluster)
-	s.Equal(map[string]any{}, result)
+	result := s.h.getChartImageSettings(cluster, "autoscaler-pull-secret")
+	s.Equal(map[string]any{
+		"pullSecrets": []string{"autoscaler-pull-secret"},
+		"repository":  "rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":    "docker.io",
+		"tag":         defaultChartVersionConfigs.imageTag,
+	}, result)
 }
 
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
-	originalImage := settings.ClusterAutoscalerImage.Get()
-	defer func() {
-		_ = settings.ClusterAutoscalerImage.Set(originalImage)
-	}()
-	_ = settings.ClusterAutoscalerImage.Set("registry.example.com/cluster-autoscaler:1.2.3")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerImage: "registry.example.com/cluster-autoscaler:1.2.3",
+	})
 
-	cluster := s.createTestCluster("test-cluster", "default")
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
 
-	result := s.h.getChartImageSettings(cluster)
+	result := s.h.getChartImageSettings(cluster, "")
 	expected := map[string]any{
 		"repository": "cluster-autoscaler",
 		"registry":   "registry.example.com",
 		"tag":        "1.2.3",
 	}
 	s.Equal(expected, result)
+}
+
+func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageUsesClusterRegistry() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local"},
+					},
+				},
+			},
+		},
+	}
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+
+	result := s.h.getChartImageSettings(cluster, "")
+	s.Equal(map[string]any{
+		"repository": "rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":   "cluster-registry.local",
+		"tag":        defaultChartVersionConfigs.imageTag,
+	}, result)
+}
+
+func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageUsesClusterRegistryWithPath() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local/subpath"},
+					},
+				},
+			},
+		},
+	}
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+
+	result := s.h.getChartImageSettings(cluster, "")
+	s.Equal(map[string]any{
+		"repository": "subpath/rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":   "cluster-registry.local",
+		"tag":        defaultChartVersionConfigs.imageTag,
+	}, result)
+}
+
+func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageFallsBackToGlobalRegistry() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec:       provv1.ClusterSpec{RKEConfig: &provv1.RKEConfig{}},
+	}
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withSettings(map[settings.Setting]string{
+		settings.SystemDefaultRegistry: "global-registry.local",
+	})
+
+	result := s.h.getChartImageSettings(cluster, "")
+	s.Equal(map[string]any{
+		"repository": "rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":   "global-registry.local",
+		"tag":        defaultChartVersionConfigs.imageTag,
+	}, result)
 }
 
 // Test cases for getKubernetesMinorVersion method
@@ -377,6 +511,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_HelmOpExists() {
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err)
@@ -387,6 +522,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_HelmOpDoesNotExist() {
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, ""))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err)
@@ -398,6 +534,7 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_DeleteError() {
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, fmt.Errorf("delete failed"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err)
@@ -411,6 +548,7 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_GetError() {
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, fmt.Errorf("get failed"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err)
@@ -425,6 +563,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_SuccessfulHelmOpDeletion() 
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when successfully cleaning up HelmOp")
@@ -435,9 +574,31 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_NoHelmOpExists() {
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when HelmOp doesn't exist")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_HappyPath_CleansClusterScopedSecrets() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+	}
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+
+	// HelmOp does not exist, so only cluster-scoped secret cleanup should run.
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(notFound)
+
+	err := s.h.cleanupFleet(cluster)
+	s.NoError(err, "Expected no error when cluster-scoped cleanup secrets are absent")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteHelmOp() {
@@ -447,6 +608,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteHelmOp() {
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, deleteError)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err, "Expected error when HelmOp deletion fails")
@@ -463,6 +625,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckHelmOpExistence() 
 	checkError := fmt.Errorf("failed to check HelmOp existence: network timeout")
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, checkError)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err, "Expected error when HelmOp existence check fails")
@@ -473,11 +636,77 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckHelmOpExistence() 
 	}
 }
 
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckProvisioningClusterExistence() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	checkError := fmt.Errorf("failed to check provisioning cluster existence: network timeout")
+
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(nil, checkError)
+
+	err := s.h.cleanupFleet(cluster)
+	s.Error(err, "Expected error when provisioning cluster existence check fails")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to check existence of Cluster "+cluster.Name+" in namespace "+cluster.Namespace)
+		s.Contains(err.Error(), "network timeout")
+	}
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCleanupClusterScopedSecrets() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+	}
+	cleanupError := fmt.Errorf("failed to delete cluster-scoped helm secret")
+
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(cleanupError)
+
+	err := s.h.cleanupFleet(cluster)
+	s.Error(err, "Expected error when cluster-scoped secret cleanup fails")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to delete cluster-scoped helm secret")
+	}
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteClusterScopedImagePullSecret() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+	}
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	cleanupError := fmt.Errorf("failed to delete cluster-scoped image pull secret")
+
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(cleanupError)
+
+	err := s.h.cleanupFleet(cluster)
+	s.Error(err, "Expected error when cluster-scoped image pull secret cleanup fails")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to delete cluster-scoped image pull secret")
+	}
+}
+
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyName() {
 	cluster := s.createTestCluster("", "default")
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has empty name")
@@ -488,9 +717,151 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyNamespace() 
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has empty namespace")
+}
+
+func (s *autoscalerSuite) TestManageHelmOpSecrets_GSDREqualsChartHost_ClusterHasOwnSDR() {
+	const (
+		chartHost      = "charts.example.com"
+		chartRepo      = "https://charts.example.com/helm/charts"
+		pullSecretName = "autoscaler-pull-secret"
+		clusterName    = "test-cluster"
+		clusterNS      = "fleet-default"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepo,
+		settings.SystemDefaultRegistry:            chartHost,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNS},
+	}
+	capiCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNS},
+	}
+	s.clusterCache.EXPECT().Get(clusterNS, clusterName).Return(provCluster, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+
+	s.secretClient.EXPECT().Delete(clusterNS, helmOpSecretName(clusterName), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNS, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
+
+	pullSecretData, err := dockerConfigSecretData(chartHost, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(sec *corev1.Secret) (*corev1.Secret, error) {
+		return sec, nil
+	})
+
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(sec *corev1.Secret) (*corev1.Secret, error) {
+		return sec, nil
+	})
+
+	helmOpSec, imagePullSec, err := s.h.manageHelmOpSecrets(capiCluster)
+	s.NoError(err)
+	s.Equal(autoscalerHelmSecretResourceName, helmOpSec)
+	s.Equal(autoscalerChartImagePullSecretName, imagePullSec,
+		"root image pull secret must be propagated even when GSDR equals the autoscaler chart host, "+
+			"because clusters with their own SDR do not get GSDR credentials in their containerd config")
+}
+
+func (s *autoscalerSuite) TestEnsureRootHelmOpSecrets_UsesProvidedChartHost() {
+	const (
+		chartRepository = "oci://charts.example.com/rancher/cluster-autoscaler"
+		globalRegistry  = "registry.example.com"
+		pullSecretName  = "autoscaler-pull-secret"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepository,
+		settings.SystemDefaultRegistry:            globalRegistry,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	pullSecretData, err := dockerConfigSecretData(globalRegistry, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+
+	created := map[string]*corev1.Secret{}
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		created[secret.Name] = secret
+		return secret, nil
+	}).Times(2)
+
+	helmOpSec, imagePullSec, err := s.h.ensureRootHelmOpSecrets(globalRegistry)
+	s.NoError(err)
+	s.Equal(autoscalerHelmSecretResourceName, helmOpSec)
+	s.Equal(autoscalerChartImagePullSecretName, imagePullSec)
+	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), globalRegistry)
+}
+
+func (s *autoscalerSuite) TestSyncRootHelmOpSecret_UsesSystemDefaultRegistry() {
+	const (
+		globalRegistry = "registry.example.com"
+		chartRepo      = "oci://charts.example.com/rancher/cluster-autoscaler"
+		pullSecretName = "autoscaler-pull-secret"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepo,
+		settings.SystemDefaultRegistry:            globalRegistry,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	pullSecretData, err := dockerConfigSecretData(globalRegistry, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+
+	created := map[string]*corev1.Secret{}
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		created[secret.Name] = secret
+		return secret, nil
+	}).Times(2)
+
+	setting := &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: settings.SystemDefaultRegistryPullSecrets.Name}}
+	result, err := s.h.syncRootHelmOpSecret("", setting)
+	s.NoError(err)
+	s.Same(setting, result)
+	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), globalRegistry)
+}
+
+func (s *autoscalerSuite) TestSyncRootHelmOpSecret_IgnoresUnrelatedSetting() {
+	setting := &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: "unrelated-setting"}}
+
+	result, err := s.h.syncRootHelmOpSecret("", setting)
+	s.NoError(err)
+	s.Same(setting, result)
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters() {
@@ -499,7 +870,112 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ExplicitSettingIsPreserved() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "oci://registry.rancher.io/rancher/cluster-autoscaler",
+	})
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", repository)
+	s.Empty(getChartName(repository))
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ExplicitHTTPSSettingIsPreserved() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "https://charts.example.com",
+	})
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("https://charts.example.com", repository)
+	s.Equal("cluster-autoscaler", getChartName(repository))
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ReturnsEmptyWithoutPrivateRegistry() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "",
+		settings.SystemDefaultRegistry:            "",
+	})
+
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Empty(repository)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ClusterRegistryTakesPrecedence() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local"},
+					},
+				},
+			},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "",
+		settings.SystemDefaultRegistry:            "global-registry.local",
+	})
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("oci://cluster-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", repository)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_FallsBackToGlobalRegistry() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "",
+		settings.SystemDefaultRegistry:            "fallback-registry.local",
+	})
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("oci://fallback-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", repository)
 }

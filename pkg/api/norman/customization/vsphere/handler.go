@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -80,7 +79,7 @@ func NewVsphereHandler(scaledContext *config.ScaledContext) http.Handler {
 func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var err error
 
-	fieldName := mux.Vars(req)["field"]
+	fieldName := req.PathValue("field")
 	dc := req.FormValue("dataCenter")
 
 	if fieldName == "" || !validFieldName(fieldName) {

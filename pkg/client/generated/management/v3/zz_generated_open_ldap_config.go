@@ -9,8 +9,10 @@ const (
 	OpenLdapConfigFieldConnectionTimeout               = "connectionTimeout"
 	OpenLdapConfigFieldCreated                         = "created"
 	OpenLdapConfigFieldCreatorID                       = "creatorId"
+	OpenLdapConfigFieldDisplayName                     = "displayName"
 	OpenLdapConfigFieldEnabled                         = "enabled"
 	OpenLdapConfigFieldGroupDNAttribute                = "groupDNAttribute"
+	OpenLdapConfigFieldGroupIDAttribute                = "groupIDAttribute"
 	OpenLdapConfigFieldGroupMemberMappingAttribute     = "groupMemberMappingAttribute"
 	OpenLdapConfigFieldGroupMemberUserAttribute        = "groupMemberUserAttribute"
 	OpenLdapConfigFieldGroupNameAttribute              = "groupNameAttribute"
@@ -36,6 +38,7 @@ const (
 	OpenLdapConfigFieldUUID                            = "uuid"
 	OpenLdapConfigFieldUserDisabledBitMask             = "userDisabledBitMask"
 	OpenLdapConfigFieldUserEnabledAttribute            = "userEnabledAttribute"
+	OpenLdapConfigFieldUserIDAttribute                 = "userIDAttribute"
 	OpenLdapConfigFieldUserLoginAttribute              = "userLoginAttribute"
 	OpenLdapConfigFieldUserLoginFilter                 = "userLoginFilter"
 	OpenLdapConfigFieldUserMemberAttribute             = "userMemberAttribute"
@@ -54,8 +57,10 @@ type OpenLdapConfig struct {
 	ConnectionTimeout               int64             `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 	Created                         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName                     string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled                         bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupDNAttribute                string            `json:"groupDNAttribute,omitempty" yaml:"groupDNAttribute,omitempty"`
+	GroupIDAttribute                string            `json:"groupIDAttribute,omitempty" yaml:"groupIDAttribute,omitempty"`
 	GroupMemberMappingAttribute     string            `json:"groupMemberMappingAttribute,omitempty" yaml:"groupMemberMappingAttribute,omitempty"`
 	GroupMemberUserAttribute        string            `json:"groupMemberUserAttribute,omitempty" yaml:"groupMemberUserAttribute,omitempty"`
 	GroupNameAttribute              string            `json:"groupNameAttribute,omitempty" yaml:"groupNameAttribute,omitempty"`
@@ -81,6 +86,7 @@ type OpenLdapConfig struct {
 	UUID                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserDisabledBitMask             int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
+	UserIDAttribute                 string            `json:"userIDAttribute,omitempty" yaml:"userIDAttribute,omitempty"`
 	UserLoginAttribute              string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
 	UserLoginFilter                 string            `json:"userLoginFilter,omitempty" yaml:"userLoginFilter,omitempty"`
 	UserMemberAttribute             string            `json:"userMemberAttribute,omitempty" yaml:"userMemberAttribute,omitempty"`

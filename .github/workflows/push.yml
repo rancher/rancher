@@ -4,6 +4,11 @@ on:
     branches:
       - "main"
       - "release/v*"
+
+permissions:
+  contents: read
+  id-token: none
+
 env:
   COMMIT: ${{ github.sha }}
   DOCKERIO_REGISTRY: "docker.io"
@@ -15,7 +20,7 @@ env:
   REGISTRY: "docker.io"
 jobs:
   unit-tests:
-    uses: ./.github/workflows/unit-test.yml
+    uses: $/.github/workflows/unit-test.yml
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -27,9 +32,11 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
+        uses: $/.github/actions/build-images/server
   build-agent:
     strategy:
       matrix:
@@ -41,16 +48,13 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
-  integration-tests:
-    needs: [build-server, build-agent]
-    uses: ./.github/workflows/integration-tests.yml
-    permissions:
-      contents: read
+        uses: $/.github/actions/build-images/agent
   push-images:
-    needs: [unit-tests, integration-tests]
+    needs: [unit-tests, build-server, build-agent]
     strategy:
       matrix:
         os: [linux]
@@ -64,19 +68,21 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: push
-        uses: ./.github/actions/push-images
+        uses: $/.github/actions/push-images
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     permissions:
       contents: read
       id-token: write
@@ -88,17 +94,14 @@ jobs:
       ARCH: amd64
       REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/rancher-chart/build
+        uses: $/.github/actions/rancher-chart/build
       - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | AWS_ACCESS_KEY_ID_CHARTS ;
@@ -109,7 +112,7 @@ jobs:
       - name: publish
         env:
           CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
-        uses: ./.github/actions/rancher-chart/publish-aws
+        uses: $/.github/actions/rancher-chart/publish-aws
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -124,15 +127,17 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
-        uses: ./.github/actions/build-images/installer
+        uses: $/.github/actions/build-images/installer
   merge-server-agent-installer-manifests:
     needs: [push-images, build-installer]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -141,17 +146,19 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Login to Docker Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
@@ -159,12 +166,12 @@ jobs:
       - name: merge server manifests
         with:
           image: "${{ env.IMAGE }}"
-        uses: ./.github/actions/merge-manifests
+        uses: $/.github/actions/merge-manifests
       - name: merge agent manifests
         with:
           image: "${{ env.IMAGE_AGENT }}"
-        uses: ./.github/actions/merge-manifests
+        uses: $/.github/actions/merge-manifests
       - name: merge installer manifests
         with:
           image: "${{ env.IMAGE_INSTALLER }}"
-        uses: ./.github/actions/merge-manifests
+        uses: $/.github/actions/merge-manifests

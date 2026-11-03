@@ -1,25 +1,22 @@
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:15.7 AS build
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:16.0 AS build
 
-RUN zypper in -y wget git
+# Used for Helm unit testing.
+RUN zypper in -y findutils git
 
-# All downloaded binaries are used at the build layer only,
-# therefore they can be based off the BUILD PLATFORM architecture.
-ARG BUILDARCH
-
+# ARCH is needed in the Helm scripts for tests.
+ARG TARGETARCH
 ARG VERSION
-ENV CHART_VERSION=${VERSION}
+ENV ARCH=${TARGETARCH} CHART_VERSION=${VERSION}
 
-# set up helm 3
-ENV HELM_VERSION=v3.20.0
-RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O - | \
-    tar -xz --strip-components=1 -C /usr/bin && \
-    mv /usr/bin/helm /usr/bin/helm_v3 && \
-    chown root:root /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/helm_v3
+RUN zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
+    zypper in -y -r pkgs helm4 yq && \
+    ln -s /usr/bin/helm4 /usr/bin/helm
 
-ENV YQ_VERSION=v4.44.2
-RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O - | \
-        tar xz && mv yq_linux_${BUILDARCH} /usr/bin/yq
+# helm-unittest pinned to git commit sha of version v1.1.2
+# It is needed in the Helm scripts for tests.
+ENV HELM_UNITTEST_GIT_COMMIT_SHA=33c48cac798e465deda9a66c8e6c07c0973cf53d
+RUN helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_GIT_COMMIT_SHA}" --verify=false
 
 WORKDIR /src
 COPY .git/ /src/.git/
@@ -27,10 +24,9 @@ COPY chart/ /src/chart/
 COPY scripts/ /src/scripts/
 COPY build.yaml .
 
-RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
 
 FROM scratch
-COPY --from=build /usr/bin/helm_v3 /helm
+COPY --from=build /usr/bin/helm /helm
 COPY --from=build /src/bin/chart/*/*.tgz /
 COPY package/installer-run.sh /run.sh

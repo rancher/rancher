@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +16,13 @@ import (
 	"time"
 
 	goidc "github.com/coreos/go-oidc/v3/oidc"
-	gmux "github.com/gorilla/mux"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	providercommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/oidcprovider"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	oprovider "github.com/rancher/rancher/pkg/oidc/provider"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -32,6 +34,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 	v1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
@@ -94,6 +97,25 @@ func (s *OIDCProviderSuite) SetupSuite() {
 			NonNamespace: true,
 			Status:       true,
 		},
+		crd.CRD{
+			// Token.UserPrincipal is tagged norman:"type=reference[principal]", which
+			// crd.CRD{SchemaObject: ...} turns into a plain "type: string" schema for
+			// userPrincipal. Since the real UserPrincipal value is a full embedded
+			// Principal object (with ObjectMeta), the apiserver's structural schema
+			// pruning strips everything under it - including userPrincipal.metadata.name,
+			// the principal ID - as unknown fields. Use an explicit open schema instead,
+			// matching how Rancher creates this CRD in production.
+			GVK: schema.GroupVersionKind{
+				Group:   "management.cattle.io",
+				Version: "v3",
+				Kind:    "Token",
+			},
+			NonNamespace: true,
+			Schema: &apiextv1.JSONSchemaProps{
+				Type:                   "object",
+				XPreserveUnknownFields: ptr.To(true),
+			},
+		},
 	)
 
 	// Create wrangler context
@@ -153,7 +175,7 @@ func (s *OIDCProviderSuite) SetupSuite() {
 			Kind:    "Secret",
 		})
 
-	// Create and start the OIDCCLient controller factory
+	// Create and start the OIDCClient controller factory
 	cf := s.wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
 		Group:    "management.cattle.io",
 		Version:  "v3",
@@ -172,10 +194,11 @@ func (s *OIDCProviderSuite) SetupSuite() {
 	})
 	assert.NoError(s.T(), err)
 
+	ets := exttokenstore.NewSystemFromWrangler(s.wranglerContext)
+
 	// init OIDC provider
-	mux := gmux.NewRouter()
-	mux.UseEncodedPath()
-	p, err := oprovider.NewProvider(s.ctx, s.wranglerContext.Mgmt.Token().Cache(), s.wranglerContext.Mgmt.Token(), s.wranglerContext.Mgmt.User().Cache(), s.wranglerContext.Mgmt.UserAttribute().Cache(), s.wranglerContext.Core.Secret().Cache(), s.wranglerContext.Core.Secret(), s.wranglerContext.Mgmt.OIDCClient().Cache(), s.wranglerContext.Mgmt.OIDCClient(), s.wranglerContext.Core.Namespace())
+	mux := http.NewServeMux()
+	p, err := oprovider.NewProvider(s.ctx, ets, s.wranglerContext.Mgmt.Token().Cache(), s.wranglerContext.Mgmt.Token(), s.wranglerContext.Mgmt.User().Cache(), s.wranglerContext.Mgmt.UserAttribute().Cache(), s.wranglerContext.Core.Secret().Cache(), s.wranglerContext.Core.Secret(), s.wranglerContext.Mgmt.OIDCClient().Cache(), s.wranglerContext.Mgmt.OIDCClient(), s.wranglerContext.Core.Namespace())
 	assert.NoError(s.T(), err)
 	p.RegisterOIDCProviderHandles(mux)
 	// register redirect endpoint. This endpoint will be called by the OIDC provider with a valid code.
@@ -192,6 +215,9 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeUser,
 		},
+		PrincipalIDs: []string{
+			fakeAuthProvider + "_user://9253000",
+		},
 	})
 	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.Mgmt.Token().Create(&apimgmtv3.Token{
@@ -202,17 +228,26 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 				tokens.UserIDLabel: fakeUser,
 			},
 		},
-		AuthProvider: fakeAuthProvider,
-		Token:        fakeTokenValue,
-		UserID:       fakeUser,
-		Enabled:      ptr.To(true),
+		UserPrincipal: apimgmtv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fakeAuthProvider + "_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+		Token:   fakeTokenValue,
+		UserID:  fakeUser,
+		Enabled: new(true),
 	})
 	assert.NoError(s.T(), err)
 
 	// mock auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
-	providers.Providers[fakeAuthProvider] = mockProvider
+	// Without an AuthConfig lister, the provider for the token's config is
+	// found by provider name.
+	mockProvider.EXPECT().GetName().Return(fakeAuthProvider).AnyTimes()
+	mockProvider.EXPECT().IsDisabledProvider(fakeAuthProvider).Return(false, nil).AnyTimes()
+	providers.SetProviders(map[string]providercommon.AuthProvider{fakeAuthProvider: mockProvider})
 
 	// create OIDC client
 	oidcClient := &apimgmtv3.OIDCClient{
@@ -264,10 +299,14 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	require.NoError(s.T(), err)
 	req.Header.Set("Authorization", "Bearer "+fakeToken+":"+fakeTokenValue)
 	s.wg.Add(1)
+
 	res, err := http.DefaultClient.Do(req)
 	require.NoError(s.T(), err)
 	defer res.Body.Close()
-	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
+	b, err := io.ReadAll(res.Body)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), http.StatusOK, res.StatusCode, fmt.Sprintf("failed to get %v - %s", authURL, b))
 
 	// use a waitGroup to ensure the asserts inside the redirect function were executed.
 	go func() {

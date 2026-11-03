@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
@@ -33,7 +34,7 @@ import (
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
+	namespaceclients "github.com/rancher/rancher/pkg/namespace/clients"
 	"github.com/rancher/rancher/pkg/peermanager"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -49,8 +50,10 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	k8sauthuser "k8s.io/apiserver/pkg/authentication/user"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -139,7 +142,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	context.Management = managementv3.NewFromControllerFactory(context.ControllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	context.RBAC = rbacv1.NewFromControllerFactory(context.ControllerFactory)
-	context.Core = namespace.NormanInterface(corev1.NewFromControllerFactory(context.ControllerFactory))
+	context.Core = namespaceclients.NormanInterface(corev1.NewFromControllerFactory(context.ControllerFactory))
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
 	if err != nil {
@@ -206,8 +209,11 @@ type Impersonator interface {
 }
 
 type UserContext struct {
-	Management        *ManagementContext
-	ClusterName       string
+	Management  *ManagementContext
+	ClusterName string
+	// ClusterUID is the UID of the management cluster this context is for. A cluster removed and created
+	// again under the same name is a different cluster, which this context must not act on.
+	ClusterUID        k8stypes.UID
 	RESTConfig        rest.Config
 	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
@@ -237,6 +243,10 @@ type UserContext struct {
 
 	KindNamespaces map[schema.GroupVersionKind]string
 
+	// OnDeferredStartError is invoked when a deferred controller registration for this cluster
+	// keeps failing and cannot be recovered in-process. The failure has already been logged.
+	OnDeferredStartError func()
+
 	extraControllerFactoriesMutex sync.Mutex
 	extraControllerFactories      map[string]controller.SharedControllerFactory
 	// startContext stores the context used to start the all controller factories, allowing to register even if Start was already called
@@ -251,7 +261,7 @@ func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 	mgmtCopy.Management = managementv3.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 	mgmtCopy.Project = projectv3.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 	mgmtCopy.RBAC = rbacv1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
-	mgmtCopy.Core = namespace.NormanInterface(corev1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory))
+	mgmtCopy.Core = namespaceclients.NormanInterface(corev1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory))
 	mgmtCopy.Apps = appsv1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 
 	mgmtCopy.Wrangler = mgmtCopy.Wrangler.WithAgent(userAgent)
@@ -259,28 +269,50 @@ func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 	return &mgmtCopy
 }
 
-func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() error {
-	f := w.deferredStartAsync(ctx, register)
-	return func() error {
-		go f()
-		return nil
+// DeferredStart returns a starter that registers and starts the cluster's controllers the first
+// time it is called. The starter returns nothing: it runs in the background, so there is no result
+// to hand back by the time it returns, and reporting a failure is its own job rather than the
+// caller's - see deferredStart.
+func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() {
+	return w.deferredStart(ctx, w.deferredStartAsync(ctx, register))
+}
+
+// deferredStart returns a starter that runs f in the background.
+//
+// Failures are escalated to OnDeferredStartError to have the whole UserContext and the factory rebuilt.
+func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() {
+	// The starter is called from controller handlers, so it fires repeatedly. Only the first call
+	// does anything: either f succeeds, or it fails and the UserContext is
+	// rebuilt, which replaces this starter along with it.
+	var started atomic.Bool
+
+	return func() {
+		if !started.CompareAndSwap(false, true) {
+			return
+		}
+
+		go func() {
+			err := f()
+
+			// A cancelled context means the cluster is already being torn down, so there is nothing
+			// left to recover.
+			if err == nil || ctx.Err() != nil {
+				return
+			}
+
+			logrus.Errorf("deferred controller start failed for cluster %s: %v, rebuilding cluster controllers", w.ClusterName, err)
+			if w.OnDeferredStartError != nil {
+				w.OnDeferredStartError()
+			}
+		}()
 	}
 }
 
+// deferredStartAsync returns the work a deferred start does on each attempt: register the cluster's
+// handlers into a transaction, start the controllers, and commit the transaction only once the
+// controllers are up. It is not safe to call concurrently - deferredStart serializes it.
 func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx context.Context) error) func() error {
-	var (
-		startLock sync.Mutex
-		started   = false
-	)
-
 	return func() error {
-		startLock.Lock()
-		defer startLock.Unlock()
-
-		if started {
-			return nil
-		}
-
 		cancelCtx, cancel := context.WithCancel(ctx)
 		transaction := controller.NewHandlerTransaction(cancelCtx)
 		if err := register(transaction); err != nil {
@@ -290,13 +322,14 @@ func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx 
 		}
 
 		if err := w.Start(cancelCtx); err != nil {
+			// Because we cancel this context, this Start cannot be retried. Informers that
+			// managed to start are stopped and can never be restarted.
 			cancel()
 			transaction.Rollback()
 			return err
 		}
 
 		transaction.Commit()
-		started = true
 		go func() {
 			// this is to make go vet happy that we aren't leaking a context
 			<-ctx.Done()
@@ -340,7 +373,7 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	context.Management = managementv3.NewFromControllerFactory(controllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(controllerFactory)
 	context.RBAC = rbacv1.NewFromControllerFactory(controllerFactory)
-	context.Core = namespace.NormanInterface(corev1.NewFromControllerFactory(controllerFactory))
+	context.Core = namespaceclients.NormanInterface(corev1.NewFromControllerFactory(controllerFactory))
 	context.Apps = appsv1.NewFromControllerFactory(controllerFactory)
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
@@ -376,6 +409,18 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	context.Scheme = wrangler.Scheme
 
 	return context, err
+}
+
+// IsCluster reports whether cluster is the cluster this context is for: it has the same name and, if this
+// context knows it, the same UID.
+func (w *UserContext) IsCluster(cluster metav1.Object) bool {
+	return cluster.GetName() == w.ClusterName && MatchesClusterUID(w.ClusterUID, cluster)
+}
+
+// MatchesClusterUID reports whether cluster has the UID a controller was started for. A controller that
+// doesn't know the UID matches any cluster with its cluster's name.
+func MatchesClusterUID(uid k8stypes.UID, cluster metav1.Object) bool {
+	return uid == "" || cluster.GetUID() == uid
 }
 
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
@@ -438,7 +483,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	if err != nil {
 		return nil, err
 	}
-	context.Corew = coreInterface{namespace.NewWranglerFactory(corew)}
+	context.Corew = coreInterface{namespaceclients.NewWranglerFactory(corew)}
 
 	ctlg, err := catalog.NewFactoryFromConfigWithOptions(&context.RESTConfig, &catalog.FactoryOptions{SharedControllerFactory: controllerFactory})
 	if err != nil {
@@ -523,7 +568,7 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.Apps = appsv1.NewFromControllerFactory(context.ControllerFactory)
-	context.Core = namespace.NormanInterface(corev1.NewFromControllerFactory(context.ControllerFactory))
+	context.Core = namespaceclients.NormanInterface(corev1.NewFromControllerFactory(context.ControllerFactory))
 	context.Project = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	context.Storage = storagev1.NewFromControllerFactory(context.ControllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(context.ControllerFactory)

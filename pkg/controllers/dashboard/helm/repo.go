@@ -8,8 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"k8s.io/apimachinery/pkg/api/equality"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -23,8 +26,8 @@ import (
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	name2 "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +52,7 @@ type repoHandler struct {
 	clusterRepos   catalogcontrollers.ClusterRepoController
 	configMaps     corev1controllers.ConfigMapClient
 	configMapCache corev1controllers.ConfigMapCache
+	settings       mgmtcontrollers.SettingController
 	apply          apply.Apply
 }
 
@@ -70,6 +74,7 @@ func RegisterRepos(ctx context.Context,
 
 }
 
+// RegisterReposForFollowers need to run on every replica (including the leader), see comment on EnsureRepositoryCheckout
 func RegisterReposForFollowers(ctx context.Context,
 	secrets corev1controllers.SecretCache,
 	clusterRepos catalogcontrollers.ClusterRepoController) {
@@ -78,23 +83,26 @@ func RegisterReposForFollowers(ctx context.Context,
 		clusterRepos: clusterRepos,
 	}
 
-	catalogcontrollers.RegisterClusterRepoStatusHandler(ctx, clusterRepos,
-		condition.Cond(catalog.FollowerRepoDownloaded), "helm-clusterrepo-ensure", h.ClusterRepoDownloadEnsureStatusHandler)
-
+	clusterRepos.OnChange(ctx, "helm-clusterrepo-ensure", h.EnsureRepositoryCheckout)
 }
 
-func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
+// EnsureRepositoryCheckout will fetch and/or initialize the necessary data to ensure the corresponding git repositories match commit in the status
+// .status.commit is only updated by the leader, but this needs to run in all replicas, including the leader despite being redundant, to ensure repositories are correctly initialized after a restart
+func (r *repoHandler) EnsureRepositoryCheckout(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
+	if repo == nil {
+		return nil, nil
+	}
 	if registry.IsOCI(repo.Spec.URL) {
-		return status, nil
+		return repo, nil
 	}
 
-	interval := defaultInterval
-	if repo.Spec.RefreshInterval > 0 {
-		interval = time.Duration(repo.Spec.RefreshInterval) * time.Second
+	if isDisabled(repo) || repo.Status.Commit == "" {
+		return repo, nil
 	}
 
-	r.clusterRepos.EnqueueAfter(repo.Name, interval)
-	return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
+	// Sync the followers' repository copy to the commit observed by the leader
+	err := r.ensure(repo)
+	return repo, err
 }
 
 func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
@@ -106,6 +114,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 			logrus.Errorf("error while removing git repo %s: %v", path, err)
 			return nil, err
 		}
+		git.ForgetRepo(path)
 		return nil, nil
 	}
 	// Ignore OCI Based Helm Repositories
@@ -119,6 +128,8 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 	}
 
 	newStatus := repo.Status.DeepCopy()
+	removeLegacyCondition(newStatus)
+
 	retryPolicy, err := getRetryPolicy(repo)
 	if err != nil {
 		err = fmt.Errorf("failed to get retry policy: %w", err)
@@ -137,9 +148,9 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 	newStatus.ShouldNotSkip = false
 
 	// If repo is disabled, then don't update the clusterrepo
-	if repo.Spec.Enabled != nil && !*repo.Spec.Enabled {
+	if isDisabled(repo) {
 		logrus.Infof("skipping repo %s because it is disabled", repo.Name)
-		return setErrorCondition(repo, err, newStatus, interval, ociCondition, r.clusterRepos)
+		return setErrorCondition(repo, nil, newStatus, interval, repoCondition, r.clusterRepos)
 	}
 
 	return r.download(repo, newStatus, metav1.OwnerReference{
@@ -148,6 +159,18 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 		Name:       repo.Name,
 		UID:        repo.UID,
 	}, interval, retryPolicy)
+}
+
+func isDisabled(repo *catalog.ClusterRepo) bool {
+	return repo != nil && repo.Spec.Enabled != nil && !*repo.Spec.Enabled
+}
+
+func removeLegacyCondition(status *catalog.RepoStatus) {
+	if n := slices.IndexFunc(status.Conditions, func(cond genericcondition.GenericCondition) bool {
+		return cond.Type == "FollowerDownloaded"
+	}); n >= 0 {
+		status.Conditions = append(status.Conditions[:n], status.Conditions[n+1:]...)
+	}
 }
 
 func toOwnerObject(namespace string, owner metav1.OwnerReference) runtime.Object {
@@ -232,22 +255,17 @@ func createOrUpdateMap(namespace string, index *repo.IndexFile, owner metav1.Own
 	return objs[0].(*corev1.ConfigMap), err
 }
 
-func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
-	if status.Commit == "" {
-		return status, nil
+func (r *repoHandler) ensure(repo *catalog.ClusterRepo) error {
+	if repo.Status.Commit == "" {
+		return nil
 	}
 
-	// If repo is disabled, skip updating the replicas.
-	if repoSpec.Enabled != nil && !*repoSpec.Enabled {
-		return status, nil
-	}
-
-	secret, err := catalogv2.GetSecret(r.secrets, repoSpec, metadata.Namespace)
+	secret, err := catalogv2.GetSecret(r.secrets, &repo.Spec, repo.Namespace)
 	if err != nil {
-		return status, err
+		return err
 	}
 
-	return status, git.Ensure(secret, metadata.Namespace, metadata.Name, status.URL, status.Commit, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
+	return git.Ensure(secret, repo.Namespace, repo.Name, repo.Status.URL, repo.Status.Commit, repo.Spec.InsecureSkipTLSverify, repo.Spec.CABundle)
 }
 
 func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catalog.RepoStatus, owner metav1.OwnerReference, interval time.Duration, retryPolicy retryPolicy) (*catalog.ClusterRepo, error) {
@@ -276,6 +294,12 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 			newStatus.URL = repoSpec.GitRepo
 			newStatus.Branch = repoSpec.GitBranch
 			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+
+			// Bootstrap succeeded via git.Head() and BuildOrGetIndex(), which initialises the repository from the current local checkout. Set ShouldNotSkip to force exactly one immediate follow-up reconcile
+			// so shouldSkip() bypasses the refresh-interval gate and the next reconcile runs git.Update(), synchronising the repository with the latest upstream commit instead of waiting for RefreshInterval.
+			if err == nil {
+				newStatus.ShouldNotSkip = true
+			}
 		}
 	} else if repoSpec.GitRepo != "" {
 		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
@@ -300,6 +324,7 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 	}
 	if retriable && err != nil {
 		newStatus.NumberOfRetries++
+		logrus.Errorf("error while downloading repo %s: %v", repository.Name, err)
 		if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
 			newStatus.NumberOfRetries = 0
 			newStatus.NextRetryAt = metav1.Time{}
@@ -310,6 +335,7 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 		return r.setConditionWithInterval(repository, err, newStatus, &backoff, interval)
 	}
 	if err != nil || index == nil {
+		logrus.Errorf("error while downloading repo %s: %v", repository.Name, err)
 		return setErrorCondition(repository, err, newStatus, interval, repoCondition, r.clusterRepos)
 	}
 
@@ -429,6 +455,11 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		return false
 	}
 
+	// negative refresh interval disables periodic updates
+	if clusterRepo.Spec.RefreshInterval < 0 {
+		return true
+	}
+
 	// The handler is triggered immediately after any changes, including when updating the number of retries done.
 	// This check is to prevent the handler from executing before the backoff time has passed
 	if !newStatus.NextRetryAt.IsZero() && newStatus.NextRetryAt.Time.After(now) {
@@ -488,7 +519,8 @@ func setConditionWithInterval(clusterRepo *catalog.ClusterRepo,
 		//Since status has changed, update the lastUpdatedTime
 		downloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
 		clusterRepo.Status = *newStatus
-		_, statusErr := controller.UpdateStatus(clusterRepo)
+		var statusErr error
+		clusterRepo, statusErr = controller.UpdateStatus(clusterRepo)
 		if statusErr != nil {
 			return clusterRepo, statusErr
 		}
@@ -519,7 +551,8 @@ func setCondition(clusterRepo *catalog.ClusterRepo,
 		//Since status has changed, update the lastUpdatedTime
 		downloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
 		clusterRepo.Status = *newStatus
-		_, statusErr := controller.UpdateStatus(clusterRepo)
+		var statusErr error
+		clusterRepo, statusErr = controller.UpdateStatus(clusterRepo)
 		if statusErr != nil {
 			return clusterRepo, statusErr
 		}

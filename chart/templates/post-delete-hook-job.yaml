@@ -18,6 +18,10 @@ spec:
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-post-delete
       restartPolicy: OnFailure
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 6 }}
+{{- end }}
       containers:
         - name: {{ template "rancher.name" . }}-post-delete
           image: "{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . .Values.postDelete.image.registry)) .Values.postDelete.image.repository }}:{{ .Values.postDelete.image.tag }}"

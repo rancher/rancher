@@ -18,6 +18,8 @@ go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 All tests can be run with `make controller-test`. That runs the bash script [`run_controller_tests.sh`](./run_controller_tests.sh).
 To specify a k8s version, set the environment variable `ENVTEST_K8S_VERSION`. Otherwise it will use the latest version available.
 
+Alternatively run `make test` which will install dependencies before running the tests.
+
 ### Manually
 
 After installing `setup-envtest`, export the environment variable `KUBEBUILDER_ASSETS` to point to where setup-envtest was installed using the following:
@@ -27,7 +29,7 @@ export KUBEBUILDER_ASSETS=$(setup-envtest use -p path)
 
 Note: You can add a k8s version to the export command if you want to test a specific version. Otherwise it will use the latest version installed.
 
-ex. `export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.30)`
+ex. `export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.37)`
 
 After setting the environment variable, running the tests is the same as any other go test and can be run with `go test`.
 

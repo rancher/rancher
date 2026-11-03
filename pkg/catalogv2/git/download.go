@@ -8,21 +8,44 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Ensure runs git clone, clean DIRTY contents and fetch the latest commit
+// Ensure the repository is checked out at the provided commit reference.
+// Cloning/fetching and cleaning a dirty state is performed if necessary.
+// If the working tree has not been restored yet, it is first restored to the local HEAD.
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return fmt.Errorf("ensure failure: %w", err)
 	}
 
+	// A repository shipped with its working tree is ready to be served as is, and has to be reported as
+	// such before anything else in here, which may take a while.
+	if !IsCheckedOut(name, gitURL) {
+		markIfPopulated(git.directory())
+	}
+
 	// If the repositories are rancher managed and if bundled is set
 	// don't fetch anything from upstream.
-	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
+	if IsBundled(git.directory()) && settings.SystemCatalog.Get() == "bundled" {
+		if err := git.reset("HEAD"); err != nil {
+			return fmt.Errorf("ensure failure: %w", err)
+		}
+		// Always use HEAD in bundled mode. During upgrades, ClusterRepo.Status.Commit may reference
+		// an old commit. Without this return, attempting to reset to that old commit could revert
+		// bundled charts to an older version, removing new charts needed by the upgraded Rancher.
 		return nil
 	}
 
 	if err := git.clone(""); err != nil {
 		return fmt.Errorf("ensure failure: %w", err)
+	}
+
+	// A repository shipped without a working tree is first restored from the commit it already holds,
+	// which needs no network access. Reaching the requested commit may need to fetch it, and if that
+	// fails the content of the local commit remains available while the caller retries.
+	if !IsCheckedOut(name, gitURL) {
+		if err := git.reset("HEAD"); err != nil {
+			return fmt.Errorf("ensure failure: %w", err)
+		}
 	}
 
 	if err := git.reset(commit); err == nil {
@@ -66,12 +89,12 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	if err != nil {
 		return "", fmt.Errorf("update failure: %w", err)
 	}
-	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
+	if IsBundled(git.directory()) && settings.SystemCatalog.Get() == "bundled" {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
 	commit, err := git.Update(branch)
-	if err != nil && IsBundled(git.Directory) {
+	if err != nil && IsBundled(git.directory()) {
 		// We don't report an error unless the branch is invalid
 		// The reason being it would break airgap environments in downstream
 		// cluster. A new issue is created to tackle this in the forthcoming.
@@ -83,7 +106,7 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	return commit, err
 }
 
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (gitClient, error) {
 	err := validateURL(gitURL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: only http(s) or ssh:// supported", err)
@@ -99,7 +122,7 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		caBundle = convertDERToPEM(caBundle)
 		insecureSkipTLS = false
 	}
-	return newGit(dir, gitURL, &Options{
+	return newGitGo(dir, gitURL, &Options{
 		Credential:        secret,
 		Headers:           headers,
 		InsecureTLSVerify: insecureSkipTLS,

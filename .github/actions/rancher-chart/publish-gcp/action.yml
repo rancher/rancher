@@ -4,11 +4,11 @@ runs:
   using: "composite"
   steps:
     - name: Authenticate with Google Cloud
-      uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
       with:
         credentials_json: ${{ env.GOOGLE_AUTH }}
     - name: Upload
-      uses: google-github-actions/upload-cloud-storage@c0f6160ff80057923ff50e5e567695cea181ec23 # v2
+      uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
       with:
         destination: releases.rancher.com/server-charts
         path: ./bin/chart

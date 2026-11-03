@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	providercommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
@@ -15,8 +16,10 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -48,8 +51,20 @@ func (s *AuthConfigSuite) SetupSuite() {
 
 	err = factory.BatchCreateCRDs(s.ctx,
 		crd.CRD{
-			SchemaObject: v3.Token{},
+			// A schema generated from v3.Token prunes userPrincipal.metadata.name,
+			// the principal ID that cleanup uses to select tokens by AuthConfig.
+			// Use an open schema instead, matching how Rancher creates this CRD
+			// in production.
+			GVK: schema.GroupVersionKind{
+				Group:   "management.cattle.io",
+				Version: "v3",
+				Kind:    "Token",
+			},
 			NonNamespace: true,
+			Schema: &apiextv1.JSONSchemaProps{
+				Type:                   "object",
+				XPreserveUnknownFields: ptr.To(true),
+			},
 		},
 		crd.CRD{
 			SchemaObject: v3.AuthConfig{},
@@ -100,10 +115,10 @@ func (s *AuthConfigSuite) SetupSuite() {
 
 func (s *AuthConfigSuite) TestTokensCleanup() {
 	const (
-		tick         = 1 * time.Second
-		duration     = 10 * time.Second
-		numOfTokens  = 2
-		authProvider = "openldap"
+		tick        = 1 * time.Second
+		duration    = 10 * time.Second
+		numOfTokens = 2
+		configName  = "openldap"
 	)
 
 	t := s.T()
@@ -111,10 +126,10 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	authConfigClient := s.managementContext.Management.AuthConfigs("")
 	tokenClient := s.managementContext.Management.Tokens("")
 
-	// create the AuthConfig for the authProvider
+	// create the AuthConfig
 	_, err := authConfigClient.Create(&v3.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: authProvider,
+			Name: configName,
 			Annotations: map[string]string{
 				auth.CleanupAnnotation: auth.CleanupUnlocked,
 			},
@@ -124,14 +139,13 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	})
 	assert.NoError(t, err)
 
-	// create some tokens for the authProvider
+	// create some tokens for the AuthConfig
 	for i := 0; i < numOfTokens; i++ {
 		_, err := tokenClient.Create(&v3.Token{
-			ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
-			AuthProvider: authProvider,
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "t-"},
 			UserPrincipal: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "openldap_user://uid=user,dc=example,dc=org",
+					Name: configName + "_user://uid=user,dc=example,dc=org",
 				},
 				PrincipalType: "user",
 				Provider:      "openldap",
@@ -143,8 +157,7 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	// and also some local tokens
 	for i := 0; i < numOfTokens; i++ {
 		_, err := tokenClient.Create(&v3.Token{
-			ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
-			AuthProvider: "local",
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "t-"},
 			UserPrincipal: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "local://u-abcdef",
@@ -156,8 +169,18 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 		assert.NoError(t, err)
 	}
 
+	// and a Rancher-issued controller token with no user principal, which
+	// belongs to local and must survive the cleanup
+	agentToken, err := tokenClient.Create(&v3.Token{
+		ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
+		AuthProvider: "local",
+	})
+	if !assert.NoError(t, err) {
+		return
+	}
+
 	// disable the provider, setting the cleanup annotation (eventually because of retries)
-	authConfig, err := authConfigClient.Get(authProvider, metav1.GetOptions{})
+	authConfig, err := authConfigClient.Get(configName, metav1.GetOptions{})
 	assert.NoError(t, err)
 
 	authConfig.Enabled = false
@@ -165,7 +188,7 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	_, err = authConfigClient.Update(authConfig)
 	assert.NoError(t, err)
 
-	// check that all the authProvider tokens are deleted
+	// check that all the tokens issued by the AuthConfig are deleted
 	ok := assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		tokens, err := tokenClient.List(metav1.ListOptions{})
 		assert.NoError(c, err)
@@ -173,7 +196,7 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 
 		var remainingTokens int
 		for _, token := range tokens.Items {
-			if token.AuthProvider == authProvider {
+			if tokenConfigName, err := providercommon.ConfigNameFromToken(&token); err == nil && tokenConfigName == configName {
 				remainingTokens++
 			}
 		}
@@ -183,6 +206,9 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	}, duration, tick)
 
 	assert.True(t, ok, "secrets were left over after disabling auth configuration")
+
+	_, err = tokenClient.Get(agentToken.Name, metav1.GetOptions{})
+	assert.NoError(t, err, "token with no user principal was deleted")
 }
 
 func (s *AuthConfigSuite) TearDownSuite() {

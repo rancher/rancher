@@ -8,6 +8,7 @@ const (
 	PodCertificateProjectionFieldKeyType              = "keyType"
 	PodCertificateProjectionFieldMaxExpirationSeconds = "maxExpirationSeconds"
 	PodCertificateProjectionFieldSignerName           = "signerName"
+	PodCertificateProjectionFieldUser                 = "user"
 	PodCertificateProjectionFieldUserAnnotations      = "userAnnotations"
 )
 
@@ -18,5 +19,6 @@ type PodCertificateProjection struct {
 	KeyType              string            `json:"keyType,omitempty" yaml:"keyType,omitempty"`
 	MaxExpirationSeconds *int64            `json:"maxExpirationSeconds,omitempty" yaml:"maxExpirationSeconds,omitempty"`
 	SignerName           string            `json:"signerName,omitempty" yaml:"signerName,omitempty"`
+	User                 *int64            `json:"user,omitempty" yaml:"user,omitempty"`
 	UserAnnotations      map[string]string `json:"userAnnotations,omitempty" yaml:"userAnnotations,omitempty"`
 }

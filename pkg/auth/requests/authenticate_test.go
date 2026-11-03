@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,13 +17,14 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
 	"github.com/rancher/rancher/pkg/oidc/provider"
@@ -61,11 +63,12 @@ func (r *fakeUserRefresher) reset() {
 type fakeProvider struct {
 	name                       string
 	disabled                   bool
-	getUserExtraAttributesFunc func(v3.Principal) map[string][]string
+	disabledErr                error
+	getUserExtraAttributesFunc func(apiv3.Principal) map[string][]string
 }
 
-func (p *fakeProvider) IsDisabledProvider() (bool, error) {
-	return p.disabled, nil
+func (p *fakeProvider) IsDisabledProvider(string) (bool, error) {
+	return p.disabled, p.disabledErr
 }
 
 func (p *fakeProvider) Logout(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error {
@@ -84,11 +87,11 @@ func (p *fakeProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any)
 	panic("not implemented")
 }
 
-func (p *fakeProvider) SearchPrincipals(string, string, accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *fakeProvider) SearchPrincipals(string, string, accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) GetPrincipal(string, accessor.TokenAccessor) (v3.Principal, error) {
+func (p *fakeProvider) GetPrincipal(string, accessor.TokenAccessor) (apiv3.Principal, error) {
 	panic("not implemented")
 }
 
@@ -100,15 +103,18 @@ func (p *fakeProvider) TransformToAuthProvider(map[string]interface{}) (map[stri
 	panic("not implemented")
 }
 
-func (p *fakeProvider) RefetchGroupPrincipals(_, _ string) ([]v3.Principal, error) {
+func (p *fakeProvider) UsesUserSecrets() bool      { return false }
+func (p *fakeProvider) CanRefreshPrincipals() bool { return true }
+
+func (p *fakeProvider) RefetchGroupPrincipals(_, _ string) ([]apiv3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) CanAccessWithGroupProviders(_ string, _ []v3.Principal) (bool, error) {
+func (p *fakeProvider) CanAccessWithGroupProviders(_ string, _ []apiv3.Principal) (bool, error) {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (p *fakeProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	if p.getUserExtraAttributesFunc != nil {
 		return p.getUserExtraAttributesFunc(userPrincipal)
 	}
@@ -119,29 +125,26 @@ func (p *fakeProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 	}
 }
 
-func (p *fakeProvider) CleanupResources(*v3.AuthConfig) error {
+func (p *fakeProvider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
 }
 
 func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	// This test cannot run in parallel.
-	existingProviders := providers.Providers
-	defer func() {
-		providers.Providers = existingProviders
-	}()
+	defer providers.SetProviders(nil)
 
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	now := time.Now()
 	userID := "u-abcdef"
 	userPrincipalID := fakeProvider.name + "_user://12345"
 
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -149,16 +152,15 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		PrincipalIDs: []string{userPrincipalID},
 	}
 
-	token := &v3.Token{
+	token := &apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-v2rcx",
 			CreationTimestamp: metav1.NewTime(now),
 		},
-		Token:        "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
-		AuthProvider: fakeProvider.name,
-		TTLMillis:    57600000,
-		UserID:       userID,
-		UserPrincipal: v3.Principal{
+		Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
+		TTLMillis: 57600000,
+		UserID:    userID,
+		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userPrincipalID,
 			},
@@ -182,7 +184,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		return nil, nil
 	}).AnyTimes()
 
-	userAttribute := &v3.UserAttribute{
+	userAttribute := &apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -207,20 +209,20 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 				common.UserAttributePrincipalID: {userPrincipalID},
 				common.UserAttributeUserName:    {user.Username},
 			},
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://" + userID},
 				common.UserAttributeUserName:    {"local-user"},
 			},
 		},
 	}
 	userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-		GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+		GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 			return userAttribute, nil
 		},
 	}
 
 	userLister := &mgmtFakes.UserListerMock{
-		GetFunc: func(_, _ string) (*v3.User, error) {
+		GetFunc: func(_, _ string) (*apiv3.User, error) {
 			return user, nil
 		},
 	}
@@ -257,6 +259,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Identity.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -267,20 +270,210 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
 	})
 
-	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+	t.Run("audit entry shows the identity next to the user ID", func(t *testing.T) {
+		userRefresher.reset()
+
+		out := &bytes.Buffer{}
+		writer, err := audit.NewWriter(out, audit.WriterOptions{})
+		require.NoError(t, err)
+		handler := ToAuthMiddleware(&authenticator)(audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(
+			NewAuthenticatedFilter(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))))
+
+		handler.ServeHTTP(httptest.NewRecorder(), req.Clone(req.Context()))
+
+		var entry struct {
+			User map[string]any `json:"user"`
+		}
+		require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+		assert.Equal(t, userID, entry.User["name"])
+		assert.Equal(t, map[string]any{
+			"username":    "fake-user",
+			"provider":    "fake",
+			"principalId": userPrincipalID,
+		}, entry.User["identity"])
+	})
+
+	t.Run("groups only include the token's auth provider", func(t *testing.T) {
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+			"other": {
+				Items: []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "other_group://98765",
+					},
+					PrincipalType: "group",
+					Provider:      "other",
+				}},
+			},
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+		assert.NotContains(t, resp.Groups, "other_group://98765")
+	})
+
+	t.Run("groups are correctly added", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+
+		configName := "test-eu"
+		token.UserPrincipal.Name = configName + "_user://12345"
+		providers.SetAuthConfigLister(&mgmtFakes.AuthConfigListerMock{
+			GetFunc: func(_, name string) (*apiv3.AuthConfig, error) {
+				if name != configName {
+					return nil, apierrors.NewNotFound(apiv3.Resource("authconfig"), name)
+				}
+				return &apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: name}, Type: fakeProvider.name + "Config"}, nil
+			},
+		})
+		t.Cleanup(func() { providers.SetAuthConfigLister(nil) })
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			configName: {
+				Items: []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: configName + "_group://56789",
+					},
+					PrincipalType: "group",
+					Provider:      fakeProvider.name,
+				}},
+			},
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, configName+"_group://56789")
+	})
+
+	// System users skip the principal parsing entirely, so an unparseable
+	// principal doesn't fail authentication. Their groups must come from the
+	// token and never from the user attributes, not even the local entry.
+	t.Run("system user groups come from the token, not user attributes, when principal is unparseable", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldUserPrincipalIDs := user.PrincipalIDs
+		oldTokenGroupPrincipals := token.GroupPrincipals
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			user.PrincipalIDs = oldUserPrincipalIDs
+			token.GroupPrincipals = oldTokenGroupPrincipals
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+
+		token.UserPrincipal.Name = "invalid-principal"
+		token.UserPrincipal.Provider = "other-provider"
+		user.PrincipalIDs = []string{"system://test"}
+		token.GroupPrincipals = []apiv3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "legacy://system-group"}}}
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+			"local": {
+				Items: []apiv3.Principal{{
+					ObjectMeta:    metav1.ObjectMeta{Name: "local://g-system-attr"},
+					PrincipalType: "group",
+					Provider:      "local",
+				}},
+			},
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, "legacy://system-group")
+		assert.NotContains(t, resp.Groups, fakeProvider.name+"_group://56789")
+		assert.NotContains(t, resp.Groups, "g-system-attr")
+		assert.NotContains(t, resp.Groups, "local://g-system-attr")
+	})
+
+	t.Run("non-system user and unparseable principal fails with invalid principal", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldUserPrincipalIDs := user.PrincipalIDs
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			user.PrincipalIDs = oldUserPrincipalIDs
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+		token.UserPrincipal.Name = "invalid-principal"
+		token.UserPrincipal.Provider = "other-provider"
+		user.PrincipalIDs = []string{"github://test"}
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+		}
+
+		_, err := authenticator.Authenticate(req)
+		require.ErrorContains(t, err, "invalid principal: invalid-principal")
+	})
+
+	// Rancher issues derived tokens for its own controllers with no user
+	// principal. They belong to no AuthConfig, but must still authenticate
+	// for non-system users.
+	t.Run("non-system user and token with no principal authenticates", func(t *testing.T) {
+		for _, tt := range []struct {
+			name         string
+			principalIDs []string
+		}{
+			{
+				name:         "autoscaler token",
+				principalIDs: []string{"local://" + userID},
+			},
+			{
+				name:         "compose token",
+				principalIDs: []string{userPrincipalID, "local://" + userID},
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				oldUserPrincipal := token.UserPrincipal
+				oldIsDerived := token.IsDerived
+				oldUserPrincipalIDs := user.PrincipalIDs
+				t.Cleanup(func() {
+					token.UserPrincipal = oldUserPrincipal
+					token.IsDerived = oldIsDerived
+					user.PrincipalIDs = oldUserPrincipalIDs
+				})
+
+				token.UserPrincipal = apiv3.Principal{}
+				token.IsDerived = true
+				user.PrincipalIDs = tt.principalIDs
+
+				resp, err := authenticator.Authenticate(req)
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+				assert.True(t, resp.IsAuthed)
+				assert.Equal(t, userID, resp.User)
+				assert.NotContains(t, resp.Groups, fakeProvider.name+"_group://56789")
+				assert.Contains(t, resp.Groups, "system:cattle:authenticated")
+			})
+		}
+	})
+
+	t.Run("lastUsedAt less than a minute from now is not updated", func(t *testing.T) {
 		oldTokenLastUsedAt := token.LastUsedAt
 		defer func() {
 			token.LastUsedAt = oldTokenLastUsedAt
 		}()
-		lastUsedAt := metav1.NewTime(now.Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Empty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Truncate(time.Second),
+			now.Add(-59 * time.Second).Truncate(time.Second),
+			now.Add(59 * time.Second).Truncate(time.Second),
+		} {
+			lastUsedAt := metav1.NewTime(stored)
+			token.LastUsedAt = &lastUsedAt
+			patchData = nil
+			userRefresher.reset()
+
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, patchData, "stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
@@ -288,24 +481,32 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		defer func() {
 			token.LastUsedAt = oldTokenLastUsedAt
 		}()
-		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Add(-time.Minute).Truncate(time.Second),
+			now.Add(time.Minute).Truncate(time.Second),
+			time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC),
+		} {
+			lastUsedAt := metav1.NewTime(stored)
+			token.LastUsedAt = &lastUsedAt
+			patchData = nil
+			userRefresher.reset()
 
-		lastUsedAt = metav1.NewTime(now.Add(time.Second).Truncate(time.Second))
-		token.LastUsedAt = &lastUsedAt
-		patchData = nil
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotEmpty(t, patchData, "stored lastUsedAt %s", stored)
 
-		resp, err = authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+			var patch []struct {
+				Path  string      `json:"path"`
+				Value metav1.Time `json:"value"`
+			}
+			require.NoError(t, json.Unmarshal(patchData, &patch))
+			require.Len(t, patch, 1)
+			assert.Equal(t, "/lastUsedAt", patch[0].Path)
+			assert.True(t, patch[0].Value.Time.Equal(now.Truncate(time.Second)),
+				"stored lastUsedAt %s: patched %s, want %s", stored, patch[0].Value, now.Truncate(time.Second))
+		}
 	})
 
 	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
@@ -314,19 +515,17 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			token.LastUsedAt = oldTokenLastUsedAt
 			authenticator.tokenClient = tokenClient
 		}()
-		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](gomock.NewController(t))
 		client.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("some error")).Times(1)
 		authenticator.tokenClient = client
 
-		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
+		lastUsedAt := metav1.NewTime(now.Add(-time.Minute).Truncate(time.Second))
 		token.LastUsedAt = &lastUsedAt
-		patchData = nil
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		require.Empty(t, patchData)
 	})
 
 	t.Run("token fetched with token client", func(t *testing.T) {
@@ -363,7 +562,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("authenticate if userattribute doesn't exist", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, name string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, name string) (*apiv3.UserAttribute, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -402,7 +601,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
 		}()
 		userAttribute.ExtraByProvider = nil
-		fakeProvider.getUserExtraAttributesFunc = func(v3.Principal) map[string][]string { return map[string][]string{} }
+		fakeProvider.getUserExtraAttributesFunc = func(apiv3.Principal) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -414,6 +613,47 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.True(t, userRefresher.called)
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], user.PrincipalIDs[0])
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.Username)
+	})
+
+	t.Run("extras of a config named unlike its provider are retrieved from the config's provider", func(t *testing.T) {
+		oldUserPrincipal := token.UserPrincipal
+		oldUserAttributeExtra := userAttribute.ExtraByProvider
+		oldFakeProviderGetUserExtraAttributesFunc := fakeProvider.getUserExtraAttributesFunc
+		defer func() {
+			token.UserPrincipal = oldUserPrincipal
+			userAttribute.ExtraByProvider = oldUserAttributeExtra
+			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
+		}()
+
+		// The provider is looked up by the provider name "fake", not by the
+		// config name "test-eu", which no provider is registered under.
+		configName := "test-eu"
+		token.UserPrincipal.Name = configName + "_user://12345"
+		providers.SetAuthConfigLister(&mgmtFakes.AuthConfigListerMock{
+			GetFunc: func(_, name string) (*apiv3.AuthConfig, error) {
+				if name != configName {
+					return nil, apierrors.NewNotFound(apiv3.Resource("authconfig"), name)
+				}
+				return &apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: name}, Type: fakeProvider.name + "Config"}, nil
+			},
+		})
+		t.Cleanup(func() { providers.SetAuthConfigLister(nil) })
+		userAttribute.ExtraByProvider = nil
+		var gotPrincipal string
+		fakeProvider.getUserExtraAttributesFunc = func(principal apiv3.Principal) map[string][]string {
+			gotPrincipal = principal.Name
+			return map[string][]string{
+				common.UserAttributePrincipalID: {"from-provider"},
+				common.UserAttributeUserName:    {"from-provider"},
+			}
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, configName+"_user://12345", gotPrincipal)
+		assert.Equal(t, []string{"from-provider"}, resp.Extras[common.UserAttributePrincipalID])
+		assert.Equal(t, []string{"from-provider"}, resp.Extras[common.UserAttributeUserName])
 	})
 
 	t.Run("provider refresh is not called if token user id has system prefix", func(t *testing.T) {
@@ -433,8 +673,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("provider refresh is not called for system users", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -454,10 +694,14 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.False(t, userRefresher.called)
 	})
 
-	t.Run("don't check provider if not specified in the token", func(t *testing.T) {
-		oldTokenAuthProvider := token.AuthProvider
-		defer func() { token.AuthProvider = oldTokenAuthProvider }()
-		token.AuthProvider = ""
+	t.Run("auth config is checked even if the provider is not specified in the token", func(t *testing.T) {
+		oldTokenGroupPrincipals := token.GroupPrincipals
+		oldIsDisabled := fakeProvider.disabled
+		t.Cleanup(func() {
+			token.GroupPrincipals = oldTokenGroupPrincipals
+			fakeProvider.disabled = oldIsDisabled
+		})
+		token.GroupPrincipals = []apiv3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "legacy://providerless-group"}}}
 
 		userRefresher.reset()
 
@@ -465,7 +709,14 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+		assert.NotContains(t, resp.Groups, "legacy://providerless-group")
 		assert.True(t, userRefresher.called)
+
+		fakeProvider.disabled = true
+		resp, err = authenticator.Authenticate(req)
+		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.Nil(t, resp)
 	})
 
 	t.Run("token not found", func(t *testing.T) {
@@ -536,7 +787,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("user doesn't exist", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, name string) (*v3.User, error) {
+		userLister.GetFunc = func(_, name string) (*apiv3.User, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -551,8 +802,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("user is disabled", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -571,7 +822,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("error getting userattribute", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, _ string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, _ string) (*apiv3.UserAttribute, error) {
 			return nil, fmt.Errorf("some error")
 		}
 
@@ -592,21 +843,86 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.ErrorContains(t, err, "auth config "+fakeProvider.name+" is disabled")
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
 	})
 
-	t.Run("auth provider doesn't exist", func(t *testing.T) {
-		oldProvider := token.AuthProvider
-		defer func() { token.AuthProvider = oldProvider }()
-		token.AuthProvider = "foo"
+	t.Run("auth config doesn't exist", func(t *testing.T) {
+		// The local provider is always registered in production. A token whose
+		// config was deleted must not fall back to it.
+		localProvider := *fakeProvider
+		localProvider.name = local.Name
+		providers.SetProviders(map[string]common.AuthProvider{
+			fakeProvider.name: fakeProvider,
+			local.Name:        &localProvider,
+		})
+		t.Cleanup(func() {
+			providers.SetProviders(map[string]common.AuthProvider{
+				fakeProvider.name: fakeProvider,
+			})
+		})
+		oldUserPrincipal := token.UserPrincipal
+		t.Cleanup(func() { token.UserPrincipal = oldUserPrincipal })
+		token.UserPrincipal.Name = "foo_user://12345"
 
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.ErrorContains(t, err, "error checking if auth config foo is disabled")
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
+	})
+
+	t.Run("error checking if the auth provider is disabled", func(t *testing.T) {
+		oldDisabledErr := fakeProvider.disabledErr
+		t.Cleanup(func() { fakeProvider.disabledErr = oldDisabledErr })
+		fakeProvider.disabledErr = fmt.Errorf("can't get auth config")
+
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.ErrorContains(t, err, "error checking if auth config "+fakeProvider.name+" is disabled: can't get auth config")
+		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
+	})
+
+	t.Run("auth config is checked against its own provider rather than the token's", func(t *testing.T) {
+		// E.g. a token whose principal was migrated to another config without
+		// updating its auth provider.
+		otherProvider := *fakeProvider
+		otherProvider.name = "other"
+		providers.SetProviders(map[string]common.AuthProvider{
+			fakeProvider.name:  fakeProvider,
+			otherProvider.name: &otherProvider,
+		})
+		t.Cleanup(func() {
+			providers.SetProviders(map[string]common.AuthProvider{
+				fakeProvider.name: fakeProvider,
+			})
+		})
+
+		oldProvider := token.AuthProvider
+		oldIsDisabled := fakeProvider.disabled
+		t.Cleanup(func() {
+			token.AuthProvider = oldProvider
+			fakeProvider.disabled = oldIsDisabled
+		})
+		token.AuthProvider = otherProvider.name
+
+		fakeProvider.disabled = true
+		resp, err := authenticator.Authenticate(req)
+		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.Nil(t, resp)
+
+		fakeProvider.disabled = false
+		otherProvider.disabled = true
+		resp, err = authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
 	})
 	t.Run("failed to verify token: token expired", func(t *testing.T) {
 		oldTokenCreationTimestamp := token.CreationTimestamp
@@ -633,26 +949,45 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
 	})
+
+	t.Run("system users are not rejected by disabled auth providers", func(t *testing.T) {
+		oldPrincipalIDs := user.PrincipalIDs
+		oldUserPrincipal := token.UserPrincipal
+		oldDisabled := fakeProvider.disabled
+		defer func() {
+			user.PrincipalIDs = oldPrincipalIDs
+			token.UserPrincipal = oldUserPrincipal
+			fakeProvider.disabled = oldDisabled
+		}()
+
+		user.PrincipalIDs = []string{"system://provisioning/fleet-local/local"}
+		token.UserPrincipal.Name = user.PrincipalIDs[0]
+		fakeProvider.disabled = true
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
+		assert.False(t, userRefresher.called)
+	})
 }
 
 func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
-	existingProviders := providers.Providers
-	defer func() {
-		providers.Providers = existingProviders
-	}()
+	defer providers.SetProviders(nil)
 
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	now := time.Now()
 	userID := "u-abcdef"
 	userPrincipalID := fakeProvider.name + "_user://12345"
 
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -674,7 +1009,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		Spec: ext.TokenSpec{
 			UserID:  userID,
 			TTL:     57600000,
-			Kind:    exttokenstore.IsLogin,
+			Kind:    exttokenstore.KindSession,
 			Enabled: ptr.To(true),
 			UserPrincipal: ext.TokenPrincipal{
 				Name:        userPrincipalID,
@@ -701,7 +1036,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		Data: map[string][]byte{
 			exttokenstore.FieldEnabled:        []byte("true"),
 			exttokenstore.FieldHash:           []byte(tokenHash),
-			exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+			exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 			exttokenstore.FieldLastUpdateTime: []byte("13:00"),
 			exttokenstore.FieldPrincipal:      principalBytes,
 			exttokenstore.FieldTTL:            []byte("57600000"),
@@ -713,7 +1048,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	var patchData []byte
 	ctrl := gomock.NewController(t)
 
-	userAttribute := &v3.UserAttribute{
+	userAttribute := &apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -738,20 +1073,20 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 				common.UserAttributePrincipalID: {userPrincipalID},
 				common.UserAttributeUserName:    {user.Username},
 			},
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://" + userID},
 				common.UserAttributeUserName:    {"local-user"},
 			},
 		},
 	}
 	userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-		GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+		GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 			return userAttribute, nil
 		},
 	}
 
 	userLister := &mgmtFakes.UserListerMock{
-		GetFunc: func(_, _ string) (*v3.User, error) {
+		GetFunc: func(_, _ string) (*apiv3.User, error) {
 			return user, nil
 		},
 	}
@@ -806,27 +1141,33 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Identity.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
 		require.NotEmpty(t, patchData)
 	})
 
-	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+	t.Run("lastUsedAt less than a minute from now is not updated", func(t *testing.T) {
 		oldTokenLastUsedAt := tokenSecret.Data["last-used-at"]
 		defer func() {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 		}()
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Empty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Truncate(time.Second),
+			now.Add(-59 * time.Second).Truncate(time.Second),
+			now.Add(59 * time.Second).Truncate(time.Second),
+		} {
+			tokenSecret.Data["last-used-at"] = []byte(stored.Format(time.RFC3339))
+			patchData = nil
+			userRefresher.reset()
+
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, patchData, "stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
@@ -834,28 +1175,31 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		defer func() {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 		}()
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(-time.Second).
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
-		userRefresher.reset()
 
-		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+		for _, stored := range []time.Time{
+			now.Add(-time.Minute).Truncate(time.Second),
+			now.Add(time.Minute).Truncate(time.Second),
+			time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC),
+		} {
+			tokenSecret.Data["last-used-at"] = []byte(stored.Format(time.RFC3339))
+			patchData = nil
+			userRefresher.reset()
 
-		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(time.Second).
-			Truncate(time.Second).
-			Format(time.RFC3339))
-		patchData = nil
+			resp, err := authenticator.Authenticate(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotEmpty(t, patchData, "stored lastUsedAt %s", stored)
 
-		resp, err = authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, patchData)
+			var patch []struct {
+				Path  string `json:"path"`
+				Value []byte `json:"value"`
+			}
+			require.NoError(t, json.Unmarshal(patchData, &patch))
+			require.Len(t, patch, 1)
+			assert.Equal(t, "/data/last-used-at", patch[0].Path)
+			assert.Equal(t, now.Truncate(time.Second).Format(time.RFC3339), string(patch[0].Value),
+				"stored lastUsedAt %s", stored)
+		}
 	})
 
 	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
@@ -864,8 +1208,9 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			tokenSecret.Data["last-used-at"] = oldTokenLastUsedAt
 			authenticator.extTokenStore = store
 		}()
-		newSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		newSCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		subCtrl := gomock.NewController(t)
+		newSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](subCtrl)
+		newSCache := fake.NewMockCacheInterface[*corev1.Secret](subCtrl)
 		newSecrets.EXPECT().Cache().Return(newSCache)
 
 		newSCache.EXPECT().
@@ -877,16 +1222,14 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil, nil)
 
 		tokenSecret.Data["last-used-at"] = []byte(now.
-			Add(-time.Second).
+			Add(-time.Minute).
 			Truncate(time.Second).
 			Format(time.RFC3339))
-		patchData = nil
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		require.Empty(t, patchData)
 	})
 
 	t.Run("token fetched with token client", func(t *testing.T) {
@@ -902,7 +1245,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("authenticate if userattribute doesn't exist", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, name string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, name string) (*apiv3.UserAttribute, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -942,7 +1285,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
 		}()
 		userAttribute.ExtraByProvider = nil
-		fakeProvider.getUserExtraAttributesFunc = func(v3.Principal) map[string][]string { return map[string][]string{} }
+		fakeProvider.getUserExtraAttributesFunc = func(apiv3.Principal) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -974,8 +1317,8 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("provider refresh is not called for system users", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -1071,7 +1414,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("user doesn't exist", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, name string) (*v3.User, error) {
+		userLister.GetFunc = func(_, name string) (*apiv3.User, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
@@ -1086,8 +1429,8 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("user is disabled", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
-		userLister.GetFunc = func(_, _ string) (*v3.User, error) {
-			return &v3.User{
+		userLister.GetFunc = func(_, _ string) (*apiv3.User, error) {
+			return &apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
@@ -1106,7 +1449,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("error getting userattribute", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
-		userAttributeLister.GetFunc = func(_, _ string) (*v3.UserAttribute, error) {
+		userAttributeLister.GetFunc = func(_, _ string) (*apiv3.UserAttribute, error) {
 			return nil, fmt.Errorf("some error")
 		}
 
@@ -1127,24 +1470,27 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.ErrorContains(t, err, "auth config "+fakeProvider.name+" is disabled")
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
 	})
 
-	t.Run("auth provider doesn't exist", func(t *testing.T) {
+	t.Run("auth config doesn't exist", func(t *testing.T) {
 		oldPrincipal := tokenSecret.Data[exttokenstore.FieldPrincipal]
-		defer func() {
+		t.Cleanup(func() {
 			tokenSecret.Data[exttokenstore.FieldPrincipal] = oldPrincipal
-		}()
-		var up v3.Principal
-		json.Unmarshal(tokenSecret.Data[exttokenstore.FieldPrincipal], &up)
-		up.Provider = "foo"
-		tokenSecret.Data[exttokenstore.FieldPrincipal], _ = json.Marshal(up)
+		})
+		up := token.Spec.UserPrincipal
+		up.Name = "foo_user://12345"
+		var err error
+		tokenSecret.Data[exttokenstore.FieldPrincipal], err = json.Marshal(up)
+		require.NoError(t, err)
 
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.ErrorIs(t, err, ErrMustAuthenticate)
+		require.ErrorContains(t, err, "error checking if auth config foo is disabled")
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
 	})
@@ -1199,9 +1545,8 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	// This test cannot run in parallel.
 	existingServerURL := settings.ServerURL.Get()
-	existingProviders := providers.Providers
 	t.Cleanup(func() {
-		providers.Providers = existingProviders
+		providers.SetProviders(nil)
 		_ = settings.ServerURL.Set(existingServerURL)
 	})
 	_ = settings.ServerURL.Set("https://rancher.example.com")
@@ -1215,13 +1560,13 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	userID := "u-abcdef"
 	userPrincipalID := "fake_user://12345"
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1231,16 +1576,15 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	now := time.Now()
 
 	t.Run("with invalid access token", func(t *testing.T) {
-		token := &v3.Token{
+		token := &apiv3.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "token-55rl6",
 				CreationTimestamp: metav1.NewTime(now),
 			},
-			Token:        "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
-			AuthProvider: "fake",
-			TTLMillis:    57600000,
-			UserID:       userID,
-			UserPrincipal: v3.Principal{
+			Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
+			TTLMillis: 57600000,
+			UserID:    userID,
+			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userPrincipalID,
 				},
@@ -1276,7 +1620,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		signingKeyGetter := mocks.NewMocksigningKeyGetter(ctrl)
 		signingKeyGetter.EXPECT().GetPublicKey("unknown").Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "unknown"))
 
-		userAttribute := &v3.UserAttribute{
+		userAttribute := &apiv3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
@@ -1301,19 +1645,19 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 					common.UserAttributePrincipalID: {userPrincipalID},
 					common.UserAttributeUserName:    {user.Username},
 				},
-				providers.LocalProvider: {
+				local.Name: {
 					common.UserAttributePrincipalID: {"local://" + userID},
 					common.UserAttributeUserName:    {"local-user"},
 				},
 			},
 		}
 		userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-			GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+			GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 				return userAttribute, nil
 			},
 		}
 		userLister := &mgmtFakes.UserListerMock{
-			GetFunc: func(_, _ string) (*v3.User, error) {
+			GetFunc: func(_, _ string) (*apiv3.User, error) {
 				return user, nil
 			},
 		}
@@ -1336,7 +1680,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 				return now
 			},
 			keyGetter:       signingKeyGetter,
-			oidcClientCache: fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl),
+			oidcClientCache: fake.NewMockNonNamespacedCacheInterface[*apiv3.OIDCClient](ctrl),
 		}
 
 		resp, err := authenticator.Authenticate(req)
@@ -1347,16 +1691,15 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	})
 
 	t.Run("with valid access token", func(t *testing.T) {
-		token := &v3.Token{
+		token := &apiv3.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "token-55rl6",
 				CreationTimestamp: metav1.NewTime(now),
 			},
-			Token:        "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
-			AuthProvider: "fake",
-			TTLMillis:    57600000,
-			UserID:       userID,
-			UserPrincipal: v3.Principal{
+			Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
+			TTLMillis: 57600000,
+			UserID:    userID,
+			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userPrincipalID,
 				},
@@ -1392,8 +1735,8 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 			},
 		}
 
-		oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl)
-		oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", testOIDCClient.Status.ClientID).Return([]*v3.OIDCClient{testOIDCClient}, nil)
+		oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.OIDCClient](ctrl)
+		oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", testOIDCClient.Status.ClientID).Return([]*apiv3.OIDCClient{testOIDCClient}, nil)
 		accessToken := provider.CreateAccessToken(testOIDCClient, token, []string{"openid"}, "kid", now)
 		privateKey := testGeneratePrivateKey(t)
 		signedToken, err := accessToken.SignedString(privateKey)
@@ -1402,7 +1745,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		signingKeyGetter := mocks.NewMocksigningKeyGetter(ctrl)
 		signingKeyGetter.EXPECT().GetPublicKey("kid").Return(&privateKey.PublicKey, nil)
 
-		userAttribute := &v3.UserAttribute{
+		userAttribute := &apiv3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
@@ -1427,19 +1770,19 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 					common.UserAttributePrincipalID: {userPrincipalID},
 					common.UserAttributeUserName:    {user.Username},
 				},
-				providers.LocalProvider: {
+				local.Name: {
 					common.UserAttributePrincipalID: {"local://" + userID},
 					common.UserAttributeUserName:    {"local-user"},
 				},
 			},
 		}
 		userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-			GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+			GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 				return userAttribute, nil
 			},
 		}
 		userLister := &mgmtFakes.UserListerMock{
-			GetFunc: func(_, _ string) (*v3.User, error) {
+			GetFunc: func(_, _ string) (*apiv3.User, error) {
 				return user, nil
 			},
 		}
@@ -1472,6 +1815,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.Equal(t, "fake-user", resp.Identity.Username)
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
@@ -1486,9 +1830,8 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	// This test cannot run in parallel.
 	existingServerURL := settings.ServerURL.Get()
-	existingProviders := providers.Providers
 	t.Cleanup(func() {
-		providers.Providers = existingProviders
+		providers.SetProviders(nil)
 		_ = settings.ServerURL.Set(existingServerURL)
 	})
 	_ = settings.ServerURL.Set("https://rancher.example.com")
@@ -1502,13 +1845,13 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	userID := "u-abcdef"
 	userPrincipalID := "fake_user://12345"
-	user := &v3.User{
+	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1517,16 +1860,15 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	}
 	now := time.Now()
 
-	token := &v3.Token{
+	token := &apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-55rl6",
 			CreationTimestamp: metav1.NewTime(now),
 		},
-		Token:        "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
-		AuthProvider: "fake",
-		TTLMillis:    57600000,
-		UserID:       userID,
-		UserPrincipal: v3.Principal{
+		Token:     "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
+		TTLMillis: 57600000,
+		UserID:    userID,
+		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userPrincipalID,
 			},
@@ -1562,7 +1904,7 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	signedToken, err := accessToken.SignedString(privateKey)
 	require.NoError(t, err)
 
-	userAttribute := &v3.UserAttribute{
+	userAttribute := &apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
@@ -1587,19 +1929,19 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 				common.UserAttributePrincipalID: {userPrincipalID},
 				common.UserAttributeUserName:    {user.Username},
 			},
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://" + userID},
 				common.UserAttributeUserName:    {"local-user"},
 			},
 		},
 	}
 	userAttributeLister := &mgmtFakes.UserAttributeListerMock{
-		GetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+		GetFunc: func(_, _ string) (*apiv3.UserAttribute, error) {
 			return userAttribute, nil
 		},
 	}
 	userLister := &mgmtFakes.UserListerMock{
-		GetFunc: func(_, _ string) (*v3.User, error) {
+		GetFunc: func(_, _ string) (*apiv3.User, error) {
 			return user, nil
 		},
 	}
@@ -1680,4 +2022,212 @@ func testGeneratePrivateKey(t *testing.T) *rsa.PrivateKey {
 	require.NoError(t, err)
 
 	return privateKey
+}
+
+func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
+	t.Parallel()
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "u-abcde"},
+		Username:     "alice",
+		PrincipalIDs: []string{"okta_user://alice", "local://u-abcde"},
+	}
+	attribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "u-abcde"},
+		ExtraByProvider: map[string]map[string][]string{
+			"okta": {
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice@example.com"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+			"github": {
+				common.UserAttributePrincipalID: {"github_user://42"},
+				common.UserAttributeUserName:    {"alice-gh"},
+				"extra":                         {"value"},
+			},
+			"github-eu": {
+				common.UserAttributePrincipalID: {"github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice-eu"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		configName    string
+		providerName  string
+		principalName string
+		want          map[string][]string
+	}{
+		{
+			name:          "token for a named config",
+			configName:    "github-eu",
+			providerName:  "github",
+			principalName: "github-eu_user://7",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice-eu"},
+			},
+		},
+		{
+			name:         "provider token",
+			configName:   "okta",
+			providerName: "okta",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice@example.com"},
+			},
+		},
+		{
+			name:         "local token",
+			configName:   "local",
+			providerName: "local",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42", "github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice@example.com", "alice-gh", "alice-eu"},
+			},
+		},
+		{
+			name:         "token without config name",
+			configName:   "",
+			providerName: "local",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42", "github-eu_user://7"},
+				common.UserAttributeUserName:    {"alice@example.com", "alice-gh", "alice-eu"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			token := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: tt.principalName}},
+			}
+
+			got := getUserExtraInfo(token, user, attribs, tt.configName, tt.providerName)
+
+			require.Len(t, got, len(tt.want))
+			for key, values := range tt.want {
+				assert.ElementsMatch(t, values, got[key], key)
+			}
+		})
+	}
+}
+
+func TestSessionIdentity(t *testing.T) {
+	t.Parallel()
+
+	user := &apiv3.User{Username: "local-user"}
+	token := func(principalID, loginName string) *apiv3.Token {
+		return &apiv3.Token{UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}, LoginName: loginName}}
+	}
+
+	tests := []struct {
+		name  string
+		token *apiv3.Token
+		want  audit.Identity
+	}{
+		{
+			name:  "local token uses the principal login name",
+			token: token("local://u-1", "local-user"),
+			want:  audit.Identity{Username: "local-user", Provider: "local", PrincipalID: "local://u-1"},
+		},
+		{
+			name:  "external token uses the principal login name and its provider",
+			token: token("keycloakoidc_user://abc", "jane@example.com"),
+			want:  audit.Identity{Username: "jane@example.com", Provider: "keycloakoidc", PrincipalID: "keycloakoidc_user://abc"},
+		},
+		{
+			name:  "principal login name wins over the user's username",
+			token: token("local://u-1", "from-principal"),
+			want:  audit.Identity{Username: "from-principal", Provider: "local", PrincipalID: "local://u-1"},
+		},
+		{
+			name:  "local token without login name uses the user's username",
+			token: token("local://u-1", ""),
+			want:  audit.Identity{Username: "local-user", Provider: "local", PrincipalID: "local://u-1"},
+		},
+		{
+			name:  "legacy token without provider is a local user",
+			token: token("", ""),
+			want:  audit.Identity{Username: "local-user", Provider: "local"},
+		},
+		{
+			name: "token without a principal is a local user whatever its auth provider",
+			// The deprecated auth provider is ignored.
+			token: &apiv3.Token{AuthProvider: "github"},
+			want:  audit.Identity{Username: "local-user", Provider: "local"},
+		},
+		{
+			name:  "external token without login name has no username but keeps its provider",
+			token: token("keycloakoidc_user://abc", ""),
+			want:  audit.Identity{Provider: "keycloakoidc", PrincipalID: "keycloakoidc_user://abc"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, sessionIdentity(tt.token, user))
+		})
+	}
+}
+
+func TestGetUserExtraInfoFromProviderOfNamedConfig(t *testing.T) {
+	// This test cannot run in parallel.
+	const configName = "github-eu"
+	var requested []string
+	githubProvider := &fakeProvider{
+		name: "github",
+		getUserExtraAttributesFunc: func(p apiv3.Principal) map[string][]string {
+			requested = append(requested, p.Name)
+			return map[string][]string{
+				common.UserAttributePrincipalID: {p.Name},
+				common.UserAttributeUserName:    {"alice-eu"},
+			}
+		},
+	}
+	providers.SetProviders(map[string]common.AuthProvider{
+		githubProvider.name: githubProvider,
+		// A provider registered under the config name must not be asked.
+		configName: &fakeProvider{
+			name: configName,
+			getUserExtraAttributesFunc: func(apiv3.Principal) map[string][]string {
+				t.Errorf("extras requested from a provider named after the config")
+				return nil
+			},
+		},
+	})
+	t.Cleanup(func() { providers.SetProviders(nil) })
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "u-abcde"},
+		Username:     "alice",
+		PrincipalIDs: []string{"github-eu_user://7", "local://u-abcde"},
+	}
+	// The user attribute holds no extras for the token's config, so they come
+	// from the provider that implements it.
+	attribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "u-abcde"},
+		ExtraByProvider: map[string]map[string][]string{
+			"github": {
+				common.UserAttributePrincipalID: {"github_user://42"},
+				common.UserAttributeUserName:    {"alice-gh"},
+			},
+		},
+	}
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "github-eu_user://7"}},
+	}
+
+	got := getUserExtraInfo(token, user, attribs, configName, githubProvider.name)
+
+	assert.Equal(t, []string{"github-eu_user://7"}, requested)
+	assert.Equal(t, map[string][]string{
+		common.UserAttributePrincipalID: {"github-eu_user://7"},
+		common.UserAttributeUserName:    {"alice-eu"},
+	}, got)
 }

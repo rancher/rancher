@@ -5,37 +5,37 @@ on:
     branches:
       - "main"
       - "release/v*"
+
+permissions: {}
+
 jobs:
   validate:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
     env:
-      GOLANG_CI_LINT_VERSION: v2.7.2
-      GOLANG_VERSION: '1.25'
+      GOLANG_CI_LINT_VERSION: v2.14.0
+      GOLANG_VERSION: '1.27'
     steps:
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
-          cache: true
+          cache: ${{ github.event_name == 'pull_request' }} # zizmor: ignore[cache-poisoning] -- validation-only dependency cache; release workflows are separate.
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ env.GOLANG_CI_LINT_VERSION }}
           args: -v
           only-new-issues: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000') }}
-          skip-cache: false
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install tox flake8
-      - name: Validate (modules and flake8)
+          skip-cache: false # zizmor: ignore[cache-poisoning] -- validation-only linter cache; release workflows are separate.
+        # only use cache on pull requests
+      - name: Validate (modules)
         run: ./scripts/validate
+      - name: Validate (generated build config)
+        if: ${{ !cancelled() }}
+        run: ./scripts/validate-generated

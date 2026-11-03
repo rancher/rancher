@@ -8,13 +8,17 @@ import (
 	"strings"
 	"time"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	"github.com/rancher/rancher/pkg/capr/configserver"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -22,12 +26,14 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/kv"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	apilabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
@@ -53,9 +59,19 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 				clients.Mgmt.Cluster(),
 				clients.Provisioning.Cluster(),
 				clients.RKE.CustomMachine(),
+				clients.RKE.RKEBootstrap(),
 				clients.CAPI.Machine(),
-				clients.RKE.RKEBootstrap()),
+				clients.RBAC.Role(),
+				clients.RBAC.RoleBinding(),
+				clients.Core.ServiceAccount(),
+				clients.Core.Secret(),
+			),
 	}
+	if features.MCM.Enabled() {
+		h.mgmtNodeClient = clients.Mgmt.Node()
+		h.mgmtNodeCache = clients.Mgmt.Node().Cache()
+	}
+
 	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine-secret", h.onSecretChange)
@@ -104,10 +120,12 @@ type handler struct {
 	unmanagedMachine  rkecontroller.CustomMachineController
 	rkeClusterCache   rkecontroller.RKEClusterCache
 	mgmtClusterCache  mgmtcontroller.ClusterCache
+	mgmtNodeClient    mgmtcontroller.NodeClient
+	mgmtNodeCache     mgmtcontroller.NodeCache
 	capiClusterCache  capicontrollers.ClusterCache
 	machineCache      capicontrollers.MachineCache
 	machineClient     capicontrollers.MachineClient
-	clusterCache      rocontrollers.ClusterCache
+	clusterCache      provcontrollers.ClusterCache
 	secrets           corecontrollers.SecretClient
 	apply             apply.Apply
 }
@@ -115,7 +133,7 @@ type handler struct {
 func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID string) (string, error) {
 	_, err := h.machineCache.Get(cluster.Namespace, machineName)
 	if apierror.IsNotFound(err) {
-		machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
+		machines, err := h.machineCache.List(cluster.Namespace, apilabels.SelectorFromSet(map[string]string{
 			capr.MachineIDLabel: machineID,
 		}))
 		if len(machines) != 1 || err != nil || machines[0].Spec.ClusterName != cluster.Name {
@@ -146,6 +164,19 @@ func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secre
 		return secret, nil
 	}
 
+	lc, err := configserver.ResolveMgmtTokenCaller(h.mgmtClusterCache, h.capiClusterCache, secret.Namespace)
+	if err != nil {
+		return secret, err
+	}
+
+	switch lc.Kind {
+	case configserver.KindImported:
+		return h.createMachinePlanForImported(secret, data)
+	case configserver.KindCAPINative:
+		return h.createMachinePlanForCAPINative(secret, data, lc.CAPICluster)
+	}
+
+	// KindV2Prov falls through to the existing custom-cluster path below.
 	capiCluster, err := h.getCAPICluster(secret)
 	if err != nil {
 		return secret, err
@@ -172,6 +203,422 @@ func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secre
 		secret.Labels[capr.MachineNamespaceLabel] = capiCluster.Namespace
 		secret.Labels[capr.MachineNameLabel] = machineName
 
+		return h.secrets.Update(secret)
+	}
+
+	return secret, nil
+}
+
+func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.Object) (*corev1.Secret, error) {
+	if h.mgmtNodeCache == nil || h.mgmtNodeClient == nil {
+		return secret, nil
+	}
+
+	labels := map[string]string{}
+	annotations := map[string]string{}
+
+	if data.Bool("role-control-plane") {
+		labels[capr.ControlPlaneRoleLabel] = "true"
+	}
+
+	if data.Bool("role-etcd") {
+		labels[capr.EtcdRoleLabel] = "true"
+	}
+
+	if data.Bool("role-worker") {
+		labels[capr.WorkerRoleLabel] = "true"
+	}
+
+	cluster, err := h.mgmtClusterCache.Get(secret.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	var machine *apimgmtv3.Node
+
+	val := data.String("node-name")
+	if val == "" {
+		return nil, fmt.Errorf("node name not found in secret")
+	}
+
+	labels[capr.NodeNameLabel] = val
+
+	machines, err := h.mgmtNodeCache.List(secret.Namespace, apilabels.SelectorFromSet(map[string]string{"management.cattle.io/nodename": val}))
+	if err != nil {
+		return nil, err
+	}
+	if len(machines) != 1 {
+		return nil, fmt.Errorf("expected exactly one machine, but got %d", len(machines))
+	}
+
+	machine = machines[0].DeepCopy()
+	if machine.Labels == nil {
+		machine.Labels = map[string]string{}
+	}
+	machine.Labels[capr.MachineIDLabel] = data.String("id")
+
+	if machine.Status.NodeLabels[corev1.LabelOSStable] == capr.WindowsMachineOS {
+		labels[capr.CattleOSLabel] = capr.WindowsMachineOS
+	}
+
+	if machine.Spec.Etcd {
+		labels[capr.EtcdRoleLabel] = "true"
+	}
+
+	if machine.Spec.ControlPlane {
+		labels[capr.ControlPlaneRoleLabel] = "true"
+	}
+
+	if machine.Spec.Worker {
+		labels[capr.WorkerRoleLabel] = "true"
+	}
+
+	// if no labels set, assume worker
+	if labels[capr.EtcdRoleLabel] != "true" && labels[capr.ControlPlaneRoleLabel] != "true" {
+		labels[capr.WorkerRoleLabel] = "true"
+	}
+
+	machine, err = h.mgmtNodeClient.Update(machine)
+	if err != nil {
+		return nil, err
+	}
+
+	// copy cluster lifecycle labels to secret
+	lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range lifecycleLabels {
+		labels[k] = v
+	}
+
+	// copy machine lifecycle labels to secret
+	lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(machine)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range lifecycleLabels {
+		labels[k] = v
+	}
+
+	labels[capr.MachineIDLabel] = data.String("id")
+	labels[capr.MachineNamespaceLabel] = machine.Namespace
+	labels[capr.MachineNameLabel] = machine.Name
+	labels[capr.ClusterNameLabel] = machine.Namespace
+
+	if address := data.String("address"); address != "" {
+		annotations[capr.AddressAnnotation] = address
+	}
+
+	if internalAddress := data.String("internal-address"); internalAddress != "" {
+		annotations[capr.InternalAddressAnnotation] = internalAddress
+	}
+
+	planSecretName := name.SafeConcatName(secret.Name, "machine", "plan")
+
+	machineOwnerRef := metav1.OwnerReference{
+		APIVersion:         machine.APIVersion,
+		Kind:               machine.Kind,
+		Name:               machine.Name,
+		UID:                machine.UID,
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
+	}
+
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       secret.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+			Labels: map[string]string{
+				capr.RoleLabel:             capr.RolePlan,
+				capr.PlanSecret:            planSecretName,
+				capr.MachineIDLabel:        data.String("id"),
+				capr.MachineNamespaceLabel: machine.Namespace,
+				capr.MachineNameLabel:      machine.Name,
+				capr.ClusterNameLabel:      machine.Namespace,
+			},
+		},
+	}
+	planSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       secret.Namespace,
+			Labels:          labels,
+			Annotations:     annotations,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+		},
+		Type: capr.SecretTypeMachinePlan,
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       secret.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"watch", "get", "update", "list"},
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{planSecretName},
+			},
+		},
+	}
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       secret.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     planSecretName,
+		},
+	}
+
+	objs := []runtime.Object{sa, planSecret, role, roleBinding}
+
+	err = h.apply.WithOwner(secret).ApplyObjects(objs...)
+	if err != nil {
+		return secret, err
+	}
+
+	if secret.Labels[capr.MachineNameLabel] != machine.Name {
+		secret = secret.DeepCopy()
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+
+		secret.Labels[capr.MachineNamespaceLabel] = machine.Namespace
+		secret.Labels[capr.MachineNameLabel] = machine.Name
+		return h.secrets.Update(secret)
+	}
+
+	return secret, nil
+}
+
+// createMachinePlanForCAPINative materializes a plan SA + plan secret + RBAC for a machine in a
+// turtles-imported CAPI cluster. Compared to createMachinePlanForImported:
+//   - Plan resources live in the CAPI cluster's namespace, not the mgmt cluster's shell namespace.
+//   - Lifecycle labels are stamped from the CAPI Cluster + CAPI Machine (not mgmt Cluster + Node).
+//   - Ownership of the plan resources is anchored to the CAPI Machine (cross-namespace ownerRefs
+//     to the MachineRequest secret are not allowed by k8s).
+//
+// The caller (onSecretChange) has already resolved the CAPI Cluster from the turtles back-reference
+// labels on the mgmt cluster shell.
+func (h *handler) createMachinePlanForCAPINative(secret *corev1.Secret, data data.Object, capiCluster *capi.Cluster) (*corev1.Secret, error) {
+	machineID := data.String("id")
+	if machineID == "" {
+		return nil, fmt.Errorf("machine id not found in secret data")
+	}
+	nodeName := data.String("node-name")
+	if nodeName == "" {
+		return nil, fmt.Errorf("node-name not found in secret data")
+	}
+
+	// Fast path: MachineIDLabel already stamped (subsequent /v3/connect/agent calls, or a
+	// pre-create controller that seeded the label).
+	machines, err := h.machineCache.List(capiCluster.Namespace, apilabels.SelectorFromSet(map[string]string{
+		capr.MachineIDLabel:   machineID,
+		capi.ClusterNameLabel: capiCluster.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	var machine *capi.Machine
+	switch len(machines) {
+	case 1:
+		machine = machines[0]
+	case 0:
+		// First-time lookup: correlate by downstream node name (CAPI Machine's Status.NodeRef.Name).
+		// This is the day-2 case — the machine is already registered downstream, so NodeRef is set.
+		all, err := h.machineCache.List(capiCluster.Namespace, apilabels.SelectorFromSet(map[string]string{
+			capi.ClusterNameLabel: capiCluster.Name,
+		}))
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range all {
+			if m.Status.NodeRef.IsDefined() && m.Status.NodeRef.Name == nodeName {
+				machine = m
+				break
+			}
+		}
+		if machine == nil {
+			// No CAPI Machine has registered this node yet. Return without updating the
+			// MachineRequest secret; the requester will retry via /v3/connect/agent's waitReady loop.
+			return secret, nil
+		}
+	default:
+		return nil, fmt.Errorf("expected at most one CAPI Machine with %s=%s in %s, got %d",
+			capr.MachineIDLabel, machineID, capiCluster.Namespace, len(machines))
+	}
+
+	// Stamp the MachineIDLabel on the CAPI Machine so subsequent lookups take the fast path.
+	if machine.Labels[capr.MachineIDLabel] != machineID {
+		machine = machine.DeepCopy()
+		if machine.Labels == nil {
+			machine.Labels = map[string]string{}
+		}
+		machine.Labels[capr.MachineIDLabel] = machineID
+		machine, err = h.machineClient.Update(machine)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	labels := map[string]string{}
+	annotations := map[string]string{}
+
+	// CAPRKE2 role model: control-plane machines carry the CAPI MachineControlPlaneLabel and run
+	// server (etcd + control-plane in RKE2 terms); everything else is a worker (from a
+	// MachineDeployment). Take the CAPI Machine's labels as authoritative — agent-supplied
+	// role hints (data.Bool("role-*")) are unreliable / not sent for CAPRKE2.
+	if _, isControlPlane := machine.Labels[capi.MachineControlPlaneLabel]; isControlPlane {
+		labels[capr.EtcdRoleLabel] = "true"
+		labels[capr.ControlPlaneRoleLabel] = "true"
+	} else {
+		labels[capr.WorkerRoleLabel] = "true"
+	}
+	labels[capr.NodeNameLabel] = nodeName
+
+	// Ensure TypeMeta is populated for lifecycle label extraction — cache-fetched objects often
+	// have empty TypeMeta.
+	capiClusterTyped := capiCluster.DeepCopy()
+	capiClusterTyped.TypeMeta = metav1.TypeMeta{
+		Kind:       "Cluster",
+		APIVersion: capi.GroupVersion.String(),
+	}
+	clusterLifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(capiClusterTyped)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range clusterLifecycleLabels {
+		labels[k] = v
+	}
+
+	machineTyped := machine.DeepCopy()
+	machineTyped.TypeMeta = metav1.TypeMeta{
+		Kind:       "Machine",
+		APIVersion: capi.GroupVersion.String(),
+	}
+	machineLifecycleLabels, err := planv1alpha1.ObjToMachineLifecycleLabels(machineTyped)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range machineLifecycleLabels {
+		labels[k] = v
+	}
+
+	labels[capr.MachineIDLabel] = machineID
+	labels[capr.MachineNamespaceLabel] = machine.Namespace
+	labels[capr.MachineNameLabel] = machine.Name
+	labels[capr.ClusterNameLabel] = capiCluster.Name
+
+	if address := data.String("address"); address != "" {
+		annotations[capr.AddressAnnotation] = address
+	}
+	if internalAddress := data.String("internal-address"); internalAddress != "" {
+		annotations[capr.InternalAddressAnnotation] = internalAddress
+	}
+
+	planSecretName := name.SafeConcatName(secret.Name, "machine", "plan")
+
+	// Explicit ownerRef to the CAPI Machine — the apply framework only stamps its own tracking
+	// annotations, not real k8s ownerReferences. capr.IsOwnedByMachine (called by the config
+	// server's PlanSACheck) walks these ownerRefs to authorize plan-secret retrieval.
+	machineOwnerRef := metav1.OwnerReference{
+		APIVersion:         capi.GroupVersion.String(),
+		Kind:               "Machine",
+		Name:               machine.Name,
+		UID:                machine.UID,
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
+	}
+
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       capiCluster.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+			Labels: map[string]string{
+				capr.RoleLabel:             capr.RolePlan,
+				capr.PlanSecret:            planSecretName,
+				capr.MachineIDLabel:        machineID,
+				capr.MachineNamespaceLabel: machine.Namespace,
+				capr.MachineNameLabel:      machine.Name,
+				capr.ClusterNameLabel:      capiCluster.Name,
+			},
+		},
+	}
+	planSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       capiCluster.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+			Labels:          labels,
+			Annotations:     annotations,
+		},
+		Type: capr.SecretTypeMachinePlan,
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       capiCluster.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"watch", "get", "update", "list"},
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{planSecretName},
+			},
+		},
+	}
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            planSecretName,
+			Namespace:       capiCluster.Namespace,
+			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     planSecretName,
+		},
+	}
+
+	if err := h.apply.WithOwner(machine).ApplyObjects(sa, planSecret, role, roleBinding); err != nil {
+		return secret, err
+	}
+
+	if secret.Labels[capr.MachineNamespaceLabel] != machine.Namespace ||
+		secret.Labels[capr.MachineNameLabel] != machine.Name {
+		secret = secret.DeepCopy()
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[capr.MachineNamespaceLabel] = machine.Namespace
+		secret.Labels[capr.MachineNameLabel] = machine.Name
 		return h.secrets.Update(secret)
 	}
 
@@ -310,7 +757,7 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 		return nil, err
 	}
 
-	rClusters, err := h.clusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, cluster.Name)
+	rClusters, err := h.clusterCache.GetByIndex(provcluster.ByCluster, cluster.Name)
 	if err != nil || len(rClusters) == 0 {
 		return nil, err
 	}

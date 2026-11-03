@@ -14,7 +14,6 @@ type TokenInput struct {
 	Description   string
 	Kind          string
 	UserName      string
-	AuthProvider  string
 	TTL           *int64
 	Randomize     bool
 	UserPrincipal v3.Principal
@@ -33,4 +32,6 @@ type Manager interface {
 	EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, bool, error)
 	IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool
 	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
+	// UserAttributeCreateOrUpdateNoGroups creates or updates the user's attributes for a write that carries no group memberships.
+	UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error
 }

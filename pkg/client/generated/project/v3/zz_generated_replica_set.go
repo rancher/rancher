@@ -17,6 +17,7 @@ const (
 	ReplicaSetFieldDNSPolicy                     = "dnsPolicy"
 	ReplicaSetFieldEnableServiceLinks            = "enableServiceLinks"
 	ReplicaSetFieldEphemeralContainers           = "ephemeralContainers"
+	ReplicaSetFieldEvictionResponders            = "evictionResponders"
 	ReplicaSetFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	ReplicaSetFieldFsgid                         = "fsgid"
 	ReplicaSetFieldGids                          = "gids"
@@ -52,6 +53,7 @@ const (
 	ReplicaSetFieldScale                         = "scale"
 	ReplicaSetFieldScheduling                    = "scheduling"
 	ReplicaSetFieldSchedulingGates               = "schedulingGates"
+	ReplicaSetFieldSchedulingGroup               = "schedulingGroup"
 	ReplicaSetFieldSeccompProfile                = "seccompProfile"
 	ReplicaSetFieldSelector                      = "selector"
 	ReplicaSetFieldServiceAccountName            = "serviceAccountName"
@@ -72,7 +74,6 @@ const (
 	ReplicaSetFieldWorkloadAnnotations           = "workloadAnnotations"
 	ReplicaSetFieldWorkloadLabels                = "workloadLabels"
 	ReplicaSetFieldWorkloadMetrics               = "workloadMetrics"
-	ReplicaSetFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicaSet struct {
@@ -88,6 +89,7 @@ type ReplicaSet struct {
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
@@ -123,6 +125,7 @@ type ReplicaSet struct {
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -143,7 +146,6 @@ type ReplicaSet struct {
 	WorkloadAnnotations           map[string]string              `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string              `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type ReplicaSetCollection struct {

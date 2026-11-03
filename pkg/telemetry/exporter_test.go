@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // func TestMain(m *testing.M) {
@@ -54,10 +55,16 @@ func TestTelemetryManager(t *testing.T) {
 
 	nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
 
+	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+
+	secretCache.EXPECT().Get("aif-operator", "nvidia-registry").AnyTimes().DoAndReturn(func(_ context.Context, _ *corev1.Secret) (*corev1.Secret, error) {
+		return &corev1.Secret{}, nil
+	})
+
 	nodeCache.EXPECT().List(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(_ string, _ any) ([]*v3.Node, error) {
 		return []*v3.Node{}, nil
 	})
-	telG := NewTelemetryGatherer(clusterCache, nodeCache)
+	telG := NewTelemetryGatherer(clusterCache, nodeCache, secretCache)
 
 	manager := NewTelemetryExporterManager(telG, time.Millisecond)
 	assert.NotNil(manager)

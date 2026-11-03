@@ -11,6 +11,7 @@ const (
 	LifecycleHandlerFieldHost        = "host"
 	LifecycleHandlerFieldPath        = "path"
 	LifecycleHandlerFieldPort        = "port"
+	LifecycleHandlerFieldProtocol    = "protocol"
 	LifecycleHandlerFieldScheme      = "scheme"
 	LifecycleHandlerFieldSleep       = "sleep"
 	LifecycleHandlerFieldTCP         = "tcp"
@@ -22,6 +23,7 @@ type LifecycleHandler struct {
 	Host        string             `json:"host,omitempty" yaml:"host,omitempty"`
 	Path        string             `json:"path,omitempty" yaml:"path,omitempty"`
 	Port        intstr.IntOrString `json:"port,omitempty" yaml:"port,omitempty"`
+	Protocol    string             `json:"protocol,omitempty" yaml:"protocol,omitempty"`
 	Scheme      string             `json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	Sleep       *SleepAction       `json:"sleep,omitempty" yaml:"sleep,omitempty"`
 	TCP         bool               `json:"tcp,omitempty" yaml:"tcp,omitempty"`

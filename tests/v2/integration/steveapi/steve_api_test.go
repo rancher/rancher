@@ -20,7 +20,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/features"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
@@ -544,7 +543,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	s.clusterID, err = clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
 
-	mgmtCluster, err := client.Management.Cluster.ByID(s.clusterID)
+	_, err = client.Management.Cluster.ByID(s.clusterID)
 	require.NoError(s.T(), err)
 
 	// create projects
@@ -704,13 +703,37 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 		for _, binding := range access {
 			switch b := binding.(type) {
 			case management.ClusterRoleTemplateBinding:
-				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID, nil)
+				_, err = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+					ClusterID:       s.clusterID,
+					UserPrincipalID: userObj.PrincipalIDs[0],
+					RoleTemplateID:  b.RoleTemplateID,
+				})
 				require.NoError(s.T(), err)
+				userClient, uErr := s.client.AsUser(userObj)
+				require.NoError(s.T(), uErr)
+				require.Eventually(s.T(), func() bool {
+					_, clErr := userClient.Management.Cluster.ByID(s.clusterID)
+					return clErr == nil
+				}, 2*time.Minute, 2*time.Second, "user never gained cluster access after CRTB")
 			case management.ProjectRoleTemplateBinding:
-				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID, nil)
+				_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+					ProjectID:       projectMap[b.ProjectID].ID,
+					UserPrincipalID: userObj.PrincipalIDs[0],
+					RoleTemplateID:  b.RoleTemplateID,
+				})
 				require.NoError(s.T(), err)
+				userClient, uErr := s.client.AsUser(userObj)
+				require.NoError(s.T(), uErr)
+				require.Eventually(s.T(), func() bool {
+					_, clErr := userClient.Management.Cluster.ByID(s.clusterID)
+					return clErr == nil
+				}, 2*time.Minute, 2*time.Second, "user never gained cluster access after PRTB")
 			case rbacv1.RoleBinding:
-				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member", nil)
+				_, _ = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+					ClusterID:       s.clusterID,
+					UserPrincipalID: userObj.PrincipalIDs[0],
+					RoleTemplateID:  "cluster-member",
+				})
 				subject := rbacv1.Subject{
 					Kind: "User",
 					Name: userObj.ID,
@@ -779,14 +802,22 @@ var SQLOnlyListTests = []listTestType{
 		expectSummary: []clientv1.SteveAPISummaryItem{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
-				Counts: map[string]int{
-					"test1": 5, "test2": 5, "test3": 5, "test4": 5, "test5": 5,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test2": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test3": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test4": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
-				Counts: map[string]int{
-					"test-ns-1": 5, "test-ns-2": 5, "test-ns-3": 5, "test-ns-4": 5, "test-ns-5": 5,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-3": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-4": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-5": clientv1.SteveSummaryWithBreakdown{Total: 5},
 				},
 			},
 		},
@@ -809,14 +840,19 @@ var SQLOnlyListTests = []listTestType{
 		expectSummary: []clientv1.SteveAPISummaryItem{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
-				Counts: map[string]int{
-					"test1": 2, "test2": 2, "test3": 2, "test4": 1, "test5": 1,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test1": clientv1.SteveSummaryWithBreakdown{Total: 2},
+					"test2": clientv1.SteveSummaryWithBreakdown{Total: 2},
+					"test3": clientv1.SteveSummaryWithBreakdown{Total: 2},
+					"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					"test5": clientv1.SteveSummaryWithBreakdown{Total: 1},
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
-				Counts: map[string]int{
-					"test-ns-1": 5, "test-ns-2": 3,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 3},
 				},
 			},
 		},
@@ -837,9 +873,9 @@ var SQLOnlyListTests = []listTestType{
 		expectSummary: []clientv1.SteveAPISummaryItem{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
-				Counts: map[string]int{
-					"test4": 1,
-					"test5": 5,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
 				},
 			},
 		},
@@ -855,14 +891,14 @@ var SQLOnlyListTests = []listTestType{
 		expectSummary: []clientv1.SteveAPISummaryItem{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
-				Counts: map[string]int{
-					"test2": 1,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test2": clientv1.SteveSummaryWithBreakdown{Total: 1},
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
-				Counts: map[string]int{
-					"test-ns-2": 1,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 1},
 				},
 			},
 		},
@@ -902,8 +938,8 @@ var SQLOnlyListTests = []listTestType{
 		expectSummary: []clientv1.SteveAPISummaryItem{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.state.name",
-				Counts: map[string]int{
-					"active": 25,
+				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+					"active": clientv1.SteveSummaryWithBreakdown{Total: 25},
 				},
 			},
 		},
@@ -932,197 +968,9 @@ var SQLOnlyListTests = []listTestType{
 	},
 }
 
-// TEST LIST
-var nonSQLListTests = []listTestType{
-	// user-a
-	{
-		description: "user:user-a,namespace:none,query:limit=8",
-		user:        "user-a",
-		namespace:   "",
-		query:       "limit=8",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test3", "namespace": "test-ns-2"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:limit=8&continue=" + continueToken,
-		user:        "user-a",
-		namespace:   "",
-		query:       "limit=8&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-2"},
-			{"name": "test5", "namespace": "test-ns-2"},
-			{"name": "test1", "namespace": "test-ns-3"},
-			{"name": "test2", "namespace": "test-ns-3"},
-			{"name": "test3", "namespace": "test-ns-3"},
-			{"name": "test4", "namespace": "test-ns-3"},
-			{"name": "test5", "namespace": "test-ns-3"},
-			{"name": "test1", "namespace": "test-ns-4"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:test-ns-1,query:limit=3",
-		user:        "user-a",
-		namespace:   "test-ns-1",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
-		user:        "user-a",
-		namespace:   "test-ns-1",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20",
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20",
-		// limit is applied BEFORE filter and pagesize, which is why not all test5 secrets appear in the result
-		expect: []map[string]string{
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test4"},
-			{"name": "test4"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
-		expect: []map[string]string{
-			{"name": "test4"},
-			{"name": "test4"},
-			{"name": "test3"},
-			{"name": "test3"},
-			{"name": "test3"},
-			{"name": "test3"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
-		// the remaining chunk is all from test-ns-5
-		expect: []map[string]string{
-			{"name": "test5", "namespace": "test-ns-5"},
-			{"name": "test4", "namespace": "test-ns-5"},
-			{"name": "test3", "namespace": "test-ns-5"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:none,query:limit=3",
-		user:        "user-b",
-		namespace:   "",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:none,query:limit=3&continue=" + continueToken,
-		user:        "user-b",
-		namespace:   "",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:test-ns-1,query:limit=3",
-		user:        "user-b",
-		namespace:   "test-ns-1",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
-		user:        "user-b",
-		namespace:   "test-ns-1",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:test-ns-5,query:limit=3",
-		user:        "user-b",
-		namespace:   "test-ns-5",
-		query:       "limit=3",
-		expect:      []map[string]string{},
-	},
-	{
-		description: "user:user-c,namespace:none,query:limit=3",
-		user:        "user-c",
-		namespace:   "",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-		},
-	},
-	{
-		description: "user:user-c,namespace:none,query:limit=3&continue=" + continueToken,
-		user:        "user-c",
-		namespace:   "",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test1", "namespace": "test-ns-3"},
-			{"name": "test2", "namespace": "test-ns-3"},
-		},
-	},
-	{
-		description: "user:user-c,namespace:test-ns-1,query:limit=3",
-		user:        "user-c",
-		namespace:   "test-ns-1",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-c,namespace:test-ns-5,query:limit=3",
-		user:        "user-c",
-		namespace:   "test-ns-5",
-		query:       "limit=3",
-		expect:      []map[string]string{},
-	},
-}
-
 func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
-	usingSQLCache := features.UISQLCache.Enabled()
 	relativeDateRx := regexp.MustCompile(`^(\d+[smhd])+$`)
 	containsNamespaceTag := regexp.MustCompile(`(%2Fsteveapi%5D~)[a-z]+`)
 	containsSortNamespace := regexp.MustCompile(`sort=.*metadata.namespace\b`)
@@ -2852,43 +2700,39 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 	}
-	if !usingSQLCache {
-		tests = append(tests, nonSQLListTests...)
-	} else {
-		tests = append(tests, SQLOnlyListTests...)
-		// map labelSelector and fieldSelector params to the VAI equivalents
-		// ensure metadata.namespace tests are doing partial matching because
-		// the actual namespaces are given an `auto` prefix and a random suffix
-		for i, test := range tests {
-			query := test.query
-			parts := strings.Split(query, "&")
-			changed := false
-			for j, part := range parts {
-				subparts := strings.Split(part, "=")
-				if subparts[0] == "labelSelector" {
-					parts[j] = fmt.Sprintf("filter=metadata.labels[%s]=%s", subparts[1], subparts[2])
+	tests = append(tests, SQLOnlyListTests...)
+	// map labelSelector and fieldSelector params to the VAI equivalents
+	// ensure metadata.namespace tests are doing partial matching because
+	// the actual namespaces are given an `auto` prefix and a random suffix
+	for i, test := range tests {
+		query := test.query
+		parts := strings.Split(query, "&")
+		changed := false
+		for j, part := range parts {
+			subparts := strings.Split(part, "=")
+			if subparts[0] == "labelSelector" {
+				parts[j] = fmt.Sprintf("filter=metadata.labels[%s]=%s", subparts[1], subparts[2])
+				changed = true
+			} else if subparts[0] == "fieldSelector" {
+				op := "="
+				if subparts[1] == "metadata.namespace" {
+					// Use the partial-match operator because actual namespaces have a random prefix and suffix
+					op = "~"
+				}
+				parts[j] = fmt.Sprintf("filter=%s%s%s", subparts[1], op, subparts[2])
+				changed = true
+			} else if subparts[0] == "filter" {
+				if strings.Contains(part, "metadata.namespace=") {
+					// No need to break the filter down into sub-filters because in the test suite we don't
+					// have any VALUES that match 'metadata.namespace='
 					changed = true
-				} else if subparts[0] == "fieldSelector" {
-					op := "="
-					if subparts[1] == "metadata.namespace" {
-						// Use the partial-match operator because actual namespaces have a random prefix and suffix
-						op = "~"
-					}
-					parts[j] = fmt.Sprintf("filter=%s%s%s", subparts[1], op, subparts[2])
-					changed = true
-				} else if subparts[0] == "filter" {
-					if strings.Contains(part, "metadata.namespace=") {
-						// No need to break the filter down into sub-filters because in the test suite we don't
-						// have any VALUES that match 'metadata.namespace='
-						changed = true
-						parts[j] = strings.ReplaceAll(part, "metadata.namespace=", "metadata.namespace~")
-					}
+					parts[j] = strings.ReplaceAll(part, "metadata.namespace=", "metadata.namespace~")
 				}
 			}
-			if changed {
-				query = strings.Join(parts, "&")
-				tests[i].query = query
-			}
+		}
+		if changed {
+			query = strings.Join(parts, "&")
+			tests[i].query = query
 		}
 	}
 
@@ -2958,11 +2802,7 @@ func (s *steveAPITestSuite) TestList() {
 			if _, ok := query["revision"]; ok {
 				query["revision"] = []string{s.lastRevision}
 			}
-			if usingSQLCache {
-				query["filter"] = append(query["filter"], fmt.Sprintf("metadata.labels[%s]~%s", steveAPITestLabel, testID))
-			} else {
-				query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
-			}
+			query["filter"] = append(query["filter"], fmt.Sprintf("metadata.labels[%s]~%s", steveAPITestLabel, testID))
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -3336,7 +3176,7 @@ func (s *steveAPITestSuite) assertSummariesMatch(expectedSummaries []clientv1.St
 		newS := clientv1.SteveAPISummaryItem{}
 		newS.Property = s.Property
 		if newS.Property == "metadata.namespace" {
-			newS.Counts = make(map[string]int)
+			newS.Counts = make(map[string]clientv1.SteveSummaryWithBreakdown)
 			for k, v := range s.Counts {
 				newS.Counts[namespaceMap[k]] = v
 			}
