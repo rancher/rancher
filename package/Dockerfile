@@ -151,6 +151,9 @@ COPY --from=rancher-build /app/rancher /bin/rancher
 FROM scratch AS server
 COPY --from=chroot-builder-server /chroot/ /
 
+# Explicitly set PATH, replicating the original BCI Nano base config, lost by using `FROM scratch`
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
 RUN /usr/bin/unshare --version && \
@@ -487,6 +490,9 @@ VOLUME /var/lib/cni
 # Final agent target, extract the bci-nano chroot we prepared
 FROM scratch AS agent
 COPY --from=chroot-builder-agent /chroot/ /
+
+# Explicitly set PATH, replicating the original BCI Nano base config, lost by using `FROM scratch`
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
