@@ -29,6 +29,7 @@ target "_base" {
     VERSION = "${TAG}"
     COMMIT = "${COMMIT}"
     ARCH = "${ARCH}"
+    IMAGE_REPO = "${REPO}"
     RANCHER_REPO = "${REPO}"
   }
 }
