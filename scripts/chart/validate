@@ -11,7 +11,7 @@ if [ -z "$(type -p helm)" ]; then
 fi
 
 chart_yaml=$(dirname $0)/../../build/chart/rancher/Chart.yaml
-# Build-time placeholders: 0.0.0-VERSION and %NAME% tags
+# Build-time placeholders: 0.0.0-VERSION and %APP_VERSION%
 placeholders='0\.0\.0-VERSION\|%[A-Z_]*%'
 if grep -q "${placeholders}" "${chart_yaml}"; then
     echo "unreplaced placeholders in ${chart_yaml}:"
