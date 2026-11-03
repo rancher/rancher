@@ -551,12 +551,12 @@ func TestFilterField(t *testing.T) {
 	t.Parallel()
 
 	release := model.Release{
-		ServerArgs: map[string]schemas.Field{
-			"data-dir": {Type: "string"},
-			"tls":      {Type: "boolean"},
+		ServerArgs: map[string]model.Arg{
+			"data-dir": {Field: schemas.Field{Type: "string"}},
+			"tls":      {Field: schemas.Field{Type: "boolean"}},
 		},
-		AgentArgs: map[string]schemas.Field{
-			"node-name": {Type: "string"},
+		AgentArgs: map[string]model.Arg{
+			"node-name": {Field: schemas.Field{Type: "string"}},
 		},
 	}
 
