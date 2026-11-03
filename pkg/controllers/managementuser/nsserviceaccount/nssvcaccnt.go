@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nsserviceaccount"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -17,8 +18,7 @@ import (
 )
 
 const (
-	projectIDAnnotation    = "field.cattle.io/projectId"
-	sysNamespaceAnnotation = "management.cattle.io/system-namespace"
+	projectIDAnnotation = "field.cattle.io/projectId"
 )
 
 type defaultSvcAccountHandler struct {
@@ -85,7 +85,7 @@ func (nsh *defaultSvcAccountHandler) isSystemProjectNS(nsObj *corev1.Namespace, 
 		return false
 	}
 
-	if val, ok := nsObj.Annotations[sysNamespaceAnnotation]; ok && val == "true" {
+	if val, ok := nsObj.Annotations[namespace.SystemNamespaceAnnotation]; ok && val == "true" {
 		return true
 	}
 
