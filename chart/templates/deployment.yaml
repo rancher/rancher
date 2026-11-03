@@ -216,6 +216,12 @@ spec:
           timeoutSeconds: {{.Values.readinessProbe.timeoutSeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
           failureThreshold: {{.Values.readinessProbe.failureThreshold }}
+        {{- if gt (int .Values.preStopSleepSeconds) 0 }}
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: {{ int .Values.preStopSleepSeconds }}
+        {{- end }}
         {{- if .Values.resources }}
         resources: {{- toYaml .Values.resources | nindent 10 }}
         {{- end }}
