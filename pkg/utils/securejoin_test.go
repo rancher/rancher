@@ -36,6 +36,7 @@ func TestSecureJoin(t *testing.T) {
 		{name: "absolute path", path: "/etc/passwd", wantErr: true},
 		{name: "non-existent", path: "doesnotexist/file.txt", want: filepath.Join(base, "doesnotexist/file.txt")},
 		{name: "symlink escaping base", path: "evil/secret.txt", wantErr: true},
+		{name: "symlink escaping base, non-existent descendant", path: "evil/new/file.txt", wantErr: true},
 		{name: "symlink within base", path: "link/file.txt", want: filepath.Join(base, "link/file.txt")},
 	}
 
