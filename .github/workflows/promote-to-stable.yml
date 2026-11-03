@@ -9,6 +9,7 @@ on:
 env:
   REGISTRY: "docker.io"
   IMAGE: ${{ github.repository_owner }}/rancher-server
+  IMAGE_DEMO: ${{ github.repository_owner }}/rancher
   TAG: ${{ github.event.inputs.tag }}
   GIT_TAG: ${{ github.event.inputs.tag }}
 jobs:
@@ -28,10 +29,14 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Skopeo login
         run: echo "${DOCKER_PASSWORD}" | skopeo login "${REGISTRY}" --username "${DOCKER_USERNAME}" --password-stdin
-      - name: Copy image to latest
+      - name: Copy server image to latest
         run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:latest" --all
-      - name: Copy image to stable
+      - name: Copy server image to stable
         run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:stable" --all
+      - name: Copy demo image to latest
+        run: skopeo copy "docker://${REGISTRY}/${IMAGE_DEMO}:${TAG}" "docker://${REGISTRY}/${IMAGE_DEMO}:latest" --all
+      - name: Copy demo image to stable
+        run: skopeo copy "docker://${REGISTRY}/${IMAGE_DEMO}:${TAG}" "docker://${REGISTRY}/${IMAGE_DEMO}:stable" --all
   promote-chart:
     runs-on: ubuntu-latest
     container:
