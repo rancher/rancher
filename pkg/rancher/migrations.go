@@ -1071,8 +1071,12 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 	_, createErr = w.Core.Secret().Create(secret)
 	if apierrors.IsNotFound(createErr) {
 		// A Create can only return NotFound when the namespace does not exist.
-		logrus.Warnf("Skipping migration of CRT %s/%s: namespace %s not found",
+		// The CRT is orphaned, so delete it rather than block Rancher startup.
+		logrus.Warnf("Deleting orphaned CRT %s/%s: namespace %s not found",
 			crt.Namespace, crt.Name, crt.Namespace)
+		if err := w.Mgmt.ClusterRegistrationToken().Delete(crt.Namespace, crt.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete orphaned CRT: %w", err)
+		}
 		return nil
 	}
 	if createErr != nil && !apierrors.IsAlreadyExists(createErr) {

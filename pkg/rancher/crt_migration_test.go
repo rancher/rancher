@@ -44,8 +44,8 @@ func (s *stubMgmtV3ForCRTMigration) ClusterRegistrationToken() managementv3.Clus
 
 // TestMigrateCRTTokensToSecretsOrphanedNamespace covers CRTs left behind in a
 // cluster namespace that no longer exists. Creating the token secret fails
-// with NotFound; the migration must skip those CRTs and complete, rather than
-// return the error and stop Rancher from starting.
+// with NotFound; the migration must delete those CRTs and complete, rather
+// than return the error and stop Rancher from starting.
 func TestMigrateCRTTokensToSecretsOrphanedNamespace(t *testing.T) {
 	originalVersion := rancherversion.Version
 	rancherversion.Version = "v2.15.3" // migrations are skipped for "dev"
@@ -53,7 +53,11 @@ func TestMigrateCRTTokensToSecretsOrphanedNamespace(t *testing.T) {
 
 	const orphanedNamespace = "c-bddqq"
 
-	setup := func(t *testing.T, createErr error) (*wrangler.Context, *ctrlfake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList]) {
+	setup := func(t *testing.T, createErr error) (
+		*wrangler.Context,
+		*ctrlfake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
+		*ctrlfake.MockControllerInterface[*mgmtv3.ClusterRegistrationToken, *mgmtv3.ClusterRegistrationTokenList],
+	) {
 		ctrl := gomock.NewController(t)
 
 		configMaps := ctrlfake.NewMockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -77,6 +81,7 @@ func TestMigrateCRTTokensToSecretsOrphanedNamespace(t *testing.T) {
 			},
 		}, nil)
 		// The orphaned CRT must not be updated; gomock fails on any unexpected call.
+		// Subtests add their own expectation for Delete.
 
 		secrets := ctrlfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
@@ -88,13 +93,14 @@ func TestMigrateCRTTokensToSecretsOrphanedNamespace(t *testing.T) {
 		return &wrangler.Context{
 			Core: &stubCoreV1ForCRTMigration{configMapCtrl: configMaps, secretCtrl: secrets},
 			Mgmt: &stubMgmtV3ForCRTMigration{crtCtrl: crts},
-		}, configMaps
+		}, configMaps, crts
 	}
 
-	t.Run("skips CRTs whose namespace is missing and records completion", func(t *testing.T) {
+	t.Run("deletes CRTs whose namespace is missing and records completion", func(t *testing.T) {
 		// This is the error the kube-apiserver NamespaceLifecycle admission
 		// plugin returns for a Create into a namespace that does not exist.
-		w, configMaps := setup(t, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, orphanedNamespace))
+		w, configMaps, crts := setup(t, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, orphanedNamespace))
+		crts.EXPECT().Delete(orphanedNamespace, "default-token", gomock.Any()).Return(nil)
 		configMaps.EXPECT().Create(&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      migrateCRTTokensToSecrets,
@@ -106,9 +112,29 @@ func TestMigrateCRTTokensToSecretsOrphanedNamespace(t *testing.T) {
 		require.NoError(t, migrateCRTTokensToSecretsFunc(w))
 	})
 
-	t.Run("other create errors abort without recording completion", func(t *testing.T) {
-		w, _ := setup(t, apierrors.NewInternalError(errors.New("etcd unavailable")))
+	t.Run("ignores NotFound when deleting an orphaned CRT", func(t *testing.T) {
+		w, configMaps, crts := setup(t, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, orphanedNamespace))
+		crts.EXPECT().Delete(orphanedNamespace, "default-token", gomock.Any()).
+			Return(apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "clusterregistrationtokens"}, "default-token"))
+		configMaps.EXPECT().Create(gomock.Any())
+
+		require.NoError(t, migrateCRTTokensToSecretsFunc(w))
+	})
+
+	t.Run("other delete errors abort without recording completion", func(t *testing.T) {
+		w, _, crts := setup(t, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, orphanedNamespace))
+		crts.EXPECT().Delete(orphanedNamespace, "default-token", gomock.Any()).
+			Return(apierrors.NewInternalError(errors.New("etcd unavailable")))
 		// No Create/Update is expected on configMaps.
+
+		err := migrateCRTTokensToSecretsFunc(w)
+		require.Error(t, err)
+		assert.True(t, apierrors.IsInternalError(err))
+	})
+
+	t.Run("other create errors abort without recording completion", func(t *testing.T) {
+		w, _, _ := setup(t, apierrors.NewInternalError(errors.New("etcd unavailable")))
+		// No Create/Update is expected on configMaps, and the CRT must not be deleted.
 
 		err := migrateCRTTokensToSecretsFunc(w)
 		require.Error(t, err)
