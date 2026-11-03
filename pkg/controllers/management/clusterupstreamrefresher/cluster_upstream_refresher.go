@@ -246,16 +246,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 			return cluster, err
 		}
 
-		for key, value := range upstreamSpecMap {
-			if specMap[key] == nil {
-				continue
-			}
-			if reflect.DeepEqual(specMap[key], value) {
-				continue
-			}
-			specChanged = true
-			specMap[key] = value
-		}
+		specChanged = mergeUpstreamSpec(cloudDriver, specMap, upstreamSpecMap)
 
 		if specChanged {
 			logrus.Debugf("change detected for cluster [%s], updating spec", cluster.Name)
@@ -313,6 +304,49 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 
 	// Update refreshTime annotation
 	return c.updateRefreshAnnotation(cluster)
+}
+
+// mergeUpstreamSpec merges the upstream cluster spec fields into the cluster's
+// current spec map. It returns true if any field on specMap was changed.
+//
+// A field present on the upstream spec is copied into specMap when its value
+// differs from what is already set. Fields that are not currently set on the
+// cluster spec (specMap[key] == nil) are normally left untouched, since they are
+// managed via other flows. The exception is immutable upstream fields (see
+// isImmutableUpstreamField): for imported clusters these start out unset on the
+// spec and must be seeded from the upstream value, which is always authoritative
+// because it cannot change upstream.
+func mergeUpstreamSpec(cloudDriver string, specMap, upstreamSpecMap map[string]interface{}) bool {
+	var specChanged bool
+	for key, value := range upstreamSpecMap {
+		if specMap[key] == nil {
+			if !isImmutableUpstreamField(cloudDriver, key) || value == nil {
+				continue
+			}
+		} else if reflect.DeepEqual(specMap[key], value) {
+			continue
+		}
+		specChanged = true
+		specMap[key] = value
+	}
+	return specChanged
+}
+
+// isImmutableUpstreamField reports whether the given upstream spec field is
+// immutable in the hosted provider and therefore always authoritative when read
+// from upstream. Such fields may be unset on an imported cluster's spec and must
+// be seeded from the upstream value during sync.
+//
+// EKS ipFamily is set at cluster creation and cannot be changed afterwards
+// (see https://docs.aws.amazon.com/eks/latest/APIReference/API_KubernetesNetworkConfigRequest.html),
+// so the upstream value is always correct and safe to copy into the cluster spec.
+func isImmutableUpstreamField(cloudDriver, field string) bool {
+	switch cloudDriver {
+	case apimgmtv3.ClusterDriverEKS:
+		return field == "ipFamily"
+	default:
+		return false
+	}
 }
 
 // updateClusterStatus updates the cluster status.
