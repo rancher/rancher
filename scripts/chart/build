@@ -13,7 +13,7 @@ mkdir -p build/chart
 rm -rf build/chart/rancher
 cp -rf ${1} build/chart/rancher
 
-sed -i -e "s/%VERSION%/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
+sed -i -e "s/0\.0\.0-VERSION/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
 sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" build/chart/rancher/Chart.yaml
 render_images_annotation build/chart/rancher/Chart.yaml
 
