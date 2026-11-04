@@ -125,8 +125,8 @@ require (
 	github.com/rancher/cluster-api-provider-rke2 v0.27.0
 	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.16.0-rc.3
-	github.com/rancher/fleet/pkg/apis v0.17.0-beta.2
-	github.com/rancher/fleet/pkg/helmvalues v0.17.0-beta.2
+	github.com/rancher/fleet/pkg/apis v0.17.0-beta.3
+	github.com/rancher/fleet/pkg/helmvalues v0.17.0-beta.3
 	github.com/rancher/gke-operator v1.16.0-rc.4
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
@@ -155,7 +155,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.58.0
 	golang.org/x/mod v0.42.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
