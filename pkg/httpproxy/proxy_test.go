@@ -15,8 +15,11 @@ import (
 	"testing"
 	"time"
 
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 // ReplaceSetCookies should rename set cookie header to api set cookie header
@@ -512,7 +515,7 @@ func TestIsBadHeader(t *testing.T) {
 		key   string
 		isBad bool
 	}{
-		{"X-Forwarded-Proto", false},
+		{"X-Forwarded-Proto", true},
 		{"Accept-Language", false},
 		{"Accept", false},
 		{"impersonate-user", true},
@@ -576,11 +579,23 @@ func TestInheritedCSPIsNotDuplicated(t *testing.T) {
 	assert.Equal(t, []string{"default-src 'none'; style-src 'unsafe-inline'; sandbox"}, recorder.Header()[CSP])
 }
 
+// emptyEndpointCache returns a ProxyEndpoint cache with no endpoints, so no
+// route matches and the proxy falls back to the default transport.
+func emptyEndpointCache(t *testing.T) *fake.MockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint] {
+	t.Helper()
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](gomock.NewController(t))
+	cache.EXPECT().List(gomock.Any()).Return(nil, nil).AnyTimes()
+
+	return cache
+}
+
 // TestProxyOutgoingHeaders checks the outgoing Cookie and Authorization
 // headers for each authentication path.
 func TestProxyOutgoingHeaders(t *testing.T) {
 	p := &proxy{
-		prefix: "/proxy/",
+		proxyEndpointCache: emptyEndpointCache(t),
+		prefix:             "/proxy/",
 		validHostsSupplier: func() []string {
 			return []string{"api.example.com"}
 		},
@@ -650,7 +665,8 @@ func TestProxyOutgoingHeaders(t *testing.T) {
 // outgoing Cookie header when a signer is used.
 func TestProxyAPICookieWithSigner(t *testing.T) {
 	p := &proxy{
-		prefix: "/proxy/",
+		proxyEndpointCache: emptyEndpointCache(t),
+		prefix:             "/proxy/",
 		validHostsSupplier: func() []string {
 			return []string{"api.example.com"}
 		},
@@ -713,6 +729,7 @@ func startMetaProxy(t *testing.T, validHosts []string) string {
 	t.Helper()
 
 	handler := newHandler(&proxy{
+		proxyEndpointCache: emptyEndpointCache(t),
 		prefix:             "/proxy/",
 		validHostsSupplier: func() []string { return validHosts },
 	})
