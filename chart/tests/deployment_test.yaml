@@ -434,6 +434,15 @@ tests:
     - equal:
         path: spec.template.spec.containers[0].lifecycle.preStop.sleep.seconds
         value: 10
+- it: should not set a preStop hook before Kubernetes 1.30
+  capabilities:
+    majorVersion: 1
+    minorVersion: 29
+  set:
+    preStopSleepSeconds: 10
+  asserts:
+    - notExists:
+        path: spec.template.spec.containers[0].lifecycle
 - it: should always have a startupProbe
   asserts:
     - equal:

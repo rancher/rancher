@@ -216,7 +216,7 @@ spec:
           timeoutSeconds: {{.Values.readinessProbe.timeoutSeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
           failureThreshold: {{.Values.readinessProbe.failureThreshold }}
-        {{- if gt (int .Values.preStopSleepSeconds) 0 }}
+        {{- if and (gt (int .Values.preStopSleepSeconds) 0) (semverCompare ">=1.30.0-0" .Capabilities.KubeVersion.Version) }}
         lifecycle:
           preStop:
             sleep:

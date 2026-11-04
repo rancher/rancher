@@ -337,6 +337,7 @@ readinessProbe:
 # Seconds a terminating Rancher pod keeps serving before it receives SIGTERM,
 # so ingress controllers and load balancers stop routing to it first.
 # Keep it below the pod's terminationGracePeriodSeconds of 30. 0 disables the hook.
+# Requires Kubernetes 1.30 or later, ignored on older clusters.
 preStopSleepSeconds: 0
 
 # Enable host networking for Rancher pods.
