@@ -7,7 +7,7 @@ env:
   HOST_ARCH: amd64
   ARCH: amd64
   GOLANG_VERSION: '1.27'
-  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
 permissions: {}
@@ -81,13 +81,13 @@ jobs:
           merge-multiple: true
       - name: Load server image
         run: |
-          image_server_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_server_id=$(docker load --input /tmp/rancher-server-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_server_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
 
-          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
+          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-server:.*amd64.*$" | head -n 1)
           echo "the image created is $AMD_IMAGE"
           docker tag "$image_server_id" "${IMAGE}:${TAG}"
           docker image ls
