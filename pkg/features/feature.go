@@ -191,7 +191,7 @@ var (
 		false,
 		true,
 	)
-	SCIM = newFeature(
+	SCIM = newPrimeFeature(
 		"scim",
 		"Enable SCIM identity provisioning",
 		false,
