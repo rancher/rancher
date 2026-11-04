@@ -12,7 +12,9 @@ import (
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -48,7 +50,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 				LoginName:     "1234567",
 				PrincipalType: "user",
 				Me:            true,
-				Provider:      Name,
+				Provider:      ProviderName,
 			},
 			wantErr: false,
 		},
@@ -75,25 +77,22 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 				LoginName:     "9876543",
 				PrincipalType: "user",
 				Me:            false,
-				Provider:      Name,
+				Provider:      ProviderName,
 			},
 			wantErr: false,
 		},
 		{
-			name:        "fetch principal token is nil",
-			principalID: "genericoidc_user://9876543",
-			want: apiv3.Principal{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "genericoidc_user://9876543",
+			name:        "fetch principal from another config",
+			principalID: "genericoidc-eu_user://9876543",
+			token: apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "genericoidc_user://1234567",
+					},
 				},
-				DisplayName:   "9876543",
-				LoginName:     "9876543",
-				PrincipalType: "user",
-				Me:            false,
-				Provider:      Name,
 			},
-			wantErr: false,
+			want:    apiv3.Principal{},
+			wantErr: true,
 		},
 		{
 			name:        "fetch principal called with empty principal",
@@ -106,7 +105,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		test := test
 		g := &GenOIDCProvider{
 			oidc.OpenIDCProvider{
-				Name: Name,
+				Name: ProviderName,
 				Type: client.GenericOIDCConfigType,
 			},
 		}
@@ -140,7 +139,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 				Spec: ext.TokenSpec{
 					UserPrincipal: ext.TokenPrincipal{
 						Name:          "genericoidc_user://1234567",
-						Provider:      Name,
+						Provider:      ProviderName,
 						DisplayName:   "Test User",
 						LoginName:     "1234567",
 						PrincipalType: "user",
@@ -155,26 +154,23 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 				DisplayName:   "Test User",
 				LoginName:     "1234567",
 				PrincipalType: "user",
-				Provider:      Name,
+				Provider:      ProviderName,
 				Me:            true,
 			},
 			wantErr: false,
 		},
 		{
-			name:        "fetch principal token is nil",
-			principalID: "genericoidc_user://9876543",
-			want: apiv3.Principal{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "genericoidc_user://9876543",
+			name:        "fetch principal from another config",
+			principalID: "genericoidc-eu_user://9876543",
+			token: ext.Token{
+				Spec: ext.TokenSpec{
+					UserPrincipal: ext.TokenPrincipal{
+						Name: "genericoidc_user://1234567",
+					},
 				},
-				DisplayName:   "9876543",
-				LoginName:     "9876543",
-				PrincipalType: "user",
-				Me:            false,
-				Provider:      Name,
 			},
-			wantErr: false,
+			want:    apiv3.Principal{},
+			wantErr: true,
 		},
 		{
 			name:        "fetch principal called with empty principal",
@@ -187,7 +183,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 		test := test
 		g := &GenOIDCProvider{
 			oidc.OpenIDCProvider{
-				Name: Name,
+				Name: ProviderName,
 				Type: client.GenericOIDCConfigType,
 			},
 		}
@@ -217,7 +213,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 					DisplayName:   "user1",
 					LoginName:     "user1",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -230,13 +226,13 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 					DisplayName:   "user1",
 					LoginName:     "user1",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://user1"},
 					DisplayName:   "user1",
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -246,12 +242,12 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://"},
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://"},
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -264,7 +260,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://group1"},
 					DisplayName:   "group1",
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -275,7 +271,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://"},
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -283,7 +279,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 
 	g := &GenOIDCProvider{
 		oidc.OpenIDCProvider{
-			Name: Name,
+			Name: ProviderName,
 			Type: client.GenericOIDCConfigType,
 		},
 	}
@@ -292,7 +288,12 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
+			token := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "genericoidc_user://testuser"},
+				},
+			}
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, token)
 			if err != nil {
 				t.Errorf("SearchPrincipals() returned an error: %v", err)
 			}
@@ -305,7 +306,14 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		// And same behaviour for ext tokens
 		t.Run(test.name+", ext", func(t *testing.T) {
 			t.Parallel()
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &ext.Token{})
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserPrincipal: ext.TokenPrincipal{
+						Name: "genericoidc_user://testuser",
+					},
+				},
+			}
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, token)
 			if err != nil {
 				t.Errorf("SearchPrincipals() returned an error: %v", err)
 			}
@@ -396,7 +404,7 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 
 	g := &GenOIDCProvider{
 		oidc.OpenIDCProvider{
-			Name: Name,
+			Name: ProviderName,
 			Type: client.GenericOIDCConfigType,
 			UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 				ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
@@ -421,14 +429,14 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -440,20 +448,20 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://testu"},
 					DisplayName:   "testu",
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -467,7 +475,7 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 					DisplayName:   "sub-0001",
 					LoginName:     "sub-0001",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -481,7 +489,7 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 					DisplayName:   "UserFromOkta",
 					LoginName:     "UserFromOkta",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -494,7 +502,7 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://testu"},
 					DisplayName:   "testu",
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -504,7 +512,12 @@ func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
+			token := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "genericoidc_user://testuser"},
+				},
+			}
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, token)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, result)
 		})
@@ -516,7 +529,7 @@ func TestGenOIDCProviderSearchPrincipalsUserSearchError(t *testing.T) {
 
 	g := &GenOIDCProvider{
 		oidc.OpenIDCProvider{
-			Name: Name,
+			Name: ProviderName,
 			Type: client.GenericOIDCConfigType,
 			UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 				ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
@@ -526,7 +539,75 @@ func TestGenOIDCProviderSearchPrincipalsUserSearchError(t *testing.T) {
 		},
 	}
 
-	got, err := g.SearchPrincipals("testu", UserType, &apiv3.Token{})
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "genericoidc_user://testuser"},
+		},
+	}
+	got, err := g.SearchPrincipals("testu", UserType, token)
 	assert.ErrorContains(t, err, "cache is not synced")
 	assert.Nil(t, got)
+}
+
+func TestGenOIDCProviderPrincipalsUseConfigName(t *testing.T) {
+	const configName = "test-eu-oidc"
+	ctrl := gomock.NewController(t)
+	userMGR := userMocks.NewMockManager(ctrl)
+	userMGR.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(false).AnyTimes()
+	g := &GenOIDCProvider{
+		oidc.OpenIDCProvider{
+			Name:    ProviderName,
+			Type:    client.GenericOIDCConfigType,
+			UserMGR: userMGR,
+		},
+	}
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: configName + "_user://testuser"},
+		},
+	}
+
+	t.Run("GetPrincipal round-trips group principal IDs", func(t *testing.T) {
+		principalID := configName + "_group://admins"
+
+		got, err := g.GetPrincipal(principalID, token)
+		assert.NoError(t, err)
+
+		assert.Equal(t, principalID, got.Name)
+		assert.Equal(t, "admins", got.DisplayName)
+		assert.Equal(t, GroupType, got.PrincipalType)
+		assert.Equal(t, ProviderName, got.Provider)
+	})
+
+	t.Run("GetPrincipal round-trips user principal IDs", func(t *testing.T) {
+		principalID := configName + "_user://1234567"
+
+		got, err := g.GetPrincipal(principalID, token)
+		assert.NoError(t, err)
+
+		assert.Equal(t, principalID, got.Name)
+		assert.Equal(t, ProviderName, got.Provider)
+	})
+
+	t.Run("SearchPrincipals returns group IDs that match the login group IDs", func(t *testing.T) {
+		result, err := g.SearchPrincipals("admins", GroupType, token)
+		assert.NoError(t, err)
+
+		// Login creates group principals named <configName>_group://<group>.
+		want := []apiv3.Principal{
+			{
+				ObjectMeta:    metav1.ObjectMeta{Name: configName + "_group://admins"},
+				DisplayName:   "admins",
+				PrincipalType: GroupType,
+				Provider:      ProviderName,
+			},
+		}
+		assert.Equal(t, want, result)
+
+		// The search result must resolve back to the same principal.
+		got, err := g.GetPrincipal(result[0].Name, token)
+		assert.NoError(t, err)
+		assert.Equal(t, result[0].Name, got.Name)
+	})
 }

@@ -166,9 +166,9 @@ noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
 image:
   # Optional: Image-specific registry override
   # registry: ""
-  repository: rancher/rancher
+  repository: rancher/rancher-server
   # Defaults to .Chart.appVersion
-  # rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
+  # rancher/rancher-server image tag. https://hub.docker.com/r/rancher/rancher-server/tags/
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -176,7 +176,7 @@ image:
 # Override the name of the Rancher image to pull.
 # To override the registry location use systemDefaultRegistry instead.
 # rancherImage: ""
-# rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
+# rancher/rancher-server image tag. https://hub.docker.com/r/rancher/rancher-server/tags/
 # Defaults to .Chart.appVersion
 # rancherImageTag: v2.0.7
 # Override imagePullPolicy for rancher server images
@@ -225,7 +225,7 @@ useBundledSystemChart: false
 # Important: update build.yaml when this default image needs to be changed, then run `go generate`.
 assetsImage:
   repository: rancher/rancher-assets
-  tag: v2.16-20260914T2041Z-dev
+  tag: v2.16-20261027T2136Z-dev
 
 # Certmanager version compatibility
 certmanager:
@@ -380,14 +380,14 @@ extraObjects: []
 
 # Control additional labels and annotations on namespaces create by Rancher.
 rancherNamespaces:
-
   # If enabled is true, the "cattle.io/managed-namespace" annotation will be applied to any new namespaces.
   enabled: false
 
-# Additional labels to be added to new namespaces.
-# labels:
-#   foo: bar
+  # If strict is true, project namespaces (except for the system project) will not receive the configured labels and annotations.
+  strict: false
 
-# Additional annotaitons to be added to new namespaces. Will be appied along with the "cattle.io/managed-namespace" annotation.  
-# annotations:
-#   foo: bar
+  # Additional labels to be added to new namespaces.
+  labels: {}
+
+  # Additional annotaitons to be added to new namespaces. Will be appied along with the "cattle.io/managed-namespace" annotation.  
+  annotations: {}

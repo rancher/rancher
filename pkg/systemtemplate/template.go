@@ -166,6 +166,9 @@ spec:
       - effect: NoExecute
         key: "node-role.kubernetes.io/etcd"
         operator: "Exists"
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: "Exists"
       {{- else if .Tolerations }}
       # Tolerations added based on found taints on controlplane nodes
 {{ .Tolerations | indent 6 }}
@@ -178,8 +181,6 @@ spec:
         key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"
       {{- end }}
-      - key: node.cloudprovider.kubernetes.io/uninitialized
-        operator: "Exists"
       {{- if .AppendTolerations }}
 {{ .AppendTolerations | indent 6 }}
       {{- end }}
@@ -189,7 +190,7 @@ spec:
       {{- if not .IsPreBootstrap }}
       initContainers:
       - name: rancher-charts-copy
-        image: {{.AssetsImage}}
+        image: {{ .AssetsImage | quote }}
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: rancher-charts
@@ -205,24 +206,24 @@ spec:
           env:
           {{- if ne .Features "" }}
           - name: CATTLE_FEATURES
-            value: "{{.Features}}"
+            value: {{ .Features | quote }}
           {{- end }}
           - name: CATTLE_SERVER
-            value: "{{.URLPlain}}"
+            value: {{ .URLPlain | quote }}
           - name: CATTLE_CA_CHECKSUM
-            value: "{{.CAChecksum}}"
+            value: {{ .CAChecksum | quote }}
           - name: CATTLE_CLUSTER
             value: "true"
           - name: CATTLE_K8S_MANAGED
             value: "true"
           - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
-            value: "{{.ClusterRegistry}}"
+            value: {{ .ClusterRegistry | quote }}
           - name: CATTLE_CREDENTIAL_NAME
             value: cattle-credentials-{{.TokenKey}}
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
-            value: "{{.SUCAppNameOverride}}"
+            value: {{ .SUCAppNameOverride | quote }}
           {{- if eq .NamespaceOptions.Enabled true }}
-          - name: RANCHER_NAMESPACE_OPTIONS
+          - name: RANCHER_NAMESPACES_OPTIONS
             value: '{{.NamespaceOptions | mustToJson}}'
           {{- end }}
           {{- if .IsPreBootstrap }}
@@ -240,7 +241,7 @@ spec:
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}
-          image: "{{.AgentImage}}"
+          image: {{ .AgentImage | quote }}
           volumeMounts:
           - name: rancher-charts
             mountPath: /var/lib/rancher-data/local-catalogs/v2
@@ -315,7 +316,7 @@ spec:
       - operator: Exists
       containers:
       - name: kube-api-auth
-        image: "{{.AuthImage}}"
+        image: {{ .AuthImage | quote }}
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: k8s-ssl
@@ -372,9 +373,9 @@ metadata:
   name: cattle-cluster-agent-priority-class
 value: {{ .PriorityClassValue }}
 {{- if .PreemptionPolicy }}
-preemptionPolicy: {{ .PreemptionPolicy }}
+preemptionPolicy: {{ .PreemptionPolicy | quote }}
 {{- end }}
-description: {{ .Description }}
+description: {{ .Description | quote }}
 `
 
 	cattleClusterPodDisruptionBudgetTemplate = `

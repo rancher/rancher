@@ -730,7 +730,12 @@ func roleBindingEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedreso
 
 // isPRTBOwnedRoleBinding reports whether rb is owned by a ProjectRoleTemplateBinding, under either
 // the aggregation model (prtb-owner-<name> label) or the legacy model (rtb-owner labels).
+// Management plane bindings (e.g. in project backing namespaces on the local cluster) are owned by
+// the management roletemplate controllers, not by this handler, so they are never reported as owned.
 func isPRTBOwnedRoleBinding(rb *rbacv1.RoleBinding) bool {
+	if rb.Labels[rbac.AggregationManagementFeatureLabel] == "true" {
+		return false
+	}
 	for key := range rb.Labels {
 		if strings.HasPrefix(key, rbac.PrtbOwnerLabel+"-") {
 			return true

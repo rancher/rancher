@@ -87,7 +87,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				exttokenstore.FieldDescription:    []byte(""),
 				exttokenstore.FieldEnabled:        []byte("true"),
 				exttokenstore.FieldHash:           []byte("al;dgkl;dkfdsafdioj"),
-				exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+				exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 				exttokenstore.FieldLastUpdateTime: []byte("13:00:05"),
 				exttokenstore.FieldPrincipal:      fakePrincipalBytes,
 				exttokenstore.FieldTTL:            []byte("-1"),
@@ -115,6 +115,8 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
 			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
 			assert.Equal(t, testUser, s.StringData[exttokenstore.FieldUserID])
+			// The kind picks the TTL limits the ext token store applies.
+			assert.Equal(t, exttokenstore.KindKubeconfig, s.StringData[exttokenstore.FieldKind])
 			n := s.DeepCopy()
 			n.Name = "token-xxx"
 			n.Data = map[string][]byte{}
@@ -175,8 +177,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "fake-legacy",
 				},
-				UserID:       testUser,
-				AuthProvider: "local",
+				UserID: testUser,
 				UserPrincipal: apimgmtv3.Principal{
 					Provider: "local",
 					ObjectMeta: metav1.ObjectMeta{
@@ -288,7 +289,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				exttokenstore.FieldDescription:    []byte(""),
 				exttokenstore.FieldEnabled:        []byte("true"),
 				exttokenstore.FieldHash:           []byte("al;dgkl;dkfdsafdioj"),
-				exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+				exttokenstore.FieldKind:           []byte(exttokenstore.KindSession),
 				exttokenstore.FieldLastUpdateTime: []byte("13:00:05"),
 				exttokenstore.FieldPrincipal:      fakePrincipalBytes,
 				exttokenstore.FieldTTL:            []byte("-1"),
@@ -376,8 +377,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "fake-legacy",
 				},
-				UserID:       testUser, // session owner, distinct from impersonated target
-				AuthProvider: "local",
+				UserID: testUser, // session owner, distinct from impersonated target
 				UserPrincipal: apimgmtv3.Principal{
 					Provider: "local",
 					ObjectMeta: metav1.ObjectMeta{

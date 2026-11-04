@@ -31,5 +31,5 @@ jobs:
           cache: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }} # zizmor: ignore[cache-poisoning] -- test-only dependency cache; release workflows are separate.
       - name: Run Integration Tests
         env:
-          ENVTEST_K8S_VERSION: "1.30"
+          ENVTEST_K8S_VERSION: "1.37"
         run: ./tests/controllers/run_controller_tests.sh

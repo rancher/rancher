@@ -14,10 +14,12 @@ import (
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var update = flag.Bool("update", false, "update snapshot files with current test outputs")
@@ -58,8 +60,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "test-provisioned-import",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -90,8 +93,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name:     "test-provisioned-import with scheduling customization, initial registration",
 			pcExists: false,
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -120,8 +124,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			name:     "test-provisioned-import with scheduling customization, cluster deploy creation",
 			pcExists: true,
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-rke2",
@@ -149,8 +154,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "test-provisioned-import-custom-agent",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-prov",
+				Name: "test-prov",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "testing-rke2",
@@ -171,8 +177,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "test-rancher-namespace-options-enabled",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+				Name: "test-namespace-options",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -198,8 +205,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "test-rancher-namespace-options-enabled-no-labels",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+				Name: "test-namespace-options",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -223,8 +231,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "test-rancher-namespace-options-enabled-no-annotations",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-namespace-options",
+				Name: "test-namespace-options",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "testing-namesapce-opotions",
@@ -248,8 +257,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "imported cluster with pull secrets renders imagePullSecrets and secret resources",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "c-abc12", // matches MgmtNameRegexp
+				Name: "c-abc12", // matches MgmtNameRegexp
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "test-imported-pull-secrets",
@@ -316,8 +326,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "imported cluster with multiple pull secrets",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "c-xyz99", // matches MgmtNameRegexp
+				Name: "c-xyz99", // matches MgmtNameRegexp
+
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "test-multi-secrets",
@@ -363,9 +375,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "pull secret lookup failure returns error",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "c-abc12",
-				},
+				Name: "c-abc12",
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName: "test-secret-failure",
 					ImportedConfig: &apimgmtv3.ImportedConfig{
@@ -387,7 +397,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		{
 			name: "pre-bootstrap renders bootstrap deployment with hostNetwork",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-preboot"},
+				Name: "test-preboot",
+				Annotations: map[string]string{
+					"provisioning.cattle.io/administrated": "true",
+				},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:    "test-preboot",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
@@ -470,4 +483,56 @@ func sanitizeName(name string) string {
 	name = strings.ReplaceAll(name, " ", "-")
 	name = strings.ReplaceAll(name, ",", "")
 	return name
+}
+
+func TestSystemTemplate_quotedValues(t *testing.T) {
+	secretLister := &corefakes.SecretListerMock{
+		GetFunc: func(namespace string, name string) (*corev1.Secret, error) {
+			return nil, apierror.NewNotFound(schema.GroupResource{}, name)
+		},
+	}
+	payload := "x\"\n          - name: EXTRA\n            value: \"y"
+
+	cluster := &apimgmtv3.Cluster{
+		Name: "test-quoted",
+		Spec: apimgmtv3.ClusterSpec{
+			DisplayName:    "test",
+			ImportedConfig: &apimgmtv3.ImportedConfig{PrivateRegistryURL: payload},
+		},
+		Status: apimgmtv3.ClusterStatus{Driver: "imported"},
+	}
+
+	var b bytes.Buffer
+	err := SystemTemplate(&b, &TemplateOps{
+		AgentImage:   payload,
+		AuthImage:    payload,
+		AssetsImage:  payload,
+		Token:        "token",
+		URL:          "https://rancher.example",
+		Cluster:      cluster,
+		SecretLister: secretLister,
+		Mutator:      namespace.GetMutator(),
+	})
+	assert.NoError(t, err)
+
+	var found bool
+	for r := range strings.SplitSeq(b.String(), "\n---\n") {
+		obj, gvk, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(r), nil, nil)
+		if err != nil || gvk.Kind != "Deployment" {
+			continue
+		}
+		found = true
+		container := obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0]
+		assert.Equal(t, payload, container.Image)
+		for _, ic := range obj.(*appsv1.Deployment).Spec.Template.Spec.InitContainers {
+			assert.Equal(t, payload, ic.Image)
+		}
+		for _, env := range container.Env {
+			assert.NotEqual(t, "EXTRA", env.Name)
+			if env.Name == "CATTLE_SYSTEM_DEFAULT_REGISTRY" {
+				assert.Equal(t, payload, env.Value)
+			}
+		}
+	}
+	assert.True(t, found, "cattle-cluster-agent deployment not rendered")
 }

@@ -1,11 +1,17 @@
 package local
 
 import (
+	"errors"
 	"sort"
 	"testing"
 
+	"github.com/rancher/norman/httperror"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -255,6 +261,123 @@ func TestProviderSearchPrincipal(t *testing.T) {
 	}
 }
 
+func TestAuthenticateUserComparesPasswordWhenUserDoesNotExist(t *testing.T) {
+	verifier := &mockPasswordVerifier{}
+	provider := Provider{
+		userIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+			userNameIndex: userNameIndexer,
+		}),
+		pwdVerifier: verifier,
+	}
+	password := "submitted-password"
+
+	_, _, _, err := provider.AuthenticateUser(nil, nil, &v3.BasicLogin{
+		Username: "missing-user",
+		Password: password,
+	})
+
+	require.Error(t, err)
+	assert.Equal(t, verifier.comparisons, []passwordComparison{
+		{
+			password:       password,
+			hashedPassword: invalidHash,
+			salt:           invalidHash,
+		},
+	})
+}
+
+func TestProviderSearchPrincipalsMultiAuthProviderCrossSearchesAllUsers(t *testing.T) {
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
+	previousMultiAuthProviderCross := features.MultiAuthProviderCross.Enabled()
+	features.MultiAuthProviderCross.Set(true)
+	t.Cleanup(func() {
+		features.MultiAuthProviderCross.Set(previousMultiAuthProviderCross)
+	})
+
+	testUsers := []*v3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-local"},
+			Username:     "local-user",
+			DisplayName:  "Local User",
+			PrincipalIDs: []string{"local://u-local"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta"},
+			DisplayName:  "Okta User",
+			PrincipalIDs: []string{"okta_user://indexed", "local://u-indexed"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-genericoidc"},
+			DisplayName:  "GenericOIDC User",
+			PrincipalIDs: []string{"genericoidc_user://distinctive", "local://u-distinctive"},
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+	}
+	token := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: "okta_user://indexed"},
+			PrincipalType: "user",
+		},
+	}
+
+	tests := []struct {
+		name      string
+		searchKey string
+		want      []v3.Principal
+	}{
+		{
+			name:      "short search uses index and includes external user",
+			searchKey: "okta",
+			want: []v3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "okta_user://indexed"},
+					DisplayName:   "Okta User",
+					Provider:      "okta",
+					PrincipalType: "user",
+					Me:            true,
+				},
+			},
+		},
+		{
+			name:      "long search scans lister and includes external user",
+			searchKey: "genericoidc user",
+			want: []v3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://distinctive"},
+					DisplayName:   "GenericOIDC User",
+					Provider:      "genericoidc",
+					PrincipalType: "user",
+				},
+			},
+		},
+		{
+			name:      "local users remain searchable",
+			searchKey: "local",
+			want: []v3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "local://u-local"},
+					DisplayName:   "Local User",
+					LoginName:     "local-user",
+					Provider:      Name,
+					PrincipalType: "user",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := provider.SearchPrincipals(tt.searchKey, "user", token)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestUserSearchIndexer(t *testing.T) {
 	indexerTests := []struct {
 		user        *v3.User
@@ -389,6 +512,55 @@ func TestProviderSearchPrincipalHybridUser(t *testing.T) {
 	require.Equal(t, []string{"local://u-admin"}, ids)
 }
 
+func TestProviderSearchPrincipalMultiAuthProviderCrossFeature(t *testing.T) {
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
+	previousMultiAuthProviderCross := features.MultiAuthProviderCross.Enabled()
+	t.Cleanup(func() {
+		features.MultiAuthProviderCross.Set(previousMultiAuthProviderCross)
+	})
+
+	testUsers := []*v3.User{
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: "u-local"},
+			Username:    "local-user",
+			DisplayName: "Local User",
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta"},
+			DisplayName:  "Okta User",
+			PrincipalIDs: []string{"okta_user://indexed", "local://u-okta"},
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		features.MultiAuthProviderCross.Set(false)
+
+		got, err := provider.SearchPrincipals("okta", "user", nil)
+		require.NoError(t, err)
+		require.Empty(t, got)
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		features.MultiAuthProviderCross.Set(true)
+
+		got, err := provider.SearchPrincipals("okta", "user", nil)
+		require.NoError(t, err)
+		require.Equal(t, []v3.Principal{
+			{
+				ObjectMeta:    metav1.ObjectMeta{Name: "okta_user://indexed"},
+				DisplayName:   "Okta User",
+				Provider:      "okta",
+				PrincipalType: "user",
+			},
+		}, got)
+	})
+}
+
 func TestProviderSearchPrincipalWhitespaceSearchKey(t *testing.T) {
 	t.Parallel()
 
@@ -418,4 +590,207 @@ func TestProviderSearchPrincipalWhitespaceSearchKey(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, got, "search key %q", searchKey)
 	}
+}
+
+func TestProviderSearchPrincipalsMultiAuthProviderCrossAdditionalConfigs(t *testing.T) {
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
+	previousMultiAuthProviderCross := features.MultiAuthProviderCross.Enabled()
+	features.MultiAuthProviderCross.Set(true)
+	t.Cleanup(func() {
+		features.MultiAuthProviderCross.Set(previousMultiAuthProviderCross)
+	})
+
+	testUsers := []*v3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-github-eu"},
+			DisplayName:  "Search EU",
+			PrincipalIDs: []string{"github-eu_user://42", "local://u-github-eu"},
+		},
+		{
+			// System users have principals that can't be parsed, these must
+			// not fail the search.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-system"},
+			DisplayName:  "Search System",
+			PrincipalIDs: []string{"system://c-12345"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-system-local"},
+			DisplayName:  "Search System Local",
+			PrincipalIDs: []string{"system://c-23456", "local://u-system-local"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-unknown"},
+			DisplayName:  "Search Unknown",
+			PrincipalIDs: []string{"removed_user://99"},
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+		authConfigLister: fakeAuthConfigLister{configs: map[string]*v3.AuthConfig{
+			"github-eu": {ObjectMeta: metav1.ObjectMeta{Name: "github-eu"}, Type: "githubConfig"},
+		}},
+	}
+
+	got, err := provider.SearchPrincipals("search", "user", nil)
+	require.NoError(t, err)
+
+	sort.Slice(got, func(i, j int) bool { return got[i].Name < got[j].Name })
+	require.Equal(t, []v3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "github-eu_user://42"},
+			DisplayName:   "Search EU",
+			Provider:      "github",
+			PrincipalType: "user",
+		},
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "local://u-system-local"},
+			DisplayName:   "Search System Local",
+			Provider:      Name,
+			PrincipalType: "user",
+		},
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "removed_user://99"},
+			DisplayName:   "Search Unknown",
+			Provider:      "removed",
+			PrincipalType: "user",
+		},
+	}, got)
+}
+
+type fakeAuthConfigLister struct {
+	configs map[string]*v3.AuthConfig
+}
+
+func (f fakeAuthConfigLister) List(namespace string, selector labels.Selector) ([]*v3.AuthConfig, error) {
+	return nil, nil
+}
+
+func (f fakeAuthConfigLister) Get(namespace, name string) (*v3.AuthConfig, error) {
+	if config, ok := f.configs[name]; ok {
+		return config, nil
+	}
+
+	return nil, errors.New("not found")
+}
+
+type passwordComparison struct {
+	password       string
+	hashedPassword []byte
+	salt           []byte
+}
+
+type mockPasswordVerifier struct {
+	comparisons []passwordComparison
+}
+
+func (r *mockPasswordVerifier) VerifyPassword(*v3.User, string) error {
+	return errors.New("not implemented")
+}
+
+func (r *mockPasswordVerifier) ComparePassword(password string, hashedPassword, salt []byte) error {
+	r.comparisons = append(r.comparisons, passwordComparison{
+		password:       password,
+		hashedPassword: hashedPassword,
+		salt:           salt,
+	})
+
+	return nil
+}
+
+// fakeUsersByPrincipal finds users by principal ID in a map.
+type fakeUsersByPrincipal struct {
+	users map[string]*v3.User
+	err   error
+}
+
+func (f fakeUsersByPrincipal) GetUserByPrincipalID(principalID string) (*v3.User, error) {
+	return f.users[principalID], f.err
+}
+
+func TestGetKnownPrincipal(t *testing.T) {
+	bob := &v3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "u-bob"},
+		Username:     "bob",
+		DisplayName:  "Bob",
+		PrincipalIDs: []string{"okta-eu_user://bob", "local://u-bob"},
+	}
+	lister := authconfigtest.NewLister(t, map[string]any{
+		"metadata": map[string]any{"name": "okta-eu"},
+		"type":     client.OKTAConfigType,
+	}, map[string]any{
+		"metadata": map[string]any{"name": "localsaml"},
+		"type":     client.OKTAConfigType,
+	})
+
+	t.Run("principal of a config named like local gets the config's provider", func(t *testing.T) {
+		frank := &v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-frank"},
+			Username:     "frank",
+			DisplayName:  "Frank",
+			PrincipalIDs: []string{"localsaml_user://frank", "local://u-frank"},
+		}
+		provider := &Provider{
+			users:            fakeUsersByPrincipal{users: map[string]*v3.User{"localsaml_user://frank": frank}},
+			authConfigLister: lister,
+		}
+
+		got, err := provider.GetKnownPrincipal("localsaml_user://frank", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "okta", got.Provider)
+	})
+
+	t.Run("principal of a known user", func(t *testing.T) {
+		provider := &Provider{
+			users:            fakeUsersByPrincipal{users: map[string]*v3.User{"okta-eu_user://bob": bob}},
+			authConfigLister: lister,
+		}
+
+		got, err := provider.GetKnownPrincipal("okta-eu_user://bob", nil)
+		require.NoError(t, err)
+		assert.Equal(t, v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: "okta-eu_user://bob"},
+			DisplayName:   "Bob",
+			LoginName:     "bob",
+			Provider:      "okta",
+			PrincipalType: "user",
+		}, got)
+	})
+
+	t.Run("principal of no user", func(t *testing.T) {
+		provider := &Provider{users: fakeUsersByPrincipal{}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_user://alice", nil)
+		assert.True(t, httperror.IsNotFound(err), "expected a not found error, got %v", err)
+	})
+
+	t.Run("group principal", func(t *testing.T) {
+		// Users only have user principals, so no user has a group principal.
+		provider := &Provider{users: fakeUsersByPrincipal{users: map[string]*v3.User{"okta-eu_user://bob": bob}}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_group://admins", nil)
+		assert.True(t, httperror.IsNotFound(err), "expected a not found error, got %v", err)
+	})
+
+	t.Run("error looking up the user", func(t *testing.T) {
+		provider := &Provider{users: fakeUsersByPrincipal{err: errors.New("unavailable")}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_user://bob", nil)
+		assert.ErrorContains(t, err, "unavailable")
+	})
+
+	t.Run("no way to look up users", func(t *testing.T) {
+		provider := &Provider{authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("okta-eu_user://bob", nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("principal that can't be parsed", func(t *testing.T) {
+		provider := &Provider{users: fakeUsersByPrincipal{}, authConfigLister: lister}
+
+		_, err := provider.GetKnownPrincipal("not-a-principal", nil)
+		assert.ErrorContains(t, err, "invalid principal id")
+	})
 }

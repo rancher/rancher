@@ -163,11 +163,9 @@ spec:
       - effect: NoSchedule
         key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"
-      - key: node.cloudprovider.kubernetes.io/uninitialized
-        operator: "Exists"
       initContainers:
       - name: rancher-charts-copy
-        image: rancher/assets:charts
+        image: "rancher/assets:charts"
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: rancher-charts
@@ -190,8 +188,8 @@ spec:
             value: cattle-credentials-5ec1f7e700
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: "mcc-testing-namesapce-opotions-managed-system-94546d"
-          - name: RANCHER_NAMESPACE_OPTIONS
-            value: '{"enabled":true,"annotations":{"foo":"bar"},"labels":{"baz":"quz"}}'
+          - name: RANCHER_NAMESPACES_OPTIONS
+            value: '{"enabled":true,"strict":false,"annotations":{"foo":"bar"},"labels":{"baz":"quz"}}'
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID

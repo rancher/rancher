@@ -297,7 +297,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	}
 	err = wait.ClusterObject(cs.Ctx, cs.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
 		mgmtCluster = obj.(*v3.Cluster)
-		return v3.Ready.IsTrue(mgmtCluster), nil
+		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
 	})
 	if err != nil {
 		t.Fatalf("timed out waiting for imported management cluster %s to be Ready after RKE2 TLS reconfiguration: %v", fx.mgmtCluster.Name, err)
@@ -695,7 +695,7 @@ func waitForImportedCertificateRotationRecovery(t *testing.T, clients *clients.C
 	mgmtCluster := fx.mgmtCluster
 	err := wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
 		mgmtCluster = obj.(*v3.Cluster)
-		return v3.Ready.IsTrue(mgmtCluster), nil
+		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
 	})
 	handleCertificateRotationError(t, clients, fx.mgmtCluster.Name, op, err)
 

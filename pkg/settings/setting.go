@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
@@ -82,7 +81,7 @@ var (
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
 	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
-	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
+	AuthImage                           = NewSetting("auth-image", buildconfig.DefaultKubeAPIAuthImage)
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	AzureGroupCacheSize                 = NewSetting("azure-group-cache-size", "10000")
@@ -127,8 +126,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.16.0-rc.3/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.8/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/"+buildconfig.SystemAgentVersion+"/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/"+buildconfig.WinsAgentVersion+"/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -142,7 +141,7 @@ var (
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	APIUIVersion                        = NewSetting("api-ui-version", "1.1.11")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	APIUIVersion                        = NewSetting("api-ui-version", "1.2.0")               // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
 	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
@@ -160,8 +159,9 @@ var (
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher146-rc.5")
+	MachineProvisionImage               = NewSetting("machine-provision-image", buildconfig.MachineProvisionImage)
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
+	SystemChartsDefaultWorkers          = NewSetting("system-feature-charts-default-workers", "3")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
 	MaxUIPluginFileByteSize             = NewSetting("max-ui-plugin-file-byte-size", strconv.Itoa(DefaultMaxUIPluginFileSizeInBytes)) // Max file size in bytes for ui plugins
@@ -181,10 +181,15 @@ var (
 	// CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=true to override.
 	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", "").WithEnvDefault("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT")
 
-	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
+	// AuthTokenMaxTTLMinutes is the max time to live for all tokens except login session tokens, which
+	// AuthUserSessionTTLMinutes controls. It also limits kubeconfig tokens, together with
+	// KubeconfigMaxTokenTTLMinutes. 0 means no limit. The limit applies when a token is created or
+	// updated.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
 
-	// AuthTokenDefaultTTLMinutes is the default allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
+	// AuthTokenDefaultTTLMinutes is the default time to live for tokens other than login session and
+	// kubeconfig tokens. 0 means the max. A default above the max is capped to the max. The default
+	// applies when a token is created or updated without a TTL.
 	AuthTokenDefaultTTLMinutes = NewSetting("auth-token-default-ttl-minutes", "129600") // 90 days
 
 	// AuthUserInfoMaxAgeSeconds represents the maximum age of a users auth tokens before an auth provider group membership sync will be performed.
@@ -255,10 +260,15 @@ var (
 	AliOperatorVersion = NewSetting("ali-operator-version", "")
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
+	// 0 means the max. A default above the max is capped to the max, which is the smaller of
+	// KubeconfigMaxTokenTTLMinutes and AuthTokenMaxTTLMinutes, where 0 is no limit. The default applies
+	// when a token is created or updated without a TTL.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "43200") // 30 days
 
 	// KubeconfigMaxTokenTTLMinutes is the max time to live applied to kubeconfigs created for users.
+	// It can't raise the limit set by AuthTokenMaxTTLMinutes: kubeconfig tokens get the smaller of the
+	// two, where 0 is no limit. The limit applies when a token is created or updated.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigMaxTokenTTLMinutes = NewSetting("kubeconfig-max-token-ttl-minutes", "129600") // 90 days
 
@@ -269,6 +279,12 @@ var (
 	// KubeconfigExecGetToken determines whether kubeconfigs without a token run "rancher auth get-token" with the user id and auth provider.
 	// If set to false they run "rancher token" with the kubeconfig user entry name. Valid values are "true" and "false". An empty string means "false".
 	KubeconfigExecGetToken = NewSetting("kubeconfig-exec-get-token", "false")
+
+	// KubeconfigPreferRancherProxy determines whether kubeconfigs generated with the ext.cattle.io
+	// Kubeconfig API use the Rancher proxy context instead of the Authorized Cluster Endpoint (ACE)
+	// context as the current-context for clusters with ACE enabled. It applies when
+	// spec.preferRancherProxy is not set. Only "true" (case-insensitive) selects the proxy context.
+	KubeconfigPreferRancherProxy = NewSetting("kubeconfig-prefer-rancher-proxy", "false")
 
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
 	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
@@ -286,11 +302,11 @@ var (
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
 	RancherTurtlesVersion = NewSetting("rancher-turtles-version", buildconfig.TurtlesVersion)
 
-	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
+	// ClusterAutoscalerChartRepository optionally overrides the chart repository for the cluster autoscaler. It
 	// can be an OCI image path or a regular helm repo.
 	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
 
-	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
+	// ClusterAutoscalerImage optionally overrides the image repository for the cluster autoscaler.
 	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
@@ -344,7 +360,7 @@ var (
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 
 	// UIDashboardIndex depends on ui-offline-preferred, use this version of the dashboard instead of the one contained in Rancher Manager.
-	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
+	UIDashboardIndex = NewSetting("ui-dashboard-index", getFromEnvOrDefault("CATTLE_UI_DASHBOARD_INDEX", "https://releases.rancher.com/dashboard/latest/index.html"))
 
 	// UIDashboardHarvesterLegacyPlugin depending on ui-offline-preferred and if a Harvester Cluster does not contain it's own Harvester plugin, use this version of the plugin instead.
 	UIDashboardHarvesterLegacyPlugin = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
@@ -679,6 +695,14 @@ func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
 // GetEnvKey will return the given string formatted as a rancher environmental variable.
 func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
+}
+
+func getFromEnvOrDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+
+	return defaultVal
 }
 
 func getMetadataConfig() string {

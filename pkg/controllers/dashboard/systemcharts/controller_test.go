@@ -9,7 +9,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	chartfake "github.com/rancher/rancher/pkg/controllers/dashboard/chart/fake"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -25,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -85,7 +85,7 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
 			Annotations: map[string]string{
-				importedclusterversionmanagement.VersionManagementAnno: "system-default",
+				v3.ClusterImportedVersionManagementAnnotation: "system-default",
 			},
 		},
 	}
@@ -110,30 +110,32 @@ priorityClassName: newClass
 `
 
 type testMocks struct {
-	manager         *chartfake.MockManager
-	namespaceCtrl   *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
-	namespaceCache  *fake.MockNonNamespacedCacheInterface[*v1.Namespace]
-	configCache     *fake.MockCacheInterface[*v1.ConfigMap]
-	deployment      *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
-	deploymentCache *fake.MockCacheInterface[*appsv1.Deployment]
-	clusterCache    *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
-	clusters        *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
-	plan            *fake.MockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList]
-	planCache       *fake.MockCacheInterface[*upgradev1.Plan]
+	manager          *chartfake.MockManager
+	namespaceCtrl    *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
+	namespaceCache   *fake.MockNonNamespacedCacheInterface[*v1.Namespace]
+	configCache      *fake.MockCacheInterface[*v1.ConfigMap]
+	deployment       *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
+	deploymentCache  *fake.MockCacheInterface[*appsv1.Deployment]
+	clusterCache     *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	clusters         *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
+	plan             *fake.MockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList]
+	planCache        *fake.MockCacheInterface[*upgradev1.Plan]
+	clusterRepoCache *fake.MockNonNamespacedCacheInterface[*catalog.ClusterRepo]
 }
 
 func (t *testMocks) Handler() *handler {
 	return &handler{
-		manager:         t.manager,
-		namespaces:      t.namespaceCtrl,
-		namespaceCache:  t.namespaceCache,
-		chartsConfig:    chart.RancherConfigGetter{ConfigCache: t.configCache},
-		deployment:      t.deployment,
-		deploymentCache: t.deploymentCache,
-		clusterCache:    t.clusterCache,
-		clusters:        t.clusters,
-		plan:            t.plan,
-		planCache:       t.planCache,
+		manager:          t.manager,
+		namespaces:       t.namespaceCtrl,
+		namespaceCache:   t.namespaceCache,
+		chartsConfig:     chart.RancherConfigGetter{ConfigCache: t.configCache},
+		deployment:       t.deployment,
+		deploymentCache:  t.deploymentCache,
+		clusterCache:     t.clusterCache,
+		clusters:         t.clusters,
+		plan:             t.plan,
+		planCache:        t.planCache,
+		clusterRepoCache: t.clusterRepoCache,
 	}
 }
 
@@ -1566,7 +1568,7 @@ func Test_ChartInstallation(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "local",
 						Annotations: map[string]string{
-							importedclusterversionmanagement.VersionManagementAnno: "system-default",
+							v3.ClusterImportedVersionManagementAnnotation: "system-default",
 						},
 					},
 					Spec: v3.ClusterSpec{
@@ -2058,4 +2060,132 @@ func Test_relatedSettings(t *testing.T) {
 
 		})
 	}
+}
+
+func Test_OnlyTheWebhookTakesOwnership(t *testing.T) {
+	// The cluster agent manages the caBundle of the webhook's WebhookConfigurations, so its upgrades
+	// conflict unless the chart takes ownership. No other system chart needs to.
+	mocks := newDownstreamTestMocks(t)
+
+	takeOwnership := map[string]bool{}
+	mocks.manager.EXPECT().Ensure(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_, chartName, _, _, _ string, _ map[string]any, owned bool, _ string) error {
+			takeOwnership[chartName] = owned
+			return nil
+		}).AnyTimes()
+
+	_, err := mocks.Handler().onRepo("", &catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName}})
+	require.NoError(t, err)
+
+	require.Contains(t, takeOwnership, chart.WebhookChartName, "the webhook is installed on downstream clusters")
+	for chartName, owned := range takeOwnership {
+		require.Equal(t, chartName == chart.WebhookChartName, owned, "chart %q", chartName)
+	}
+}
+
+// newDownstreamTestMocks returns mocks for a downstream cluster (MCMAgent enabled) that allow everything
+// onRepo does besides ensuring charts, for which tests set their own expectations.
+func newDownstreamTestMocks(t *testing.T) testMocks {
+	t.Helper()
+	t.Cleanup(func() {
+		features.MCM.Set(originalMCM)
+		features.MCMAgent.Set(originalMCMAgent)
+		_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
+	})
+	features.MCMAgent.Set(true)
+	features.MCM.Set(false)
+	_ = settings.RancherWebhookVersion.Set("2.0.0")
+
+	ctrl := gomock.NewController(t)
+	mocks := testMocks{
+		clusterRepoCache: fake.NewMockNonNamespacedCacheInterface[*catalog.ClusterRepo](ctrl),
+		manager:          chartfake.NewMockManager(ctrl),
+		namespaceCtrl:    fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
+		namespaceCache:   fake.NewMockNonNamespacedCacheInterface[*v1.Namespace](ctrl),
+		configCache:      fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
+		deploymentCache:  fake.NewMockCacheInterface[*appsv1.Deployment](ctrl),
+		plan:             fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
+		planCache:        fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
+		clusterCache:     fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
+		clusters:         fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl),
+	}
+	notFound := apierrors.NewNotFound(schema.GroupResource{}, "")
+	mocks.configCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFound).AnyTimes()
+	mocks.deploymentCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFound).AnyTimes()
+	mocks.namespaceCtrl.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.planCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	mocks.clusterCache.EXPECT().Get(gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.manager.EXPECT().Uninstall(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.manager.EXPECT().Remove(gomock.Any(), gomock.Any()).AnyTimes()
+
+	return mocks
+}
+
+// newIndexConfigMap returns the index ConfigMap of the ClusterRepo named repoName, with the given UID.
+func newIndexConfigMap(namespace, repoName string, uid types.UID) *v1.ConfigMap {
+	return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:      repoName + "-0-" + string(uid),
+		Namespace: namespace,
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: "catalog.cattle.io/v1",
+			Kind:       "ClusterRepo",
+			Name:       repoName,
+			UID:        uid,
+		}},
+	}}
+}
+
+func Test_onIndexConfigMapEnsuresTheCharts(t *testing.T) {
+	// The repo's own handlers can be held for minutes by the git work of another one; the charts are
+	// ensured as soon as the index is written instead.
+	mocks := newDownstreamTestMocks(t)
+	mocks.clusterRepoCache.EXPECT().Get(repoName).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName, UID: "repo-uid"}}, nil)
+	var ensured []string
+	mocks.manager.EXPECT().Ensure(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_, chartName, _, _, _ string, _ map[string]any, _ bool, _ string) error {
+			ensured = append(ensured, chartName)
+			return nil
+		}).AnyTimes()
+
+	_, err := mocks.Handler().onIndexConfigMap("", newIndexConfigMap(namespace.System, repoName, "repo-uid"))
+
+	require.NoError(t, err)
+	require.Contains(t, ensured, chart.WebhookChartName)
+}
+
+func Test_onIndexConfigMapIgnoresOtherConfigMaps(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	// No expectations: the handler must not touch anything for these.
+	mocks := testMocks{manager: chartfake.NewMockManager(ctrl), clusterRepoCache: fake.NewMockNonNamespacedCacheInterface[*catalog.ClusterRepo](ctrl)}
+	h := mocks.Handler()
+
+	for name, cm := range map[string]*v1.ConfigMap{
+		"deleted":                  nil,
+		"index of another repo":    newIndexConfigMap(namespace.System, "rancher-partner-charts", "partner-uid"),
+		"outside of cattle-system": newIndexConfigMap("default", repoName, "repo-uid"),
+		"not an index":             {ObjectMeta: metav1.ObjectMeta{Name: "rancher-config", Namespace: namespace.System}},
+	} {
+		_, err := h.onIndexConfigMap("", cm)
+		require.NoError(t, err, name)
+	}
+}
+
+func Test_onIndexConfigMapIgnoresTheIndexOfAReplacedRepo(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mocks := testMocks{manager: chartfake.NewMockManager(ctrl), clusterRepoCache: fake.NewMockNonNamespacedCacheInterface[*catalog.ClusterRepo](ctrl)}
+	mocks.clusterRepoCache.EXPECT().Get(repoName).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName, UID: "new-uid"}}, nil)
+
+	_, err := mocks.Handler().onIndexConfigMap("", newIndexConfigMap(namespace.System, repoName, "old-uid"))
+
+	require.NoError(t, err)
+}
+
+func Test_onIndexConfigMapWaitsForTheRepo(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mocks := testMocks{manager: chartfake.NewMockManager(ctrl), clusterRepoCache: fake.NewMockNonNamespacedCacheInterface[*catalog.ClusterRepo](ctrl)}
+	mocks.clusterRepoCache.EXPECT().Get(repoName).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, repoName))
+
+	_, err := mocks.Handler().onIndexConfigMap("", newIndexConfigMap(namespace.System, repoName, "repo-uid"))
+
+	require.NoError(t, err, "the repo's own handler ensures the charts once it exists")
 }

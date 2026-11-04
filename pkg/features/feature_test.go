@@ -516,3 +516,16 @@ func TestADFSLDAPSearchIsPrimeFeature(t *testing.T) {
 	t.Setenv(primeEnv, "prime")
 	assert.True(t, ADFSLDAPSearch.Enabled())
 }
+
+func TestMultiAuthProvidersPrimeFeature(t *testing.T) {
+	assert.True(t, MultiAuthProviders.Prime())
+
+	MultiAuthProviders.Set(true)
+	t.Cleanup(MultiAuthProviders.Unset)
+
+	t.Setenv(primeEnv, "")
+	assert.False(t, MultiAuthProviders.Enabled())
+
+	t.Setenv(primeEnv, "prime")
+	assert.True(t, MultiAuthProviders.Enabled())
+}

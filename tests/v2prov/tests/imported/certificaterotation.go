@@ -245,7 +245,7 @@ func summarizeMachinePlanSecrets(secrets []corev1.Secret) []machinePlanSecretSum
 func summarizeManagementCluster(cluster *v3.Cluster) managementClusterSummary {
 	return managementClusterSummary{
 		Name:       cluster.Name,
-		Ready:      v3.Ready.IsTrue(cluster),
+		Ready:      v3.ClusterConditionReady.IsTrue(cluster),
 		Conditions: summarizeClusterConditions(cluster.Status.Conditions),
 	}
 }

@@ -65,8 +65,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	auditUser, ok := audit.FromContext(req.Context())
 	if ok {
-		auditUser.Name = userInfo.GetName()
-		auditUser.Group = userInfo.GetGroups()
+		auditUser.SetIdentity(userInfo)
 	}
 
 	h.next.ServeHTTP(rw, req)

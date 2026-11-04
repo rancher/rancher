@@ -3,7 +3,7 @@ package aks
 import (
 	"context"
 	"encoding/base64"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -26,7 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -95,7 +95,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	aksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
 
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return cluster, err
 		}
 
@@ -130,6 +130,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
+	message, _ := status["message"].(string)
 
 	switch phase {
 	case "creating":
@@ -140,7 +141,13 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster AKS [%s] to finish creating", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			if message != "" {
+				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, message)
+				if err != nil {
+					return cluster, err
+				}
+			}
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, message)
 		}
 		logrus.Infof("waiting for cluster AKS [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -206,7 +213,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
 				var statusErr error
-				if err == dialer.ErrAgentDisconnected {
+				if errors.Is(err, dialer.ErrAgentDisconnected) {
 					// In this case, the API endpoint is private and rancher is waiting for the import cluster command to be run.
 					cluster, statusErr = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, "waiting for cluster agent to be deployed")
 					if statusErr == nil {
@@ -237,33 +244,32 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster AKS [%s] to update", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		}
 		logrus.Infof("waiting for cluster AKS [%s] update failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionUpdated, failureMessage)
 	default:
+		statusMessage := message
+		if statusMessage == "" {
+			if cluster.Spec.AKSConfig.Imported {
+				statusMessage = fmt.Sprintf("Waiting for cluster import [%s] to start", cluster.Name)
+			} else {
+				statusMessage = fmt.Sprintf("Waiting for cluster creation [%s] to start", cluster.Name)
+			}
+		}
+
 		if cluster.Spec.AKSConfig.Imported {
-			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
+			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, statusMessage)
 			if err != nil {
 				return cluster, err
 			}
-			logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-		} else {
-			logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
 		}
 
+		logrus.Info(statusMessage)
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
+
 		if failureMessage == "" {
-			if cluster.Spec.AKSConfig.Imported {
-				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
-				if err != nil {
-					return cluster, err
-				}
-				logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-			} else {
-				logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
-			}
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, statusMessage)
 		}
 		logrus.Infof("waiting for cluster AKS [%s] pre-create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -309,13 +315,14 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluste
 				return cluster, fmt.Errorf("unexpected nil cluster config")
 			}
 			status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
+			message, _ := status["message"].(string)
 			if status["phase"] == "active" {
 				continue
 			}
 
 			// this enqueue is necessary to ensure that the controller is reentered with the updating phase
 			e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		case <-timeout.C:
 			cluster, err = e.recordAppliedSpec(cluster)
 			if err != nil {
@@ -436,14 +443,14 @@ func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *apimgmtv3.
 	if err != nil {
 		*requiresTunnel = true
 		var dnsError *net.DNSError
-		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
+		if errors.As(err, &dnsError) && !dnsError.IsTemporary {
 			return "", requiresTunnel, nil
 		}
 
 		// In the existence of a proxy, it may be the case that the following error occurs,
 		// in which case rancher should use the tunnel connection to communicate with the cluster.
 		var urlError *url.Error
-		if stderrors.As(err, &urlError) && urlError.Timeout() {
+		if errors.As(err, &urlError) && urlError.Timeout() {
 			return "", requiresTunnel, nil
 		}
 

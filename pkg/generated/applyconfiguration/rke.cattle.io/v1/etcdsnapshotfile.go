@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,7 +47,7 @@ type ETCDSnapshotFileApplyConfiguration struct {
 	Size *int64 `json:"size,omitempty"`
 	// S3 holds metadata about the S3 destination if the snapshot is stored remotely. If nil, the snapshot
 	// is assumed to be stored locally and associated with the owning CAPI machine.
-	S3 *ETCDSnapshotS3ApplyConfiguration `json:"s3,omitempty"`
+	S3 *v3.ETCDSnapshotS3 `json:"s3,omitempty"`
 	// Status represents the current state of the snapshot, such as "successful" or "failed".
 	Status *string `json:"status,omitempty"`
 	// Message is a string detailing the encountered error during snapshot creation if specified.
@@ -110,8 +111,8 @@ func (b *ETCDSnapshotFileApplyConfiguration) WithSize(value int64) *ETCDSnapshot
 // WithS3 sets the S3 field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the S3 field is set to the value of the last call.
-func (b *ETCDSnapshotFileApplyConfiguration) WithS3(value *ETCDSnapshotS3ApplyConfiguration) *ETCDSnapshotFileApplyConfiguration {
-	b.S3 = value
+func (b *ETCDSnapshotFileApplyConfiguration) WithS3(value v3.ETCDSnapshotS3) *ETCDSnapshotFileApplyConfiguration {
+	b.S3 = &value
 	return b
 }
 

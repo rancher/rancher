@@ -47,7 +47,7 @@ const (
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
 	prtbByUIDIndex                   = "authz.cluster.cattle.io/rtb-owner"
-	prtbByNsAndNameIndex             = "authz.cluster.cattle.io/rtb-owner-updated"
+	prtbByNsAndNameIndex             = pkgrbac.PRTBByRTBLabelIndex
 	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
 	rtbByClusterAndUserIndex         = "authz.cluster.cattle.io/rtb-by-cluster-user"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"

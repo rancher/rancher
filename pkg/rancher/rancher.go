@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy"
@@ -68,7 +69,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/k8scheck"
 	"github.com/rancher/wrangler/v3/pkg/unstructured"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"gopkg.in/natefinch/lumberjack.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -91,7 +91,7 @@ const (
 )
 
 type Options struct {
-	ACMEDomains                    cli.StringSlice
+	ACMEDomains                    []string
 	AddLocal                       string
 	Embedded                       bool
 	BindHost                       string
@@ -167,7 +167,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 		mutator.Annotations[namespace.AnnotationManagedNamespace] = namespace.AnnotationManagedNamespaceTrue
 
-		namespace.SetMutator(mutator)
+		if err := namespace.SetMutator(mutator); err != nil {
+			return nil, err
+		}
 	}
 
 	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
@@ -355,7 +357,17 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, fmt.Errorf("failed to register audit log controller: %w", err)
 		}
 
-		auditLogMiddleware = audit.NewAuditLogMiddleware(auditLogWriter)
+		// The user cache is backed by the informer, so a lookup reads local memory and makes no API request.
+		userCache := wranglerContext.Mgmt.User().Cache()
+		auditLogMiddleware = audit.NewAuditLogMiddleware(auditLogWriter,
+			audit.WithIncludeUsername(features.AuditLogUsername.Enabled),
+			audit.WithUserResolver(func(userID string) (string, string, bool) {
+				u, err := userCache.Get(userID)
+				if err != nil {
+					return "", "", false
+				}
+				return u.Username, u.DisplayName, true
+			}))
 	}
 
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
@@ -454,6 +466,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
+	}
+	if features.SCIM.Enabled() {
+		scim.DeleteLegacyTokens(r.Wrangler.Core.Secret())
 	}
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err

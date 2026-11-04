@@ -168,8 +168,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationrkecattleiov1.DrainOptionsApplyConfiguration{}
 	case rkecattleiov1.SchemeGroupVersion.WithKind("EnvVar"):
 		return &applyconfigurationrkecattleiov1.EnvVarApplyConfiguration{}
-	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCD"):
-		return &applyconfigurationrkecattleiov1.ETCDApplyConfiguration{}
 	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCDSnapshot"):
 		return &applyconfigurationrkecattleiov1.ETCDSnapshotApplyConfiguration{}
 	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCDSnapshotCreate"):
@@ -178,8 +176,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationrkecattleiov1.ETCDSnapshotFileApplyConfiguration{}
 	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCDSnapshotRestore"):
 		return &applyconfigurationrkecattleiov1.ETCDSnapshotRestoreApplyConfiguration{}
-	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCDSnapshotS3"):
-		return &applyconfigurationrkecattleiov1.ETCDSnapshotS3ApplyConfiguration{}
 	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCDSnapshotSpec"):
 		return &applyconfigurationrkecattleiov1.ETCDSnapshotSpecApplyConfiguration{}
 	case rkecattleiov1.SchemeGroupVersion.WithKind("ETCDSnapshotStatus"):

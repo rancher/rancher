@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -376,6 +378,10 @@ func (s *autoscalerSuite) TestEnsureUserToken_TokenDoesNotExist() {
 		s.Require().Equal(username, token.Name, "Token name should match username")
 		s.Require().Equal(username, token.UserID, "Token UserID should match username")
 		s.Require().Equal("local", token.AuthProvider, "Token AuthProvider should be local")
+		s.Require().Equal(autoscalerUserPrincipal(username), token.UserPrincipal)
+		configName, err := common.ConfigNameFromToken(token)
+		s.Require().NoError(err)
+		s.Require().Equal("local", configName)
 		s.Require().True(token.IsDerived, "Token should be derived")
 		s.Require().NotEmpty(token.Token, "Token should not be empty")
 		return token, nil
@@ -384,10 +390,9 @@ func (s *autoscalerSuite) TestEnsureUserToken_TokenDoesNotExist() {
 			Name:            username,
 			OwnerReferences: ownerReference(testCluster),
 		},
-		UserID:       username,
-		AuthProvider: "local",
-		IsDerived:    true,
-		Token:        "generated-token-string", // This will be the actual generated token
+		UserID:    username,
+		IsDerived: true,
+		Token:     "generated-token-string", // This will be the actual generated token
 	}, nil)
 
 	// Call ensureUserToken and verify it creates the token
@@ -414,7 +419,10 @@ func (s *autoscalerSuite) TestEnsureUserToken_TokenAlreadyExists() {
 			Name:            username,
 			OwnerReferences: ownerReference(testCluster),
 		},
-		Token: "existing-token-string",
+		UserID:        username,
+		AuthProvider:  "local",
+		UserPrincipal: autoscalerUserPrincipal(username),
+		Token:         "existing-token-string",
 	}
 	s.tokenCache.EXPECT().Get(username).Return(existingToken, nil)
 
@@ -423,6 +431,104 @@ func (s *autoscalerSuite) TestEnsureUserToken_TokenAlreadyExists() {
 	s.Require().NoError(err, "Should not return error when token exists")
 	s.Require().NotNil(result, "Should return a result")
 	s.Require().Equal("test-user:existing-token-string", result, "Result should match expected format with existing token")
+}
+
+// legacyAutoscalerToken returns an autoscaler token as created before
+// autoscaler tokens were issued with a UserPrincipal.
+func legacyAutoscalerToken(cluster *capi.Cluster, username string) *v3.Token {
+	return &v3.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: username,
+			Labels: map[string]string{
+				tokens.UserIDLabel:    username,
+				tokens.TokenKindLabel: autoscalerTokenKind,
+				capi.ClusterNameLabel: cluster.Name,
+			},
+			OwnerReferences: ownerReference(cluster),
+		},
+		UserID:       username,
+		AuthProvider: "local",
+		Token:        "existing-token-string",
+	}
+}
+
+func (s *autoscalerSuite) TestEnsureUserToken_RepairsMissingPrincipal() {
+	cluster := &capi.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"}}
+	username := autoscalerUserName(cluster)
+
+	// The repair must not depend on the deprecated AuthProvider field.
+	for _, authProvider := range []string{"local", "", "github"} {
+		s.Run("AuthProvider="+authProvider, func() {
+			existingToken := legacyAutoscalerToken(cluster, username)
+			existingToken.AuthProvider = authProvider
+			s.tokenCache.EXPECT().Get(username).Return(existingToken, nil)
+
+			updatedToken := existingToken.DeepCopy()
+			updatedToken.UserPrincipal = autoscalerUserPrincipal(username)
+			s.tokenClient.EXPECT().Update(updatedToken).Return(updatedToken, nil)
+
+			result, err := s.h.ensureUserToken(cluster, username)
+			s.Require().NoError(err)
+			s.Equal(username+":existing-token-string", result)
+			s.Empty(existingToken.UserPrincipal.Name, "The cached token must not be mutated")
+			configName, err := common.ConfigNameFromToken(updatedToken)
+			s.Require().NoError(err)
+			s.Equal("local", configName)
+		})
+	}
+}
+
+func (s *autoscalerSuite) TestEnsureUserToken_DoesNotRepairNonQualifyingTokens() {
+	cluster := &capi.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"}}
+	username := autoscalerUserName(cluster)
+
+	tests := map[string]func(t *v3.Token){
+		"token with a principal": func(t *v3.Token) {
+			t.UserPrincipal = autoscalerUserPrincipal(username)
+		},
+		"token with a principal and no AuthProvider": func(t *v3.Token) {
+			t.UserPrincipal = autoscalerUserPrincipal(username)
+			t.AuthProvider = ""
+		},
+		"token without the kind label": func(t *v3.Token) {
+			delete(t.Labels, tokens.TokenKindLabel)
+		},
+		"token with a different kind label": func(t *v3.Token) {
+			t.Labels[tokens.TokenKindLabel] = "session"
+		},
+		"token without labels": func(t *v3.Token) {
+			t.Labels = nil
+		},
+	}
+
+	for name, mutate := range tests {
+		s.Run(name, func() {
+			existingToken := legacyAutoscalerToken(cluster, username)
+			mutate(existingToken)
+			original := existingToken.DeepCopy()
+			s.tokenCache.EXPECT().Get(username).Return(existingToken, nil)
+			// No Update is expected on the tokenClient mock.
+
+			result, err := s.h.ensureUserToken(cluster, username)
+			s.Require().NoError(err)
+			s.Equal(username+":existing-token-string", result)
+			s.Equal(original, existingToken)
+		})
+	}
+}
+
+func (s *autoscalerSuite) TestEnsureUserToken_PrincipalUpdateError() {
+	cluster := &capi.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"}}
+	username := autoscalerUserName(cluster)
+	existingToken := legacyAutoscalerToken(cluster, username)
+	s.tokenCache.EXPECT().Get(username).Return(existingToken, nil)
+	updateError := errors.NewConflict(v3.Resource("tokens"), username, fmt.Errorf("token changed"))
+	s.tokenClient.EXPECT().Update(gomock.Any()).Return(nil, updateError)
+
+	result, err := s.h.ensureUserToken(cluster, username)
+	s.ErrorIs(err, updateError)
+	s.Empty(result)
+	s.Empty(existingToken.UserPrincipal.Name)
 }
 
 func (s *autoscalerSuite) TestEnsureUserToken_CacheError() {

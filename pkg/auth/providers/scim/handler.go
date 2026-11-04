@@ -37,7 +37,7 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 		},
 	}
 
-	authenticator := NewTokenAuthenticator(scaledContext.Wrangler)
+	authenticator := NewTokenAuthenticator(scaledContext)
 	rateLimiter := newRateLimiter(func(provider string) (int, int) {
 		cfg := srv.getConfig(provider)
 		return cfg.RateLimitRequestsPerSecond, cfg.RateLimitBurst

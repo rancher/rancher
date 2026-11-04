@@ -28,24 +28,26 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Token struct {
-	metav1.TypeMeta    `json:",inline"`
-	metav1.ObjectMeta  `json:"metadata,omitempty"`
-	Token              string            `json:"token" norman:"writeOnly,noupdate"`
-	UserPrincipal      Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
-	GroupPrincipals    []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
-	ProviderInfo       map[string]string `json:"providerInfo,omitempty"`
-	UserID             string            `json:"userId" norman:"type=reference[user]"`
-	AuthProvider       string            `json:"authProvider"`
-	TTLMillis          int64             `json:"ttl"`
-	LastUsedAt         *metav1.Time      `json:"lastUsedAt,omitempty"`
-	ActivityLastSeenAt *metav1.Time      `json:"activityLastSeenAt,omitempty"`
-	IsDerived          bool              `json:"isDerived"`
-	Description        string            `json:"description"`
-	Expired            bool              `json:"expired"`
-	ExpiresAt          string            `json:"expiresAt"`
-	Current            bool              `json:"current"`
-	ClusterName        string            `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
-	Enabled            *bool             `json:"enabled,omitempty" norman:"default=true"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Token             string            `json:"token" norman:"writeOnly,noupdate"`
+	UserPrincipal     Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
+	GroupPrincipals   []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
+	ProviderInfo      map[string]string `json:"providerInfo,omitempty"`
+	UserID            string            `json:"userId" norman:"type=reference[user]"`
+	// Deprecated: The AuthConfig name is parsed from the UserPrincipal.Name
+	// and the provider is derived from that AuthConfig's type.
+	AuthProvider       string       `json:"authProvider"`
+	TTLMillis          int64        `json:"ttl"`
+	LastUsedAt         *metav1.Time `json:"lastUsedAt,omitempty"`
+	ActivityLastSeenAt *metav1.Time `json:"activityLastSeenAt,omitempty"`
+	IsDerived          bool         `json:"isDerived"`
+	Description        string       `json:"description"`
+	Expired            bool         `json:"expired"`
+	ExpiresAt          string       `json:"expiresAt"`
+	Current            bool         `json:"current"`
+	ClusterName        string       `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
+	Enabled            *bool        `json:"enabled,omitempty" norman:"default=true"`
 }
 
 // Implement the TokenAccessor interface
@@ -74,6 +76,8 @@ func (t *Token) GetIsDerived() bool {
 	return t.IsDerived
 }
 
+// Deprecated: GetAuthProvider is deprecated in favour of parsing the
+// AuthConfig name from the Principal's ID and using that AuthConfig's type.
 func (t *Token) GetAuthProvider() string {
 	return t.AuthProvider
 }
@@ -316,6 +320,10 @@ type AuthConfig struct {
 	// Currently only the SAML providers do, with their `Single Log Out` flow.
 	LogoutAllSupported bool `json:"logoutAllSupported,omitempty"`
 
+	// DisplayName is the user friendly name shown in the UI.
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
+
 	Status AuthConfigStatus `json:"status"`
 }
 
@@ -389,6 +397,8 @@ type GithubConfigApplyInput struct {
 	GithubConfig GithubConfig `json:"githubConfig,omitempty"`
 	Code         string       `json:"code,omitempty"`
 	Enabled      bool         `json:"enabled,omitempty"`
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +genclient
@@ -431,6 +441,9 @@ type GithubAppConfigApplyInput struct {
 	GithubConfig GithubAppConfig `json:"githubConfig,omitempty"`
 	Code         string          `json:"code,omitempty"`
 	Enabled      bool            `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -454,6 +467,9 @@ type GoogleOauthConfigApplyInput struct {
 	GoogleOauthConfig GoogleOauthConfig `json:"googleOauthConfig,omitempty"`
 	Code              string            `json:"code,omitempty"`
 	Enabled           bool              `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -490,8 +506,9 @@ type AzureADConfigTestOutput struct {
 }
 
 type AzureADConfigApplyInput struct {
-	Config AzureADConfig `json:"config,omitempty"`
-	Code   string        `json:"code,omitempty"`
+	Config     AzureADConfig `json:"config,omitempty"`
+	Code       string        `json:"code,omitempty"`
+	ConfigName string        `json:"configName,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -561,6 +578,9 @@ type ActiveDirectoryTestAndApplyInput struct {
 	Username              string                `json:"username"`
 	Password              string                `json:"password"`
 	Enabled               bool                  `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 type LdapFields struct {
@@ -636,6 +656,9 @@ type LdapTestAndApplyInput struct {
 	LdapConfig `json:"ldapConfig,omitempty"`
 	Username   string `json:"username"`
 	Password   string `json:"password" norman:"type=password,required"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName,omitempty"`
 }
 
 type OpenLdapConfig struct {
@@ -743,6 +766,8 @@ type GenericSAMLConfig struct {
 	SamlConfig `json:",inline" mapstructure:",squash"`
 }
 
+// AuthSystemImages is a list of images used for auth systems
+// Deprecated: Image value now stored as buildconfig.DefaultKubeAPIAuthImage updated via build.yaml
 type AuthSystemImages struct {
 	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
 }
@@ -812,6 +837,9 @@ type OIDCApplyInput struct {
 	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
 	Code       string     `json:"code,omitempty"`
 	Enabled    bool       `json:"enabled,omitempty"`
+
+	// ConfigName is the name of the AuthConfig to create.
+	ConfigName string `json:"configName"`
 }
 
 // +genclient

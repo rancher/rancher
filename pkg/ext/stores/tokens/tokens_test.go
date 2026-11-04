@@ -61,7 +61,7 @@ var (
 			FieldDescription:    []byte(""),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("13:00:05"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
@@ -82,7 +82,7 @@ var (
 			FieldDescription:    []byte(""),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("13:00:05"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
@@ -136,7 +136,7 @@ var (
 		Data: map[string][]byte{
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("this is a fake now"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("5000"),
@@ -156,7 +156,7 @@ var (
 		Data: map[string][]byte{
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("this is a fake now"),
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("3000"),
@@ -178,6 +178,7 @@ var (
 	sessionNotFoundError    = apierrors.NewNotFound(GVR.GroupResource(), "session-token")
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
+	createSessionKind       = apierrors.NewBadRequest("unable to create token of kind session")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
 	admissionDenialMessage  = "ValidatingAdmissionPolicy 'block' denied request: blocked"
 
@@ -1267,6 +1268,66 @@ func TestStoreCreate(t *testing.T) {
 					Return(&mockUser{name: properUser}, false, true, nil)
 			},
 		},
+		{
+			name: "session kind",
+			err:  createSessionKind,
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+			},
+		},
+		{
+			name: "session kind, dry run",
+			err:  createSessionKind,
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
+			opts: &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+			},
+		},
+		{
+			name: "session kind, full access",
+			err:  createSessionKind,
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "world", Kind: KindSession}},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, true, true, nil)
+			},
+		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
 		{
 			name: "user retrieval error",
@@ -1422,9 +1483,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1461,9 +1522,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1513,9 +1574,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1559,9 +1620,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1608,9 +1669,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1665,9 +1726,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1708,7 +1769,7 @@ func TestStoreCreate(t *testing.T) {
 								FieldLastActivitySeen: "",
 								FieldLastUpdateTime:   "this is a fake now",
 								FieldLastUsedAt:       "",
-								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
 								FieldTTL:              "7776000000",
 								FieldUID:              have.StringData[FieldUID],
 								FieldUserID:           "world",
@@ -1757,9 +1818,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1800,7 +1861,7 @@ func TestStoreCreate(t *testing.T) {
 								FieldLastActivitySeen: "",
 								FieldLastUpdateTime:   "this is a fake now",
 								FieldLastUsedAt:       "",
-								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
 								FieldTTL:              "7776000000",
 								FieldUID:              have.StringData[FieldUID],
 								FieldUserID:           "world",
@@ -1849,9 +1910,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1892,7 +1953,7 @@ func TestStoreCreate(t *testing.T) {
 								FieldLastActivitySeen: "",
 								FieldLastUpdateTime:   "this is a fake now",
 								FieldLastUsedAt:       "",
-								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
 								FieldTTL:              "7776000000",
 								FieldUID:              have.StringData[FieldUID],
 								FieldUserID:           "world",
@@ -1941,9 +2002,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").Return(&v3.Token{
-					AuthProvider: "local",
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
 					}}, nil)
 
 				users.EXPECT().Get("world").
@@ -1984,8 +2045,100 @@ func TestStoreCreate(t *testing.T) {
 								FieldLastActivitySeen: "",
 								FieldLastUpdateTime:   "this is a fake now",
 								FieldLastUsedAt:       "",
-								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
 								FieldTTL:              "6775980000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name: "created secret ok, kind other than session",
+			err:  nil,
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   "kubeconfig",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+						Provider:   "local",
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "kubeconfig",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "kubeconfig",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world","provider":"local"}`,
+								FieldTTL:              "2592000000", // the kubeconfig default, 30 days
 								FieldUID:              have.StringData[FieldUID],
 								FieldUserID:           "world",
 							},
@@ -2122,9 +2275,9 @@ func TestSystemStoreCreateClusterScoped(t *testing.T) {
 
 			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
 			tcache.EXPECT().Get("session-token").Return(&v3.Token{
-				AuthProvider: "local",
 				UserPrincipal: v3.Principal{
 					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					Provider:   "local",
 				},
 			}, nil)
 
@@ -2160,6 +2313,71 @@ func TestSystemStoreCreateClusterScoped(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestSystemStoreCreateRejectsIncompleteRequestPrincipal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		principal v3.Principal
+	}{
+		{
+			name:      "empty principal",
+			principal: v3.Principal{},
+		},
+		{
+			name:      "missing provider",
+			principal: v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "local://world"}},
+		},
+		{
+			name:      "missing name",
+			principal: v3.Principal{Provider: "local"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			// No secret is expected to be created.
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			ccache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+
+			timer := NewMocktimeHandler(ctrl)
+			hasher := NewMockhashHandler(ctrl)
+			auth := NewMockauthHandler(ctrl)
+
+			store := NewSystem(nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth, nil)
+
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				UserPrincipal: test.principal,
+			}, nil)
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			}
+
+			_, err := store.Create(t.Context(), GVR.GroupResource(), token, &metav1.CreateOptions{}, &mockUser{name: "world"})
+			require.Error(t, err)
+			assert.True(t, apierrors.IsForbidden(err), "expected forbidden, got %v", err)
+			assert.Contains(t, err.Error(), "authentication token session-token has no user principal")
 		})
 	}
 }
@@ -2746,7 +2964,7 @@ func TestSystemStoreUpdateLastActivitySeen(t *testing.T) {
 						FieldDescription:      []byte(""),
 						FieldEnabled:          []byte("true"),
 						FieldHash:             []byte("kla9jkdmj"),
-						FieldKind:             []byte(IsLogin),
+						FieldKind:             []byte(KindSession),
 						FieldLastUpdateTime:   []byte(now.Add(-time.Hour).Format(time.RFC3339)),
 						FieldPrincipal:        properPrincipalBytes,
 						FieldTTL:              []byte("4000"),
@@ -3423,48 +3641,52 @@ func (w *mockWatch) ResultChan() <-chan watch.Event {
 
 func (w *mockWatch) Stop() {}
 
-func TestSystemStoreListForProvider(t *testing.T) {
+func TestSystemStoreListForConfig(t *testing.T) {
 	t.Parallel()
 
-	otherPrincipal := ext.TokenPrincipal{
-		Name:     "other-user",
-		Provider: "otherprovider",
-	}
-	otherPrincipalBytes, _ := json.Marshal(otherPrincipal)
-
-	otherSecret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "token-other",
-			Labels: map[string]string{
-				UserIDLabel:     "otheruser",
-				SecretKindLabel: SecretKindLabelValue,
+	newSecret := func(name, principalID string) *corev1.Secret {
+		principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+			Name:     principalID,
+			Provider: "github",
+		})
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					UserIDLabel:     name + "-user",
+					SecretKindLabel: SecretKindLabelValue,
+				},
+				UID: types.UID(name + "-uid"),
 			},
-			UID: "other-uid",
-		},
-		Data: map[string][]byte{
-			FieldDescription:    []byte(""),
-			FieldEnabled:        []byte("true"),
-			FieldHash:           []byte("otherhash"),
-			FieldKind:           []byte(IsLogin),
-			FieldLastUpdateTime: []byte("14:00:00"),
-			FieldPrincipal:      otherPrincipalBytes,
-			FieldTTL:            []byte("5000"),
-			FieldUID:            []byte("other-kube-uid"),
-			FieldUserID:         []byte("otheruser"),
-		},
+			Data: map[string][]byte{
+				FieldDescription:    []byte(""),
+				FieldEnabled:        []byte("true"),
+				FieldHash:           []byte("somehash"),
+				FieldKind:           []byte(KindSession),
+				FieldLastUpdateTime: []byte("14:00:00"),
+				FieldPrincipal:      principalBytes,
+				FieldTTL:            []byte("5000"),
+				FieldUID:            []byte(name + "-kube-uid"),
+				FieldUserID:         []byte(name + "-user"),
+			},
+		}
 	}
+
+	// Both configs have the provider type github.
+	githubSecret := newSecret("token-github", "github_user://1")
+	githubEUSecret := newSecret("token-github-eu", "github-eu_user://2")
 
 	tests := []struct {
 		name       string
-		provider   string
+		configName string
 		err        error
-		wantCount  int
+		wantTokens []string
 		storeSetup func(scache *fake.MockCacheInterface[*corev1.Secret])
 	}{
 		{
-			name:     "cache error propagates",
-			provider: "somebody",
-			err:      apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider somebody: %w", errSomeError)),
+			name:       "cache error propagates",
+			configName: "github",
+			err:        apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config github: %w", errSomeError)),
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -3472,9 +3694,8 @@ func TestSystemStoreListForProvider(t *testing.T) {
 			},
 		},
 		{
-			name:      "empty result",
-			provider:  "somebody",
-			wantCount: 0,
+			name:       "empty result",
+			configName: "github",
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -3482,33 +3703,44 @@ func TestSystemStoreListForProvider(t *testing.T) {
 			},
 		},
 		{
-			name:      "returns only matching provider",
-			provider:  "somebody",
-			wantCount: 1,
+			name:       "returns only the default config's tokens",
+			configName: "github",
+			wantTokens: []string{"token-github"},
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
-					Return([]*corev1.Secret{&properSecret, &otherSecret}, nil)
+					Return([]*corev1.Secret{githubSecret, githubEUSecret}, nil)
 			},
 		},
 		{
-			name:      "no match returns empty",
-			provider:  "nonexistent",
-			wantCount: 0,
+			name:       "returns only the named config's tokens",
+			configName: "github-eu",
+			wantTokens: []string{"token-github-eu"},
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
-					Return([]*corev1.Secret{&properSecret, &otherSecret}, nil)
+					Return([]*corev1.Secret{githubSecret, githubEUSecret}, nil)
 			},
 		},
 		{
-			name:      "skips broken secrets",
-			provider:  "somebody",
-			wantCount: 1,
+			name:       "does not match by provider type",
+			configName: "somebody",
 			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
 				scache.EXPECT().
 					List(TokenNamespace, gomock.Any()).
-					Return([]*corev1.Secret{&properSecret, &badSecret}, nil)
+					// properSecret has the provider somebody but an
+					// unparseable principal ID.
+					Return([]*corev1.Secret{&properSecret, githubSecret}, nil)
+			},
+		},
+		{
+			name:       "skips broken secrets",
+			configName: "github",
+			wantTokens: []string{"token-github"},
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return([]*corev1.Secret{githubSecret, &badSecret}, nil)
 			},
 		},
 	}
@@ -3528,17 +3760,562 @@ func TestSystemStoreListForProvider(t *testing.T) {
 			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 			tt.storeSetup(scache)
 
-			toks, err := store.ListForProvider(tt.provider)
+			toks, err := store.ListForConfig(tt.configName)
 			if tt.err != nil {
 				assert.Equal(t, tt.err, err)
 				assert.Nil(t, toks)
-			} else {
-				require.NoError(t, err)
-				assert.Len(t, toks.Items, tt.wantCount)
-				for _, tok := range toks.Items {
-					assert.Equal(t, tt.provider, tok.Spec.UserPrincipal.Provider)
-				}
+				return
 			}
+
+			require.NoError(t, err)
+			var names []string
+			for _, tok := range toks.Items {
+				names = append(names, tok.Name)
+			}
+			assert.ElementsMatch(t, tt.wantTokens, names)
+		})
+	}
+}
+
+// setTTLSettings sets the token and session TTL settings, in minutes, for the duration of the test.
+func setTTLSettings(t *testing.T, maxMinutes, defaultMinutes, sessionMinutes string) {
+	t.Helper()
+
+	for setting, value := range map[*settings.Setting]string{
+		&settings.AuthTokenMaxTTLMinutes:     maxMinutes,
+		&settings.AuthTokenDefaultTTLMinutes: defaultMinutes,
+		&settings.AuthUserSessionTTLMinutes:  sessionMinutes,
+	} {
+		prior := setting.Get()
+		require.NoError(t, setting.Set(value))
+		t.Cleanup(func() {
+			assert.NoError(t, setting.Set(prior))
+		})
+	}
+}
+
+// setKubeconfigTTLSettings sets the kubeconfig TTL settings, in minutes, for the duration of the test.
+func setKubeconfigTTLSettings(t *testing.T, maxMinutes, defaultMinutes string) {
+	t.Helper()
+
+	for setting, value := range map[*settings.Setting]string{
+		&settings.KubeconfigMaxTokenTTLMinutes:     maxMinutes,
+		&settings.KubeconfigDefaultTokenTTLMinutes: defaultMinutes,
+	} {
+		prior := setting.Get()
+		require.NoError(t, setting.Set(value))
+		t.Cleanup(func() {
+			assert.NoError(t, setting.Set(prior))
+		})
+	}
+}
+
+func TestTTLLimits(t *testing.T) {
+	const (
+		hour  = int64(time.Hour / time.Millisecond)
+		day   = 24 * hour
+		never = int64(-1)
+	)
+
+	tests := []struct {
+		name                     string
+		kind                     string
+		maxMinutes               string
+		defaultMinutes           string
+		sessionMinutes           string
+		kubeconfigMaxMinutes     string
+		kubeconfigDefaultMinutes string
+		wantDefault              int64
+		wantMax                  int64
+	}{
+		{
+			name:        "session",
+			kind:        KindSession,
+			wantDefault: 16 * hour,
+			wantMax:     16 * hour,
+		},
+		{
+			name:           "session, no session ttl limit",
+			kind:           KindSession,
+			sessionMinutes: "0",
+			wantDefault:    never,
+			wantMax:        never,
+		},
+		{
+			name:        "session ignores the token max",
+			kind:        KindSession,
+			maxMinutes:  "60",
+			wantDefault: 16 * hour,
+			wantMax:     16 * hour,
+		},
+		{
+			name:        "derived",
+			kind:        "",
+			wantDefault: 90 * day,
+			wantMax:     90 * day,
+		},
+		{
+			name:           "derived, default below the max",
+			kind:           "",
+			defaultMinutes: "43200",
+			wantDefault:    30 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, default above the max",
+			kind:           "",
+			defaultMinutes: "144000",
+			wantDefault:    90 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, default 0",
+			kind:           "",
+			defaultMinutes: "0",
+			wantDefault:    90 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:           "derived, no max",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "43200",
+			wantDefault:    30 * day,
+			wantMax:        never,
+		},
+		{
+			name:           "derived, no max, default 0",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "0",
+			wantDefault:    never,
+			wantMax:        never,
+		},
+		{
+			name:        "derived, negative max",
+			kind:        "",
+			maxMinutes:  "-5",
+			wantDefault: 90 * day,
+			wantMax:     never,
+		},
+		{
+			name:        "kubeconfig",
+			kind:        KindKubeconfig,
+			wantDefault: 30 * day,
+			wantMax:     90 * day,
+		},
+		{
+			name:           "kubeconfig ignores the token default",
+			kind:           KindKubeconfig,
+			defaultMinutes: "1440",
+			wantDefault:    30 * day,
+			wantMax:        90 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max above the max",
+			kind:                 KindKubeconfig,
+			kubeconfigMaxMinutes: "259200",
+			wantDefault:          30 * day,
+			wantMax:              90 * day,
+		},
+		{
+			name:                     "kubeconfig, kubeconfig max below the max",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "28800",
+			kubeconfigDefaultMinutes: "86400",
+			wantDefault:              20 * day,
+			wantMax:                  20 * day,
+		},
+		{
+			name:                     "kubeconfig, default above the max",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "259200",
+			kubeconfigDefaultMinutes: "259200",
+			wantDefault:              90 * day,
+			wantMax:                  90 * day,
+		},
+		{
+			name:                 "kubeconfig, no kubeconfig max",
+			kind:                 KindKubeconfig,
+			kubeconfigMaxMinutes: "0",
+			wantDefault:          30 * day,
+			wantMax:              90 * day,
+		},
+		{
+			name:                 "kubeconfig, no max",
+			kind:                 KindKubeconfig,
+			maxMinutes:           "0",
+			kubeconfigMaxMinutes: "86400",
+			wantDefault:          30 * day,
+			wantMax:              60 * day,
+		},
+		{
+			name:                     "kubeconfig, both kubeconfig settings 0",
+			kind:                     KindKubeconfig,
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantDefault:              90 * day,
+			wantMax:                  90 * day,
+		},
+		{
+			name:                     "kubeconfig, no max at any level",
+			kind:                     KindKubeconfig,
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "0",
+			wantDefault:              never,
+			wantMax:                  never,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			orDefault := func(value, fallback string) string {
+				if value == "" {
+					return fallback
+				}
+				return value
+			}
+			setTTLSettings(t,
+				orDefault(test.maxMinutes, "129600"),
+				orDefault(test.defaultMinutes, "129600"),
+				orDefault(test.sessionMinutes, "960"))
+			setKubeconfigTTLSettings(t,
+				orDefault(test.kubeconfigMaxMinutes, "129600"),
+				orDefault(test.kubeconfigDefaultMinutes, "43200"))
+
+			defaultTTL, maxTTL, err := TTLLimits(test.kind)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantDefault, defaultTTL, "default")
+			assert.Equal(t, test.wantMax, maxTTL, "max")
+		})
+	}
+}
+
+func TestTTLLimitsInvalidSetting(t *testing.T) {
+	setTTLSettings(t, "90d", "129600", "960")
+
+	_, _, err := TTLLimits("")
+	assert.ErrorContains(t, err, "auth-token-max-ttl-minutes")
+}
+
+func TestToSecretTTL(t *testing.T) {
+	const (
+		hour  = int64(time.Hour / time.Millisecond)
+		day   = 24 * hour
+		never = int64(-1)
+	)
+
+	tests := []struct {
+		name                 string
+		kind                 string
+		ttl                  int64
+		maxMinutes           string
+		sessionMinutes       string
+		kubeconfigMaxMinutes string
+		want                 int64
+	}{
+		{
+			name: "session, default",
+			kind: KindSession,
+			want: 16 * hour,
+		},
+		{
+			name: "session, shorter than the session ttl",
+			kind: KindSession,
+			ttl:  hour,
+			want: hour,
+		},
+		{
+			name: "session, longer than the session ttl",
+			kind: KindSession,
+			ttl:  30 * day,
+			want: 16 * hour,
+		},
+		{
+			name: "session, never expires",
+			kind: KindSession,
+			ttl:  never,
+			want: 16 * hour,
+		},
+		{
+			name:           "session, no session ttl limit",
+			kind:           KindSession,
+			sessionMinutes: "0",
+			want:           never,
+		},
+		{
+			name:       "session, never expires, no max",
+			kind:       KindSession,
+			ttl:        never,
+			maxMinutes: "0",
+			want:       16 * hour,
+		},
+		{
+			name:       "session, default, no max",
+			kind:       KindSession,
+			maxMinutes: "0",
+			want:       16 * hour,
+		},
+		{
+			name: "derived, default",
+			kind: "",
+			want: 90 * day,
+		},
+		{
+			name:       "derived, never expires, no max",
+			kind:       "",
+			ttl:        never,
+			maxMinutes: "0",
+			want:       never,
+		},
+		{
+			name: "derived, longer than the session ttl",
+			kind: "",
+			ttl:  30 * day,
+			want: 30 * day,
+		},
+		{
+			name: "derived, longer than the max",
+			kind: "",
+			ttl:  100 * day,
+			want: 90 * day,
+		},
+		{
+			name: "kubeconfig, default",
+			kind: KindKubeconfig,
+			want: 30 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max above the max",
+			kind:                 KindKubeconfig,
+			ttl:                  150 * day,
+			kubeconfigMaxMinutes: "259200", // 180 days
+			want:                 90 * day,
+		},
+		{
+			name:                 "kubeconfig, kubeconfig max below the max",
+			kind:                 KindKubeconfig,
+			ttl:                  60 * day,
+			kubeconfigMaxMinutes: "28800", // 20 days
+			want:                 20 * day,
+		},
+		{
+			name:       "kubeconfig, never expires, no max, kubeconfig max",
+			kind:       KindKubeconfig,
+			ttl:        never,
+			maxMinutes: "0",
+			want:       90 * day,
+		},
+		{
+			name:                 "kubeconfig, never expires, no max at either level",
+			kind:                 KindKubeconfig,
+			ttl:                  never,
+			maxMinutes:           "0",
+			kubeconfigMaxMinutes: "0",
+			want:                 never,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			maxMinutes := "129600"
+			if test.maxMinutes != "" {
+				maxMinutes = test.maxMinutes
+			}
+			sessionMinutes := "960"
+			if test.sessionMinutes != "" {
+				sessionMinutes = test.sessionMinutes
+			}
+			kubeconfigMaxMinutes := "129600"
+			if test.kubeconfigMaxMinutes != "" {
+				kubeconfigMaxMinutes = test.kubeconfigMaxMinutes
+			}
+			setTTLSettings(t, maxMinutes, "129600", sessionMinutes)
+			setKubeconfigTTLSettings(t, kubeconfigMaxMinutes, "43200")
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   test.kind,
+					TTL:    test.ttl,
+				},
+			}
+
+			secret, err := toSecret(token)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.want, token.Spec.TTL)
+			assert.Equal(t, strconv.FormatInt(test.want, 10), secret.StringData[FieldTTL])
+		})
+	}
+}
+
+func TestSystemStoreUpdateTTL(t *testing.T) {
+	const (
+		hour = int64(time.Hour / time.Millisecond)
+		day  = 24 * hour
+	)
+
+	tests := []struct {
+		name   string
+		kind   string
+		oldTTL int64
+		ttl    int64
+		want   int64
+	}{
+		{
+			name:   "session, default is the session ttl",
+			kind:   KindSession,
+			oldTTL: 16 * hour,
+			ttl:    0,
+			want:   16 * hour,
+		},
+		{
+			name:   "session, longer ttl is limited to the session ttl",
+			kind:   KindSession,
+			oldTTL: 90 * day,
+			ttl:    90 * day,
+			want:   16 * hour,
+		},
+		{
+			name:   "session, shorter ttl is kept",
+			kind:   KindSession,
+			oldTTL: 16 * hour,
+			ttl:    hour,
+			want:   hour,
+		},
+		{
+			name:   "kubeconfig, default is capped to the kubeconfig max",
+			kind:   KindKubeconfig,
+			oldTTL: 30 * day,
+			ttl:    0,
+			want:   20 * day,
+		},
+		{
+			name:   "kubeconfig, longer ttl is limited to the kubeconfig max",
+			kind:   KindKubeconfig,
+			oldTTL: 90 * day,
+			ttl:    90 * day,
+			want:   20 * day,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTTLSettings(t, "129600", "129600", "960")
+			setKubeconfigTTLSettings(t, "28800", "43200") // 20 days, 30 days
+
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+
+			timer := NewMocktimeHandler(ctrl)
+			timer.EXPECT().Now().Return("this is a fake now")
+
+			secrets.EXPECT().Update(gomock.Any()).
+				DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+					assert.Equal(t, strconv.FormatInt(test.want, 10), secret.StringData[FieldTTL])
+					return &properSecret, nil
+				})
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, timer, NewMockhashHandler(ctrl), NewMockauthHandler(ctrl))
+
+			old := properToken.DeepCopy()
+			old.Spec.Kind = test.kind
+			old.Spec.TTL = test.oldTTL
+			token := old.DeepCopy()
+			token.Spec.TTL = test.ttl
+
+			_, err := store.update("", false, old, token, &metav1.UpdateOptions{})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestSystemStoreCreateDryRun(t *testing.T) {
+	const (
+		hour = int64(time.Hour / time.Millisecond)
+		day  = 24 * hour
+	)
+
+	tests := []struct {
+		name string
+		kind string
+		ttl  int64
+		want int64
+	}{
+		{
+			name: "default",
+			want: 90 * day,
+		},
+		{
+			name: "longer than the max",
+			ttl:  100 * day,
+			want: 90 * day,
+		},
+		{
+			name: "session, default",
+			kind: KindSession,
+			want: 16 * hour,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTTLSettings(t, "129600", "129600", "960")
+
+			ctrl := gomock.NewController(t)
+
+			// No secret is created on a dry run.
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().Get(TokenNamespace, gomock.Any()).
+				Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "token"))
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					Provider:   "local",
+				},
+			}, nil)
+
+			auth := NewMockauthHandler(ctrl)
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+
+			hasher := NewMockhashHandler(ctrl)
+			hasher.EXPECT().MakeAndHashSecret().Return("secretval", "hashval", nil)
+
+			timer := NewMocktimeHandler(ctrl)
+			timer.EXPECT().Now().Return("fake-now")
+
+			store := NewSystem(nil, nil, secrets, users, tcache, nil, timer, hasher, auth)
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					Kind:   test.kind,
+					TTL:    test.ttl,
+				},
+			}
+
+			opts := &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+			created, err := store.Create(t.Context(), GVR.GroupResource(), token, opts, &mockUser{name: "world"})
+			require.NoError(t, err)
+			assert.Equal(t, test.want, created.Spec.TTL)
+			assert.Empty(t, created.Status.Hash)
 		})
 	}
 }

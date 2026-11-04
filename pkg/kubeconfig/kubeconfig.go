@@ -45,8 +45,9 @@ type data struct {
 // ExecUser is the Rancher user written in exec entries of a kubeconfig without a token.
 // When set, exec entries run "rancher auth get-token" instead of "rancher token".
 type ExecUser struct {
-	ID           string
-	AuthProvider string
+	ID string
+	// ConfigName is the name of the AuthConfig, passed as --auth-provider.
+	ConfigName string
 }
 
 type Cluster struct {

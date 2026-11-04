@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/cognito"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
@@ -159,19 +160,20 @@ func providerInputForType(providerType string) loginAccessor {
 		}
 	case client.GithubProviderType:
 		return &apiv3.GithubLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: github.Name},
+			// TODO: This needs fixed
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: github.ProviderName},
 		}
 	case client.GithubAppProviderType:
 		return &apiv3.GithubLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: githubapp.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: githubapp.ProviderName},
 		}
 	case client.ActiveDirectoryProviderType:
 		return &apiv3.BasicLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: activedirectory.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: activedirectory.ProviderName},
 		}
 	case client.AzureADProviderType:
 		return &apiv3.AzureADLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: azure.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: azure.ProviderName},
 		}
 	case client.OpenLdapProviderType:
 		return &apiv3.BasicLogin{
@@ -212,23 +214,23 @@ func providerInputForType(providerType string) loginAccessor {
 		}
 	case client.GoogleOAuthProviderType, "googleOauthProvider":
 		return &apiv3.GoogleOauthLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: googleoauth.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: googleoauth.ProviderName},
 		}
 	case client.OIDCProviderType:
 		return &apiv3.OIDCLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: oidc.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: oidc.ProviderName},
 		}
 	case client.KeyCloakOIDCProviderType:
 		return &apiv3.OIDCLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: keycloakoidc.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: keycloakoidc.ProviderName},
 		}
 	case client.GenericOIDCProviderType:
 		return &apiv3.OIDCLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: genericoidc.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: genericoidc.ProviderName},
 		}
 	case client.CognitoProviderType:
 		return &apiv3.OIDCLogin{
-			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: cognito.Name},
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: cognito.ProviderName},
 		}
 	default:
 		return nil
@@ -265,7 +267,7 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 		return
 	}
 
-	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(w, r, input, input.GetName())
+	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(w, r, input, input.GetType())
 	if err != nil {
 		if !util.IsAPIError(err) {
 			logrus.Errorf("login: Error authenticating user: %s", err)
@@ -303,8 +305,8 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 		}
 
 		loginTime := time.Now()
-		userExtraInfo := providers.GetUserExtraAttributes(input.GetName(), userPrincipal)
-		err = h.ensureUserAttribute(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		userExtraInfo := providers.GetUserExtraAttributes(input.GetType(), userPrincipal)
+		err = h.ensureUserAttribute(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo, loginTime)
 		if err != nil {
 			logrus.Warnf("login: Error creating or updating userAttribute for %s, retrying: %s", userPrincipal.Name, err)
 			return false, nil

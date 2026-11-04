@@ -30,6 +30,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	kind := convert.ToString(authType)
+	prefix := common.SecretNamePrefix(id, kind)
 	fields, ok := TypeToFields[kind]
 	subFields, subOk := SubTypeToFields[kind]
 	if !ok && !subOk {
@@ -39,7 +40,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	var err error
 	for _, field := range fields {
 		if val, ok := data[field]; ok {
-			data[field], err = s.CreateOrUpdateSecrets(convert.ToString(val), field, kind)
+			data[field], err = s.CreateOrUpdateSecrets(convert.ToString(val), field, prefix)
 			if err != nil {
 				return nil, err
 			}
@@ -55,7 +56,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			}
 			for _, field := range subFieldList {
 				if val, ok := subData[field]; ok {
-					subData[field], err = s.CreateOrUpdateSecrets(convert.ToString(val), field, kind)
+					subData[field], err = s.CreateOrUpdateSecrets(convert.ToString(val), field, prefix)
 					if err != nil {
 						return nil, err
 					}
@@ -67,8 +68,8 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	return s.Store.Update(apiContext, schema, data, id)
 }
 
-func (s *Store) CreateOrUpdateSecrets(value, field, kind string) (string, error) {
-	name, err := common.CreateOrUpdateSecrets(s.Secrets, value, strings.ToLower(field), strings.ToLower(kind))
+func (s *Store) CreateOrUpdateSecrets(value, field, prefix string) (string, error) {
+	name, err := common.CreateOrUpdateSecrets(s.Secrets, value, strings.ToLower(field), prefix)
 	if err != nil {
 		return "", fmt.Errorf("error creating secret %s: %w", name, err)
 	}

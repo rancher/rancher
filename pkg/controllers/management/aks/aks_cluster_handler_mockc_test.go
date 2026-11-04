@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
 	v1 "github.com/rancher/aks-operator/pkg/apis/aks.cattle.io/v1"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
@@ -24,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed test/*

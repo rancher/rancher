@@ -104,11 +104,47 @@ func TestClusterLifeCycleCreateProjectAnnotations(t *testing.T) {
 }
 
 func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
+	tests := map[string]struct {
+		principalName     string
+		wantUserName      string
+		wantPrincipalName string
+	}{
+		"a provider principal is bound by principal": {
+			principalName:     "keycloak_user://12345",
+			wantPrincipalName: "keycloak_user://12345",
+		},
+		"a principal of a config named like local is bound by principal": {
+			principalName:     "localsaml_user://12345",
+			wantPrincipalName: "localsaml_user://12345",
+		},
+		"a local principal is bound by user name": {
+			principalName: "local://u-abcdef",
+			wantUserName:  "u-abcdef",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			crtbs := reconcileClusterCreatorRTB(t, tt.principalName)
+
+			require.Len(t, crtbs, 1)
+			assert.Equal(t, "creator-cluster-owner", crtbs[0].Name)
+			assert.Equal(t, "test-cluster", crtbs[0].Namespace)
+			assert.Equal(t, "test-cluster", crtbs[0].ClusterName)
+			assert.Equal(t, tt.wantUserName, crtbs[0].UserName)
+			assert.Equal(t, tt.wantPrincipalName, crtbs[0].UserPrincipalName)
+		})
+	}
+}
+
+// reconcileClusterCreatorRTB reconciles the creator bindings of a cluster
+// created by u-abcdef with the given principal and returns the created CRTBs.
+func reconcileClusterCreatorRTB(t *testing.T, userPrincipalName string) []*apisv3.ClusterRoleTemplateBinding {
+	t.Helper()
 	var crtbs []*apisv3.ClusterRoleTemplateBinding
 
 	clusterName := "test-cluster"
 	userID := "u-abcdef"
-	userPrincipalName := "keycloak_user://12345"
 
 	cluster := &apisv3.Cluster{
 		ObjectMeta: v1.ObjectMeta{
@@ -151,12 +187,7 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, obj)
 
-	require.Len(t, crtbs, 1)
-	assert.Equal(t, "creator-cluster-owner", crtbs[0].Name)
-	assert.Equal(t, clusterName, crtbs[0].Namespace)
-	assert.Equal(t, clusterName, crtbs[0].ClusterName)
-	assert.Equal(t, "", crtbs[0].UserName)
-	assert.Equal(t, userPrincipalName, crtbs[0].UserPrincipalName)
+	return crtbs
 }
 
 func TestReconcileClusterCreatorRTBNoCreatorRBAC(t *testing.T) {

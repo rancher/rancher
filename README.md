@@ -1,7 +1,6 @@
 # Rancher
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
-[![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
 
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
@@ -11,8 +10,8 @@ Rancher is an open source container management platform built for organizations 
 
 ## Stable Release
 
-<!-- stable v2.15.2 DO NOT REMOVE THIS LINE -->
-* v2.15.2 - `rancher/rancher:v2.15.2` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.15.2).
+<!-- stable v2.15.3 DO NOT REMOVE THIS LINE -->
+* v2.15.3 - `rancher/rancher:v2.15.3` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.15.3).
   
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](https://forums.suse.com/c/announcements/12), or subscribe to the RSS feed `https://forums.suse.com/c/announcements/12.rss`.
 

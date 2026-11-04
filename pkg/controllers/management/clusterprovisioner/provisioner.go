@@ -3,6 +3,7 @@ package clusterprovisioner
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -102,7 +103,7 @@ func (p *Provisioner) Remove(cluster *apimgmtv3.Cluster) (runtime.Object, error)
 		return nil, nil
 	}
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		// cluster will be forcefully removed on last attempt
 		err := p.driverRemove(cluster, i == 3)
 		if err == nil {
@@ -124,7 +125,7 @@ func (p *Provisioner) Updated(cluster *apimgmtv3.Cluster) (runtime.Object, error
 		return cluster, nil
 	}
 
-	if imported.IsAdministratedByProvisioningCluster(cluster) {
+	if pkgcluster.IsAdministrated(cluster) {
 		if reconcileACE(cluster) {
 			_, err := p.Clusters.UpdateStatus(cluster)
 			// Return nil to norman to avoid redundant write-back
@@ -310,7 +311,7 @@ func setVersion(cluster *apimgmtv3.Cluster) {
 
 func (p *Provisioner) update(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv3.Cluster, error) {
 	cluster, err := p.reconcileCluster(cluster, create)
-	if err != nil || imported.IsAdministratedByProvisioningCluster(cluster) {
+	if err != nil || pkgcluster.IsAdministrated(cluster) {
 		return cluster, err
 	}
 
@@ -360,7 +361,7 @@ func (p *Provisioner) update(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv
 }
 
 func (p *Provisioner) Create(cluster *apimgmtv3.Cluster) (runtime.Object, error) {
-	if skipOperatorCluster("create", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
+	if skipOperatorCluster("create", cluster) || pkgcluster.IsAdministrated(cluster) {
 		return cluster, nil
 	}
 
@@ -557,7 +558,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 	}
 
 	saved := false
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return cluster, err
@@ -626,9 +627,7 @@ func (p *Provisioner) setGenericConfigs(cluster *apimgmtv3.Cluster) {
 func copyMap(toCopy apimgmtv3.MapStringInterface) apimgmtv3.MapStringInterface {
 	newMap := apimgmtv3.MapStringInterface{}
 
-	for k, v := range toCopy {
-		newMap[k] = v
-	}
+	maps.Copy(newMap, toCopy)
 
 	return newMap
 }
@@ -639,8 +638,8 @@ func (p *Provisioner) censorGenericEngineConfig(input apimgmtv3.ClusterSpec) (ap
 		return input, nil
 	}
 
-	config := copyMap(*input.GenericEngineConfig)
-	driverName, ok := config[DriverNameField].(string)
+	cfg := copyMap(*input.GenericEngineConfig)
+	driverName, ok := cfg[DriverNameField].(string)
 	if !ok {
 		// can't figure out driver type so blank out the whole thing
 		logrus.Warnf("cluster %v has a generic engine config but no driver type field; can't hide password "+
@@ -666,14 +665,14 @@ func (p *Provisioner) censorGenericEngineConfig(input apimgmtv3.ClusterSpec) (ap
 		return apimgmtv3.ClusterSpec{}, fmt.Errorf("error getting dynamic schema %v", err)
 	}
 
-	for key := range config {
+	for key := range cfg {
 		field := kontainerDriverSchema.Spec.ResourceFields[key]
 		if field.Type == "password" {
-			delete(config, key)
+			delete(cfg, key)
 		}
 	}
 
-	input.GenericEngineConfig = &config
+	input.GenericEngineConfig = &cfg
 	return input, nil
 }
 
@@ -686,10 +685,10 @@ func skipLocalK3sImported(cluster *apimgmtv3.Cluster) bool {
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD
 }
 
-func (p *Provisioner) getConfig(spec apimgmtv3.ClusterSpec) (*apimgmtv3.ClusterSpec, interface{}, error) {
-	var v interface{}
+func (p *Provisioner) getConfig(spec apimgmtv3.ClusterSpec) (*apimgmtv3.ClusterSpec, any, error) {
+	var v any
 	if spec.GenericEngineConfig == nil {
-		v = map[string]interface{}{}
+		v = map[string]any{}
 	} else {
 		v = *spec.GenericEngineConfig
 	}
@@ -797,9 +796,10 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
-		imported.IsAdministratedByProvisioningCluster(cluster) {
+		pkgcluster.IsAdministrated(cluster) {
 		return false, false, nil // no-op
 	}
+
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
 	driver := cluster.Status.Driver
 	specChanged := false
@@ -811,19 +811,21 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 				break
 			}
 		}
+
 		if cluster.Status.Driver != apimgmtv3.ClusterDriverK3os {
 			cluster.Status.Driver = apimgmtv3.ClusterDriverK3s
 		}
+
 		// only set these values on init, and not for embedded clusters as those shouldn't be upgraded
-		if cluster.Spec.K3sConfig == nil && !isEmbedded {
-			cluster.Spec.K3sConfig = &apimgmtv3.K3sConfig{
-				Version: cluster.Status.Version.String(),
+		if (cluster.Spec.K3sConfig == nil || cluster.Spec.K3sConfig.Version == "") && !isEmbedded {
+			if cluster.Spec.K3sConfig == nil {
+				cluster.Spec.K3sConfig = &apimgmtv3.K3sConfig{}
 			}
+			cluster.Spec.K3sConfig.Version = cluster.Status.Version.String()
 			cluster.Spec.K3sConfig.SetStrategy(1, 1)
 			specChanged = true
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
-
 		_, err := p.DaemonsetLister.Get("cattle-system", "rancher")
 		if apierrors.IsNotFound(err) {
 			cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
@@ -834,10 +836,13 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 			statusChanged := driver != cluster.Status.Driver
 			return statusChanged, false, nil
 		}
-		if cluster.Spec.Rke2Config == nil {
-			cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{
-				Version: cluster.Status.Version.String(),
+
+		// only set these values on init, and not for embedded clusters as those shouldn't be upgraded
+		if (cluster.Spec.Rke2Config == nil || cluster.Spec.Rke2Config.Version == "") && !isEmbedded {
+			if cluster.Spec.Rke2Config == nil {
+				cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{}
 			}
+			cluster.Spec.Rke2Config.Version = cluster.Status.Version.String()
 			cluster.Spec.Rke2Config.SetStrategy(1, 1)
 			specChanged = true
 		}
@@ -847,7 +852,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 }
 
 func reconcileACE(cluster *apimgmtv3.Cluster) bool {
-	if imported.IsAdministratedByProvisioningCluster(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+	if pkgcluster.IsAdministrated(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		if cluster.Status.AppliedSpec.LocalClusterAuthEndpoint != cluster.Spec.LocalClusterAuthEndpoint {
 			cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
 			return true

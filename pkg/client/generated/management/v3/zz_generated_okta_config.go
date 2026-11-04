@@ -8,6 +8,7 @@ const (
 	OKTAConfigFieldAnnotations         = "annotations"
 	OKTAConfigFieldCreated             = "created"
 	OKTAConfigFieldCreatorID           = "creatorId"
+	OKTAConfigFieldDisplayName         = "displayName"
 	OKTAConfigFieldDisplayNameField    = "displayNameField"
 	OKTAConfigFieldEnabled             = "enabled"
 	OKTAConfigFieldEntityID            = "entityID"
@@ -41,6 +42,7 @@ type OKTAConfig struct {
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName         string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DisplayNameField    string            `json:"displayNameField,omitempty" yaml:"displayNameField,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EntityID            string            `json:"entityID,omitempty" yaml:"entityID,omitempty"`

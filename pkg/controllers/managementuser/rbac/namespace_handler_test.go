@@ -765,6 +765,21 @@ func aggregationRoleBinding(name, namespace, ownerLabel string) *rbacv1.RoleBind
 	}
 }
 
+// managementRoleBinding builds a RoleBinding mirroring what the management roletemplate controllers
+// create in a project backing namespace.
+func managementRoleBinding(name, namespace, ownerLabel string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				pkgrbac.AggregationManagementFeatureLabel: "true",
+				ownerLabel: "true",
+			},
+		},
+	}
+}
+
 // legacyRoleBinding builds a RoleBinding carrying a single legacy rtb-owner label (key/value),
 // mirroring what the legacy PRTB handler creates in each namespace.
 func legacyRoleBinding(name, namespace, label, value string) *rbacv1.RoleBinding {
@@ -903,6 +918,14 @@ func TestRemovePRTBRoleBindingsNotInProject(t *testing.T) {
 				"uid-any": {prtb(otherNamespace, "any")},
 			},
 			wantDeleted: []string{"rb-agg", "rb-leg"},
+		},
+		{
+			name:      "no project: management plane prtb binding (project backing namespace) is left alone",
+			projectID: "",
+			existingRBs: []*rbacv1.RoleBinding{
+				managementRoleBinding("rb-mgmt", namespaceName, otherPRTBLabel),
+			},
+			wantDeleted: nil,
 		},
 		{
 			name:          "project not found: cleanup skipped",
@@ -1048,6 +1071,11 @@ func TestIsPRTBOwnedRoleBinding(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "management plane prtb-owner labelled binding is not owned",
+			rb:   managementRoleBinding("rb", namespaceName, prtbLabel),
+			want: false,
+		},
+		{
 			name: "crtb-owner labelled binding is not owned",
 			rb:   aggregationRoleBinding("rb", namespaceName, crtbLabel),
 			want: false,
@@ -1074,6 +1102,12 @@ func TestRoleBindingEnqueueNamespace(t *testing.T) {
 		keys, err := roleBindingEnqueueNamespace("", "", aggregationRoleBinding("rb", namespaceName, prtbLabel))
 		assert.NoError(t, err)
 		assert.Equal(t, []relatedresource.Key{{Name: namespaceName}}, keys)
+	})
+
+	t.Run("management plane prtb binding enqueues nothing", func(t *testing.T) {
+		keys, err := roleBindingEnqueueNamespace("", "", managementRoleBinding("rb", namespaceName, prtbLabel))
+		assert.NoError(t, err)
+		assert.Empty(t, keys)
 	})
 
 	t.Run("non-prtb binding enqueues nothing", func(t *testing.T) {

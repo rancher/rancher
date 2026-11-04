@@ -15,11 +15,13 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/user/mocks"
 	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetUserIdFromRelayState(t *testing.T) {
@@ -284,20 +286,11 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset engine state for isolation.
-			appliedVersion = ""
-			SamlProviders[GenericSAMLName] = &Provider{name: GenericSAMLName}
-			t.Cleanup(func() {
-				delete(SamlProviders, GenericSAMLName)
-				handlerMu.Lock()
-				delete(routeHandlers, "GenericSAMLACS")
-				delete(routeHandlers, "GenericSAMLSLO")
-				delete(routeHandlers, "GenericSAMLSLOGet")
-				delete(routeHandlers, "GenericSAMLMetadata")
-				handlerMu.Unlock()
-			})
+			setupSamlProviderTypes(t, GenericSAMLName)
 
 			cfg := base()
 			cfg.ResourceVersion = "test-" + string(rune('a'+i))
+			cfg.Type = client.GenericSAMLConfigType
 			tt.mutate(cfg)
 
 			err := InitializeSamlServiceProvider(cfg, GenericSAMLName)
@@ -314,12 +307,9 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 			assert.Equal(t, tt.wantIDPInit, sp.AllowIDPInitiated)
 			assert.Equal(t, tt.wantForce, sp.ForceAuthn)
 
-			handlerMu.RLock()
-			_, acsRegistered := routeHandlers["GenericSAMLACS"]
-			_, metaRegistered := routeHandlers["GenericSAMLMetadata"]
-			handlerMu.RUnlock()
-			assert.True(t, acsRegistered, "GenericSAMLACS route handler should be registered")
-			assert.True(t, metaRegistered, "GenericSAMLMetadata route handler should be registered")
+			res := httptest.NewRecorder()
+			AuthHandler().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/v1-saml/"+GenericSAMLName+"/saml/metadata", nil))
+			assert.Equal(t, http.StatusOK, res.Code, "Metadata route should be served")
 		})
 	}
 }
@@ -440,12 +430,10 @@ func TestUpdateUserAttribute(t *testing.T) {
 			}
 
 			s := &Provider{
-				name:      provider,
-				userType:  provider + "_user",
-				groupType: provider + "_group",
-				userMGR:   userMGR,
+				name:    provider,
+				userMGR: userMGR,
 			}
-			config := &apiv3.SamlConfig{UIDField: "uid", GroupsField: tc.groupsField}
+			config := &apiv3.SamlConfig{UIDField: "uid", GroupsField: tc.groupsField, Name: "okta"}
 
 			_, groupPrincipals, err := s.getSamlPrincipals(config, tc.samlData)
 			require.NoError(t, err)
@@ -454,4 +442,164 @@ func TestUpdateUserAttribute(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// setupSamlProviderTypes registers base providers for the provider names and
+// restores the SAML provider state when the test completes.
+func setupSamlProviderTypes(t *testing.T, providerNames ...string) {
+	t.Helper()
+
+	samlProvidersMu.Lock()
+	originalProviders := SamlProviders
+	originalProviderTypes := samlProviderTypes
+	originalAppliedVersions := appliedVersions
+	SamlProviders = make(map[string]*Provider)
+	samlProviderTypes = make(map[string]*Provider)
+	appliedVersions = make(map[string]string)
+	for _, name := range providerNames {
+		samlProviderTypes[name] = &Provider{name: name}
+	}
+	samlProvidersMu.Unlock()
+
+	t.Cleanup(func() {
+		samlProvidersMu.Lock()
+		defer samlProvidersMu.Unlock()
+		SamlProviders = originalProviders
+		samlProviderTypes = originalProviderTypes
+		appliedVersions = originalAppliedVersions
+	})
+}
+
+func testSamlConfig(t *testing.T, configName, configType string) *apiv3.SamlConfig {
+	t.Helper()
+	keyPEM, certPEM := genericSAMLTestKeyAndCert(t)
+
+	return &apiv3.SamlConfig{
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: configName, ResourceVersion: "1"},
+			Type:       configType,
+		},
+		IDPMetadataContent: genericSAMLTestIDPMetadata,
+		SpCert:             certPEM,
+		SpKey:              keyPEM,
+		RancherAPIHost:     "https://rancher.example.com",
+		EntityID:           "https://rancher.example.com/v1-saml/" + configName + "/saml/metadata",
+	}
+}
+
+func TestInitializeSamlServiceProviderProviderTypes(t *testing.T) {
+	tests := []struct {
+		providerName string
+		configType   string
+	}{
+		{providerName: PingName, configType: client.PingConfigType},
+		{providerName: ADFSName, configType: client.ADFSConfigType},
+		{providerName: KeyCloakName, configType: client.KeyCloakConfigType},
+		{providerName: OKTAName, configType: client.OKTAConfigType},
+		{providerName: ShibbolethName, configType: client.ShibbolethConfigType},
+		{providerName: GenericSAMLName, configType: client.GenericSAMLConfigType},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.configType, func(t *testing.T) {
+			setupSamlProviderTypes(t, tt.providerName)
+
+			require.NoError(t, InitializeSamlServiceProvider(testSamlConfig(t, tt.providerName, tt.configType), tt.providerName))
+
+			provider, ok := getSamlProvider(tt.providerName)
+			require.True(t, ok)
+			require.NotNil(t, provider.serviceProvider)
+			assert.Equal(t, tt.providerName, provider.name)
+			assert.Equal(t, "/v1-saml/"+tt.providerName+"/saml/acs", provider.serviceProvider.AcsURL.Path)
+		})
+	}
+}
+
+func TestInitializeSamlServiceProviderUnknownProviderType(t *testing.T) {
+	setupSamlProviderTypes(t, OKTAName)
+
+	err := InitializeSamlServiceProvider(testSamlConfig(t, "ping", client.PingConfigType), "ping")
+	assert.ErrorContains(t, err, "Provider ping not configured")
+}
+
+func TestInitializeSamlServiceProviderMultipleConfigsOfSameType(t *testing.T) {
+	setupSamlProviderTypes(t, OKTAName)
+	base := samlProviderTypes[OKTAName]
+
+	oktaConfig := testSamlConfig(t, "okta", client.OKTAConfigType)
+	oktaEUConfig := testSamlConfig(t, "okta-eu", client.OKTAConfigType)
+	oktaEUConfig.LogoutAllEnabled = true
+	oktaEUConfig.LogoutAllForced = true
+
+	require.NoError(t, InitializeSamlServiceProvider(oktaConfig, "okta"))
+	require.NoError(t, InitializeSamlServiceProvider(oktaEUConfig, "okta-eu"))
+
+	okta, ok := getSamlProvider("okta")
+	require.True(t, ok)
+	oktaEU, ok := getSamlProvider("okta-eu")
+	require.True(t, ok)
+
+	assert.NotSame(t, okta, oktaEU, "each config should have its own provider")
+	assert.Nil(t, base.serviceProvider, "the base provider should not be modified")
+	assert.Equal(t, OKTAName, oktaEU.name, "the provider name should be the provider type")
+	assert.False(t, okta.sloForced)
+	assert.True(t, oktaEU.sloForced)
+	assert.NotSame(t, okta.clientState, oktaEU.clientState)
+
+	for configName, provider := range map[string]*Provider{"okta": okta, "okta-eu": oktaEU} {
+		res := httptest.NewRecorder()
+		AuthHandler().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/v1-saml/"+configName+"/saml/metadata", nil))
+
+		require.Equal(t, http.StatusOK, res.Code, configName)
+		assert.Contains(t, res.Body.String(), `entityID="`+provider.serviceProvider.EntityID+`"`, configName)
+		assert.Contains(t, res.Body.String(), "/v1-saml/"+configName+"/saml/acs", configName)
+	}
+
+	res := httptest.NewRecorder()
+	AuthHandler().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/v1-saml/okta-us/saml/metadata", nil))
+	assert.Equal(t, http.StatusNotFound, res.Code, "configs that are not initialized should not be served")
+}
+
+func TestInitializeSamlServiceProviderAppliedVersionPerConfig(t *testing.T) {
+	setupSamlProviderTypes(t, OKTAName)
+
+	require.NoError(t, InitializeSamlServiceProvider(testSamlConfig(t, "okta", client.OKTAConfigType), "okta"))
+	// The second config has the same ResourceVersion, but must still be applied.
+	require.NoError(t, InitializeSamlServiceProvider(testSamlConfig(t, "okta-eu", client.OKTAConfigType), "okta-eu"))
+
+	provider, ok := getSamlProvider("okta-eu")
+	require.True(t, ok)
+	assert.NotNil(t, provider.serviceProvider)
+}
+
+func TestRemoveSamlServiceProvider(t *testing.T) {
+	setupSamlProviderTypes(t, OKTAName)
+	base := samlProviderTypes[OKTAName]
+	setSamlProvider(OKTAName, base)
+
+	require.NoError(t, InitializeSamlServiceProvider(testSamlConfig(t, "okta", client.OKTAConfigType), "okta"))
+	require.NoError(t, InitializeSamlServiceProvider(testSamlConfig(t, "okta-eu", client.OKTAConfigType), "okta-eu"))
+
+	RemoveSamlServiceProvider("okta-eu")
+	RemoveSamlServiceProvider("okta")
+
+	_, ok := getSamlProvider("okta-eu")
+	assert.False(t, ok, "the provider for an additional config should be removed")
+
+	okta, ok := getSamlProvider("okta")
+	require.True(t, ok)
+	assert.Same(t, base, okta, "the base provider should be restored for the default config")
+	assert.Empty(t, appliedVersions)
+
+	for _, configName := range []string{"okta", "okta-eu"} {
+		res := httptest.NewRecorder()
+		AuthHandler().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/v1-saml/"+configName+"/saml/metadata", nil))
+		assert.Equal(t, http.StatusNotFound, res.Code, "removed configs should not be served: %s", configName)
+	}
+
+	// Re-enabling a config with the same ResourceVersion must initialize it again.
+	require.NoError(t, InitializeSamlServiceProvider(testSamlConfig(t, "okta-eu", client.OKTAConfigType), "okta-eu"))
+	res := httptest.NewRecorder()
+	AuthHandler().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/v1-saml/okta-eu/saml/metadata", nil))
+	assert.Equal(t, http.StatusOK, res.Code)
 }

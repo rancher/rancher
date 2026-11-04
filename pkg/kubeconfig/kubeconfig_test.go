@@ -39,7 +39,7 @@ func TestForTokenBased(t *testing.T) {
 		},
 		{
 			name:     "get-token command with exec user",
-			execUser: &ExecUser{ID: "u-w7drc", AuthProvider: "github"},
+			execUser: &ExecUser{ID: "u-w7drc", ConfigName: "github"},
 			wantArgs: []string{"auth", "get-token", "--server=" + testHost, "--user-id=u-w7drc", "--auth-provider=github"},
 		},
 		{
@@ -50,7 +50,7 @@ func TestForTokenBased(t *testing.T) {
 		{
 			name:     "embedded token ignores exec user",
 			token:    "kubeconfig-u-w7drc:secret",
-			execUser: &ExecUser{ID: "u-w7drc", AuthProvider: "github"},
+			execUser: &ExecUser{ID: "u-w7drc", ConfigName: "github"},
 		},
 	}
 
@@ -112,7 +112,7 @@ func TestForClusterTokenBased(t *testing.T) {
 		{
 			name:         "get-token command with control plane nodes",
 			cluster:      &clientv3.Cluster{Name: "ace", CACert: "Y2E=", LocalClusterAuthEndpoint: &clientv3.LocalClusterAuthEndpoint{Enabled: true}},
-			execUser:     &ExecUser{ID: "u-w7drc", AuthProvider: "local"},
+			execUser:     &ExecUser{ID: "u-w7drc", ConfigName: "local"},
 			wantContexts: []string{"ace", "ace-cp1"},
 			wantArgs:     []string{"auth", "get-token", "--server=" + testHost, "--cluster=c-m-ace", "--user-id=u-w7drc", "--auth-provider=local"},
 		},
@@ -123,7 +123,7 @@ func TestForClusterTokenBased(t *testing.T) {
 				FQDN:    "ace.example.com",
 				CACerts: "cacert",
 			}},
-			execUser:     &ExecUser{ID: "u-w7drc", AuthProvider: "local"},
+			execUser:     &ExecUser{ID: "u-w7drc", ConfigName: "local"},
 			wantContexts: []string{"ace", "ace-fqdn"},
 			wantArgs:     []string{"auth", "get-token", "--server=" + testHost, "--cluster=c-m-ace", "--user-id=u-w7drc", "--auth-provider=local"},
 		},
@@ -138,7 +138,7 @@ func TestForClusterTokenBased(t *testing.T) {
 			name:         "embedded token ignores exec user",
 			cluster:      &clientv3.Cluster{Name: "ace", CACert: "Y2E=", LocalClusterAuthEndpoint: &clientv3.LocalClusterAuthEndpoint{Enabled: true}},
 			token:        "kubeconfig-u-w7drc:secret",
-			execUser:     &ExecUser{ID: "u-w7drc", AuthProvider: "local"},
+			execUser:     &ExecUser{ID: "u-w7drc", ConfigName: "local"},
 			wantContexts: []string{"ace", "ace-cp1"},
 		},
 	}
@@ -215,7 +215,7 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name:     "get-token command with exec user",
-			execUser: &ExecUser{ID: "u-w7drc", AuthProvider: "activedirectory"},
+			execUser: &ExecUser{ID: "u-w7drc", ConfigName: "activedirectory"},
 			wantArgs: map[string][]string{
 				"rancher": {"auth", "get-token", "--server=" + testHost, "--user-id=u-w7drc", "--auth-provider=activedirectory"},
 				"ace":     {"auth", "get-token", "--server=" + testHost, "--cluster=c-m-ace", "--user-id=u-w7drc", "--auth-provider=activedirectory"},
@@ -232,7 +232,7 @@ func TestGenerate(t *testing.T) {
 		{
 			name:     "embedded token ignores exec user",
 			token:    "kubeconfig-u-w7drc:secret",
-			execUser: &ExecUser{ID: "u-w7drc", AuthProvider: "activedirectory"},
+			execUser: &ExecUser{ID: "u-w7drc", ConfigName: "activedirectory"},
 		},
 	}
 

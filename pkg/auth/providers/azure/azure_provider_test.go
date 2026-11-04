@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/api/writer"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -586,11 +587,21 @@ func TestLogout(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return tt.config, nil }}
+			p := &Provider{getConfig: func(string) (*v3.AzureADConfig, error) { return tt.config, nil }}
 			r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logout", nil)
 			w := httptest.NewRecorder()
 
-			err := p.Logout(w, r, &v3.Token{})
+			token := &v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "azuread_user://9253000",
+					},
+					LoginName:     "developer",
+					PrincipalType: "user",
+				},
+			}
+
+			err := p.Logout(w, r, token)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -606,7 +617,7 @@ func TestLogoutAllDisabled(t *testing.T) {
 	cfg := newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
 		c.LogoutAllEnabled = false
 	})
-	p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return cfg, nil }}
+	p := &Provider{getConfig: func(string) (*v3.AzureADConfig, error) { return cfg, nil }}
 
 	b, err := json.Marshal(&v3.AuthConfigLogoutInput{FinalRedirectURL: "https://example.com/logged-out"})
 	require.NoError(t, err)
@@ -614,7 +625,16 @@ func TestLogoutAllDisabled(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logoutAll", bytes.NewReader(b))
 	w := httptest.NewRecorder()
 
-	assert.ErrorContains(t, p.LogoutAll(w, r, &v3.Token{}), "not configured for SSO logout")
+	token := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "azuread_user://1",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+	assert.ErrorContains(t, p.LogoutAll(w, r, token), "not configured for SSO logout")
 }
 
 func TestLogoutAll(t *testing.T) {
@@ -672,7 +692,7 @@ func TestLogoutAll(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return tt.config, nil }}
+			p := &Provider{getConfig: func(string) (*v3.AzureADConfig, error) { return tt.config, nil }}
 
 			b, err := json.Marshal(&v3.AuthConfigLogoutInput{FinalRedirectURL: tt.finalRedirect})
 			require.NoError(t, err)
@@ -683,7 +703,16 @@ func TestLogoutAll(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 
-			require.NoError(t, p.LogoutAll(w, r, &v3.Token{}))
+			token := &v3.Token{
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "azuread_user://1",
+					},
+					LoginName:     "developer",
+					PrincipalType: "user",
+				},
+			}
+			require.NoError(t, p.LogoutAll(w, r, token))
 			require.Equal(t, http.StatusOK, w.Code)
 
 			var resp map[string]any
@@ -721,4 +750,20 @@ func TestSetIDTokenCookie(t *testing.T) {
 	require.NotNil(t, found, "expected %s cookie to be set", IDTokenCookie)
 	assert.Equal(t, "my.id.token", found.Value)
 	assert.True(t, found.HttpOnly)
+}
+
+func TestGetPrincipalRejectsOtherConfig(t *testing.T) {
+	// The provider has no clients configured, so this fails if the principal
+	// is looked up.
+	provider := &Provider{}
+	token := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "azuread-corp_user://1"},
+		},
+	}
+
+	for _, principalID := range []string{"azuread-it_user://2", "azuread-it_group://3", "azuread_user://2"} {
+		_, err := provider.GetPrincipal(principalID, token)
+		assert.True(t, httperror.IsNotFound(err), "expected NotFound for %s, got %v", principalID, err)
+	}
 }

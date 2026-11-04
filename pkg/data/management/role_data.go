@@ -42,7 +42,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	clusterCreateRole.addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("turtles-capi.cattle.io").resources("capiproviders").verbs("get", "list").
-		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
@@ -67,7 +66,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Manage Roles", "roles-manage").
 		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch")
 	rb.addRole("Manage Authentication", "authn-manage").
-		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
+		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("create", "get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 
@@ -222,8 +221,12 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
+		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs(crudVerbs...).
+		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs(crudVerbs...).
+		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs(crudVerbs...).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("own").
 		addRule().apiGroups("catalog.cattle.io").resources("operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("traefik.io").resources("ingressroutes", "ingressroutetcps", "ingressrouteudps", "middlewares", "middlewaretcps", "tlsoptions", "tlsstores", "serverstransports", "serverstransporttcps").verbs(crudVerbs...).
 		// Promoted Rules
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
@@ -427,10 +430,14 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
+		addRule().apiGroups("turtles-capi.cattle.io").resources("capiproviders").verbs("get", "list").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
+		addRule().apiGroups("operation.cattle.io").resources("*").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
+		addRule().apiGroups("ui.cattle.io").resources("tableconfigurations").verbs("get", "list", "watch")
 
 	return role
 }

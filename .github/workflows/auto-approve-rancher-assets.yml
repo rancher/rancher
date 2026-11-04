@@ -1,0 +1,154 @@
+name: Rancher Assets Auto-Approve
+
+# Approves the rancher/rancher-assets/.github/workflows/push-to-rancher.yml
+# generated bump PRs in rancher/rancher once their checks are green,
+# and re-runs failed checks (rancher/rancher's CI is known-flaky).
+# Scheduled, not event-triggered - rancher/rancher's required checks run
+# too long for a single polling job. push-to-rancher.yml creates the PR
+# and requests auto-merge; native GitHub auto-merge (already enabled on
+# rancher/rancher) does the actual merging once approval and checks are
+# both satisfied. This job only supplies the approval and nudges flaky
+# failures, snapshot-style, every run - never waits in-job.
+
+on:
+  schedule:
+    # 00:00, 08:00, 16:00 UTC, Monday through Friday.
+    - cron: '0 0,8,16 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: rancher-assets-auto-approve-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  ci-check-trigger:
+    name: Check/Re-trigger Rancher Assets Release GHAs PRs
+    permissions:
+      actions: write # Re-run failed checks.
+      checks: read # Find which checks failed.
+      pull-requests: read # List open bump PRs and read their checks.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find failed check runs
+        id: find-failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          pr_numbers=$(gh pr list --repo "$REPO" --state open \
+            --author "rancher-pr-actions-write[bot]" \
+            --base main \
+            --limit 50 \
+            --json number,title \
+            --jq '.[] | select(.title | contains("Update rancher-assets to")) | .number')
+
+          if [[ -z "$pr_numbers" ]]; then
+            echo "No open rancher-assets bump PRs."
+            printf 'failed_runs=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          failed_runs=()
+          for pr_number in $pr_numbers; do
+            checks_json=$(gh pr checks "$pr_number" --repo "$REPO" --json name,bucket,link) || continue
+
+            links=$(jq -r '.[] | select(.bucket != "pass") | .link' <<<"$checks_json")
+            while IFS= read -r link; do
+              [[ -z "$link" ]] && continue
+              run_id=$(echo "$link" | sed -nE 's#.*/actions/runs/([0-9]+).*#\1#p')
+              [[ -z "$run_id" ]] && continue
+              failed_runs+=("$run_id")
+            done <<<"$links"
+          done
+
+          printf 'failed_runs=%s\n' "${failed_runs[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Re-trigger failed runs
+        if: steps.find-failures.outputs.failed_runs != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_IDS: ${{ steps.find-failures.outputs.failed_runs }}
+          MAX_RETRIES: 5
+        run: |
+          set -euo pipefail
+
+          for run_id in $(printf '%s\n' $RUN_IDS | sort -u); do
+            attempt=$(gh api "repos/$REPO/actions/runs/$run_id" --jq '.run_attempt') || {
+              echo "Could not read run $run_id, skipping."
+              continue
+            }
+
+            if (( attempt < MAX_RETRIES )); then
+              echo "Re-running failed run $run_id (attempt $attempt of $MAX_RETRIES)"
+              gh run rerun "$run_id" --repo "$REPO" --failed || echo "Rerun request failed, will retry next schedule."
+            else
+              echo "Run $run_id already failed $attempt times - not retrying automatically. Needs human attention."
+              # TODO: real alerting mechanism, not designed yet.
+            fi
+          done
+
+  approve:
+    name: Approve Rancher Assets Release PRs
+    permissions:
+      id-token: write # Allow Vault action to authenticate with GitHub OIDC.
+      pull-requests: read # Read PR restrictions and review state.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR eligibility
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          eligible_prs=$(gh pr list --repo "$REPO" --state open \
+            --author "rancher-pr-actions-write[bot]" \
+            --base main \
+            --limit 50 \
+            --json number,title,reviewDecision \
+            --jq '.[] | select(.title | contains("Update rancher-assets to")) | select(.reviewDecision != "APPROVED") | .number')
+
+          if [[ -z "$eligible_prs" ]]; then
+            echo "No eligible rancher-assets bump PRs to approve."
+            printf 'eligible_prs=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf 'eligible_prs=%s\n' "$(echo "$eligible_prs" | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Read Vault Token
+        if: steps.eligibility.outputs.eligible_prs != ''
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+        with:
+          secrets: |
+            github/token/rancher--rancher--auto-approve--pull_requests--write token | APPROVE_TOKEN
+
+      - name: Approve PR
+        if: steps.eligibility.outputs.eligible_prs != ''
+        env:
+          GH_TOKEN: ${{ env.APPROVE_TOKEN }}
+          PR_NUMBERS: ${{ steps.eligibility.outputs.eligible_prs }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          for pr_number in $PR_NUMBERS; do
+            review_decision=$(gh pr view "$pr_number" --repo "$REPO" \
+              --json reviewDecision --jq '.reviewDecision')
+
+            if [[ "$review_decision" == "APPROVED" ]]; then
+              echo "PR #$pr_number is currently approved."
+              continue
+            fi
+
+            gh pr review "$pr_number" \
+              --repo "$REPO" \
+              --approve \
+              --body "Auto-approving Rancher Assets PR with auto-merge enabled."
+          done

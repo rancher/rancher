@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -97,9 +99,8 @@ func TestRefreshAttributes(t *testing.T) {
 	}
 
 	loginTokenLocal := apiv3.Token{
-		UserID:       "user-abcde",
-		IsDerived:    false,
-		AuthProvider: local.Name,
+		UserID:    "user-abcde",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "local://user-abcde",
@@ -117,9 +118,8 @@ func TestRefreshAttributes(t *testing.T) {
 	derivedTokenLocal.IsDerived = true
 
 	derivedTokenShibboleth := apiv3.Token{
-		UserID:       "user-abcde",
-		IsDerived:    true,
-		AuthProvider: saml.ShibbolethName,
+		UserID:    "user-abcde",
+		IsDerived: true,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "shibboleth_user://user1",
@@ -142,7 +142,7 @@ func TestRefreshAttributes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-login-local"},
 		Spec: ext.TokenSpec{
 			UserID: "user-abcde",
-			Kind:   exttokens.IsLogin,
+			Kind:   exttokens.KindSession,
 			UserPrincipal: ext.TokenPrincipal{
 				Name:      "local://user-abcde",
 				Provider:  local.Name,
@@ -161,7 +161,7 @@ func TestRefreshAttributes(t *testing.T) {
 		Data: map[string][]byte{
 			exttokens.FieldEnabled:        []byte("true"),
 			exttokens.FieldHash:           []byte("kla9jkdmj"),
-			exttokens.FieldKind:           []byte(exttokens.IsLogin),
+			exttokens.FieldKind:           []byte(exttokens.KindSession),
 			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
 			exttokens.FieldPrincipal:      localPrincipalBytes,
 			exttokens.FieldTTL:            []byte("4000"),
@@ -508,6 +508,7 @@ func TestRefreshAttributes(t *testing.T) {
 					disabledErr: tt.providerDisabledError,
 				},
 				saml.ShibbolethName: &mockShibbolethProvider{},
+				"unconfigured":      &mockLocalProvider{},
 			})
 
 			ctrl := gomock.NewController(t)
@@ -546,6 +547,7 @@ func TestRefreshAttributes(t *testing.T) {
 			}).AnyTimes()
 
 			r := &refresher{
+				authConfigLister: newFakeAuthConfigs(local.Name, saml.ShibbolethName),
 				tokenLister: &fakes.TokenListerMock{
 					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 						return tt.tokens, nil
@@ -567,6 +569,10 @@ func TestRefreshAttributes(t *testing.T) {
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),
 					exttokens.NewAuthHandler()),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+					"local":      !tt.enabled,
+					"shibboleth": false,
+				}),
 			}
 			got, err := r.refreshAttributes(tt.attribs)
 			assert.Nil(t, err)
@@ -757,6 +763,10 @@ func TestTriggerUserRefreshIgnoresUserAttributeNotFound(t *testing.T) {
 					name)
 			},
 		},
+		isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+			"local":      false,
+			"shibboleth": false,
+		}),
 	}
 
 	r.triggerUserRefresh(userID, true)
@@ -825,9 +835,8 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-abcde",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-abcde",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://some-guid"},
 			Provider:   providerName,
@@ -851,6 +860,7 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 
 	var tokenDeleteCalled, tokenUpdateCalled bool
 	r := &refresher{
+		authConfigLister: newFakeAuthConfigs(providerName),
 		tokenLister: &fakes.TokenListerMock{
 			ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 				return []*apiv3.Token{loginToken}, nil
@@ -872,6 +882,9 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 			exttokens.NewTimeHandler(),
 			exttokens.NewHashHandler(),
 			exttokens.NewAuthHandler()),
+		isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+			providerName: false,
+		}),
 	}
 
 	got, err := r.refreshAttributes(attribs)
@@ -892,7 +905,7 @@ func (p *mockNonTransientProvider) RefetchGroupPrincipals(principalID string, se
 	return nil, &common.NonTransientError{Err: fmt.Errorf("oauth2: invalid_grant: Session not active")}
 }
 
-func (p *mockNonTransientProvider) IsDisabledProvider() (bool, error) {
+func (p *mockNonTransientProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -904,7 +917,7 @@ type mockLocalProvider struct {
 	disabledErr    error
 }
 
-func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
+func (p *mockLocalProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
@@ -970,7 +983,7 @@ type mockShibbolethProvider struct {
 	enabledErr error
 }
 
-func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
+func (p *mockShibbolethProvider) IsDisabledProvider(string) (bool, error) {
 	return p.enabled, p.enabledErr
 }
 
@@ -1041,7 +1054,7 @@ func (p *mockGitHubAppProvider) RefetchGroupPrincipals(principalID, secret strin
 	return p.groupPrincipals, nil
 }
 
-func (p *mockGitHubAppProvider) IsDisabledProvider() (bool, error) {
+func (p *mockGitHubAppProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -1060,9 +1073,8 @@ func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-ghapp",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-ghapp",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
 			Provider:   providerName,
@@ -1103,6 +1115,7 @@ func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
 	tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 
 	r := &refresher{
+		authConfigLister: newFakeAuthConfigs(providerName),
 		tokenLister: &fakes.TokenListerMock{
 			ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 				return []*apiv3.Token{loginToken}, nil
@@ -1119,6 +1132,9 @@ func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
 			exttokens.NewTimeHandler(),
 			exttokens.NewHashHandler(),
 			exttokens.NewAuthHandler()),
+		isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+			"githubapp": false,
+		}),
 	}
 
 	got, err := r.refreshAttributes(attribs)
@@ -1143,7 +1159,7 @@ func (p *mockSecretProvider) RefetchGroupPrincipals(principalID, secret string) 
 	return p.refetchGroups, p.refetchErr
 }
 
-func (p *mockSecretProvider) IsDisabledProvider() (bool, error) {
+func (p *mockSecretProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
@@ -1156,11 +1172,78 @@ func (p *mockRefetchErrorProvider) RefetchGroupPrincipals(principalID, secret st
 	return nil, p.refetchErr
 }
 
-func (p *mockRefetchErrorProvider) IsDisabledProvider() (bool, error) {
+func (p *mockRefetchErrorProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
+// newFakeAuthConfigs returns AuthConfigs whose names match their provider type.
+func newFakeAuthConfigs(providerNames ...string) *fakes.AuthConfigListerMock {
+	configs := map[string]string{}
+	for _, providerName := range providerNames {
+		configs[providerName] = providerName
+	}
+	return newFakeNamedAuthConfigs(configs)
+}
+
+// newFakeNamedAuthConfigs returns AuthConfigs from a map of config name to
+// provider name.
+func newFakeNamedAuthConfigs(configs map[string]string) *fakes.AuthConfigListerMock {
+	return &fakes.AuthConfigListerMock{
+		ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.AuthConfig, error) {
+			var list []*apiv3.AuthConfig
+			for _, configName := range slices.Sorted(maps.Keys(configs)) {
+				list = append(list, &apiv3.AuthConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: configName},
+					Type:       configs[configName] + "Config",
+				})
+			}
+			return list, nil
+		},
+	}
+}
+
 func TestRefreshAttributesEarlyErrors(t *testing.T) {
+	t.Run("auth config list error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil)
+
+		listErr := errors.New("auth config list failed")
+		r := &refresher{
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return nil, nil
+				},
+			},
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) {
+					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
+				},
+			},
+			authConfigLister: &fakes.AuthConfigListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.AuthConfig, error) {
+					return nil, listErr
+				},
+			},
+		}
+
+		got, err := r.refreshAttributes(&apiv3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		})
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "listing auth configs: auth config list failed")
+		assert.ErrorIs(t, err, listErr)
+	})
+
 	t.Run("user lister error", func(t *testing.T) {
 		r := &refresher{
 			userLister: &fakes.UserListerMock{
@@ -1168,6 +1251,9 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 					return nil, fmt.Errorf("user lookup failed")
 				},
 			},
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				"github": false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1182,6 +1268,7 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 
 	t.Run("token lister error", func(t *testing.T) {
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) {
 					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
@@ -1215,6 +1302,7 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return(nil, fmt.Errorf("cache error")).AnyTimes()
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) {
 					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
@@ -1279,9 +1367,8 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		})
 
 		derivedToken := &apiv3.Token{
-			UserID:       "user-secret",
-			IsDerived:    true,
-			AuthProvider: providerName,
+			UserID:    "user-secret",
+			IsDerived: true,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
 				Provider:   providerName,
@@ -1289,6 +1376,7 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		}
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1303,6 +1391,9 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1346,9 +1437,8 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		})
 
 		loginToken := &apiv3.Token{
-			UserID:       "user-secret",
-			IsDerived:    false,
-			AuthProvider: providerName,
+			UserID:    "user-secret",
+			IsDerived: false,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
 				Provider:   providerName,
@@ -1356,6 +1446,7 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		}
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1370,6 +1461,9 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1385,7 +1479,7 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 }
 
 func TestRefreshAttributesRefetchErrors(t *testing.T) {
-	const providerName = "testprovider"
+	const providerName = "test"
 
 	user := &apiv3.User{
 		ObjectMeta:   metav1.ObjectMeta{Name: "user-refetch"},
@@ -1397,9 +1491,8 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-refetch",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-refetch",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
 			Provider:   providerName,
@@ -1431,6 +1524,7 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 
 		var tokenDeleteCalled bool
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1450,6 +1544,10 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1485,9 +1583,8 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 		})
 
 		derivedToken := &apiv3.Token{
-			UserID:       "user-refetch",
-			IsDerived:    true,
-			AuthProvider: providerName,
+			UserID:    "user-refetch",
+			IsDerived: true,
 			UserPrincipal: apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
 				Provider:   providerName,
@@ -1496,6 +1593,7 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 
 		var tokenDeleteCalled, tokenUpdateCalled bool
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1515,6 +1613,9 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *apiv3.Token) (*apiv3.Token, error) {
@@ -1539,7 +1640,7 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 }
 
 func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
-	const providerName = "testprovider"
+	const providerName = "test"
 
 	user := &apiv3.User{
 		ObjectMeta:   metav1.ObjectMeta{Name: "user-err"},
@@ -1547,9 +1648,8 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 	}
 
 	loginToken := &apiv3.Token{
-		UserID:       "user-err",
-		IsDerived:    false,
-		AuthProvider: providerName,
+		UserID:    "user-err",
+		IsDerived: false,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
 			Provider:   providerName,
@@ -1583,6 +1683,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1597,6 +1698,10 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+				"local":      false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1639,6 +1744,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName, local.Name),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1653,6 +1759,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1684,6 +1793,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1698,6 +1808,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1733,6 +1846,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		}).AnyTimes()
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1751,6 +1865,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1782,6 +1899,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1800,6 +1918,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1878,6 +1999,7 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1892,6 +2014,9 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				"local": false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1927,6 +2052,7 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigLister: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1941,6 +2067,9 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				"local": false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -2052,8 +2181,7 @@ func TestRefreshAttributesWithSCIM(t *testing.T) {
 			}
 			attribsBefore := attribs.DeepCopy()
 			loginToken := &apiv3.Token{
-				UserID:       "user-alice",
-				AuthProvider: providerName,
+				UserID: "user-alice",
 				UserPrincipal: apiv3.Principal{
 					ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://alice"},
 					Provider:   providerName,
@@ -2098,7 +2226,11 @@ func TestRefreshAttributesWithSCIM(t *testing.T) {
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),
 					exttokens.NewAuthHandler()),
-				configMapCache: configMapCache,
+				configMapCache:   configMapCache,
+				authConfigLister: newFakeAuthConfigs(providerName),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+					providerName: false,
+				}),
 			}
 
 			got, err := r.refreshAttributes(attribs)
@@ -2108,6 +2240,425 @@ func TestRefreshAttributesWithSCIM(t *testing.T) {
 			assert.Equal(t, tt.wantGroups, got.GroupPrincipals[providerName].Items)
 			// The refresh works on a copy.
 			assert.Equal(t, attribsBefore, attribs)
+		})
+	}
+}
+
+// accepts a map of named provider to whether or not it's disabled.
+// newFakeIsDisabledFunc returns a disabled check keyed by config name.
+func newFakeIsDisabledFunc(data map[string]bool) func(string, string) (bool, error) {
+	return func(_, configName string) (bool, error) {
+		disabled, ok := data[configName]
+		if ok {
+			return disabled, nil
+		}
+
+		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "authconfigs"}, configName)
+	}
+}
+
+// mockMultiConfigProvider is a provider implementation shared by several
+// AuthConfigs, which decides access per principal.
+type mockMultiConfigProvider struct {
+	mockLocalProvider
+	canAccessByPrincipal map[string]bool
+	refetchSecrets       map[string]string
+}
+
+func (p *mockMultiConfigProvider) UsesUserSecrets() bool { return true }
+
+func (p *mockMultiConfigProvider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
+	p.refetchSecrets[principalID] = secret
+	return nil, nil
+}
+
+func (p *mockMultiConfigProvider) CanAccessWithGroupProviders(userPrincipalID string, _ []apiv3.Principal) (bool, error) {
+	return p.canAccessByPrincipal[userPrincipalID], nil
+}
+
+func TestRefreshAttributesMultipleConfigsForProvider(t *testing.T) {
+	const (
+		providerName = "github"
+		euConfigName = "github-eu"
+		userName     = "user-multi"
+	)
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: userName},
+		PrincipalIDs: []string{"github_user://1", "github-eu_user://2"},
+	}
+
+	// Tokens record the provider name as their AuthProvider regardless of
+	// which config they were issued for.
+	newLoginToken := func(name, principalID string) *apiv3.Token {
+		return &apiv3.Token{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			UserID:     userName,
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{Name: principalID},
+				Provider:   providerName,
+			},
+		}
+	}
+	githubToken := newLoginToken("token-github", "github_user://1")
+	euToken := newLoginToken("token-github-eu", "github-eu_user://2")
+
+	setup := func(t *testing.T, canAccess map[string]bool) (*refresher, *mockMultiConfigProvider, *[]string) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		mgrSecretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		mgrSecretCache.EXPECT().
+			Get("cattle-system", userName+"-secret").
+			Return(&corev1.Secret{Data: map[string][]byte{
+				providerName: []byte("github-secret"),
+				euConfigName: []byte("github-eu-secret"),
+			}}, nil).
+			AnyTimes()
+
+		mockProvider := &mockMultiConfigProvider{
+			canAccessByPrincipal: canAccess,
+			refetchSecrets:       map[string]string{},
+		}
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: mockProvider,
+		})
+
+		var deleted []string
+		r := &refresher{
+			authConfigLister: newFakeNamedAuthConfigs(map[string]string{
+				providerName: providerName,
+				euConfigName: providerName,
+			}),
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{githubToken, euToken}, nil
+				},
+			},
+			tokens: &fakes.TokenInterfaceMock{
+				DeleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+					deleted = append(deleted, name)
+					return nil
+				},
+			},
+			tokenMGR: tokens.NewMockedManager(nil, mgrSecretCache),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+				euConfigName: false,
+			}),
+		}
+
+		return r, mockProvider, &deleted
+	}
+
+	newAttribs := func() *apiv3.UserAttribute {
+		return &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: userName},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+	}
+
+	t.Run("each config uses its own secret", func(t *testing.T) {
+		r, mockProvider, deleted := setup(t, map[string]bool{
+			"github_user://1":    true,
+			"github-eu_user://2": true,
+		})
+
+		got, err := r.refreshAttributes(newAttribs())
+		require.NoError(t, err)
+		assert.Empty(t, *deleted)
+		assert.Equal(t, map[string]string{
+			"github_user://1":    "github-secret",
+			"github-eu_user://2": "github-eu-secret",
+		}, mockProvider.refetchSecrets)
+		assert.Contains(t, got.GroupPrincipals, providerName)
+		assert.Contains(t, got.GroupPrincipals, euConfigName)
+	})
+
+	t.Run("revoking access on one config only deletes its login tokens", func(t *testing.T) {
+		r, _, deleted := setup(t, map[string]bool{
+			"github_user://1":    false,
+			"github-eu_user://2": true,
+		})
+
+		_, err := r.refreshAttributes(newAttribs())
+		require.NoError(t, err)
+		assert.Equal(t, []string{"token-github"}, *deleted)
+	})
+
+	t.Run("revoking access on the non-default config only deletes its login tokens", func(t *testing.T) {
+		r, _, deleted := setup(t, map[string]bool{
+			"github_user://1":    true,
+			"github-eu_user://2": false,
+		})
+
+		_, err := r.refreshAttributes(newAttribs())
+		require.NoError(t, err)
+		assert.Equal(t, []string{"token-github-eu"}, *deleted)
+	})
+}
+
+func TestRefreshAttributesCleansUpDeletedConfigs(t *testing.T) {
+	const userName = "user-deleted-config"
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: userName},
+		PrincipalIDs: []string{"local://" + userName, "github-eu_user://2"},
+	}
+	staleToken := &apiv3.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "token-github-eu"},
+		UserID:     userName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "github-eu_user://2"},
+			Provider:   "github",
+		},
+	}
+	newAttribs := func() *apiv3.UserAttribute {
+		return &apiv3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userName},
+			GroupPrincipals: map[string]apiv3.Principals{
+				"github-eu": {Items: []apiv3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "github-eu_org://1"}}}},
+			},
+			ExtraByProvider: map[string]map[string][]string{
+				"github-eu": {common.UserAttributePrincipalID: {"github-eu_user://2"}},
+			},
+		}
+	}
+
+	setup := func(t *testing.T, configs map[string]string) (*refresher, *[]string) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			local.Name: &mockLocalProvider{canAccess: true},
+			"github":   &mockLocalProvider{canAccess: true},
+		})
+
+		var deleted []string
+		r := &refresher{
+			authConfigLister: newFakeNamedAuthConfigs(configs),
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{staleToken}, nil
+				},
+			},
+			tokens: &fakes.TokenInterfaceMock{
+				DeleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+					deleted = append(deleted, name)
+					return nil
+				},
+			},
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+			isDisabledProvider: func(_, _ string) (bool, error) { return false, nil },
+		}
+
+		return r, &deleted
+	}
+
+	t.Run("state for a deleted config is removed", func(t *testing.T) {
+		r, deleted := setup(t, map[string]string{local.Name: local.Name, "github": "github"})
+
+		got, err := r.refreshAttributes(newAttribs())
+		require.NoError(t, err)
+		assert.Equal(t, []string{"token-github-eu"}, *deleted)
+		assert.NotContains(t, got.GroupPrincipals, "github-eu")
+		assert.NotContains(t, got.ExtraByProvider, "github-eu")
+	})
+
+	t.Run("an incomplete config list removes nothing", func(t *testing.T) {
+		// Without the local config, the list can't be trusted to be complete.
+		r, deleted := setup(t, map[string]string{"github": "github"})
+
+		got, err := r.refreshAttributes(newAttribs())
+		require.NoError(t, err)
+		assert.Empty(t, *deleted)
+		assert.Contains(t, got.GroupPrincipals, "github-eu")
+		assert.Contains(t, got.ExtraByProvider, "github-eu")
+	})
+}
+
+// Tokens with no user principal, e.g. the tokens Rancher issues for its own
+// controllers, are refreshed with the local AuthConfig. Tokens whose user
+// principal can't be parsed belong to no AuthConfig, so they are skipped.
+func TestRefreshAttributesUnparseablePrincipal(t *testing.T) {
+	localExtras := map[string]map[string][]string{
+		local.Name: {
+			common.UserAttributePrincipalID: {"local://user-abcde"},
+			common.UserAttributeUserName:    {"admin"},
+		},
+	}
+	tests := []struct {
+		name        string
+		principalID string
+		isDerived   bool
+		wantExtras  map[string]map[string][]string
+	}{
+		{name: "login token with an empty principal", principalID: "", wantExtras: localExtras},
+		{name: "derived token with an empty principal", principalID: "", isDerived: true, wantExtras: localExtras},
+		{name: "login token with an unparseable principal", principalID: "not-a-principal", wantExtras: map[string]map[string][]string{}},
+		{name: "derived token with an unparseable principal", principalID: "not-a-principal", isDerived: true, wantExtras: map[string]map[string][]string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			providers.SetProviders(map[string]common.AuthProvider{
+				local.Name: &mockLocalProvider{canAccess: true},
+			})
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil)
+
+			token := &apiv3.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: "token-abcde"},
+				UserID:     "user-abcde",
+				IsDerived:  tt.isDerived,
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: tt.principalID},
+					ExtraInfo: map[string]string{
+						common.UserAttributePrincipalID: "local://user-abcde",
+						common.UserAttributeUserName:    "admin",
+					},
+				},
+			}
+
+			r := &refresher{
+				authConfigLister: newFakeAuthConfigs(local.Name),
+				tokenLister: &fakes.TokenListerMock{
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+						return []*apiv3.Token{token}, nil
+					},
+				},
+				userLister: &fakes.UserListerMock{
+					GetFunc: func(_, _ string) (*apiv3.User, error) {
+						return &apiv3.User{
+							ObjectMeta:   metav1.ObjectMeta{Name: "user-abcde"},
+							Username:     "admin",
+							PrincipalIDs: []string{"local://user-abcde"},
+						}, nil
+					},
+				},
+				tokens: &fakes.TokenInterfaceMock{
+					DeleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+						t.Errorf("unexpected delete of token %s", name)
+						return nil
+					},
+				},
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{"local": false}),
+			}
+
+			got, err := r.refreshAttributes(&apiv3.UserAttribute{
+				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]apiv3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			})
+			require.NoError(t, err)
+
+			// The extra attributes are only refreshed from a token in the
+			// config's bucket, so they show whether the token was bucketed as
+			// local.
+			assert.Equal(t, tt.wantExtras, got.ExtraByProvider)
+		})
+	}
+}
+
+// A login token with no principal is bucketed as local, so it is deleted when
+// the user can no longer log in with the local AuthConfig. A login token with
+// an unparseable principal is skipped, so it is not.
+func TestRefreshAttributesUnparseablePrincipalDeletedWithLocal(t *testing.T) {
+	for principalID, wantDeleted := range map[string][]string{
+		"":                {"token-abcde"},
+		"not-a-principal": nil,
+	} {
+		t.Run("principal "+strconv.Quote(principalID), func(t *testing.T) {
+			providers.SetProviders(map[string]common.AuthProvider{
+				local.Name: &mockLocalProvider{canAccess: false},
+			})
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil)
+
+			token := &apiv3.Token{
+				ObjectMeta:    metav1.ObjectMeta{Name: "token-abcde"},
+				UserID:        "user-abcde",
+				UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}},
+			}
+
+			var deleted []string
+			r := &refresher{
+				authConfigLister: newFakeAuthConfigs(local.Name),
+				tokenLister: &fakes.TokenListerMock{
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+						return []*apiv3.Token{token}, nil
+					},
+				},
+				userLister: &fakes.UserListerMock{
+					GetFunc: func(_, _ string) (*apiv3.User, error) {
+						return &apiv3.User{
+							ObjectMeta:   metav1.ObjectMeta{Name: "user-abcde"},
+							Username:     "admin",
+							PrincipalIDs: []string{"local://user-abcde"},
+						}, nil
+					},
+				},
+				tokens: &fakes.TokenInterfaceMock{
+					DeleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+						deleted = append(deleted, name)
+						return nil
+					},
+				},
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{"local": false}),
+			}
+
+			_, err := r.refreshAttributes(&apiv3.UserAttribute{
+				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]apiv3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, wantDeleted, deleted)
 		})
 	}
 }

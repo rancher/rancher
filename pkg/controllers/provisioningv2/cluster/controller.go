@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"sort"
 	"strconv"
@@ -47,7 +48,6 @@ const (
 	ByETCDSnapshotName     = "by-etcd-snapshot-name"
 
 	creatorIDAnn              = "field.cattle.io/creatorId"
-	administratedAnn          = "provisioning.cattle.io/administrated"
 	mgmtClusterNameAnn        = "provisioning.cattle.io/management-cluster-name"
 	mgmtClusterDisplayNameAnn = "provisioning.cattle.io/management-cluster-display-name"
 	fleetWorkspaceNameAnn     = "provisioning.cattle.io/fleet-workspace-name"
@@ -141,6 +141,10 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 	)
 
 	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-update", h.OnChange)
+
+	// Each removes the cluster it created, see removeManagementClusterFinalizer.
+	clients.Provisioning.Cluster().OnChange(ctx, "remove-management-cluster", h.onProvisioningClusterRemove)
+	clients.Mgmt.Cluster().OnChange(ctx, "remove-provisioning-cluster", h.onManagementClusterRemove)
 
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-watch", h.createToken)
 
@@ -300,6 +304,12 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged) {
 		return nil, status, nil
 	}
+	// The management cluster has to be able to remove the provisioning cluster before it creates it.
+	if added, err := h.ensureManagementClusterFinalizer(cluster); err != nil {
+		return nil, status, err
+	} else if added {
+		return nil, status, errFinalizerAdded
+	}
 	provCluster := &v1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
@@ -388,6 +398,15 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 // generateLegacyClusterFromProvisioningCluster will generate and return a clusters.management.cattle.io/v3 object based
 // on the clusters.provisioning.cattle.io/v1 object passed in.
 func (h *handler) generateLegacyClusterFromProvisioningCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
+	// A legacy provisioning cluster was created by its management cluster, and creates nothing itself.
+	// Any other one creates its management cluster, so it has to be able to remove it first.
+	if !h.isLegacyCluster(cluster) {
+		if added, err := h.ensureProvisioningClusterFinalizer(cluster); err != nil {
+			return nil, status, err
+		} else if added {
+			return nil, status, errFinalizerAdded
+		}
+	}
 	switch {
 	case cluster.Spec.ClusterAPIConfig != nil:
 		return h.createClusterAndDeployAgent(cluster, status)
@@ -421,7 +440,8 @@ func NormalizeCluster(cluster *v3.Cluster, isImportedCluster bool) (runtime.Obje
 }
 
 func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil {
+	// A cluster being removed isn't registered again; its namespace, where the token goes, is going away.
+	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
 	_, err := h.clusterTokenCache.Get(cluster.Name, "default-token")
@@ -516,6 +536,9 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	if cluster.Spec.RKEConfig == nil {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
 		if err == nil {
+			if err := h.checkManagementClusterAdoptable(cluster, mgmtCluster.Name); err != nil {
+				return nil, status, err
+			}
 			return h.updateImportedCluster(cluster, status, mgmtCluster)
 		} else if !apierror.IsNotFound(err) {
 			return nil, status, err
@@ -630,12 +653,10 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	}
 
 	newCluster := &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Status.ClusterName,
-			Labels:      cluster.Labels,
-			Annotations: map[string]string{administratedAnn: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
-		},
-		Spec: spec,
+		Name:        cluster.Status.ClusterName,
+		Labels:      cluster.Labels,
+		Annotations: map[string]string{v3.ClusterAdministratedAnnotation: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
+		Spec:        spec,
 	}
 
 	if mgmtClusterNameAnnVal, ok := cluster.Annotations[mgmtClusterNameAnn]; ok && mgmtClusterNameAnnVal != "" && newCluster.Name == "" {
@@ -650,9 +671,14 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		newCluster.Name = mgmtName
 	}
 
-	for k, v := range cluster.Annotations {
-		newCluster.Annotations[k] = v
+	// Don't take over, or report the state of, a management cluster that is being removed or that
+	// belongs to another provisioning cluster. A cluster recreated under the same name waits here until
+	// the old management cluster is gone.
+	if err := h.checkManagementClusterAdoptable(cluster, newCluster.Name); err != nil {
+		return nil, status, err
 	}
+
+	maps.Copy(newCluster.Annotations, cluster.Annotations)
 
 	delete(cluster.Annotations, creatorIDAnn)
 

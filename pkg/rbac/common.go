@@ -62,7 +62,13 @@ const (
 	// PRTBByProjectNameIndex keys PRTBs by their ProjectName (<cluster-id>:<project-id>), which
 	// matches the field.cattle.io/projectId annotation on namespaces. Used by the aggregation
 	// namespace enqueuer to reconcile the PRTBs of a project when one of its namespaces changes.
-	PRTBByProjectNameIndex              = "auth.management.cattle.io/prtb-by-project-name"
+	PRTBByProjectNameIndex = "auth.management.cattle.io/prtb-by-project-name"
+	// PRTBByRTBLabelIndex keys PRTBs by GetRTBLabel, the key of a legacy project ClusterRoleBinding owner label.
+	// Registered by pkg/controllers/managementuser/rbac.RegisterIndexers.
+	PRTBByRTBLabelIndex = "authz.cluster.cattle.io/rtb-owner-updated"
+	// LegacyProjectCRBOwnerValue is the label value legacy RBAC sets on project cluster-wide ClusterRoleBindings
+	// (create-ns, <project>-namespaces-*, *-promoted). The label key is the owning PRTB's GetRTBLabel.
+	LegacyProjectCRBOwnerValue          = "owner-user"
 	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
 	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"

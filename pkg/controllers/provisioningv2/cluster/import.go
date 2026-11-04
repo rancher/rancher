@@ -3,6 +3,7 @@ package cluster
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -61,12 +62,12 @@ func (h *handler) deployAgent(cluster *v1.Cluster, status v1.ClusterStatus) (boo
 	}
 
 	tokenValue, err := crt.GetTokenFromSecret(h.secretCache, tokens[0])
-	if err != nil {
-		return false, err
-	}
-	if tokenValue == "" {
+	if errors.Is(err, crt.ErrTokenNotReady) {
 		h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, 2*time.Second)
 		return false, nil
+	}
+	if err != nil {
+		return false, err
 	}
 
 	secretName := fmt.Sprintf("%s-kubeconfig", cluster.Spec.ClusterAPIConfig.ClusterName)

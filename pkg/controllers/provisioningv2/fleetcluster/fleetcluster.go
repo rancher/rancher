@@ -8,23 +8,23 @@ import (
 	"strings"
 	"time"
 
+	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	clusterutils "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	fleetpkg "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/sirupsen/logrus"
-
-	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,13 +85,13 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			// If the RKEConfig is nil, we are likely dealing with
 			// a legacy (v3/mgmt) cluster, and need to check the v3
 			// cluster for the cluster level registry.
-			return clusterutils.GetPrivateRegistryURL(mgmtCluster)
+			return pkgcluster.GetPrivateRegistryURL(mgmtCluster)
 		}
 		url, _ := image.GetPrivateRepoURLFromCluster(cluster)
 		return url
 	}
 
-	rocontrollers.RegisterClusterGeneratingHandler(ctx,
+	provcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithCacheTypes(clients.Fleet.Cluster(),
@@ -104,6 +104,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	clients.Mgmt.Cluster().OnChange(ctx, "fleet-cluster-assign", h.assignWorkspace)
 	clients.Fleet.Cluster().OnChange(ctx, "fleet-local-agent-migration", h.ensureAgentMigrated)
+	relatedresource.Watch(ctx, "fleet-cluster-kubeconfig-secret", kubeConfigSecretOwner,
+		clients.Provisioning.Cluster(), clients.Core.Secret())
 }
 
 // addCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
@@ -182,9 +184,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 
 func (h *handler) ensureNamespace(name string) error {
 	_, err := h.namespacesClient.Create(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
@@ -212,6 +212,12 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		return nil, status, err
 	}
 
+	// Synchronized before the readiness gate, so that unassigning a workspace
+	// revokes access to the secret even while the cluster is not ready.
+	if err := h.syncKubeConfigSecretLabel(cluster.Namespace, status.ClientSecretName, mgmtCluster.Spec.FleetWorkspaceName); err != nil {
+		return nil, status, err
+	}
+
 	if !apimgmtv3.ClusterConditionReady.IsTrue(mgmtCluster) {
 		return nil, status, generic.ErrSkip
 	}
@@ -233,7 +239,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	agentNamespace := ""
 	clientSecret := status.ClientSecretName
 
-	tolerations := clusterutils.GetFleetAgentTolerations(mgmtCluster)
+	tolerations := pkgcluster.GetFleetAgentTolerations(mgmtCluster)
 	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
 		// When not running inside a cluster (which may happen in local dev setups), do not populate API server
@@ -247,10 +253,8 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		labels["name"] = "local"
 		// default cluster group, used if fleet bundle has no targets, uses hardcoded name label
 		objs = append(objs, &fleet.ClusterGroup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "default",
-				Namespace: cluster.Namespace,
-			},
+			Name:      "default",
+			Namespace: cluster.Namespace,
 			Spec: fleet.ClusterGroupSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"name": "local"},
@@ -265,7 +269,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		}
 	}
 
-	agentAffinity, err := clusterutils.GetFleetAgentAffinity(mgmtCluster)
+	agentAffinity, err := pkgcluster.GetFleetAgentAffinity(mgmtCluster)
 	if err != nil {
 		return nil, status, err
 	}
@@ -293,12 +297,10 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	}
 
 	return append(objs, &fleet.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Name,
-			Namespace:   mgmtCluster.Spec.FleetWorkspaceName,
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Name:        cluster.Name,
+		Namespace:   mgmtCluster.Spec.FleetWorkspaceName,
+		Labels:      labels,
+		Annotations: annotations,
 		Spec: fleet.ClusterSpec{
 			KubeConfigSecret:             clientSecret,
 			KubeConfigSecretNamespace:    cluster.Namespace,
@@ -307,7 +309,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			PrivateRepoURL:               h.getPrivateRepoURL(cluster, mgmtCluster),
 			AgentTolerations:             tolerations,
 			AgentAffinity:                agentAffinity,
-			AgentResources:               clusterutils.GetFleetAgentResourceRequirements(mgmtCluster),
+			AgentResources:               pkgcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 			AgentSchedulingCustomization: schedulingCustomization,
 			AgentPullSecrets:             h.getPrivateRepoPullSecrets(mgmtCluster),
 		},
@@ -337,11 +339,64 @@ func (h *handler) addAPIServer(clientSecret string) {
 	}
 }
 
+// syncKubeConfigSecretLabel lets the Fleet Cluster in workspace use the
+// kubeconfig secret, which stays in the provisioning cluster's namespace when
+// the cluster is assigned to another workspace. Fleet only uses a secret from
+// another namespace if its KubeConfigReferenceableFromLabel names the Fleet
+// Cluster's namespace. The label is removed when no other namespace needs it.
+func (h *handler) syncKubeConfigSecretLabel(namespace, name, workspace string) error {
+	secret, err := h.secretsController.Cache().Get(namespace, name)
+	if apierrors.IsNotFound(err) {
+		// kubeConfigSecretOwner requeues the cluster once the secret exists.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	want := workspace
+	if workspace == namespace {
+		want = ""
+	}
+	current, present := secret.Labels[fleetpkg.KubeConfigReferenceableFromLabel]
+	if (want == "" && !present) || (want != "" && current == want) {
+		return nil
+	}
+
+	secret = secret.DeepCopy()
+	if want == "" {
+		delete(secret.Labels, fleetpkg.KubeConfigReferenceableFromLabel)
+	} else {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[fleetpkg.KubeConfigReferenceableFromLabel] = want
+	}
+	_, err = h.secretsController.Update(secret)
+	return err
+}
+
+// kubeConfigSecretOwner resolves a kubeconfig secret to the provisioning
+// cluster owning it, so that a recreated secret is labeled again.
+func kubeConfigSecretOwner(namespace, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil, nil
+	}
+	for _, owner := range secret.OwnerReferences {
+		if owner.APIVersion == provv1.SchemeGroupVersion.String() && owner.Kind == "Cluster" &&
+			secret.Name == owner.Name+"-kubeconfig" {
+			return []relatedresource.Key{{Namespace: namespace, Name: owner.Name}}, nil
+		}
+	}
+	return nil, nil
+}
+
 func getPrivateRepoSecrets(mgmtCluster *apimgmtv3.Cluster) *[]corev1.LocalObjectReference {
-	if !clusterutils.MgmtNameRegexp.MatchString(mgmtCluster.Name) {
+	if !pkgcluster.MgmtNameRegexp.MatchString(mgmtCluster.Name) {
 		return &[]corev1.LocalObjectReference{}
 	}
-	registry, _ := clusterutils.GetPrivateRegistry(mgmtCluster)
+	registry, _ := pkgcluster.GetPrivateRegistry(mgmtCluster)
 	if registry == nil {
 		return &[]corev1.LocalObjectReference{}
 	}

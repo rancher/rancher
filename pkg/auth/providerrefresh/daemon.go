@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -40,9 +41,11 @@ func StartRefreshDaemon(scaledContext *config.ScaledContext, mgmtContext *config
 			userAttributes:            mgmtContext.Management.UserAttributes(""),
 			userAttributeLister:       mgmtContext.Management.UserAttributes("").Controller().Lister(),
 			extTokenStore:             extTokenStore,
+			authConfigLister:          scaledContext.Management.AuthConfigs("").Controller().Lister(),
 			ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 			configMapCache:            scaledContext.Wrangler.Core.ConfigMap().Cache(),
 		}
+		ref.isDisabledProvider = providers.IsDisabledProvider
 
 		UpdateRefreshMaxAge(maxAge)
 		UpdateRefreshCronTime(refreshCronTime)
@@ -75,6 +78,8 @@ func UpdateRefreshMaxAge(maxAge string) {
 		return
 	}
 
+	ref.Lock()
+	defer ref.Unlock()
 	ref.ensureMaxAgeUpToDate(maxAge)
 }
 

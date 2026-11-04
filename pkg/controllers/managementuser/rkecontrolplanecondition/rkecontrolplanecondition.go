@@ -10,17 +10,27 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-// systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
-// downstream API calls to check the system-upgrade-controller app status.
-const systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+const (
+	// systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
+	// downstream API calls to check the system-upgrade-controller app status.
+	systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+
+	// noSUCChartVersionReason is the SystemUpgradeControllerReady reason used when the
+	// SystemUpgradeControllerChartVersion setting is empty. It is compared against the existing
+	// condition so the accompanying warning is logged only when the state actually changes.
+	noSUCChartVersionReason = "the SystemUpgradeControllerChartVersion setting is not set"
+)
 
 // throttleState tracks throttle and enqueue deduplication state for a single RKEControlPlane object.
 type throttleState struct {
@@ -30,16 +40,22 @@ type throttleState struct {
 
 type handler struct {
 	mgmtClusterName           string
+	mgmtClusterUID            types.UID
+	mgmtClusterCache          mgmtcontrollers.ClusterCache
 	downstreamAppClient       catalogv1.AppClient
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController
 	pendingEnqueues           sync.Map
 }
 
-func Register(ctx context.Context, mgmtClusterName string, downstreamAppClient catalogv1.AppClient,
-	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
+// Register registers the handler for the management cluster mgmtClusterName. If mgmtClusterUID is set, it
+// only handles the control plane of the management cluster with that UID, which mgmtClusterCache finds.
+func Register(ctx context.Context, mgmtClusterName string, mgmtClusterUID types.UID, mgmtClusterCache mgmtcontrollers.ClusterCache,
+	downstreamAppClient catalogv1.AppClient, rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
 
 	h := handler{
 		mgmtClusterName:           mgmtClusterName,
+		mgmtClusterUID:            mgmtClusterUID,
+		mgmtClusterCache:          mgmtClusterCache,
 		downstreamAppClient:       downstreamAppClient,
 		rkeControlPlaneController: rkeControlPlaneController,
 	}
@@ -64,11 +80,28 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
 		return status, nil
 	}
+	if h.mgmtClusterUID != "" {
+		// The control plane of a cluster created again under the same name is not this controller's.
+		mgmtCluster, err := h.mgmtClusterCache.Get(h.mgmtClusterName)
+		if errors.IsNotFound(err) {
+			return status, nil
+		} else if err != nil {
+			return status, err
+		}
+		if !config.MatchesClusterUID(h.mgmtClusterUID, mgmtCluster) {
+			return status, nil
+		}
+	}
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
-		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
+		// Log only on transition; this is a status handler, so it runs on every change, and the condition set below
+		// already records the reason so we can filter out duplicate logs.
+		if !capr.SystemUpgradeControllerReady.IsFalse(&status) ||
+			capr.SystemUpgradeControllerReady.GetReason(&status) != noSUCChartVersionReason {
+			logrus.Warnf("[rkecontrolplanecondition] %s/%s: %s", obj.Namespace, obj.Name, noSUCChartVersionReason)
+		}
+		capr.SystemUpgradeControllerReady.Reason(&status, noSUCChartVersionReason)
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
 		return status, nil

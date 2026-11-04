@@ -24,7 +24,7 @@ const (
 
 var (
 	// Label selector to identify tokens created by the autoscaler controller
-	autoscalerTokenSelector = labels.Set{tokens.TokenKindLabel: "autoscaler"}.AsSelector().String()
+	autoscalerTokenSelector = labels.Set{tokens.TokenKindLabel: autoscalerTokenKind}.AsSelector().String()
 )
 
 // startTokenRenewal begins the background token renewal process.

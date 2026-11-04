@@ -10,7 +10,7 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -104,7 +104,7 @@ func turtlesCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) 
 // cluster → provv1.Cluster (via the ByCluster index) → CAPI Cluster and dispatches via
 // capiClusterAdapter. Returns (nil, nil) when the annotation is not set.
 func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) (Adapter, error) {
-	if cluster.Annotations["provisioning.cattle.io/administrated"] != "true" {
+	if !pkgcluster.IsAdministrated(cluster) {
 		return nil, nil
 	}
 	provClusters, err := clients.Provisioning.Cluster().Cache().GetByIndex(provcluster.ByCluster, cluster.Name)
@@ -124,6 +124,18 @@ func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Clu
 	// v2prov clusters never take the CAPRKE2 branch (they route to CAPRAdapter), so the
 	// mgmt-cluster-name parameter is inert here — pass empty.
 	return capiClusterAdapter(clients, capiCluster, "")
+}
+
+// NewImportedAdapter returns an ImportedAdapter for the given mgmt v3 Cluster.
+//
+// Use it when the caller has already established that the cluster is a true imported standalone
+// RKE2/K3s cluster. NewAdapter re-derives that from the cluster's labels and annotations and will
+// dispatch to a CAPI-backed adapter instead when either indicates the cluster is provisioned.
+func NewImportedAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) *ImportedAdapter {
+	return &ImportedAdapter{
+		cluster: cluster,
+		clients: clients,
+	}
 }
 
 // BeaconRef returns the mgmt v3 Cluster's name-as-namespace + name convention. The mgmt v3
@@ -222,8 +234,19 @@ func (a *ImportedAdapter) kubernetesVersion() string {
 	return ""
 }
 
+// LoopbackAddress returns "localhost" rather than a literal loopback address, so that it works
+// whichever address family the node runs on.
+//
+// RKE2/K3s bind node-local endpoints (the controller-manager, scheduler and kubelet health
+// endpoints, and etcd's client and metrics listeners) to the loopback of the node's primary family:
+// 127.0.0.1 on an IPv4-primary node, but only ::1 on an IPv6-primary one. An imported cluster has no
+// stack preference Rancher could read that from — unlike CAPR's, see capr.GetLoopbackAddress — and
+// the management Node may be stale or, on a restore from nothing, missing. localhost resolves to both
+// loopbacks, and the node's own resolver and Go's dialer fall through to whichever is listening when
+// the probe or command runs. The distro's serving certificates all list localhost, so certificate
+// verification against it holds.
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
-	return "127.0.0.1"
+	return "localhost"
 }
 
 func (a *ImportedAdapter) ConfigFile(_ *corev1.Secret) string {
@@ -234,6 +257,9 @@ func (a *ImportedAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return fmt.Sprintf("/etc/rancher/%s/config.yaml.d", a.RuntimeCommand())
 }
 
+// GetServerURL returns the address of the node behind the machine-plan secret that other nodes should
+// join through — see primaryNodeAddress. It is a bare host, which may be an IPv6 address; callers
+// building a URL from it must bracket it, e.g. with net.JoinHostPort.
 func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 	if secret == nil {
 		return ""
@@ -259,17 +285,29 @@ func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 		return ""
 	}
 
-	var address string
+	return primaryNodeAddress(machine.Status.InternalNodeStatus.Addresses)
+}
 
-	for _, addr := range machine.Status.InternalNodeStatus.Addresses {
-		if addr.Type == corev1.NodeExternalIP && address == "" {
-			address = addr.Address
-		} else if addr.Type == corev1.NodeInternalIP {
-			address = addr.Address
+// primaryNodeAddress returns the address other nodes should use to reach a node: its first
+// InternalIP, or failing that its first ExternalIP.
+//
+// The first InternalIP is the node's primary address. The kubelet lists a node's addresses in its
+// node-ip order, so on a dual-stack node the first InternalIP is in the family the node — and its
+// etcd, which advertises peers on it — actually runs on. Taking any other one would point rejoining
+// nodes at the cluster's secondary family.
+func primaryNodeAddress(addresses []corev1.NodeAddress) string {
+	var external string
+	for _, addr := range addresses {
+		switch addr.Type {
+		case corev1.NodeInternalIP:
+			return addr.Address
+		case corev1.NodeExternalIP:
+			if external == "" {
+				external = addr.Address
+			}
 		}
 	}
-
-	return address
+	return external
 }
 
 func (a *ImportedAdapter) GetSupervisorPort(_ *corev1.Secret) string {
@@ -284,8 +322,44 @@ type ImportedAdapter struct {
 	clients *wrangler.CAPIContext
 }
 
-func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+// ETCDSnapshotS3 returns the etcd S3 configuration from the mgmt v3 Cluster's distro config. The
+// rke2 and k3s configs carry the same ETCD type, so which one applies follows the runtime.
+func (a *ImportedAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	if a.RuntimeCommand() == capr.RuntimeRKE2 {
+		if a.cluster.Spec.Rke2Config == nil {
+			return nil
+		}
+		return a.cluster.Spec.Rke2Config.ETCD.S3
+	}
+
+	if a.cluster.Spec.K3sConfig == nil {
+		return nil
+	}
+	return a.cluster.Spec.K3sConfig.ETCD.S3
+}
+
+// ToS3ArgsEnvAndFiles resolves s3 against the mgmt v3 Cluster's own S3 configuration and the cloud
+// credential either of them references. Cloud credentials for a mgmt cluster are named
+// "<namespace>:<name>" and live in the global namespace, which is where a bare name is resolved.
+func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	target, err := ResolveS3Target(
+		a.clients.Core.Secret().Cache(),
+		s3,
+		a.ETCDSnapshotS3(),
+		a.cluster.Name,
+		path.Join(dataDir, EndpointCADirectory),
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
 }
 
 // WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
@@ -743,8 +817,7 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		return nil, err
 	}
 
-	// only support ipv4, need to implement per-node extraction mechanism
-	loopbackAddress := "127.0.0.1"
+	loopbackAddress := a.LoopbackAddress(secret)
 
 	// render this probe separately because it has a specific format
 	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {
@@ -945,7 +1018,7 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 }
 
 // PauseCluster suspends version management for the imported cluster by toggling
-// importedclusterversionmanagement.VersionManagementPausedAnno on the mgmt v3 Cluster.
+// importedclusterversionmanagement.ClusterImportedVersionManagementPausedAnnotation on the mgmt v3 Cluster.
 //
 // An imported cluster has no CAPI object to pause, but it does have a controller that reacts to the
 // cluster's desired Kubernetes version: k3sbasedupgrade renders system-upgrade-controller plans from
@@ -966,24 +1039,24 @@ func (a *ImportedAdapter) PauseCluster(pause bool) error {
 		}
 
 		if pause {
-			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] == "true" {
+			if cluster.Annotations[mgmtv3.ClusterImportedVersionManagementPausedAnnotation] == "true" {
 				return nil
 			}
 			cluster = cluster.DeepCopy()
 			if cluster.Annotations == nil {
 				cluster.Annotations = map[string]string{}
 			}
-			cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
+			cluster.Annotations[mgmtv3.ClusterImportedVersionManagementPausedAnnotation] = "true"
 		} else {
-			if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; !ok {
+			if _, ok := cluster.Annotations[mgmtv3.ClusterImportedVersionManagementPausedAnnotation]; !ok {
 				return nil
 			}
 			cluster = cluster.DeepCopy()
-			delete(cluster.Annotations, importedclusterversionmanagement.VersionManagementPausedAnno)
+			delete(cluster.Annotations, mgmtv3.ClusterImportedVersionManagementPausedAnnotation)
 		}
 
 		logrus.Infof("[operations] imported cluster %s: setting %s=%v", cluster.Name,
-			importedclusterversionmanagement.VersionManagementPausedAnno, pause)
+			mgmtv3.ClusterImportedVersionManagementPausedAnnotation, pause)
 
 		_, err = a.clients.Mgmt.Cluster().Update(cluster)
 		return err

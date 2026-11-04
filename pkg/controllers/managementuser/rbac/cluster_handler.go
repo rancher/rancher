@@ -12,6 +12,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -24,6 +25,7 @@ func newClusterHandler(workload *config.UserContext) func(key string, obj *v32.C
 
 	ch := &clusterHandler{
 		clusterName: workload.ClusterName,
+		clusterUID:  workload.ClusterUID,
 		grbIndexer:  informer.GetIndexer(),
 		// Management level resources
 		clusters: workload.Management.Wrangler.Mgmt.Cluster(),
@@ -36,6 +38,7 @@ func newClusterHandler(workload *config.UserContext) func(key string, obj *v32.C
 
 type clusterHandler struct {
 	clusterName string
+	clusterUID  types.UID
 	grbIndexer  cache.Indexer
 	// Management level resources
 	clusters mgmtcontrollers.ClusterClient
@@ -50,8 +53,9 @@ func (h *clusterHandler) sync(key string, obj *v32.Cluster) (*v32.Cluster, error
 		return nil, nil
 	}
 
-	// Don't operate on a cluster this handler isn't created for
-	if h.clusterName != obj.Name {
+	// Don't operate on a cluster this handler isn't created for, including a cluster created again under the
+	// same name
+	if h.clusterName != obj.Name || !config.MatchesClusterUID(h.clusterUID, obj) {
 		return nil, nil
 	}
 

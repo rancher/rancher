@@ -32,9 +32,10 @@ const (
 	migrateCrtbsOperation     = "migrate-ad-crtbs"
 	migratePrtbsOperation     = "migrate-ad-prtbs"
 	migrateGrbsOperation      = "migrate-ad-grbs"
-	activeDirecotryName       = "activedirectory"
+	activeDirectoryName       = "activedirectory"
 	activeDirectoryScope      = "activedirectory_user"
 	activeDirectoryPrefix     = "activedirectory_user://"
+	localName                 = "local"
 	localPrefix               = "local://"
 	adGUIDMigrationLabel      = "ad-guid-migration"
 	adGUIDMigrationAnnotation = "ad-guid-migration-data"
@@ -124,6 +125,9 @@ func UnmigrateAdGUIDUsersOnce(sc *config.ScaledContext) error {
 	return UnmigrateAdGUIDUsers(&sc.RESTConfig, false, false)
 }
 
+// prepareClientContextsFunc builds the client context and is used for testing.
+var prepareClientContextsFunc = prepareClientContexts
+
 // UnmigrateAdGUIDUsers will cycle through all users, ctrb, ptrb, tokens and migrate them to an
 // appropriate DN-based PrincipalID.
 func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMissingUsers bool) error {
@@ -134,8 +138,12 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 		logrus.Infof("[%v] deleteMissingUsers is true, GUID-based users not present in Active Directory will be deleted", migrateAdUserOperation)
 	}
 
-	sc, adConfig, err := prepareClientContexts(clientConfig)
+	sc, adConfig, err := prepareClientContextsFunc(clientConfig)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Infof("[%v] activedirectory auth config not found, nothing to unmigrate", migrateAdUserOperation)
+			return nil
+		}
 		return err
 	}
 

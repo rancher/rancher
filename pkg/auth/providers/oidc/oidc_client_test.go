@@ -2,7 +2,6 @@ package oidc
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -169,7 +168,7 @@ func TestAddCertKeyToContext(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, err := AddCertKeyToContext(context.Background(), tc.cert, tc.key)
+			ctx, err := AddCertKeyToContext(t.Context(), tc.cert, tc.key)
 			assert.Equal(t, err != nil, tc.shouldFail)
 			if tc.shouldFail && err != nil {
 				return

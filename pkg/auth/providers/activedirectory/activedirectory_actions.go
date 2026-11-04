@@ -1,6 +1,7 @@
 package activedirectory
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
@@ -16,6 +16,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -25,7 +26,7 @@ func (p *adProvider) formatter(apiContext *types.APIContext, resource *types.Raw
 }
 
 func (p *adProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, p.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, p.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -53,6 +54,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	config := &configApplyInput.ActiveDirectoryConfig
+	config.Name = cmp.Or(configApplyInput.ConfigName, config.Name, ProviderName)
 
 	login := &v32.BasicLogin{
 		Username: configApplyInput.Username,
@@ -121,7 +123,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIDAttribute")
 	}
 
-	storedADConfig, _, err := p.getActiveDirectoryConfig()
+	storedADConfig, _, err := p.getActiveDirectoryConfig(config.Name)
 	if err != nil {
 		return err
 	}
@@ -172,26 +174,34 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}
 
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", "Token via AD Configuration", request)
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {
-	storedConfig, _, err := p.getActiveDirectoryConfig()
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedConfig, _, err := p.getActiveDirectoryConfig(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		return storedConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.ActiveDirectoryConfigType
-	config.ObjectMeta = storedConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	field := strings.ToLower(client.ActiveDirectoryConfigFieldServiceAccountPassword)
-	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, strings.ToLower(convert.ToString(config.Type)))
+	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, common.SecretNamePrefix(config.Name, config.Type))
 	if err != nil {
 		return err
 	}
@@ -199,11 +209,7 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 	config.ServiceAccountPassword = name
 
 	logrus.Debugf("updating activeDirectoryConfig")
-	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return common.UpdateAuthConfig(p.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 // validateIDAttributesUnchanged rejects changes to the principal identifier attributes of an enabled provider.

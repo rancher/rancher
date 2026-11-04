@@ -87,7 +87,7 @@ func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRo
 	mgmtCluster := fx.mgmtCluster
 	err = wait.ClusterObject(cs.Ctx, cs.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
 		mgmtCluster = obj.(*v3.Cluster)
-		return v3.Ready.IsTrue(mgmtCluster), nil
+		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
 	})
 	handleEKRError(t, cs, fx.ns.Name, mgmtCluster.Name, err)
 	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, kubectlEnv, expectedNodes)

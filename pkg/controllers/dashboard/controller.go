@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -50,6 +51,11 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 	clusterconnected.Register(ctx, clients)
 
+	if features.SCIM.Enabled() {
+		// Registered here, not with the management controllers, because SCIM is served without MCM too.
+		scim.RegisterTokenExpiry(ctx, clients.Core.Secret(), clients.Mgmt.Setting())
+	}
+
 	if features.MCM.Enabled() {
 		hostedcluster.Register(ctx, clients)
 		// Automatically enable / disable built-in ProxyEndpoints via settings
@@ -76,7 +82,11 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 		// defer registration of controllers which have CAPI clients or use CAPI caches
 		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
-			provisioningv2.Register(ctx, clients, kubeconfigManager)
+			err := provisioningv2.Register(ctx, clients, kubeconfigManager)
+			if err != nil {
+				return fmt.Errorf("failed to register deferred provv2 controllers: %w", err)
+			}
+
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
 					return fmt.Errorf("failed to register deferred capr controllers: %w", err)
@@ -94,6 +104,8 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
 		rkecontrolplanecondition.Register(ctx,
 			"local",
+			"",
+			nil,
 			clients.Catalog.App(),
 			clients.RKE.RKEControlPlane())
 	}

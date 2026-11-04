@@ -62,61 +62,55 @@ func TestShouldInstall(t *testing.T) {
 		{
 			name: "local cluster is skipped",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "local"},
+				Name: "local",
 			},
 			want: false,
 		},
 		{
 			name: "administrated cluster is skipped",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "c-m-admin",
-					Annotations: map[string]string{"provisioning.cattle.io/administrated": "true"},
-				},
-				Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
+				Name:        "c-m-admin",
+				Annotations: map[string]string{"provisioning.cattle.io/administrated": "true"},
+				Status:      apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverImported},
 			},
 			want: false,
 		},
 		{
 			name: "imported rke2 cluster is handled",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "c-m-rke2"},
-				Status:     apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
+				Name:   "c-m-rke2",
+				Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
 			},
 			want: true,
 		},
 		{
 			name: "imported k3s cluster is handled",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "c-m-k3s"},
-				Status:     apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverK3s},
+				Name:   "c-m-k3s",
+				Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverK3s},
 			},
 			want: true,
 		},
 		{
 			name: "provider label rke2 fallback is handled",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "c-m-capr-rke2",
-					Labels: map[string]string{k8sprovider.ProviderKey: "rke2"},
-				},
+				Name:   "c-m-capr-rke2",
+				Labels: map[string]string{k8sprovider.ProviderKey: "rke2"},
 			},
 			want: true,
 		},
 		{
 			name: "provider label k3s fallback is handled",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "c-m-capr-k3s",
-					Labels: map[string]string{k8sprovider.ProviderKey: "k3s"},
-				},
+				Name:   "c-m-capr-k3s",
+				Labels: map[string]string{k8sprovider.ProviderKey: "k3s"},
 			},
 			want: true,
 		},
 		{
 			name: "unrelated cluster is ignored",
 			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "c-m-other"},
+				Name: "c-m-other",
 			},
 			want: false,
 		},
@@ -135,7 +129,7 @@ func TestInstallerRender(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Name: "c-m-abc",
 		Spec: apimgmtv3.ClusterSpec{
 			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 				AgentEnvVars: []corev1.EnvVar{
@@ -195,7 +189,7 @@ func TestUninstallerRender(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Name: "c-m-abc",
 		Spec: apimgmtv3.ClusterSpec{
 			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 				AgentEnvVars: []corev1.EnvVar{
@@ -265,7 +259,7 @@ func TestUninstallerIncludesSharedSUCObjects(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Name: "c-m-abc",
 	}
 
 	objs := uninstaller(cluster, "rollout-id-1")
@@ -301,19 +295,15 @@ func TestUninstallPlanReady(t *testing.T) {
 	const rolloutID = "rollout-id"
 	labeledNodes := []corev1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-1",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
+			Name: "node-1",
+			Labels: map[string]string{
+				systemAgentUpgraderRolloutIDLabel: rolloutID,
 			},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-2",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
+			Name: "node-2",
+			Labels: map[string]string{
+				systemAgentUpgraderRolloutIDLabel: rolloutID,
 			},
 		},
 	}
@@ -330,7 +320,7 @@ func TestUninstallPlanReady(t *testing.T) {
 			name:     "missing rollout label on targeted node",
 			planName: SystemAgentUpgraderPlanName,
 			nodes: []corev1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{}}},
+				{Name: "node-1", Labels: map[string]string{}},
 				labeledNodes[1],
 			},
 			wantReady:       false,
@@ -347,11 +337,9 @@ func TestUninstallPlanReady(t *testing.T) {
 			planName: SystemAgentUpgraderPlanName,
 			nodes: []corev1.Node{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node-1",
-						Labels: map[string]string{
-							systemAgentUpgraderRolloutIDLabel: "stale-rollout-id",
-						},
+					Name: "node-1",
+					Labels: map[string]string{
+						systemAgentUpgraderRolloutIDLabel: "stale-rollout-id",
 					},
 				},
 			},
@@ -436,11 +424,9 @@ func TestReconcileImportedDisableUninstallCreatesRolloutAndRequeuesBeforePlanApp
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "c-m-test",
-			Annotations: map[string]string{
-				importedCleaningStateAnnotation: apimgmtv3.ImportedDay2OpsCleaningStateUninstall,
-			},
+		Name: "c-m-test",
+		Annotations: map[string]string{
+			importedCleaningStateAnnotation: apimgmtv3.ImportedDay2OpsCleaningStateUninstall,
 		},
 	}
 	fakeClusters := &fakeClusterController{}
@@ -475,22 +461,18 @@ func TestPlanTargetedNodesRequiresHostnameLabel(t *testing.T) {
 	ctx := &config.UserContext{
 		K8sClient: k8sfake.NewSimpleClientset(
 			&corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-with-hostname",
-					Labels: map[string]string{
-						corev1.LabelOSStable: "linux",
-						corev1.LabelHostname: "node-with-hostname",
-						"custom-role":        "worker",
-						"another-test-label": "value",
-					},
+				Name: "node-with-hostname",
+				Labels: map[string]string{
+					corev1.LabelOSStable: "linux",
+					corev1.LabelHostname: "node-with-hostname",
+					"custom-role":        "worker",
+					"another-test-label": "value",
 				},
 			},
 			&corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-without-hostname",
-					Labels: map[string]string{
-						corev1.LabelOSStable: "linux",
-					},
+				Name: "node-without-hostname",
+				Labels: map[string]string{
+					corev1.LabelOSStable: "linux",
 				},
 			},
 		),
@@ -520,7 +502,7 @@ func TestHasOperationsReturnsTrueForClusterNamespace(t *testing.T) {
 
 	saveCache := &fakeETCDSnapshotSaveCache{
 		items: []*opv1alpha1.ETCDSnapshotSave{
-			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-save"}},
+			{Namespace: "c-m-test", Name: "op-save"},
 		},
 	}
 	h := &handler{
@@ -545,17 +527,17 @@ func TestDeleteOperationsDeletesNamespacedOperationsAndSkipsDeleting(t *testing.
 	now := metav1.Now()
 	saveCache := &fakeETCDSnapshotSaveCache{
 		items: []*opv1alpha1.ETCDSnapshotSave{
-			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-save"}},
+			{Namespace: "c-m-test", Name: "op-save"},
 		},
 	}
 	restoreCache := &fakeETCDSnapshotRestoreCache{
 		items: []*opv1alpha1.ETCDSnapshotRestore{
-			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-restore", DeletionTimestamp: &now}},
+			{Namespace: "c-m-test", Name: "op-restore", DeletionTimestamp: &now},
 		},
 	}
 	rotationCache := &fakeEncryptionKeyRotationCache{
 		items: []*opv1alpha1.EncryptionKeyRotation{
-			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-rotation"}},
+			{Namespace: "c-m-test", Name: "op-rotation"},
 		},
 	}
 
@@ -617,7 +599,7 @@ func TestDeleteOperationsReturnsFalseWhenNoOperationsExist(t *testing.T) {
 func TestDisableNeededReturnsTrueForLeftoverImportedPlanIdentity(t *testing.T) {
 	t.Parallel()
 
-	cluster := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}}
+	cluster := &apimgmtv3.Cluster{Name: "c-m-test"}
 
 	h := &handler{
 		beaconCache:              &fakeBeaconCache{notFound: true},
@@ -627,12 +609,10 @@ func TestDisableNeededReturnsTrueForLeftoverImportedPlanIdentity(t *testing.T) {
 		secretCache: &fakeSecretCache{
 			items: []*corev1.Secret{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "c-m-test",
-						Name:      "leftover-machine-plan-token",
-						Labels: map[string]string{
-							serviceaccounttoken.ServiceAccountSecretLabel: "leftover-machine-plan",
-						},
+					Namespace: "c-m-test",
+					Name:      "leftover-machine-plan-token",
+					Labels: map[string]string{
+						serviceaccounttoken.ServiceAccountSecretLabel: "leftover-machine-plan",
 					},
 					Type: corev1.SecretTypeServiceAccountToken,
 				},
@@ -641,13 +621,13 @@ func TestDisableNeededReturnsTrueForLeftoverImportedPlanIdentity(t *testing.T) {
 		serviceAccountCache: &fakeServiceAccountCache{},
 		roleCache: &fakeRoleCache{
 			items: []*rbacv1.Role{
-				{ObjectMeta: metav1.ObjectMeta{Name: "leftover-machine-plan", Namespace: "c-m-test"}},
+				{Name: "leftover-machine-plan", Namespace: "c-m-test"},
 			},
 		},
 		roleBindingCache: &fakeRoleBindingCache{
 			items: []*rbacv1.RoleBinding{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "leftover-machine-plan", Namespace: "c-m-test"},
+					Name: "leftover-machine-plan", Namespace: "c-m-test",
 					Subjects: []rbacv1.Subject{
 						{Kind: "ServiceAccount", Name: "leftover-machine-plan", Namespace: "c-m-test"},
 					},
@@ -672,22 +652,18 @@ func TestDeleteImportedPlanIdentityDeletesOnlyServiceAccountTokenSecrets(t *test
 		secretCache: &fakeSecretCache{
 			items: []*corev1.Secret{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "c-m-test",
-						Name:      "plan-token",
-						Labels: map[string]string{
-							serviceaccounttoken.ServiceAccountSecretLabel: "node-machine-plan",
-						},
+					Namespace: "c-m-test",
+					Name:      "plan-token",
+					Labels: map[string]string{
+						serviceaccounttoken.ServiceAccountSecretLabel: "node-machine-plan",
 					},
 					Type: corev1.SecretTypeServiceAccountToken,
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "c-m-test",
-						Name:      "plan-opaque",
-						Labels: map[string]string{
-							serviceaccounttoken.ServiceAccountSecretLabel: "node-machine-plan",
-						},
+					Namespace: "c-m-test",
+					Name:      "plan-opaque",
+					Labels: map[string]string{
+						serviceaccounttoken.ServiceAccountSecretLabel: "node-machine-plan",
 					},
 					Type: corev1.SecretTypeOpaque,
 				},
@@ -700,13 +676,11 @@ func TestDeleteImportedPlanIdentityDeletesOnlyServiceAccountTokenSecrets(t *test
 	}
 
 	err := h.deleteImportedPlanIdentity(&corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "node-machine-plan",
-			Namespace: "c-m-test",
-			Labels: map[string]string{
-				capr.RoleLabel:        capr.RolePlan,
-				capr.ClusterNameLabel: "c-m-test",
-			},
+		Name:      "node-machine-plan",
+		Namespace: "c-m-test",
+		Labels: map[string]string{
+			capr.RoleLabel:        capr.RolePlan,
+			capr.ClusterNameLabel: "c-m-test",
 		},
 	})
 	if err != nil {
@@ -721,10 +695,8 @@ func TestDeleteImportedPlanIdentityDeletesOnlyServiceAccountTokenSecrets(t *test
 
 func completeUninstallPlan(name, rolloutID string) *upgradev1.Plan {
 	plan := &upgradev1.Plan{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespaces.System,
-		},
+		Name:      name,
+		Namespace: namespaces.System,
 		Spec: upgradev1.PlanSpec{
 			Upgrade: &upgradev1.ContainerSpec{
 				Env: []corev1.EnvVar{

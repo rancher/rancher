@@ -99,7 +99,6 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 
 			fakeAuth := fakeAuthToken{
 				token: apimgmtv3.Token{
-					AuthProvider: "local",
 					UserPrincipal: apimgmtv3.Principal{
 						Provider: "local",
 						ObjectMeta: metav1.ObjectMeta{
@@ -257,7 +256,7 @@ func TestGenerateKubeconfigActionHandlerExecUser(t *testing.T) {
 		execGetToken      string
 		generateToken     string
 		clusterAceEnabled bool
-		authProvider      string
+		userPrincipalID   string
 		tokenFetchErr     error
 
 		wantErr   bool
@@ -265,11 +264,11 @@ func TestGenerateKubeconfigActionHandlerExecUser(t *testing.T) {
 		wantArgs  []string
 	}{
 		{
-			name:          "token command with setting off",
-			execGetToken:  "false",
-			generateToken: "false",
-			authProvider:  "github",
-			wantArgs:      []string{"token", "--server=" + fakeHost, "--user=" + testClusterName},
+			name:            "token command with setting off",
+			execGetToken:    "false",
+			generateToken:   "false",
+			userPrincipalID: "github_user://12345",
+			wantArgs:        []string{"token", "--server=" + fakeHost, "--user=" + testClusterName},
 		},
 		{
 			name:          "token command with setting off ignores token fetch error",
@@ -279,19 +278,27 @@ func TestGenerateKubeconfigActionHandlerExecUser(t *testing.T) {
 			wantArgs:      []string{"token", "--server=" + fakeHost, "--user=" + testClusterName},
 		},
 		{
-			name:          "get-token command",
-			execGetToken:  "true",
-			generateToken: "false",
-			authProvider:  "github",
-			wantArgs:      []string{"auth", "get-token", "--server=" + fakeHost, "--user-id=" + testUserID, "--auth-provider=github"},
+			name:            "get-token command",
+			execGetToken:    "true",
+			generateToken:   "false",
+			userPrincipalID: "github_user://12345",
+			wantArgs:        []string{"auth", "get-token", "--server=" + fakeHost, "--user-id=" + testUserID, "--auth-provider=github"},
 		},
 		{
 			name:              "get-token command with authorized cluster endpoint",
 			execGetToken:      "true",
 			generateToken:     "false",
 			clusterAceEnabled: true,
-			authProvider:      "github",
+			userPrincipalID:   "github_user://12345",
 			wantArgs:          []string{"auth", "get-token", "--server=" + fakeHost, "--cluster=" + testClusterName, "--user-id=" + testUserID, "--auth-provider=github"},
+		},
+		{
+			name:              "get-token command with token from a non-default auth config",
+			execGetToken:      "true",
+			generateToken:     "false",
+			clusterAceEnabled: true,
+			userPrincipalID:   "github-eu_user://12345",
+			wantArgs:          []string{"auth", "get-token", "--server=" + fakeHost, "--cluster=" + testClusterName, "--user-id=" + testUserID, "--auth-provider=github-eu"},
 		},
 		{
 			name:          "get-token command without auth provider",
@@ -307,18 +314,18 @@ func TestGenerateKubeconfigActionHandlerExecUser(t *testing.T) {
 			wantErr:       true,
 		},
 		{
-			name:          "embedded token with setting on",
-			execGetToken:  "true",
-			generateToken: "true",
-			authProvider:  "github",
-			wantToken:     "kubeconfig-" + testUserID + ":tokenvalue",
+			name:            "embedded token with setting on",
+			execGetToken:    "true",
+			generateToken:   "true",
+			userPrincipalID: "github_user://12345",
+			wantToken:       "kubeconfig-" + testUserID + ":tokenvalue",
 		},
 		{
 			name:              "embedded token with setting on and authorized cluster endpoint",
 			execGetToken:      "true",
 			generateToken:     "true",
 			clusterAceEnabled: true,
-			authProvider:      "github",
+			userPrincipalID:   "github_user://12345",
 			wantToken:         "kubeconfig-" + testUserID + ":tokenvalue",
 		},
 	}
@@ -362,8 +369,8 @@ func TestGenerateKubeconfigActionHandlerExecUser(t *testing.T) {
 				TokenMgr: &fakeTokenManager{},
 				AuthToken: &fakeAuthToken{
 					token: apimgmtv3.Token{
-						UserID:       "u-tokenuser", // The user id must come from the request user, not the token.
-						AuthProvider: test.authProvider,
+						UserID:        "u-tokenuser", // The user id must come from the request user, not the token.
+						UserPrincipal: apimgmtv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: test.userPrincipalID}},
 					},
 					err: test.tokenFetchErr,
 				},

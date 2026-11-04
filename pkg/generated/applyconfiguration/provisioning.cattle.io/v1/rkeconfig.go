@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisrkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -133,8 +134,8 @@ func (b *RKEConfigApplyConfiguration) WithRegistries(value *rkecattleiov1.Regist
 // WithETCD sets the ETCD field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ETCD field is set to the value of the last call.
-func (b *RKEConfigApplyConfiguration) WithETCD(value *rkecattleiov1.ETCDApplyConfiguration) *RKEConfigApplyConfiguration {
-	b.ClusterConfigurationApplyConfiguration.ETCD = value
+func (b *RKEConfigApplyConfiguration) WithETCD(value v3.ETCD) *RKEConfigApplyConfiguration {
+	b.ClusterConfigurationApplyConfiguration.ETCD = &value
 	return b
 }
 

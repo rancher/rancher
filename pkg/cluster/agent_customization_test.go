@@ -786,6 +786,93 @@ func TestAgentCustomization_agentSchedulingPodDisruptionBudgetChanged(t *testing
 				},
 			},
 		},
+		{
+			name:           "PC definition in spec and status",
+			updateExpected: false,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 123,
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 123,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "add PDB definition to existing PC definition",
+			updateExpected: true,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 123,
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 123,
+								},
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "delete PDB definition and keep PC definition",
+			updateExpected: true,
+			deleteExpected: true,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 123,
+							},
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 123,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	t.Parallel()
@@ -926,6 +1013,96 @@ func TestAgentCustomization_agentSchedulingPriorityClassChanged(t *testing.T) {
 				},
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{},
+				},
+			},
+		},
+		{
+			name:           "PDB definition in spec and status",
+			createExpected: false,
+			updateExpected: false,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "add PC definition to existing PDB definition",
+			createExpected: true,
+			updateExpected: false,
+			deleteExpected: false,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value: 12345,
+								},
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "delete PC definition and keep PDB definition",
+			createExpected: false,
+			updateExpected: true,
+			deleteExpected: true,
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					AppliedClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+						SchedulingCustomization: &v3.AgentSchedulingCustomization{
+							PriorityClass: &v3.PriorityClassSpec{
+								Value: 12345,
+							},
+							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "1",
+								},
+							},
+						},
+					},
 				},
 			},
 		},

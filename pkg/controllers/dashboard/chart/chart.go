@@ -59,6 +59,9 @@ type Definition struct {
 	Enabled             func() bool
 	Uninstall           bool // if true, the chart will be uninstalled regardless of the value of Enabled
 	RemoveNamespace     bool
+	// TakeOwnership installs the chart with server-side apply forcing conflicts, for charts whose resources have
+	// fields managed by something other than the chart.
+	TakeOwnership bool
 }
 
 // RancherConfigGetter is used to get Rancher chart configuration information from the rancher config map.

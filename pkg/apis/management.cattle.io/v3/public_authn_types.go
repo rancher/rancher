@@ -52,11 +52,15 @@ type AuthToken struct {
 }
 
 type GenericLogin struct {
+	// This is the provider type.
 	Type         string `json:"type,omitempty"`
 	TTLMillis    int64  `json:"ttl,omitempty"`
 	Description  string `json:"description,omitempty" norman:"type=string,required"`
 	ResponseType string `json:"responseType,omitempty" norman:"type=string,required"` //json or cookie
 	Name         string `json:"-"`
+
+	// ConfigName is the name of the underlying AuthConfig resource.
+	ConfigName string `json:"configName"`
 }
 
 func (g GenericLogin) GetType() string {

@@ -4,6 +4,7 @@
 ./.worktrees
 ./.idea
 ./default.etcd
+./package/Dockerfile
 ./package/rancher
 ./package/agent
 ./tests/MANIFEST

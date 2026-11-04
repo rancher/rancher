@@ -38,7 +38,7 @@ func makeTokenSecret(t *testing.T, name string, created time.Time, ttl time.Dura
 			FieldDescription:    []byte(""),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("hash-" + name),
-			FieldKind:           []byte(IsLogin),
+			FieldKind:           []byte(KindSession),
 			FieldLastUpdateTime: []byte("13:00:05"),
 			FieldPrincipal:      principalBytes,
 			FieldTTL:            []byte(strconv.FormatInt(ttl.Milliseconds(), 10)),

@@ -46,7 +46,7 @@ import (
 )
 
 // addEtcd mutates the given config map with etcd-specific configuration elements, and adds S3-related arguments and files if renderS3 is true.
-func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, renderS3 bool) (result []plan.File, _ error) {
+func (p *Planner) addETCD(config map[string]any, controlPlane *rkev1.RKEControlPlane, entry *planEntry, renderS3 bool) (result []plan.File, _ error) {
 	if !isEtcd(entry) || controlPlane.Spec.ETCD == nil {
 		return nil, nil
 	}
@@ -90,13 +90,13 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 	return
 }
 
-func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane) {
+func addDefaults(config map[string]any, controlPlane *rkev1.RKEControlPlane) {
 	if capr.GetRuntime(controlPlane.Spec.KubernetesVersion) == capr.RuntimeRKE2 {
 		config["cni"] = "calico"
 	}
 }
 
-func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
+func addUserConfig(config map[string]any, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
 	for k, v := range controlPlane.Spec.MachineGlobalConfig.Data {
 		config[k] = v
 	}
@@ -129,7 +129,7 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 
 // addRoleConfig adds the role config to the passed in map, and returns the join server that the config was rendered for.
 // It will return "-" as the join server if the entry is an init node (the init node should not join a server)
-func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, joinServer string) string {
+func addRoleConfig(config map[string]any, controlPlane *rkev1.RKEControlPlane, entry *planEntry, joinServer string) string {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if isInitNode(entry) {
 		// If this node is the init node, it should not be joined to anything. Clear the joinServer URL.
@@ -195,7 +195,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 // 3. The user has not already explicitly set "prime" in config
 // 4. The KDM release data includes "prime" as a valid server arg for this version
 // 5. The per-cluster annotation or global setting enables prime
-func addRKE2Prime(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
+func addRKE2Prime(config map[string]any, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
 	// Only applies to RKE2 server nodes
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if runtime != capr.RuntimeRKE2 || isOnlyWorker(entry) {
@@ -233,7 +233,7 @@ func addRKE2Prime(config map[string]interface{}, controlPlane *rkev1.RKEControlP
 	config["prime"] = true
 }
 
-func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
+func addLocalClusterAuthenticationEndpointConfig(config map[string]any, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
 	if isOnlyWorker(entry) || !controlPlane.Spec.LocalClusterAuthEndpoint.Enabled {
 		return
 	}
@@ -280,23 +280,23 @@ func (p *Planner) addManifests(nodePlan plan.NodePlan, controlPlane *rkev1.RKECo
 }
 
 func isVSphereProvider(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (bool, error) {
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	if err := addUserConfig(data, controlPlane, entry); err != nil {
 		return false, err
 	}
 	return data["cloud-provider-name"] == "rancher-vsphere", nil
 }
 
-func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]interface{}, error) {
+func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]any, error) {
 	if isVSphere, err := isVSphereProvider(controlPlane, entry); err != nil {
 		return nil, err
 	} else if isVSphere && controlPlane.Spec.ChartValues.Data["rancher-vsphere-csi"] == nil {
 		// ensure we have this chart config so that the global.cattle.clusterId is set
 		newData := controlPlane.Spec.ChartValues.DeepCopy()
 		if newData.Data == nil {
-			newData.Data = map[string]interface{}{}
+			newData.Data = map[string]any{}
 		}
-		newData.Data["rancher-vsphere-csi"] = map[string]interface{}{}
+		newData.Data["rancher-vsphere-csi"] = map[string]any{}
 		return newData.Data, nil
 	}
 
@@ -332,7 +332,7 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 	for _, chart := range capr.SortedKeys(chartValues) {
 		valuesMap := convert.ToMapInterface(chartValues[chart])
 		if valuesMap == nil {
-			valuesMap = map[string]interface{}{}
+			valuesMap = map[string]any{}
 		}
 		data.PutValue(valuesMap, controlPlane.Spec.ManagementClusterName, "global", "cattle", "clusterId")
 
@@ -408,7 +408,7 @@ func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, imag
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func addToken(config map[string]interface{}, entry *planEntry, tokensSecret plan.Secret) {
+func addToken(config map[string]any, entry *planEntry, tokensSecret plan.Secret) {
 	if tokensSecret.ServerToken == "" {
 		return
 	}
@@ -420,7 +420,7 @@ func addToken(config map[string]interface{}, entry *planEntry, tokensSecret plan
 	}
 }
 
-func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, entry *planEntry) error {
+func addAddresses(secrets corecontrollers.SecretCache, config map[string]any, entry *planEntry) error {
 	info, err := getMachineNetworkInfo(secrets, entry)
 	if err != nil {
 		return err
@@ -504,7 +504,7 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 }
 
 // updateConfigWithAddresses mutates the node configuration map based on the provided network information.
-func updateConfigWithAddresses(config map[string]interface{}, info *machineNetworkInfo) {
+func updateConfigWithAddresses(config map[string]any, info *machineNetworkInfo) {
 	nodeIPs := convert.ToStringSlice(config["node-ip"])
 	var toAdd []string
 	primaryNodeIPFamily := primaryAddressFamily(config)
@@ -571,7 +571,7 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 // family (4 or 6) of the first non-empty CIDR found;
 // returns 0 if "service-cidr" is absent, empty, or if the first non-empty CIDR is not a valid network address.
 // The service-cidr value should be a comma-separated string.
-func primaryAddressFamily(config map[string]interface{}) int {
+func primaryAddressFamily(config map[string]any) int {
 	for _, serviceCIDRValue := range convert.ToStringSlice(config["service-cidr"]) {
 		for _, serviceCIDR := range strings.Split(serviceCIDRValue, ",") {
 			serviceCIDR = strings.TrimSpace(serviceCIDR)
@@ -630,7 +630,7 @@ func reorderAddressesByFamily(addresses []string, primaryFamily int) []string {
 // for non-worker nodes when the configured node-ip and node-external-ip values differ.
 // It reads node-ip and node-external-ip from the config (already ordered by preferred IP family)
 // and uses the first node-ip value as the advertise-address.
-func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *machineNetworkInfo) {
+func updateConfigWithAdvertiseAddresses(config map[string]any, info *machineNetworkInfo) {
 	nodeIPs := convert.ToStringSlice(config["node-ip"])
 	nodeExternalIPs := convert.ToStringSlice(config["node-external-ip"])
 	if isOnlyWorker(info.Entry) || len(nodeIPs) == 0 || len(nodeExternalIPs) == 0 {
@@ -653,7 +653,7 @@ func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *mac
 	}
 }
 
-func addLabels(config map[string]interface{}, cluster *capi.Cluster, entry *planEntry) error {
+func addLabels(config map[string]any, cluster *capi.Cluster, entry *planEntry) error {
 	var labels []string
 	if data := entry.Metadata.Annotations[capr.LabelsAnnotation]; data != "" {
 		labelMap := map[string]string{}
@@ -690,7 +690,7 @@ func addLabels(config map[string]interface{}, cluster *capi.Cluster, entry *plan
 	return nil
 }
 
-func addTaints(config map[string]interface{}, entry *planEntry, cp *rkev1.RKEControlPlane) error {
+func addTaints(config map[string]any, entry *planEntry, cp *rkev1.RKEControlPlane) error {
 	var (
 		taintString []string
 	)
@@ -716,8 +716,8 @@ func addTaints(config map[string]interface{}, entry *planEntry, cp *rkev1.RKECon
 // by looking at the 'v2prov-secret-authorized-for-cluster' annotation and determining if it is equal to the cluster name.
 // if the cluster is authorized to use the secret, the contents of the 'credential' key are returned as a byte slice
 func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]byte, error) {
-	authorized, ownerFound := clusterObjectAuthorized(secret, secretmigrator.AuthorizedSecretAnnotation, clusterName)
-	if !ownerFound || !authorized {
+	authorized := clusterObjectNameAuthorized(secret, secretmigrator.AuthorizedSecretAnnotation, clusterName)
+	if !authorized {
 		return nil, fmt.Errorf("the secret 'secret://%s:%s' provided within the cloud-provider-config does not belong to cluster '%s'", secret.Namespace, secret.Name, clusterName)
 	}
 
@@ -728,27 +728,37 @@ func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]b
 	return secretContent, nil
 }
 
-// clusterObjectAuthorized accepts any object, and inspects the metadata.Annotations of the object for the specified annotation
-// and determines if the object has authorized the cluster to access it. It returns two booleans, the first being whether the
-// cluster is authorized to access the object and the second being whether the annotation and a corresponding value were found
-// on the object
-func clusterObjectAuthorized(obj runtime.Object, annotation, clusterName string) (bool, bool) {
-	annotationValueFound := false
+// clusterObjectNameAuthorized reports whether clusterName appears in the object's
+// comma-separated list of names under the specified annotation.
+func clusterObjectNameAuthorized(obj runtime.Object, annotation, clusterName string) bool {
 	if obj == nil || annotation == "" || clusterName == "" {
-		return false, annotationValueFound
+		return false
 	}
 	copiedObj := obj.DeepCopyObject()
 	if objMeta, err := meta.Accessor(copiedObj); err == nil && objMeta != nil {
-		authorizedClusters := objMeta.GetAnnotations()[annotation]
-		// Preserve the existing "found" behavior for callers while delegating the match
-		// decision to the shared CAPR authorization helper.
-		splitAuthorizedClusters := strings.Split(authorizedClusters, ",")
-		if len(splitAuthorizedClusters) > 0 {
-			annotationValueFound = true
-		}
-		return capr.ClusterAuthorizedForSecret(authorizedClusters, clusterName), annotationValueFound
+		return capr.ClusterAuthorizedForSecret(objMeta.GetAnnotations()[annotation], clusterName)
 	}
-	return false, annotationValueFound
+	return false
+}
+
+// clusterObjectLabelSelectorAuthorized reports whether the object's selector
+// annotation matches clusterLabels. A present empty selector matches every label
+// set; an invalid selector matches nothing.
+func clusterObjectLabelSelectorAuthorized(obj metav1.Object, clusterLabels map[string]string) bool {
+	value, ok := obj.GetAnnotations()[capr.AuthorizedObjectSelectorAnnotation]
+	if !ok {
+		// labels.Parse("") matches everything, but an absent annotation authorizes nothing.
+		return false
+	}
+
+	selector, err := labels.Parse(value)
+	if err != nil {
+		logrus.Debugf("invalid cluster selector on %s/%s: %v",
+			obj.GetNamespace(), obj.GetName(), err)
+		return false
+	}
+
+	return selector.Matches(labels.Set(clusterLabels))
 }
 
 func checkForSecretFormat(secretFieldName, configValue string) (bool, string, string, error) {
@@ -777,6 +787,32 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 	return path.Join(capr.GetDistroDataDir(controlPlane), "etc/config-files", filename)
 }
 
+// machineSelectorFileAuthorized checks whether the object's annotations allow
+// the control plane's cluster by name or by its provisioning Cluster labels.
+// It returns an error if the required object metadata or Cluster lookup fails.
+func (p *Planner) machineSelectorFileAuthorized(
+	obj runtime.Object, controlPlane *rkev1.RKEControlPlane,
+) (bool, error) {
+	if clusterObjectNameAuthorized(obj, capr.AuthorizedObjectAnnotation, controlPlane.Name) {
+		return true, nil
+	}
+
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return false, err
+	}
+	if _, ok := objectMeta.GetAnnotations()[capr.AuthorizedObjectSelectorAnnotation]; !ok {
+		return false, nil
+	}
+
+	cluster, err := p.rancherClusterCache.Get(controlPlane.Namespace, controlPlane.Name)
+	if err != nil {
+		return false, fmt.Errorf("error retrieving cluster %s/%s while rendering files: %w",
+			controlPlane.Namespace, controlPlane.Name, err)
+	}
+	return clusterObjectLabelSelectorAuthorized(objectMeta, cluster.GetLabels()), nil
+}
+
 func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]plan.File, error) {
 	var files []plan.File
 	for _, msf := range controlPlane.Spec.MachineSelectorFiles {
@@ -797,7 +833,13 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 				if err != nil {
 					return files, fmt.Errorf("error retrieving secret %s/%s while rendering files: %v", controlPlane.Namespace, fs.Secret.Name, err)
 				}
-				if authorized, found := clusterObjectAuthorized(secret, capr.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
+
+				authorized, err := p.machineSelectorFileAuthorized(secret, controlPlane)
+				if err != nil {
+					return files, fmt.Errorf("error checking authorization for secret %s/%s: %v", controlPlane.Namespace, fs.Secret.Name, err)
+				}
+
+				if authorized {
 					for _, v := range fs.Secret.Items {
 						file := plan.File{
 							Path:    v.Path,
@@ -824,8 +866,14 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 				if err != nil {
 					return files, fmt.Errorf("error retrieving configmap %s/%s while rendering files: %v", controlPlane.Namespace, fs.ConfigMap.Name, err)
 				}
+
+				authorized, err := p.machineSelectorFileAuthorized(configmap, controlPlane)
+				if err != nil {
+					return files, fmt.Errorf("error checking authorization for configmap %s/%s: %v", controlPlane.Namespace, fs.ConfigMap.Name, err)
+				}
+
 				// retrieve configmap and use contents
-				if authorized, found := clusterObjectAuthorized(configmap, capr.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
+				if authorized {
 					for _, v := range fs.ConfigMap.Items {
 						file := plan.File{
 							Path:    v.Path,
@@ -857,8 +905,8 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 // NodePlan, the config that was rendered in a map, the joined server, and an error if one exists.
 // NOTE: the joined server can be "-" if the config file is being added for the init node.
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, entry *planEntry, tokensSecret plan.Secret,
-	joinServer string, reg registries, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
-	config := map[string]interface{}{}
+	joinServer string, reg registries, renderS3 bool) (plan.NodePlan, map[string]any, string, error) {
+	config := map[string]any{}
 
 	addDefaults(config, controlPlane)
 
@@ -893,7 +941,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	}
 
 	for _, fileParam := range fileParams {
-		var content interface{}
+		var content any
 		if fileParam == privateRegistryArg {
 			content = string(reg.registriesFileRaw)
 		} else {
@@ -972,8 +1020,8 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	return nodePlan, config, joinedServer, nil
 }
 
-func extractConfigJSON(extractedConfig string) (map[string]interface{}, error) {
-	result := map[string]interface{}{}
+func extractConfigJSON(extractedConfig string) (map[string]any, error) {
+	result := map[string]any{}
 
 	configBytes, err := base64.StdEncoding.DecodeString(extractedConfig)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -71,13 +72,26 @@ func ResolveMgmtTokenCaller(
 ) (*LifecycleContext, error) {
 	mgmtCluster, err := mgmtClusterCache.Get(tokenNamespace)
 	if apierrors.IsNotFound(err) {
+		mgmtCluster, err = nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return resolveTokenCaller(mgmtCluster, capiClusterCache, tokenNamespace)
+}
+
+// resolveTokenCaller classifies a caller like ResolveMgmtTokenCaller, given the mgmt cluster the token's
+// namespace dereferenced to, or nil if there is none.
+func resolveTokenCaller(
+	mgmtCluster *apimgmtv3.Cluster,
+	capiClusterCache capicontrollers.ClusterCache,
+	tokenNamespace string,
+) (*LifecycleContext, error) {
+	if mgmtCluster == nil {
 		return &LifecycleContext{
 			Kind:            KindV2Prov,
 			TargetNamespace: tokenNamespace,
 		}, nil
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	// v2prov clusters (custom + node-driver) have a mgmt cluster *shell* stamped with the
@@ -86,7 +100,7 @@ func ResolveMgmtTokenCaller(
 	// navigate mgmt shell → provv1.Cluster → CAPI cluster in fleet-default. Classify as
 	// KindV2Prov so onSecretChange falls through to that path rather than mistakenly running the
 	// imported RKE2/K3s (mgmt v3 Node) handler.
-	if mgmtCluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	if pkgcluster.IsAdministrated(mgmtCluster) {
 		return &LifecycleContext{
 			Kind:            KindV2Prov,
 			TargetNamespace: tokenNamespace,

@@ -300,7 +300,7 @@ func TestOnUpdate(t *testing.T) {
 							Data: map[string][]byte{
 								exttokens.FieldEnabled:        []byte("true"),
 								exttokens.FieldHash:           []byte("kla9jkdmj"),
-								exttokens.FieldKind:           []byte(exttokens.IsLogin),
+								exttokens.FieldKind:           []byte(exttokens.KindSession),
 								exttokens.FieldLastUpdateTime: []byte("13:00:05"),
 								exttokens.FieldPrincipal:      principalBytes,
 								exttokens.FieldTTL:            []byte("4000"),

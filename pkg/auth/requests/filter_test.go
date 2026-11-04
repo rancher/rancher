@@ -1,15 +1,20 @@
 package requests
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	requestsar "github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -178,6 +183,172 @@ func TestAuthHeaderHandlerServeHTTPClearsImpersonationHeadersForServiceAccountAu
 	assert.Empty(t, requested.impersonateFoo)
 }
 
+func TestAuthHeaderHandlerServeHTTPRefreshesAuditIdentity(t *testing.T) {
+	t.Parallel()
+
+	realCaller := &user.DefaultInfo{
+		Name:   "user-admin",
+		Groups: []string{"system:authenticated"},
+		Extra:  map[string][]string{"username": {"admin"}},
+	}
+
+	tests := []struct {
+		name         string
+		effective    *user.DefaultInfo
+		wantName     string
+		wantIdentity map[string]any
+	}{
+		{
+			name:         "request user unchanged",
+			effective:    realCaller,
+			wantName:     "user-admin",
+			wantIdentity: map[string]any{"username": "admin"},
+		},
+		{
+			name: "impersonated user without identity does not keep the real caller's identity",
+			effective: &user.DefaultInfo{
+				Name:   "user-target",
+				Groups: []string{"system:authenticated"},
+			},
+			wantName: "user-target",
+		},
+		{
+			name: "impersonated user with username",
+			effective: &user.DefaultInfo{
+				Name:   "user-target",
+				Groups: []string{"system:authenticated"},
+				Extra:  map[string][]string{"username": {"target"}},
+			},
+			wantName:     "user-target",
+			wantIdentity: map[string]any{"username": "target"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			writer, err := audit.NewWriter(out, audit.WriterOptions{})
+			require.NoError(t, err)
+
+			// Stands in for the impersonation filter, which replaces the request user after the audit user is captured.
+			swapUser := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+					next.ServeHTTP(rw, req.WithContext(request.WithUser(req.Context(), tt.effective)))
+				})
+			}
+			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+			handler := audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(swapUser(authHeaderHandler{next: next}))
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(request.WithUser(t.Context(), realCaller))
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			var entry struct {
+				User map[string]any `json:"user"`
+			}
+			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+
+			assert.Equal(t, tt.wantName, entry.User["name"])
+			if tt.wantIdentity == nil {
+				assert.NotContains(t, entry.User, "identity")
+			} else {
+				assert.Equal(t, tt.wantIdentity, entry.User["identity"])
+			}
+		})
+	}
+}
+
+type filterTestAuthenticator struct {
+	resp *AuthenticatorResponse
+}
+
+func (a filterTestAuthenticator) Authenticate(*http.Request) (*AuthenticatorResponse, error) {
+	return a.resp, nil
+}
+
+func (a filterTestAuthenticator) TokenFromRequest(*http.Request) (accessor.TokenAccessor, error) {
+	return nil, nil
+}
+
+func TestAuditIdentityFromAuthenticatorResponse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		resp         *AuthenticatorResponse
+		swapTo       *user.DefaultInfo // Stands in for the impersonation filter.
+		wantName     string
+		wantIdentity map[string]any
+	}{
+		{
+			name: "explicit identity wins over the extra",
+			resp: &AuthenticatorResponse{
+				IsAuthed: true, User: "u-1",
+				Extras:   map[string][]string{"username": {"from-extra"}},
+				Identity: audit.Identity{Username: "explicit", Provider: "github", PrincipalID: "github_user://1"},
+			},
+			wantName:     "u-1",
+			wantIdentity: map[string]any{"username": "explicit", "provider": "github", "principalId": "github_user://1"},
+		},
+		{
+			name: "no explicit identity uses only the username extra",
+			resp: &AuthenticatorResponse{
+				IsAuthed: true, User: "u-1",
+				Extras: map[string][]string{"username": {"from-extra"}},
+			},
+			wantName:     "u-1",
+			wantIdentity: map[string]any{"username": "from-extra"},
+		},
+		{
+			name: "explicit identity is dropped when the request user is replaced",
+			resp: &AuthenticatorResponse{
+				IsAuthed: true, User: "u-1",
+				Extras:   map[string][]string{"username": {"from-extra"}},
+				Identity: audit.Identity{Username: "explicit", Provider: "github", PrincipalID: "github_user://1"},
+			},
+			swapTo:   &user.DefaultInfo{Name: "u-target"},
+			wantName: "u-target",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			out := &bytes.Buffer{}
+			writer, err := audit.NewWriter(out, audit.WriterOptions{})
+			require.NoError(t, err)
+
+			swap := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+					if tt.swapTo != nil {
+						req = req.WithContext(request.WithUser(req.Context(), tt.swapTo))
+					}
+					next.ServeHTTP(rw, req)
+				})
+			}
+			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+			handler := ToAuthMiddleware(filterTestAuthenticator{resp: tt.resp})(
+				audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(usernameEnabled))(swap(authHeaderHandler{next: next})))
+
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+			var entry struct {
+				User map[string]any `json:"user"`
+			}
+			require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+
+			assert.Equal(t, tt.wantName, entry.User["name"])
+			if tt.wantIdentity == nil {
+				assert.NotContains(t, entry.User, "identity")
+			} else {
+				assert.Equal(t, tt.wantIdentity, entry.User["identity"])
+			}
+		})
+	}
+}
+
 type filterTestSubjectAccessReviewClient struct {
 	createFunc func(ctx context.Context, review *authv1.SubjectAccessReview, opts metav1.CreateOptions) (*authv1.SubjectAccessReview, error)
 }
@@ -185,3 +356,6 @@ type filterTestSubjectAccessReviewClient struct {
 func (s filterTestSubjectAccessReviewClient) Create(ctx context.Context, review *authv1.SubjectAccessReview, opts metav1.CreateOptions) (*authv1.SubjectAccessReview, error) {
 	return s.createFunc(ctx, review, opts)
 }
+
+// usernameEnabled stands in for the audit-log-username feature being enabled.
+func usernameEnabled() bool { return true }

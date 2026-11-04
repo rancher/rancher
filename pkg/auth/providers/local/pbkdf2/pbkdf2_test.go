@@ -16,6 +16,51 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+func TestComparePassword(t *testing.T) {
+	password := "correct-password"
+	salt := []byte("password-salt")
+	hashedPassword := []byte("password-hash")
+
+	tests := map[string]struct {
+		hashKey            func(password string, salt []byte, iter, keyLength int) ([]byte, error)
+		expectErrorMessage string
+	}{
+		"matching password": {
+			hashKey: func(gotPassword string, gotSalt []byte, iter, keyLen int) ([]byte, error) {
+				assert.Equal(t, password, gotPassword)
+				assert.Equal(t, salt, gotSalt)
+				assert.Equal(t, iterations, iter)
+				assert.Equal(t, keyLength, keyLen)
+				return hashedPassword, nil
+			},
+		},
+		"non-matching password": {
+			hashKey: func(string, []byte, int, int) ([]byte, error) {
+				return []byte("different-hash"), nil
+			},
+			expectErrorMessage: "invalid password",
+		},
+		"hashing error": {
+			hashKey: func(string, []byte, int, int) ([]byte, error) {
+				return nil, errors.New("unexpected error")
+			},
+			expectErrorMessage: "failed to hash password: unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := Pbkdf2{hashKey: test.hashKey}
+			err := p.ComparePassword(password, hashedPassword, salt)
+			if test.expectErrorMessage == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.expectErrorMessage)
+			}
+		})
+	}
+}
+
 func TestCreatePassword(t *testing.T) {
 	ctlr := gomock.NewController(t)
 	fakeUserID := "fake-user-id"
@@ -656,6 +701,36 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 			mockSaltGenerator: func() ([]byte, error) {
 				return []byte(fakeNewPasswordSalt), nil
 			},
+		},
+		"error when current password doesn't match": {
+			userID:          fakeUserID,
+			currentPassword: fakeCurrentPassword,
+			newPassword:     fakeNewPassword,
+			mockHashKey: func(string, []byte, int, int) ([]byte, error) {
+				return []byte("different-password-hash"), nil
+			},
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fakeUserID,
+						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
+					},
+					Data: map[string][]byte{
+						"salt":     []byte(fakePasswordSalt),
+						"password": []byte(fakeCurrentPasswordHash),
+					},
+				}, nil)
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			expectErrorMessage: "invalid current password",
 		},
 		"error when secret can't be fetched": {
 			userID:          fakeUserID,

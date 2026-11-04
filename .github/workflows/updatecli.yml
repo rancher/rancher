@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install updatecli
-        uses: updatecli/updatecli-action@2efa15cbae1751f532f9bfc88f56adafd6d1faed # v3.8.0
+        uses: updatecli/updatecli-action@93ae2608256484ef8598e902aa675bbc9e278e4e # v3.10.0
 
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -73,7 +73,7 @@ jobs:
             secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
 
       - name: Create App token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}

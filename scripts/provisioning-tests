@@ -146,10 +146,36 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
   esac
 fi
 
+KDM_DATA_URL=https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.16/data/data.json
+
 # Fallback: use the latest release for this $DIST from KDM data.json
 if [ -z "${SOME_K8S_VERSION}" ]; then
-  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.16/data/data.json | jq -r ".$DIST.releases[-1].version")
+  export SOME_K8S_VERSION=$(curl -sS "${KDM_DATA_URL}" | jq -r ".$DIST.releases[-1].version")
   echo "Resolved ${DIST} to latest version ${SOME_K8S_VERSION}"
+fi
+
+# The restore-mode tests provision on SOME_K8S_VERSION_PREV, upgrade to SOME_K8S_VERSION, then restore
+# a snapshot taken before the upgrade, so they need a release exactly one minor behind SOME_K8S_VERSION,
+# of the same distro, and skip without one. If it is not set, use the latest KDM release of the previous
+# minor. KDM's release list is not guaranteed to be in version order, so the candidates are sorted by
+# their numeric version components rather than taken from the end of the list; release candidates and
+# other versions not of the form v<major>.<minor>.<patch>+<distro-revision> are ignored. Failing to find
+# one is not fatal: the tests that need it skip.
+if [ -z "${SOME_K8S_VERSION_PREV}" ]; then
+  current_minor=$(printf '%s' "${SOME_K8S_VERSION}" | sed -nE 's/^v1\.([0-9]+)\..*/\1/p')
+  if [ -n "${current_minor}" ] && [ "${current_minor}" -gt 0 ]; then
+    export SOME_K8S_VERSION_PREV=$(curl -sS "${KDM_DATA_URL}" | jq -r --arg dist "${DIST}" --arg minor "$((current_minor - 1))" '
+      [ .[$dist].releases[].version
+        | try (capture("^v(?<major>[0-9]+)\\.(?<minor>[0-9]+)\\.(?<patch>[0-9]+)\\+(k3s|rke2r)(?<revision>[0-9]+)$") as $v
+            | select($v.major == "1" and $v.minor == $minor)
+            | {version: ., key: ([$v.patch, $v.revision] | map(tonumber))}) catch empty ]
+      | sort_by(.key) | last | .version // empty')
+  fi
+  if [ -n "${SOME_K8S_VERSION_PREV}" ]; then
+    echo "Resolved ${DIST} previous minor to latest version ${SOME_K8S_VERSION_PREV}"
+  else
+    echo "warning: could not resolve a ${DIST} release one minor behind ${SOME_K8S_VERSION}; SOME_K8S_VERSION_PREV is unset and the restore-mode tests will skip"
+  fi
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
@@ -172,7 +198,7 @@ fi
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
-grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
+grep -m1 '^machineProvisionImage:' build.yaml | cut -d ' ' -f2 >> /var/lib/rancher/$DIST/agent/images/pull.txt
 mkdir -p /usr/share/rancher/ui-dashboard/assets
 curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-amd64
 curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-arm64
@@ -249,13 +275,13 @@ push_cattle_agent_image()
 # Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
 # time before Rancher is ready and therefore causing flakiness of the health check below.
 
-if ! docker image inspect rancher/rancher:$TAG >/dev/null 2>&1 ; then
+if ! docker image inspect rancher/rancher-server:$TAG >/dev/null 2>&1 ; then
     echo "building rancher from source - no preloaded container image available"
     ./scripts/build-server
 else
     # otherwise just copy it from the artifacts that are already there. neat!
     echo "pulling bin/rancher from preloaded container image"
-    container_id=$(docker create rancher/rancher:$TAG)
+    container_id=$(docker create rancher/rancher-server:$TAG)
     docker cp $container_id:/usr/bin/rancher bin/rancher
     docker rm $container_id
 fi

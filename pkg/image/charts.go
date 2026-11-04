@@ -12,7 +12,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	"go.yaml.in/yaml/v2"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 

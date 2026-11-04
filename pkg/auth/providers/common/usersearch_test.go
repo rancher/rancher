@@ -193,7 +193,7 @@ func TestUserSearcherSearchPrincipals(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := searcher.SearchPrincipals(test.provider, test.searchKey)
+			got, err := searcher.SearchPrincipals(test.provider, test.provider, test.searchKey)
 			require.NoError(t, err)
 			assert.Equal(t, test.want, got)
 		})
@@ -229,7 +229,7 @@ func TestUserSearcherSearchPrincipalsOrder(t *testing.T) {
 		},
 	})
 
-	got, err := searcher.SearchPrincipals("genericoidc", "testu")
+	got, err := searcher.SearchPrincipals("genericoidc", "genericoidc", "testu")
 	require.NoError(t, err)
 
 	var ids []string
@@ -244,6 +244,41 @@ func TestUserSearcherSearchPrincipalsOrder(t *testing.T) {
 	}, ids)
 }
 
+func TestUserSearcherSearchPrincipalsNamedConfig(t *testing.T) {
+	t.Parallel()
+
+	users := []*apiv3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-default"},
+			DisplayName:  "Test UserOne",
+			PrincipalIDs: []string{"genericoidc_user://sub-0001"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-eu"},
+			DisplayName:  "Test UserTwo",
+			PrincipalIDs: []string{"genericoidc-eu_user://sub-0002"},
+		},
+	}
+
+	searcher := common.NewUserSearcher(&fakes.UserListerMock{
+		ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+			return users, nil
+		},
+	})
+
+	got, err := searcher.SearchPrincipals("genericoidc", "genericoidc-eu", "testu")
+	require.NoError(t, err)
+
+	assert.Equal(t, []apiv3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc-eu_user://sub-0002"},
+			DisplayName:   "Test UserTwo",
+			PrincipalType: common.UserPrincipalType,
+			Provider:      "genericoidc",
+		},
+	}, got)
+}
+
 func TestUserSearcherSearchPrincipalsListError(t *testing.T) {
 	t.Parallel()
 
@@ -253,7 +288,7 @@ func TestUserSearcherSearchPrincipalsListError(t *testing.T) {
 		},
 	})
 
-	got, err := searcher.SearchPrincipals("genericoidc", "testu")
+	got, err := searcher.SearchPrincipals("genericoidc", "genericoidc", "testu")
 	require.ErrorContains(t, err, `listing users for search "testu": cache is not synced`)
 	assert.Nil(t, got)
 }

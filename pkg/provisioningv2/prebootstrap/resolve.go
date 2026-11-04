@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path"
-	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -47,22 +46,20 @@ func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1
 		return nil, err
 	}
 
-	if len(tokens) == 0 {
-		return nil, fmt.Errorf("no cluster registration token found")
-	}
-
-	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i].Name < tokens[j].Name
-	})
-
 	mgmtCluster, err := r.mgmtClusterCache.Get(controlPlane.Spec.ManagementClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mgmt Cluster %v: %w", controlPlane.Spec.ManagementClusterName, err)
 	}
 
-	token, err := crt.GetTokenFromSecret(r.secretCache, tokens[0])
+	// The same token as the agent clusterDeploy deploys once the pre-bootstrap agent has connected.
+	registrationToken, err := planner.ClusterAgentRegistrationToken(mgmtCluster, tokens)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token for CRT %s/%s: %w", tokens[0].Namespace, tokens[0].Name, err)
+		return nil, err
+	}
+
+	token, err := crt.GetTokenFromSecret(r.secretCache, registrationToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token for CRT %s/%s: %w", registrationToken.Namespace, registrationToken.Name, err)
 	}
 
 	// passing in nil for taints since prebootstrapping involves specific taints to uninitialized nodes

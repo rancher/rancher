@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -228,7 +229,7 @@ func Test_certificateRotationOrderedEntriesPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run((tt.name), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			collected := collectOrderedCertificateRotationEntries(tt.clusterPlan)
 			assert.Equal(t, tt.expectedNumberOfCollectedEntries, len(collected))
 			for i, n := range tt.expectedOrder {
@@ -247,8 +248,11 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 	}
 
 	genericSetup := func(mp *mockPlanner) {
-		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(ClusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{Status: v3.ClusterRegistrationTokenStatus{Token: "lol"}}}, nil)
-		mp.managementClusters.EXPECT().Get("somecluster").Return(&v3.Cluster{}, nil)
+		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(ClusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{ObjectMeta: metav1.ObjectMeta{Namespace: "somecluster", Name: "default-token"}, Status: v3.ClusterRegistrationTokenStatus{TokenSecretName: "crt-token-default-token"}}}, nil)
+		mp.secretCache.EXPECT().Get("somecluster", "crt-token-default-token").Return(&v1.Secret{Data: map[string][]byte{"token": []byte("lol")}}, nil)
+		mp.managementClusters.EXPECT().Get("somecluster").Return(&v3.Cluster{
+			Name: "somecluster",
+		}, nil)
 	}
 
 	tests := []struct {
@@ -444,7 +448,6 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 
 	for _, tt := range tests {
 		// copy test case for persistence in parallel runs
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			mockPlanner := newMockPlanner(t, InfoFunctions{
 				SystemAgentImage:      func() string { return "system-agent" },

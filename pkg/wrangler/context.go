@@ -48,7 +48,7 @@ import (
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
+	namespaceclients "github.com/rancher/rancher/pkg/namespace/clients"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
@@ -151,13 +151,14 @@ type Context struct {
 	MultiClusterManager MultiClusterManager
 	TunnelServer        *remotedialer.Server
 	TunnelAuthorizer    *tunnelserver.Authorizers
+	TunnelSessions      *tunnelserver.SessionTracker
 	PeerManager         peermanager.PeerManager
 	Provisioning        provisioningv1.Interface
 	RBAC                rbacv1.Interface
 	Core                corev1.Interface
 	API                 apiregv1.Interface
 	CRD                 crdv1.Interface
-	K8s                 *namespace.Clientset
+	K8s                 *namespaceclients.Clientset
 	Upgrade             upgradev1.Interface
 	Telemetry           telemetryv1.Interface
 	Plan                planv1alpha1.Interface
@@ -186,7 +187,7 @@ type Context struct {
 	fleet        *fleet.Factory
 	provisioning *provisioning.Factory
 	batch        *batch.Factory
-	core         *namespace.WranglerFactory
+	core         *namespaceclients.WranglerFactory
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
 	upgrade      *upgrade.Factory
@@ -325,7 +326,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		*restConfigCopy = *w.RESTConfig
 		restConfigCopy.UserAgent = userAgent
 	}
-	k8sClientWithAgent, err := namespace.NewForConfig(restConfigCopy)
+	k8sClientWithAgent, err := namespaceclients.NewForConfig(restConfigCopy)
 	if err != nil {
 		logrus.Debugf("failed to set agent [%s] on k8s client: %v", userAgent, err)
 	}
@@ -459,7 +460,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	if err != nil {
 		return nil, err
 	}
-	core := namespace.NewWranglerFactory(rCore)
+	core := namespaceclients.NewWranglerFactory(rCore)
 
 	api, err := apiregistration.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
@@ -486,7 +487,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	k8s, err := namespace.NewForConfig(restConfig)
+	k8s, err := namespaceclients.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -576,6 +577,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
+		TunnelSessions:          tunnelserver.NewSessionTracker(),
 		Upgrade:                 upgrade.Upgrade().V1(),
 		Telemetry:               telemetry.Telemetry().V1(),
 		Plan:                    plan.Plan().V1alpha1(),

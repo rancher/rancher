@@ -9,13 +9,16 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -681,4 +684,55 @@ func deleteDir(dir string) error {
 		return err
 	}
 	return nil
+}
+
+func TestNotReady(t *testing.T) {
+	other := fmt.Errorf("boom")
+
+	assert.NoError(t, notReady(nil))
+	assert.Same(t, other, notReady(other))
+	assert.False(t, IsNotReady(other))
+	assert.False(t, IsNotReady(apierror.NewAPIError(validation.ClusterUnavailable, "unrelated 503")))
+
+	err := notReady(fmt.Errorf("wrapped: %w", git.ErrNotCheckedOut))
+	var apiErr *apierror.APIError
+	assert.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 503, apiErr.Code.Status)
+	assert.True(t, IsNotReady(err))
+}
+
+type fakeClusterRepoCache struct {
+	catalogcontrollers.ClusterRepoCache
+	repo *v1.ClusterRepo
+}
+
+func (f fakeClusterRepoCache) Get(string) (*v1.ClusterRepo, error) { return f.repo, nil }
+
+func TestGetRepoDisabled(t *testing.T) {
+	enabled, disabled := true, false
+
+	tests := []struct {
+		name        string
+		enabled     *bool
+		expectFound bool
+	}{
+		{name: "enabled unset", enabled: nil, expectFound: true},
+		{name: "enabled", enabled: &enabled, expectFound: true},
+		{name: "disabled", enabled: &disabled, expectFound: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewManager(nil, nil, nil, fakeClusterRepoCache{repo: &v1.ClusterRepo{
+				Spec: v1.RepoSpec{Enabled: tt.enabled},
+			}})
+
+			_, err := m.getRepo("", "repo")
+
+			if tt.expectFound {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, validation.NotFound)
+			}
+		})
+	}
 }

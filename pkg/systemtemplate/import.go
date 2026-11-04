@@ -15,8 +15,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	util "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/image"
@@ -58,12 +57,12 @@ type clusterAgentContext struct {
 	NamespaceOptions     namespace.Mutator
 	// AgentDeploymentPullSecrets are pull secrets that are used exclusively for
 	// the cluster agent deployment
-	AgentDeploymentPullSecrets []util.AgentPullSecret
+	AgentDeploymentPullSecrets []pkgcluster.AgentPullSecret
 	// SystemDefaultPullSecrets are secret references passed to the cluster
 	// agent as environment variables, later used to deploy system charts with the
 	// correct pull secret configuration.
-	SystemDefaultPullSecrets []util.AgentPullSecret
-	AllPullSecrets           []util.AgentPullSecret
+	SystemDefaultPullSecrets []pkgcluster.AgentPullSecret
+	AllPullSecrets           []pkgcluster.AgentPullSecret
 }
 
 type priorityClassContext struct {
@@ -101,12 +100,12 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func PriorityClassTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
-	value, preemption := util.GetDesiredPriorityClassValueAndPreemption(cluster)
+	value, preemption := pkgcluster.GetDesiredPriorityClassValueAndPreemption(cluster)
 
 	pctx := priorityClassContext{
 		PriorityClassValue: value,
 		PreemptionPolicy:   preemption,
-		Description:        util.PriorityClassDescription,
+		Description:        pkgcluster.PriorityClassDescription,
 	}
 
 	buf := &bytes.Buffer{}
@@ -123,7 +122,7 @@ func PriorityClassTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 }
 
 func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
-	minAvailable, maxUnavailable := util.GetDesiredPodDisruptionBudgetValues(cluster)
+	minAvailable, maxUnavailable := pkgcluster.GetDesiredPodDisruptionBudgetValues(cluster)
 
 	pdbctx := podDisruptionBudgetContext{
 		MinAvailable:   minAvailable,
@@ -161,6 +160,7 @@ type TemplateOps struct {
 
 func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
+
 	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", ops.URL, ops.Token, ops.Namespace)))
 	tokenKey := hex.EncodeToString(d[:])[:10]
 
@@ -174,9 +174,9 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	var registryURL string
 	var err error
-	var registryConfigs, agentDeploymentPullSecrets, systemDefaultPullSecrets []util.AgentPullSecret
+	var registryConfigs, agentDeploymentPullSecrets, systemDefaultPullSecrets []pkgcluster.AgentPullSecret
 
-	registryURL, registryConfigs, err = util.GeneratePrivateRegistryEncodedDockerConfig(ops.Cluster, ops.SecretLister)
+	registryURL, registryConfigs, err = pkgcluster.GeneratePrivateRegistryEncodedDockerConfig(ops.Cluster, ops.SecretLister)
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 	// only set the _system default_ pull secrets for imported or hosted clusters, which are identified by the legacy cluster naming convention (c-xxxxx).
 	// Provisioned and custom clusters (identified by c-m-xxxxx) will use the underlying containerd configuration set at the node level
 	// to authenticate pulls, so deploying image pull secrets in those environments is unnecessary.
-	if util.MgmtNameRegexp.MatchString(ops.Cluster.Name) {
+	if pkgcluster.MgmtNameRegexp.MatchString(ops.Cluster.Name) {
 		systemDefaultPullSecrets = registryConfigs
 	}
 
@@ -253,14 +253,14 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	agentEnvVars = toYAML(envVars)
 
-	if appendTolerations := util.GetClusterAgentTolerations(ops.Cluster); appendTolerations != nil {
+	if appendTolerations := pkgcluster.GetClusterAgentTolerations(ops.Cluster); appendTolerations != nil {
 		agentAppendTolerations = toYAML(appendTolerations)
 		if agentAppendTolerations == "" {
 			return fmt.Errorf("error converting agent append tolerations to YAML")
 		}
 	}
 
-	affinity, err := util.GetClusterAgentAffinity(ops.Cluster)
+	affinity, err := pkgcluster.GetClusterAgentAffinity(ops.Cluster)
 	if err != nil {
 		return err
 	}
@@ -269,14 +269,14 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		return fmt.Errorf("error converting agent affinity to YAML")
 	}
 
-	if resourceRequirements := util.GetClusterAgentResourceRequirements(ops.Cluster); resourceRequirements != nil {
+	if resourceRequirements := pkgcluster.GetClusterAgentResourceRequirements(ops.Cluster); resourceRequirements != nil {
 		agentResourceRequirements = toYAML(resourceRequirements)
 		if agentResourceRequirements == "" {
 			return fmt.Errorf("error converting agent resource requirements to YAML")
 		}
 	}
 
-	pcEnabled, pdbEnabled := util.AgentSchedulingCustomizationEnabled(ops.Cluster)
+	pcEnabled, pdbEnabled := pkgcluster.AgentSchedulingCustomizationEnabled(ops.Cluster)
 
 	var pdb string
 	if pdbEnabled {
@@ -312,12 +312,17 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AllPullSecrets:             registryConfigs,
 		SUCAppNameOverride: func() string {
 			// Set the field to ensure backward compatibility in the case of node-driver RKE2/K3s cluster
-			if ops.Cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
-				(ops.Cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || ops.Cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
-				if ops.Cluster.Spec.DisplayName != "" {
-					return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
-						capr.SafeConcatName(48, ops.Cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
-				}
+			if pkgcluster.IsAdministrated(ops.Cluster) && ops.Cluster.Spec.DisplayName != "" {
+				return capr.SafeConcatName(
+					capr.MaxHelmReleaseNameLength,
+					"mcc",
+					capr.SafeConcatName(
+						48,
+						ops.Cluster.Spec.DisplayName,
+						"managed",
+						"system-upgrade-controller",
+					),
+				)
 			}
 			return ""
 		}(),
@@ -332,7 +337,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		// the case of imported RKE2/K3s cluster
 		if features.ManagedSystemUpgradeController.Enabled() {
-			if importedclusterversionmanagement.Enabled(cluster) {
+			if pkgcluster.ImportedVersionManagementEnabled(cluster) {
 				enableMSUC = true
 			} else if cluster.Labels != nil {
 				if _, ok := cluster.Labels["cluster-api.cattle.io/owned"]; ok {
@@ -359,9 +364,16 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	}
 }
 
+// ForCluster is used to generate the cluster agent manifest for a given management cluster.
+// ForCluster should be preferred over SystemTemplate where possible as it provides the complete manifest as a byte
+// array and requires no further input.
+// Ideally the token and taints would be derived solely based on the cluster object, but currently consumers are allowed
+// to choose between the "default-token" and "system" token, and taints are not always derivable from the management
+// cluster object.
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
-	status := util.GetAgentSchedulingCustomizationStatus(cluster)
+	status := pkgcluster.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil
+	preBootstrap := capr.ShouldPreBootstrap(cluster)
 
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, &TemplateOps{
@@ -371,7 +383,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            settings.ServerURL.Get(),
-		IsPreBootstrap: capr.ShouldPreBootstrap(cluster),
+		IsPreBootstrap: preBootstrap,
 		Cluster:        cluster,
 		AgentFeatures:  GetDesiredFeatures(cluster),
 		Taints:         taints,
@@ -408,13 +420,16 @@ func CAChecksum() string {
 
 func GetDesiredAgentImage(cluster *apimgmtv3.Cluster) string {
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
+
 	desiredAgent := cluster.Spec.DesiredAgentImage
 	if cluster.Spec.AgentImageOverride != "" {
 		desiredAgent = cluster.Spec.AgentImageOverride
 	}
+
 	if desiredAgent == "" || desiredAgent == "fixed" {
 		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	}
+
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAgent is [%s] for cluster [%s]", desiredAgent, cluster.Name)
 	return desiredAgent
 }
@@ -432,19 +447,19 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 }
 
 func GetDesiredAssetsImage(cluster *apimgmtv3.Cluster) string {
-	logrus.Tracef("clusterDeploy: getting desired charts image for [%s]", cluster.Name)
-	desiredCharts := cluster.Spec.DesiredAssetsImage
+	logrus.Tracef("clusterDeploy: getting desired assets image for [%s]", cluster.Name)
+	desiredAssetsImage := cluster.Spec.DesiredAssetsImage
 	if cluster.Spec.AssetsImageOverride != "" {
-		desiredCharts = cluster.Spec.AssetsImageOverride
+		desiredAssetsImage = cluster.Spec.AssetsImageOverride
 	}
-	if desiredCharts == "" || desiredCharts == "fixed" {
-		desiredCharts = image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
+	if desiredAssetsImage == "" || desiredAssetsImage == "fixed" {
+		desiredAssetsImage = image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
 	}
-	logrus.Tracef("clusterDeploy: desiredCharts is [%s] for cluster [%s]", desiredCharts, cluster.Name)
-	return desiredCharts
+	logrus.Tracef("clusterDeploy: desiredAssets is [%s] for cluster [%s]", desiredAssetsImage, cluster.Name)
+	return desiredAssetsImage
 }
 
-func toYAML(v interface{}) string {
+func toYAML(v any) string {
 	data, err := json.Marshal(v)
 	if err != nil {
 		// Swallow errors inside of a template so it doesn't affect remaining template lines

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	util "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -99,7 +99,7 @@ func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster
 	}
 
 	// Don't do this for provisioned clusters, the creds will be passed via prov2 and the system-agent.
-	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
+	if !pkgcluster.MgmtNameRegexp.MatchString(cluster.Name) {
 		logrus.Tracef("[private-registry] cluster %q is provisioned, not imported/hosted; skipping system project label management", cluster.Name)
 		return cluster, nil
 	}
@@ -120,7 +120,7 @@ func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster
 	}
 
 	usesGlobalSecrets := sysProj.Labels != nil && sysProj.Labels[secret.NeedsGlobalPrivateRegistryPullSecret] == "true"
-	registry, isGlobalDefault := util.GetPrivateRegistry(cluster)
+	registry, isGlobalDefault := pkgcluster.GetPrivateRegistry(cluster)
 
 	logrus.Tracef("[private-registry] cluster %q: isGlobalDefault=%v, usesGlobalSecrets=%v, registryNil=%v",
 		cluster.Name, isGlobalDefault, usesGlobalSecrets, registry == nil)
@@ -167,7 +167,7 @@ func (h *handler) labelConfiguredSourceGlobalRegistryPullSecrets(_ string, setti
 	logrus.Tracef("[private-registry] syncing global registry pull secret labels for setting %q", setting.Name)
 
 	existingGlobalPullSecrets, err := h.secretCache.List(namespaces.System, labels.SelectorFromSet(map[string]string{
-		util.SourcePullSecretLabel: "true",
+		pkgcluster.SourcePullSecretLabel: "true",
 	}))
 	if err != nil {
 		logrus.Errorf("[private-registry] failed to list labeled source pull secrets in namespace %q: %v", namespaces.System, err)
@@ -196,7 +196,7 @@ func (h *handler) labelConfiguredSourceGlobalRegistryPullSecrets(_ string, setti
 			return setting, err
 		}
 		sec = sec.DeepCopy()
-		delete(sec.Labels, util.SourcePullSecretLabel)
+		delete(sec.Labels, pkgcluster.SourcePullSecretLabel)
 		delete(sec.Annotations, secret.PSSIgnoreNamespacesAnnotation)
 		logrus.Tracef("[private-registry] removing source label and PSS annotation from secret %q", s)
 		_, err = h.secrets.Update(sec)
@@ -221,7 +221,7 @@ func (h *handler) labelConfiguredSourceGlobalRegistryPullSecrets(_ string, setti
 		if sec.Labels == nil {
 			sec.Labels = map[string]string{}
 		}
-		sec.Labels[util.SourcePullSecretLabel] = "true"
+		sec.Labels[pkgcluster.SourcePullSecretLabel] = "true"
 		if sec.Annotations == nil {
 			sec.Annotations = map[string]string{}
 		}
@@ -249,7 +249,7 @@ func (h *handler) labelSourceGlobalRegistryPullSecret(_ string, s *kcorev1.Secre
 		return s, nil
 	}
 
-	sps, hasSps := s.Labels[util.SourcePullSecretLabel]
+	sps, hasSps := s.Labels[pkgcluster.SourcePullSecretLabel]
 	ins, hasIns := s.Annotations[secret.PSSIgnoreNamespacesAnnotation]
 	expectedIns := strings.Join(settings.SystemNamespacesIgnoringPullSecrets, ",")
 	if !hasSps || sps != "true" || !hasIns || ins == "" || ins != expectedIns {
@@ -261,7 +261,7 @@ func (h *handler) labelSourceGlobalRegistryPullSecret(_ string, s *kcorev1.Secre
 			s.Annotations = map[string]string{}
 		}
 		if !hasSps || sps != "true" {
-			s.Labels[util.SourcePullSecretLabel] = "true"
+			s.Labels[pkgcluster.SourcePullSecretLabel] = "true"
 		}
 		if !hasIns || ins == "" || ins != expectedIns {
 			s.Annotations[secret.PSSIgnoreNamespacesAnnotation] = expectedIns
@@ -290,7 +290,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 
 	// don't use pull secrets if we're working with a provisioned cluster, credentials
 	// will be configured at the container runtime level.
-	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
+	if !pkgcluster.MgmtNameRegexp.MatchString(cluster.Name) {
 		logrus.Debugf("[private-registry] cluster %q is provisioned, not imported/hosted; skipping PSS management", cluster.Name)
 		return cluster, nil
 	}
@@ -314,14 +314,14 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 
 	// gather all PSS's for this specific cluster in its system projects backing namespace
 	createdPSS, err := h.secretCache.List(backingNamespace, labels.SelectorFromSet(map[string]string{
-		util.CopiedPullSecretLabel: "true",
+		pkgcluster.CopiedPullSecretLabel: "true",
 	}))
 	if err != nil {
 		logrus.Errorf("[private-registry] failed to list copied PSS(s) in backing namespace %q for cluster %q: %v", backingNamespace, cluster.Name, err)
 		return cluster, err
 	}
 
-	privateRegistry, isGlobalDefault := util.GetPrivateRegistry(cluster)
+	privateRegistry, isGlobalDefault := pkgcluster.GetPrivateRegistry(cluster)
 	if cluster.Name != "local" && (privateRegistry == nil || isGlobalDefault) && len(createdPSS) == 0 {
 		logrus.Debugf("[private-registry] no applicable cluster-level pull secrets for cluster %q (isGlobalDefault=%v), skipping", cluster.Name, isGlobalDefault)
 		return cluster, nil
@@ -356,7 +356,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 		if slices.ContainsFunc(sourceAuthSecrets, func(s *kcorev1.Secret) bool {
 			expectedName := s.Name
 			if cluster.Name != "local" {
-				expectedName = util.GeneratePullSecretName(s.Name)
+				expectedName = pkgcluster.GeneratePullSecretName(s.Name)
 			}
 			return expectedName == pss.Name
 		}) {
@@ -376,7 +376,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 
 	// Create any missing PSS's
 	for _, sourcePullSecret := range sourceAuthSecrets {
-		data, err := util.ConvertToDockerConfigJson(privateRegistry.URL, sourcePullSecret)
+		data, err := pkgcluster.ConvertToDockerConfigJson(privateRegistry.URL, sourcePullSecret)
 		if err != nil {
 			logrus.Errorf("[private-registry] failed to convert pull secret %q to docker config for cluster %q: %v", sourcePullSecret.Name, cluster.Name, err)
 			return cluster, err
@@ -384,7 +384,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 
 		pssName := sourcePullSecret.Name
 		if cluster.Name != "local" {
-			pssName = util.GeneratePullSecretName(pssName)
+			pssName = pkgcluster.GeneratePullSecretName(pssName)
 		}
 
 		existingSecret := findSecretByName(createdPSS, pssName)
@@ -414,7 +414,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 			if existing.Data == nil {
 				existing.Data = map[string][]byte{}
 			}
-			existing.Labels[util.CopiedPullSecretLabel] = "true"
+			existing.Labels[pkgcluster.CopiedPullSecretLabel] = "true"
 			existing.Labels[registrySecretUIHint] = "true"
 			existing.Data[kcorev1.DockerConfigJsonKey] = data
 			logrus.Debugf("[private-registry] adopting existing PSS %q in namespace %q for cluster %q", pssName, backingNamespace, cluster.Name)
@@ -458,7 +458,7 @@ func (h *handler) syncClusterOnGlobalPullSecretChange(_ string, _ string, obj ru
 	if !ok {
 		return nil, nil
 	}
-	if sec.Labels == nil || sec.Labels[util.SourcePullSecretLabel] != "true" {
+	if sec.Labels == nil || sec.Labels[pkgcluster.SourcePullSecretLabel] != "true" {
 		return nil, nil
 	}
 
@@ -515,9 +515,9 @@ func buildPSS(proj *v3.Project, systemProjectBackingNamespace, name string, dock
 				secret.PSSIgnoreNamespacesAnnotation: strings.Join(settings.SystemNamespacesIgnoringPullSecrets, ","),
 			},
 			Labels: map[string]string{
-				util.CopiedPullSecretLabel:      "true",
-				secret.ProjectScopedSecretLabel: proj.Name,
-				registrySecretUIHint:            "true",
+				pkgcluster.CopiedPullSecretLabel: "true",
+				secret.ProjectScopedSecretLabel:  proj.Name,
+				registrySecretUIHint:             "true",
 			},
 		},
 		Data: map[string][]byte{
@@ -546,7 +546,7 @@ func findV3ClustersUsingGlobalPullSecrets(clusterCache mgmtcontrollers.ClusterCa
 	}
 	var clusterNames []string
 	for _, cluster := range clusters {
-		_, isGlobalDefault := util.GetPrivateRegistry(cluster)
+		_, isGlobalDefault := pkgcluster.GetPrivateRegistry(cluster)
 		if !isGlobalDefault {
 			continue
 		}
@@ -557,7 +557,7 @@ func findV3ClustersUsingGlobalPullSecrets(clusterCache mgmtcontrollers.ClusterCa
 
 func activeGlobalPullSecrets() sets.Set[string] {
 	specifiedSecretsSet := sets.New[string]()
-	registry, _ := util.GetPrivateRegistry(nil)
+	registry, _ := pkgcluster.GetPrivateRegistry(nil)
 	if registry != nil {
 		for _, p := range registry.PullSecrets {
 			specifiedSecretsSet.Insert(p.Name)

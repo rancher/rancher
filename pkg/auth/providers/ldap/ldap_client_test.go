@@ -54,8 +54,6 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		providerName: "openldap",
 		userMGR:      userManager,
 		tokenMGR:     &tokens.Manager{},
-		userScope:    "openldap_user",
-		groupScope:   "openldap_group",
 	}
 
 	credentials := v3.BasicLogin{
@@ -575,8 +573,6 @@ func TestSearchLdapNoSuchObjectErrorIsIgnored(t *testing.T) {
 
 	provider := &ldapProvider{
 		providerName: "openldap",
-		userScope:    "openldap_user",
-		groupScope:   "openldap_group",
 	}
 
 	config := &v3.LdapConfig{
@@ -596,7 +592,7 @@ func TestSearchLdapNoSuchObjectErrorIsIgnored(t *testing.T) {
 		},
 	}
 
-	principals, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope, config, ldapConn)
+	principals, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope(config), config, ldapConn)
 
 	require.NoError(t, err, "LDAPResultNoSuchObject should be treated as empty results, not an error")
 	require.Empty(t, principals)
@@ -607,8 +603,6 @@ func TestSearchLdapOtherLDAPErrorIsPropagated(t *testing.T) {
 
 	provider := &ldapProvider{
 		providerName: "openldap",
-		userScope:    "openldap_user",
-		groupScope:   "openldap_group",
 	}
 
 	config := &v3.LdapConfig{
@@ -626,7 +620,7 @@ func TestSearchLdapOtherLDAPErrorIsPropagated(t *testing.T) {
 		},
 	}
 
-	principals, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope, config, ldapConn)
+	principals, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope(config), config, ldapConn)
 
 	require.Error(t, err, "non-NoSuchObject LDAP errors should be propagated to the caller")
 	require.Empty(t, principals)

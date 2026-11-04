@@ -56,7 +56,8 @@ const (
 	TokenNamespace       = "cattle-tokens"
 	UserIDLabel          = "cattle.io/user-id"
 	KindLabel            = "authn.management.cattle.io/kind"
-	IsLogin              = "session"
+	KindSession          = "session"
+	KindKubeconfig       = "kubeconfig"
 	SecretKindLabel      = "cattle.io/kind"
 	SecretKindLabelValue = "token"
 	GeneratePrefix       = "token-"
@@ -627,6 +628,11 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 	if !userMatchOrDefault(userInfo.GetName(), token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
+	// Login tokens are created by Rancher only. Rancher treats them differently from derived tokens,
+	// e.g. for user activity and OIDC.
+	if token.Spec.Kind == KindSession {
+		return nil, apierrors.NewBadRequest("unable to create token of kind session")
+	}
 	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options, userInfo)
 }
 
@@ -661,6 +667,12 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
+	// A token without principal name and provider can't be read back, reject
+	// it before anything is written.
+	if rtPrincipal.Name == "" || rtPrincipal.Provider == "" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("authentication token %s has no user principal", authTokenID))
+	}
 	token.Spec.UserPrincipal = ext.TokenPrincipal{
 		Name:           rtPrincipal.ObjectMeta.Name,
 		DisplayName:    rtPrincipal.DisplayName,
@@ -724,6 +736,13 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rest.FillObjectMetaSystemFields(token)
 
+	// Converting resolves the TTL, so a dry run returns the TTL that would be stored.
+	secret, err := toSecret(token)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
+			token.Name, err))
+	}
+
 	// Return early as the user does not wish to actually change anything.
 	if dryRun {
 		// enforce our choice of name
@@ -732,13 +751,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		if err != nil {
 			return nil, err
 		}
+		// Users don't care about the hashed value.
+		token.Status.Hash = ""
 		return token, nil
-	}
-
-	secret, err := toSecret(token)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
-			token.Name, err))
 	}
 
 	// enforce our choice of name, without racing create
@@ -891,14 +906,17 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
-// ListForProvider returns all ext tokens associated with the named auth
-// provider. It is an internal call invoked by other parts of Rancher.
-func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
+// ListForConfig returns all ext tokens issued by the named AuthConfig. It is an
+// internal call invoked by other parts of Rancher.
+//
+// Several AuthConfigs can share a provider type, so tokens are selected by the
+// config name prefix of their user principal, not by the principal's provider.
+func (t *SystemStore) ListForConfig(configName string) (*ext.TokenList, error) {
 	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
 		SecretKindLabel: SecretKindLabelValue,
 	}).AsSelector())
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider %s: %w", provider, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for auth config %s: %w", configName, err))
 	}
 
 	var tokens []ext.Token
@@ -907,7 +925,13 @@ func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
 		if err != nil {
 			continue
 		}
-		if token.Spec.UserPrincipal.Provider == provider {
+		tokenConfigName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			logrus.Debugf("tokens: failed to parse configName from token %s: %s", secret.Name, err)
+			continue
+		}
+
+		if tokenConfigName == configName {
 			tokens = append(tokens, *token)
 		}
 	}
@@ -995,7 +1019,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
+		ttl, err := IngestTTL(token.Spec.TTL, token.Spec.Kind)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
@@ -1596,7 +1620,7 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
+	ttl, err := IngestTTL(token.Spec.TTL, token.Spec.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -1747,27 +1771,63 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-// IngestTTL returns the input ttl (milliseconds) with requests for defaults
-// resolved, and further limited to the maximum allowed, as per the given
-// settings.
-func IngestTTL(ttl int64, maxSetting, defaultSetting settings.Setting) (int64, error) {
-	maxValue, err := ParseTTLToMilliseconds(maxSetting)
+// TTLLimits returns the default and the max TTL, in milliseconds, for a token of the given kind. A
+// negative value means no limit, i.e. a token that never expires.
+//
+// Login tokens follow the login session lifetime, as v3 login tokens do. Every other token is
+// limited by auth-token-max-ttl-minutes. Kubeconfig tokens are further limited by
+// kubeconfig-max-token-ttl-minutes. A max setting of 0 is no limit at its level. A default of 0
+// falls back to the max, and a default above the max is capped to it.
+func TTLLimits(kind string) (defaultTTL, maxTTL int64, err error) {
+	var defaultSetting settings.Setting
+	switch kind {
+	case KindSession:
+		defaultSetting = settings.AuthUserSessionTTLMinutes
+		maxTTL, err = parseMaxTTL(settings.AuthUserSessionTTLMinutes)
+	case KindKubeconfig:
+		defaultSetting = settings.KubeconfigDefaultTokenTTLMinutes
+		var kubeconfigMax int64
+		kubeconfigMax, err = parseMaxTTL(settings.KubeconfigMaxTokenTTLMinutes)
+		if err == nil {
+			maxTTL, err = parseMaxTTL(settings.AuthTokenMaxTTLMinutes)
+			maxTTL = ClampToMaxTTL(kubeconfigMax, maxTTL)
+		}
+	default:
+		defaultSetting = settings.AuthTokenDefaultTTLMinutes
+		maxTTL, err = parseMaxTTL(settings.AuthTokenMaxTTLMinutes)
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+
+	defaultTTL, err = ParseTTLToMilliseconds(defaultSetting)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return ClampToMaxTTL(DefaultTTL(defaultTTL, maxTTL), maxTTL), maxTTL, nil
+}
+
+// parseMaxTTL returns a max TTL setting in milliseconds, with -1 for no limit.
+func parseMaxTTL(setting settings.Setting) (int64, error) {
+	maxTTL, err := ParseTTLToMilliseconds(setting)
 	if err != nil {
 		return 0, err
 	}
-	if maxValue < 1 {
-		maxValue = -1 // "0" means no max — use the real "never expires" value.
+	if maxTTL < 1 {
+		return -1, nil
 	}
-	defaultValue, err := ParseTTLToMilliseconds(defaultSetting)
+	return maxTTL, nil
+}
+
+// IngestTTL returns the input ttl (milliseconds) with a request for the default (0) resolved and
+// limited to the max, for a token of the given kind. See TTLLimits.
+func IngestTTL(ttl int64, kind string) (int64, error) {
+	defaultTTL, maxTTL, err := TTLLimits(kind)
 	if err != nil {
 		return 0, err
 	}
-
-	// We fall back to the maximum when the default value requests a default itself
-	defaultValue = DefaultTTL(defaultValue, maxValue)
-
-	// Then resolve a default request in the input and clamp
-	return ClampToMaxTTL(DefaultTTL(ttl, defaultValue), maxValue), nil
+	return ClampToMaxTTL(DefaultTTL(ttl, defaultTTL), maxTTL), nil
 }
 
 // ParseTTLToMilliseconds retrieves a ttl setting (in minutes) and returns it as milliseconds

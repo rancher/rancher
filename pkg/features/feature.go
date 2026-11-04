@@ -125,7 +125,7 @@ var (
 	AggregatedRoleTemplates = newFeature(
 		"aggregated-roletemplates",
 		"Make RoleTemplates use aggregation for generated RBAC roles",
-		true,
+		false,
 		true,
 		true)
 	ClusterAgentSchedulingCustomization = newFeature(
@@ -161,7 +161,7 @@ var (
 	ClusterAutoscaling = newPrimeFeature(
 		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",
-		true,
+		IsPrime(), // we only want this to show in the UI if it's a prime build - even if it's a prime-only feature.
 		false,
 		true,
 	)
@@ -249,6 +249,25 @@ var (
 		true,
 		true,
 	)
+	MultiAuthProviders = newPrimeFeature(
+		"multiple-auth-providers",
+		"Allows multiple enabled auth-providers",
+		true,
+		true,
+		true)
+	AuditLogUsername = newFeature(
+		"audit-log-username",
+		"Add the human-readable username of the user, and of the impersonator, to the audit log entries",
+		false,
+		true,
+		true,
+	)
+	MultiAuthProviderCross = newPrimeFeature(
+		"multiple-auth-provider-cross",
+		"Search across all auth-providers",
+		false,
+		true,
+		true)
 )
 
 func ListEnabled() []string {

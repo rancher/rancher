@@ -211,7 +211,7 @@ func AgentSchedulingPodDisruptionBudgetChanged(cluster *v3.Cluster) (bool, bool)
 		return false, false
 	}
 
-	return !reflect.DeepEqual(specCustomization.PodDisruptionBudget, statusCustomization.PodDisruptionBudget), specCustomization.PodDisruptionBudget == nil
+	return !reflect.DeepEqual(specCustomization.PodDisruptionBudget, statusCustomization.PodDisruptionBudget), specCustomization.PodDisruptionBudget == nil && statusCustomization.PodDisruptionBudget != nil
 }
 
 // AgentSchedulingPriorityClassChanged compares the cluster spec and status to determine if the
@@ -238,7 +238,11 @@ func AgentSchedulingPriorityClassChanged(cluster *v3.Cluster) (bool, bool, bool)
 		return false, false, false
 	}
 
-	return !reflect.DeepEqual(specCustomization.PriorityClass, statusCustomization.PriorityClass), false, specCustomization.PriorityClass == nil
+	if specCustomization.PriorityClass != nil && statusCustomization.PriorityClass == nil {
+		return false, true, false
+	}
+
+	return !reflect.DeepEqual(specCustomization.PriorityClass, statusCustomization.PriorityClass), false, specCustomization.PriorityClass == nil && statusCustomization.PriorityClass != nil
 }
 
 // AgentSchedulingCustomizationEnabled determines if scheduling customization has been defined for either the

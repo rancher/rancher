@@ -7,6 +7,7 @@ import (
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -145,6 +146,10 @@ func (s *autoscalerSuite) TestRenewToken_HappyPath_SuccessfulTokenRenewal() {
 		s.Equal("user-123", token.UserID)
 		s.Equal("test-cluster", token.Labels[capi.ClusterNameLabel])
 		s.Equal("autoscaler", token.Labels[tokens.TokenKindLabel])
+		s.Equal(autoscalerUserPrincipal("user-123"), token.UserPrincipal)
+		configName, err := common.ConfigNameFromToken(token)
+		s.Require().NoError(err)
+		s.Equal("local", configName)
 		return token, nil
 	})
 

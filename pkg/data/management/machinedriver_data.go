@@ -75,9 +75,6 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip", "", "1757e2b807b0fea4a38eade4e961bcc609853986a44a99a4e86a37ccea1f7679", []string{"objects-east.cloud.ca"}, false, false, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/releases/download/v1.2.0/docker-machine-driver-cloudscale_v1.2.0_linux_amd64.tar.gz", "", "e33fbd6c2f87b1c470bcb653cc8aa50baf914a9d641a2f18f86a07c398cfb544", []string{"objects.rma.cloudscale.ch"}, false, false, false, nil, management); err != nil {
-		return err
-	}
 	if err := addMachineDriver(DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, false, nil, management); err != nil {
 		return err
 	}
@@ -152,16 +149,17 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	deleteMachineDriver("pinganyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
 	deleteMachineDriver("aliyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
 	deleteMachineDriver("otc", "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/driver/0.3.3/", management.Management.NodeDrivers(""))
+	deleteMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/", management.Management.NodeDrivers(""))
 
 	return nil
 }
 
 func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	harvesterDriverVersion := "v1.0.9"
+	harvesterDriverVersion := "v1.1.1"
 	harvesterDriverChecksums := map[string]string{
-		"amd64": "159ec4d8c0d9dae8e322e7ddff64c0a5837c3dc209ae2e345128d4d5cb32279d",
-		"arm64": "32a2d906bae047884c30dfd5370f83458edfc77e016b631dcdd46c9f98610951",
+		"amd64": "719ac4b604f2d75143e6d42e917209ff28db5bff06cb89d700ffd63d581cf341",
+		"arm64": "e47daaa358f744f1b456a80a6f0add84b9f3031323abae8afb86739ace426716",
 	}
 
 	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz",

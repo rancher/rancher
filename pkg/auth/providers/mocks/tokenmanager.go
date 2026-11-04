@@ -57,17 +57,17 @@ func (mr *MocktokenManagerMockRecorder) CreateSecret(userID, provider, secret an
 }
 
 // CreateTokenAndSetCookie mocks base method.
-func (m *MocktokenManager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+func (m *MocktokenManager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken, description string, request *types.APIContext) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateTokenAndSetCookie", userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
+	ret := m.ctrl.Call(m, "CreateTokenAndSetCookie", userID, userPrincipal, groupPrincipals, providerToken, description, request)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateTokenAndSetCookie indicates an expected call of CreateTokenAndSetCookie.
-func (mr *MocktokenManagerMockRecorder) CreateTokenAndSetCookie(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request any) *gomock.Call {
+func (mr *MocktokenManagerMockRecorder) CreateTokenAndSetCookie(userID, userPrincipal, groupPrincipals, providerToken, description, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTokenAndSetCookie", reflect.TypeOf((*MocktokenManager)(nil).CreateTokenAndSetCookie), userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTokenAndSetCookie", reflect.TypeOf((*MocktokenManager)(nil).CreateTokenAndSetCookie), userID, userPrincipal, groupPrincipals, providerToken, description, request)
 }
 
 // GetSecret mocks base method.

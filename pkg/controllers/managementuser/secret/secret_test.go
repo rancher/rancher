@@ -87,3 +87,38 @@ func TestSyncable(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncableIgnoresClusterSelectorAnnotation(t *testing.T) {
+	c := ResourceSyncController{clusterName: "test-cluster"}
+	tests := []struct {
+		name          string
+		authorization string
+		want          bool
+	}{
+		{
+			name: "empty selector does not authorize resource sync",
+		},
+		{
+			name:          "name authorization allows resource sync",
+			authorization: "test-cluster",
+			want:          true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			annotations := map[string]string{
+				capr.SyncAnnotation:                     "true",
+				capr.SyncNamespaceAnnotation:            "kube-system",
+				capr.SyncNameAnnotation:                 "resource-sync-test",
+				capr.AuthorizedObjectSelectorAnnotation: "",
+			}
+			if tt.authorization != "" {
+				annotations[capr.AuthorizedObjectAnnotation] = tt.authorization
+			}
+
+			sec := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: annotations}}
+			assert.Equal(t, tt.want, c.syncable(sec))
+		})
+	}
+}

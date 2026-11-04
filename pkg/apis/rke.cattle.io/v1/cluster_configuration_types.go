@@ -1,6 +1,7 @@
 package v1
 
 import (
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -350,26 +351,8 @@ type RegistryConfig struct {
 	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
 }
 
-type ETCD struct {
-	// DisableSnapshots disables the creation of snapshots for the cluster.
-	// +optional
-	DisableSnapshots bool `json:"disableSnapshots,omitempty"`
-
-	// SnapshotScheduleCron is the cron schedule for the snapshot creation.
-	// +nullable
-	// +optional
-	SnapshotScheduleCron string `json:"snapshotScheduleCron,omitempty"`
-
-	// SnapshotRetention is the number of snapshots the downstream cluster
-	// should retain per snapshot generation.
-	// +optional
-	SnapshotRetention int `json:"snapshotRetention,omitempty"`
-
-	// S3 defines the S3 configuration for the cluster if enabled.
-	// +nullable
-	// +optional
-	S3 *ETCDSnapshotS3 `json:"s3,omitempty"`
-}
+// ETCD defines the etcd configuration for RKE2/K3s clusters
+type ETCD = mgmt.ETCD
 
 // Networking contains information regarding the desired and actual networking stack of the cluster.
 type Networking struct {

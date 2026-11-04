@@ -3,16 +3,15 @@ package systemaccount
 import (
 	"fmt"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterregistrationtoken "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
-
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
-	errors2 "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,16 +56,16 @@ type SystemAccountManager interface {
 type Manager struct {
 	userManager  user.Manager
 	systemTokens systemtokens.Interface
-	crtbs        v3.ClusterRoleTemplateBindingInterface
-	crts         v3.ClusterRegistrationTokenInterface
-	prtbLister   v3.ProjectRoleTemplateBindingLister
-	tokens       v3.TokenInterface
-	tokenLister  v3.TokenLister
-	users        v3.UserInterface
+	crtbs        mgmtcontrollers.ClusterRoleTemplateBindingInterface
+	crts         mgmtcontrollers.ClusterRegistrationTokenInterface
+	prtbLister   mgmtcontrollers.ProjectRoleTemplateBindingLister
+	tokens       mgmtcontrollers.TokenInterface
+	tokenLister  mgmtcontrollers.TokenLister
+	users        mgmtcontrollers.UserInterface
 	secretLister corev1.SecretLister
 }
 
-func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
+func (s *Manager) CreateSystemAccount(cluster *apimgmtv3.Cluster) error {
 	user, err := s.GetSystemUser(cluster.Name)
 	if err != nil {
 		return err
@@ -78,11 +77,9 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	_, err = s.crtbs.Create(&v3.ClusterRoleTemplateBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      bindingName,
-			Namespace: cluster.Name,
-		},
+	_, err = s.crtbs.Create(&apimgmtv3.ClusterRoleTemplateBinding{
+		Name:             bindingName,
+		Namespace:        cluster.Name,
 		ClusterName:      cluster.Name,
 		UserName:         user.Name,
 		RoleTemplateName: clusterOwnerRole,
@@ -91,7 +88,7 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 	return err
 }
 
-func (s *Manager) GetSystemUser(clusterName string) (*v3.User, error) {
+func (s *Manager) GetSystemUser(clusterName string) (*apimgmtv3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", clusterName), ClusterSystemAccountPrefix+clusterName)
 }
 
@@ -99,20 +96,18 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 	token := ""
 
 	crt, err := s.crts.GetNamespaced(clusterName, "system", v1.GetOptions{})
-	if errors2.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		token, err = randomtoken.Generate()
 		if err != nil {
 			return "", err
 		}
-		crt = &v3.ClusterRegistrationToken{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "system",
-				Namespace: clusterName,
-			},
-			Spec: v32.ClusterRegistrationTokenSpec{
+		crt = &apimgmtv3.ClusterRegistrationToken{
+			Name:      "system",
+			Namespace: clusterName,
+			Spec: apimgmtv3.ClusterRegistrationTokenSpec{
 				ClusterName: clusterName,
 			},
-			Status: v32.ClusterRegistrationTokenStatus{
+			Status: apimgmtv3.ClusterRegistrationTokenStatus{
 				Token: token,
 			},
 		}
@@ -122,17 +117,17 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 		}
 	} else if err != nil {
 		return "", err
-	} else {
-		token, err = clusterregistrationtoken.GetTokenFromSecret(s.secretLister, crt)
-		if err != nil {
-			return "", err
-		}
+	}
+
+	token, err = clusterregistrationtoken.GetTokenFromSecret(s.secretLister, crt)
+	if err != nil {
+		return "", err
 	}
 
 	return token, nil
 }
 
-func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
+func (s *Manager) GetProjectSystemUser(projectName string) (*apimgmtv3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
@@ -153,7 +148,7 @@ func (s *Manager) RemoveSystemAccount(userID string) error {
 		// user not found, must have been removed
 		return nil
 	}
-	if err := s.users.Delete(u.Name, &v1.DeleteOptions{}); err != nil && !errors2.IsNotFound(err) && !errors2.IsGone(err) {
+	if err := s.users.Delete(u.Name, &v1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 		return err
 	}
 	return nil

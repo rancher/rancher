@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
@@ -59,9 +60,11 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			apiRequest.WriteError(err)
 			return
 		}
+		// Tokens that belong to no AuthConfig leave the CLI to ask for one.
+		configName, _ := common.ConfigNameFromToken(authToken)
 		execUser = &kubeconfig.ExecUser{
-			ID:           userName.GetName(),
-			AuthProvider: authToken.GetAuthProvider(),
+			ID:         userName.GetName(),
+			ConfigName: configName,
 		}
 	}
 
@@ -106,7 +109,6 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
-		AuthProvider:  authToken.GetAuthProvider(),
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
 		UserPrincipal: authToken.GetUserPrincipal(),

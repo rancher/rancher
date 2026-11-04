@@ -1,6 +1,8 @@
 package webhookchart
 
 import (
+	"context"
+
 	"errors"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
@@ -38,10 +41,11 @@ var (
 		ObjectMeta: metav1.ObjectMeta{Name: "local"},
 	}
 
-	originalWebhookVersion        = settings.RancherWebhookVersion.Get()
-	originalSystemDefaultRegistry = settings.SystemDefaultRegistry.Get()
-	originalMCM                   = features.MCM.Enabled()
-	originalMCMAgent              = features.MCMAgent.Enabled()
+	originalWebhookVersion                   = settings.RancherWebhookVersion.Get()
+	originalSystemDefaultRegistry            = settings.SystemDefaultRegistry.Get()
+	originalSystemDefaultRegistryPullSecrets = settings.SystemDefaultRegistryPullSecrets.Get()
+	originalMCM                              = features.MCM.Enabled()
+	originalMCMAgent                         = features.MCMAgent.Enabled()
 )
 
 type testMocks struct {
@@ -66,11 +70,13 @@ func newTestMocks(t *testing.T) testMocks {
 	t.Helper()
 	_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
 	_ = settings.SystemDefaultRegistry.Set(originalSystemDefaultRegistry)
+	_ = settings.SystemDefaultRegistryPullSecrets.Set(originalSystemDefaultRegistryPullSecrets)
 	features.MCM.Set(originalMCM)
 	features.MCMAgent.Set(originalMCMAgent)
 	t.Cleanup(func() {
 		_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
 		_ = settings.SystemDefaultRegistry.Set(originalSystemDefaultRegistry)
+		_ = settings.SystemDefaultRegistryPullSecrets.Set(originalSystemDefaultRegistryPullSecrets)
 		features.MCM.Set(originalMCM)
 		features.MCMAgent.Set(originalMCMAgent)
 	})
@@ -117,7 +123,10 @@ func TestOnRepo_BasicInstall(t *testing.T) {
 
 	expected := map[string]interface{}{
 		"global": map[string]interface{}{
-			"cattle": map[string]interface{}{"systemDefaultRegistry": ""},
+			"cattle": map[string]interface{}{
+				"systemDefaultRegistry": "",
+				"imagePullSecrets":      ([]string)(nil),
+			},
 		},
 		"capi":                nil,
 		"mcm":                 map[string]interface{}{"enabled": true},
@@ -290,22 +299,16 @@ func TestOnRepo_PriorityClassNotFoundIsNotFatal(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestOnRepo_MCMAgentEnabled_SkipsLocalClusterLookup(t *testing.T) {
-	mocks := newTestMocks(t)
+func TestRegister_SkipsDownstreamClusters(t *testing.T) {
+	// The cluster agent runs the same dashboard controllers; there, systemcharts manages the webhook.
+	// Registering here as well would make two handlers fight over the same release.
+	newTestMocks(t)
 	features.MCMAgent.Set(true)
 
-	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).
-		Return(priorityConfig, nil).AnyTimes()
-	// No clusterCache/clusters expectations: on a downstream (MCMAgent) install, webhook
-	// customization comes from the rancher-config ConfigMap only, and status is
-	// management-server-owned — the local cluster must not be touched at all.
-	mocks.manager.EXPECT().Ensure(
-		namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", gomock.Any(), gomock.Any(), true, "",
-	).Return(nil)
-
-	h := mocks.Handler()
-	_, err := h.onRepo("", repo)
-	require.NoError(t, err)
+	// An empty context: registering would dereference its clients and panic.
+	require.NotPanics(t, func() {
+		require.NoError(t, Register(context.Background(), &wrangler.Context{}, ""))
+	})
 }
 
 func TestOnRepo_EnsureErrorIsPropagated(t *testing.T) {
@@ -343,6 +346,84 @@ func TestOnRepo_UpdateAppliedCustomizationErrorDoesNotFailInstall(t *testing.T) 
 	// Status update failure is logged, not returned — chart install already succeeded.
 	_, err := h.onRepo("", repo)
 	require.NoError(t, err)
+}
+
+func TestOnRepo_ImagePullSecrets(t *testing.T) {
+	tests := []struct {
+		name             string
+		registry         string
+		pullSecrets      string
+		registryOverride string
+		wantPullSecrets  []string
+	}{
+		{
+			name:            "no registry and no pull secrets",
+			wantPullSecrets: nil,
+		},
+		{
+			name:            "pull secrets ignored without a system default registry",
+			pullSecrets:     "pull-secret-a",
+			wantPullSecrets: nil,
+		},
+		{
+			name:            "registry without pull secrets",
+			registry:        "registry.example.com",
+			wantPullSecrets: nil,
+		},
+		{
+			name:            "single pull secret",
+			registry:        "registry.example.com",
+			pullSecrets:     "pull-secret-a",
+			wantPullSecrets: []string{"pull-secret-a"},
+		},
+		{
+			name:            "multiple pull secrets are trimmed and empty entries dropped",
+			registry:        "registry.example.com",
+			pullSecrets:     " pull-secret-a, ,pull-secret-b ",
+			wantPullSecrets: []string{"pull-secret-a", "pull-secret-b"},
+		},
+		{
+			name:             "pull secrets still set when registryOverride is in effect",
+			registry:         "registry.example.com",
+			pullSecrets:      "pull-secret-a",
+			registryOverride: "my.registry.io",
+			wantPullSecrets:  []string{"pull-secret-a"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mocks := newTestMocks(t)
+			_ = settings.SystemDefaultRegistry.Set(tt.registry)
+			_ = settings.SystemDefaultRegistryPullSecrets.Set(tt.pullSecrets)
+			features.MCM.Set(true)
+			features.MCMAgent.Set(false)
+
+			mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).
+				Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "configmaps"}, chart.CustomValueMapName)).
+				AnyTimes()
+			mocks.clusterCache.EXPECT().Get("local").Return(localCluster, nil).Times(2)
+			mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCluster, nil).Times(1)
+
+			mocks.manager.EXPECT().Ensure(
+				namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", gomock.Any(), gomock.Any(), true, gomock.Any(),
+			).DoAndReturn(func(_, _, _, _, _ string, values map[string]interface{}, _ bool, _ string) error {
+				global, ok := values["global"].(map[string]interface{})
+				require.True(t, ok, "expected global values map")
+				cattle, ok := global["cattle"].(map[string]interface{})
+				require.True(t, ok, "expected global.cattle values map")
+				require.Contains(t, cattle, "imagePullSecrets",
+					"imagePullSecrets should always be set so stale values are cleared on upgrade")
+				require.Equal(t, tt.wantPullSecrets, cattle["imagePullSecrets"])
+				return nil
+			})
+
+			h := mocks.Handler()
+			h.registryOverride = tt.registryOverride
+			_, err := h.onRepo("", repo)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestOnCluster_EnqueuesOnWebhookCustomizationDrift(t *testing.T) {
@@ -412,6 +493,7 @@ func TestRelatedSettings(t *testing.T) {
 	}{
 		{name: "watched setting: rancher-webhook-version", obj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: settings.RancherWebhookVersion.Name}}, wantKey: true},
 		{name: "watched setting: system-default-registry", obj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: settings.SystemDefaultRegistry.Name}}, wantKey: true},
+		{name: "watched setting: system-default-registry-pull-secrets", obj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: settings.SystemDefaultRegistryPullSecrets.Name}}, wantKey: true},
 		{name: "unwatched setting", obj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: "some-other-setting"}}, wantKey: false},
 		{name: "non-setting object", obj: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "local"}}, wantKey: false},
 	}

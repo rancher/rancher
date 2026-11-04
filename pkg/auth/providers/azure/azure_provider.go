@@ -4,12 +4,13 @@ package azure
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
@@ -33,7 +34,7 @@ import (
 )
 
 const (
-	Name = "azuread"
+	ProviderName = "azuread"
 
 	// IDTokenCookie is the name of the cookie that holds the raw Azure AD ID token for SSO logout.
 	IDTokenCookie = "R_AZUREAD_ID"
@@ -48,36 +49,43 @@ type unstructuredGetter interface {
 }
 
 type Provider struct {
-	authConfigs v3.AuthConfigInterface
-	Retriever   unstructuredGetter
-	secrets     wcorev1.SecretController
-	userMGR     user.Manager
-	tokenMGR    *tokens.Manager
+	authConfigs      v3.AuthConfigInterface
+	authConfigLister v3.AuthConfigLister
+	Retriever        unstructuredGetter
+	secrets          wcorev1.SecretController
+	userMGR          user.Manager
+	tokenMGR         *tokens.Manager
 	// getConfig is used to retrieve the AzureAD configuration; injectable for testing.
-	getConfig func() (*apiv3.AzureADConfig, error)
+	getConfig func(string) (*apiv3.AzureADConfig, error)
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	var err error
-	clients.GroupCache, err = lru.New(settings.AzureGroupCacheSize.GetInt())
+	clients.GroupCache, err = lru.New[string, apiv3.Principal](settings.AzureGroupCacheSize.GetInt())
 	if err != nil {
 		logrus.Warnf("initial azure-group-cache-size was invalid value, setting to 10000 error:%v", err)
-		clients.GroupCache, _ = lru.New(10000)
+		clients.GroupCache, _ = lru.New[string, apiv3.Principal](10000)
 	}
 
 	p := &Provider{
-		Retriever:   mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
-		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		secrets:     mgmtCtx.Wrangler.Core.Secret(),
-		userMGR:     userMGR,
-		tokenMGR:    tokenMGR,
+		Retriever:        mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		userMGR:          userMGR,
+		tokenMGR:         tokenMGR,
 	}
 	p.getConfig = p.GetAzureConfigK8s
 	return p
 }
 
 func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
-	cfg, err := ap.getConfig()
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := ap.getConfig(configName)
 	if err != nil {
 		return fmt.Errorf("getting Azure AD config for LogoutAll: %w", err)
 	}
@@ -127,7 +135,11 @@ func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acce
 }
 
 func (ap *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
-	cfg, err := ap.getConfig()
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return err
+	}
+	cfg, err := ap.getConfig(configName)
 	if err != nil {
 		return fmt.Errorf("azure AD [logout]: getting Azure AD config for Logout: %w", err)
 	}
@@ -138,7 +150,7 @@ func (ap *Provider) Logout(w http.ResponseWriter, r *http.Request, token accesso
 }
 
 func (ap *Provider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 func (ap *Provider) AuthenticateUser(w http.ResponseWriter, r *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
@@ -146,9 +158,14 @@ func (ap *Provider) AuthenticateUser(w http.ResponseWriter, r *http.Request, inp
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	cfg, err := ap.getConfig()
+	configName, err := common.LoginConfigName(ap.authConfigLister, login.ConfigName, ProviderName)
 	if err != nil {
 		return apiv3.Principal{}, nil, "", err
+	}
+	logrus.Debugf("Loading Azure config %s", configName)
+	cfg, err := ap.getConfig(configName)
+	if err != nil {
+		return v3.Principal{}, nil, "", fmt.Errorf("getting Azure config %s: %w", configName, err)
 	}
 	userPrincipal, groupPrincipals, providerToken, idToken, err := ap.loginUser(cfg, login, false)
 	if err != nil {
@@ -161,7 +178,12 @@ func (ap *Provider) AuthenticateUser(w http.ResponseWriter, r *http.Request, inp
 }
 
 func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
-	cfg, err := ap.GetAzureConfigK8s()
+	configName, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := ap.GetAzureConfigK8s(configName)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +222,11 @@ func (ap *Provider) UsesUserSecrets() bool      { return false }
 func (ap *Provider) CanRefreshPrincipals() bool { return true }
 
 func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	cfg, err := ap.GetAzureConfigK8s()
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := ap.GetAzureConfigK8s(configName)
 	if err != nil {
 		return nil, err
 	}
@@ -240,10 +266,13 @@ func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.
 
 func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	var principal apiv3.Principal
-	var err error
-	cfg, err := ap.GetAzureConfigK8s()
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
-		return apiv3.Principal{}, err
+		return principal, err
+	}
+	cfg, err := ap.GetAzureConfigK8s(configName)
+	if err != nil {
+		return principal, err
 	}
 
 	azureClient, err := ap.newAzureClient(cfg)
@@ -253,7 +282,7 @@ func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccesso
 
 	parsed, err := clients.ParsePrincipalID(principalID)
 	if err != nil {
-		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, "invalid principal")
+		return principal, httperror.NewAPIError(httperror.NotFound, "invalid principal")
 	}
 
 	switch parsed["type"] {
@@ -410,27 +439,37 @@ func (ap *Provider) newAzureClient(cfg *apiv3.AzureADConfig) (clients.AzureClien
 }
 
 func (ap *Provider) saveAzureConfigK8s(config *apiv3.AzureADConfig) error {
-	// Copy the annotations.
-	annotations := config.Annotations
-	storedAzureConfig, err := ap.GetAzureConfigK8s()
+	// The annotations passed in are applied over the stored metadata, including
+	// on retry, so they win over any written to the AuthConfig since it was read.
+	annotations := maps.Clone(config.Annotations)
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedAzureConfig, err := ap.GetAzureConfigK8s(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		meta := storedAzureConfig.ObjectMeta
+
+		// Ensure the passed in config's annotations are applied to the object to be persisted.
+		if meta.Annotations == nil {
+			meta.Annotations = map[string]string{}
+		}
+		for k, v := range annotations {
+			meta.Annotations[k] = v
+		}
+		return meta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.AzureADConfigType
-	config.ObjectMeta = storedAzureConfig.ObjectMeta
-
-	// Ensure the passed in config's annotations are applied to the object to be persisted.
-	if config.Annotations == nil {
-		config.Annotations = map[string]string{}
-	}
-	for k, v := range annotations {
-		config.Annotations[k] = v
-	}
+	config.ObjectMeta = storedMeta
 
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
-	name, err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type))
+	name, err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, common.SecretNamePrefix(config.Name, config.Type))
 	if err != nil {
 		return err
 	}
@@ -438,15 +477,11 @@ func (ap *Provider) saveAzureConfigK8s(config *apiv3.AzureADConfig) error {
 	config.ApplicationSecret = name
 
 	logrus.Debugf("updating AzureADConfig")
-	_, err = ap.authConfigs.ObjectClient().Update(config.Name, config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return common.UpdateAuthConfig(ap.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
-func (ap *Provider) GetAzureConfigK8s() (*apiv3.AzureADConfig, error) {
-	authConfigObj, err := ap.Retriever.Get(Name, metav1.GetOptions{})
+func (ap *Provider) GetAzureConfigK8s(configName string) (*apiv3.AzureADConfig, error) {
+	authConfigObj, err := ap.Retriever.Get(configName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve AzureADConfig, error: %v", err)
 	}
@@ -492,7 +527,12 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 }
 
 func (ap *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
-	cfg, err := ap.GetAzureConfigK8s()
+	configName, _, _, err := common.SplitPrincipalID(userPrincipalID)
+	if err != nil {
+		return false, err
+	}
+
+	cfg, err := ap.GetAzureConfigK8s(configName)
 	if err != nil {
 		logrus.Errorf("Error fetching azure config: %v", err)
 		return false, err
@@ -527,8 +567,8 @@ func (ap *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[st
 }
 
 // IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.
-func (ap *Provider) IsDisabledProvider() (bool, error) {
-	azureConfig, err := ap.GetAzureConfigK8s()
+func (ap *Provider) IsDisabledProvider(configName string) (bool, error) {
+	azureConfig, err := ap.GetAzureConfigK8s(configName)
 	if err != nil {
 		return false, err
 	}

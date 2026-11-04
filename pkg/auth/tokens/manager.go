@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -101,9 +103,8 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return apiv3.Token{}, "", http.StatusUnauthorized, err
 	}
 
-	tokenTTL, err := exttokenstore.IngestTTL(int64(jsonInput.TTLMillis),
-		settings.AuthTokenMaxTTLMinutes,
-		settings.AuthTokenDefaultTTLMinutes)
+	// Tokens created here have no kind and get the limits of derived tokens.
+	tokenTTL, err := exttokenstore.IngestTTL(int64(jsonInput.TTLMillis), "")
 	if err != nil {
 		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating ttl against default and max: %w", err)
 	}
@@ -112,9 +113,9 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 	derivedToken := &apiv3.Token{
 		UserPrincipal: token.GetUserPrincipal(),
 		IsDerived:     true,
-		TTLMillis:     tokenTTL,
+		TTLMillis:     v3TTL(tokenTTL),
 		UserID:        token.GetUserID(),
-		AuthProvider:  token.GetAuthProvider(),
+		AuthProvider:  authProviderForPrincipal(token.GetUserPrincipal()),
 		ProviderInfo:  token.GetProviderInfo(),
 		Description:   jsonInput.Description,
 		ClusterName:   jsonInput.ClusterID,
@@ -529,8 +530,15 @@ var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc",
 func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
+	// The secret is keyed by the AuthConfig name so that multiple configs of
+	// the same provider don't overwrite each other.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
-		err := m.CreateSecret(userID, provider, providerToken)
+		configName, _, _, err := common.SplitPrincipalID(userPrincipal.Name)
+		if err != nil {
+			return nil, "", err
+		}
+
+		err = m.CreateSecret(userID, configName, providerToken)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create secret: %s", err)
 		}
@@ -555,8 +563,14 @@ func (m *Manager) UpdateToken(token *apiv3.Token) (*apiv3.Token, error) {
 	return m.updateToken(token)
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
-	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error {
+	ttl, err := exttokenstore.ParseTTLToMilliseconds(settings.AuthUserSessionTTLMinutes)
+	if err != nil {
+		logrus.Errorf("Failed creating token with error: %v", err)
+		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
+	}
+
+	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, ttl, description)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
@@ -671,14 +685,14 @@ func (m *Manager) EnsureClusterToken(clusterName string, input user.TokenInput) 
 		TTLMillis:     0,
 		Description:   input.Description,
 		UserID:        input.UserName,
-		AuthProvider:  input.AuthProvider,
+		AuthProvider:  authProviderForPrincipal(input.UserPrincipal),
 		UserPrincipal: input.UserPrincipal,
 		IsDerived:     true,
 		Token:         key,
 		ClusterName:   clusterName,
 	}
 	if input.TTL != nil {
-		token.TTLMillis = *input.TTL
+		token.TTLMillis = v3TTL(*input.TTL)
 	}
 	if input.Randomize {
 		token.ObjectMeta.Name = ""
@@ -710,6 +724,14 @@ func (m *Manager) EnsureClusterToken(clusterName string, input user.TokenInput) 
 	return token.Name + ":" + key, token, nil
 }
 
+// authProviderForPrincipal returns the value of the deprecated
+// Token.AuthProvider for a token issued for the principal: the principal's
+// provider, or local for the tokens Rancher issues for its own controllers,
+// which have no principal.
+func authProviderForPrincipal(principal apiv3.Principal) string {
+	return cmp.Or(principal.Provider, "local")
+}
+
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *Manager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (string, error) {
 	tokenTTL, err := GetKubeconfigDefaultTokenTTLInMilliSeconds()
@@ -722,7 +744,6 @@ func (m *Manager) newTokenForKubeconfig(clusterName, tokenName, description, kin
 		Description:   description,
 		Kind:          kind,
 		UserName:      userName,
-		AuthProvider:  userPrincipal.Provider,
 		TTL:           tokenTTL,
 		Randomize:     true,
 		UserPrincipal: userPrincipal,
@@ -796,8 +817,9 @@ func (m *Manager) GetKubeconfigToken(clusterName, tokenName, description, kind, 
 
 // GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for
 // kubeconfig tokens, in milliseconds, and clamped to the associated max.
+// A negative value means the token never expires.
 func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
-	ttlMillis, err := exttokenstore.IngestTTL(0, settings.KubeconfigMaxTokenTTLMinutes, settings.KubeconfigDefaultTokenTTLMinutes)
+	ttlMillis, err := exttokenstore.IngestTTL(0, exttokenstore.KindKubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -805,7 +827,17 @@ func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
 }
 
 // GetKubeconfigMaxTokenTTLInMilliSeconds will return the maximum TTL for
-// kubeconfig tokens, in milliseconds
+// kubeconfig tokens, in milliseconds. A value below 1 means no limit.
 func GetKubeconfigMaxTokenTTLInMilliSeconds() (int64, error) {
-	return exttokenstore.ParseTTLToMilliseconds(settings.KubeconfigMaxTokenTTLMinutes)
+	_, maxTTL, err := exttokenstore.TTLLimits(exttokenstore.KindKubeconfig)
+	return maxTTL, err
+}
+
+// v3TTL converts a TTL in the ext token convention, where a negative value means never expires, to
+// the v3 token convention, where 0 means never expires.
+func v3TTL(ttl int64) int64 {
+	if ttl < 0 {
+		return 0
+	}
+	return ttl
 }

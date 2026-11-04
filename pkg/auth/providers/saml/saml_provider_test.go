@@ -2,6 +2,7 @@ package saml
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -19,6 +20,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -127,7 +129,9 @@ func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
 		getLDAPConfig = originalGetLDAPConfig
 	})
 
-	getLDAPConfig = func(common.AuthProvider) (*apiv3.LdapConfig, *x509.CertPool, error) {
+	var gotLDAPConfigName string
+	getLDAPConfig = func(_ common.AuthProvider, configName string) (*apiv3.LdapConfig, *x509.CertPool, error) {
+		gotLDAPConfigName = configName
 		return &apiv3.LdapConfig{
 			LdapFields: apiv3.LdapFields{
 				ServiceAccountPassword: "test-password",
@@ -138,6 +142,7 @@ func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
 	tests := []struct {
 		name           string
 		providerName   string
+		configName     string
 		configType     string
 		wantSecretName string
 	}{
@@ -146,6 +151,20 @@ func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
 			providerName:   OKTAName,
 			configType:     client.OKTAConfigType,
 			wantSecretName: "oktaconfig-serviceaccountpassword",
+		},
+		{
+			name:           "default okta config",
+			providerName:   OKTAName,
+			configName:     "okta",
+			configType:     client.OKTAConfigType,
+			wantSecretName: "oktaconfig-serviceaccountpassword",
+		},
+		{
+			name:           "additional okta config",
+			providerName:   OKTAName,
+			configName:     "okta-eu",
+			configType:     client.OKTAConfigType,
+			wantSecretName: "oktaconfig-okta-eu-serviceaccountpassword",
 		},
 		{
 			name:           "shibboleth",
@@ -180,10 +199,12 @@ func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
 
 			config, err := provider.combineSamlAndLdapConfig(&apiv3.SamlConfig{
 				AuthConfig: apiv3.AuthConfig{
-					Type: tt.configType,
+					ObjectMeta: metav1.ObjectMeta{Name: tt.configName},
+					Type:       tt.configType,
 				},
 			})
 			require.NoError(t, err)
+			assert.Equal(t, tt.configName, gotLDAPConfigName, "LDAP config must be read from the SAML config being saved")
 
 			wantSecretRef := common.SecretsNamespace + ":" + tt.wantSecretName
 
@@ -207,7 +228,7 @@ func TestSaveSamlConfigReturnsErrorWhenLDAPPasswordSecretSaveFails(t *testing.T)
 		getLDAPConfig = originalGetLDAPConfig
 	})
 
-	getLDAPConfig = func(common.AuthProvider) (*apiv3.LdapConfig, *x509.CertPool, error) {
+	getLDAPConfig = func(common.AuthProvider, string) (*apiv3.LdapConfig, *x509.CertPool, error) {
 		return &apiv3.LdapConfig{
 			LdapFields: apiv3.LdapFields{
 				ServiceAccountPassword: "test-password",
@@ -231,7 +252,7 @@ func TestSaveSamlConfigReturnsErrorWhenLDAPPasswordSecretSaveFails(t *testing.T)
 				return nil
 			},
 		},
-		getSamlConfig: func() (*apiv3.SamlConfig, error) {
+		getSamlConfig: func(string) (*apiv3.SamlConfig, error) {
 			return &apiv3.SamlConfig{
 				AuthConfig: apiv3.AuthConfig{
 					ObjectMeta: metav1.ObjectMeta{Name: "okta"},
@@ -243,6 +264,32 @@ func TestSaveSamlConfigReturnsErrorWhenLDAPPasswordSecretSaveFails(t *testing.T)
 	err := provider.saveSamlConfig(&apiv3.SamlConfig{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unable to save ldap service account password")
+}
+
+func TestSaveSamlConfigUsesConfigNameForSpKeySecret(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretController.EXPECT().Cache().Return(secretCache)
+	secretCache.EXPECT().Get(common.SecretsNamespace, "genericsamlconfig-genericsaml-eu-spkey").Return(nil, assert.AnError)
+
+	provider := &Provider{
+		name:    GenericSAMLName,
+		secrets: secretController,
+		getSamlConfig: func(string) (*apiv3.SamlConfig, error) {
+			return &apiv3.SamlConfig{
+				AuthConfig: apiv3.AuthConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "genericsaml-eu"},
+				},
+			}, nil
+		},
+	}
+
+	err := provider.saveSamlConfig(&apiv3.SamlConfig{
+		AuthConfig: apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: "genericsaml-eu"}},
+		SpKey:      "test-key",
+	})
+	require.ErrorIs(t, err, assert.AnError)
 }
 
 func TestSearchPrincipals(t *testing.T) {
@@ -307,20 +354,38 @@ func TestSearchPrincipals(t *testing.T) {
 				},
 			}
 
+			token := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userType + "://00ux3opnquJigzHYx697",
+					},
+					LoginName:     "developer",
+					PrincipalType: "user",
+				},
+			}
+
+			extToken := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserPrincipal: ext.TokenPrincipal{
+						Name:          userType + "://00ux3opnquJigzHYx697",
+						LoginName:     "developer",
+						PrincipalType: "user",
+						Provider:      "otka",
+					},
+				},
+			}
+
 			for _, tt := range tests {
-				tt := tt
 				t.Run(tt.desc, func(t *testing.T) {
 					provider := &Provider{
-						name:      providerName,
-						userType:  userType,
-						groupType: groupType,
+						name: providerName,
 						ldapProvider: &mockLdapProvider{
 							providerName:     providerName,
 							isLdapConfigured: tt.isLdapConfigured,
 						},
 					}
 
-					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, token)
 					require.NoError(t, err)
 					require.Len(t, results, len(tt.principals))
 					for _, principal := range results {
@@ -331,16 +396,14 @@ func TestSearchPrincipals(t *testing.T) {
 				// same behaviour for ext tokens
 				t.Run(tt.desc+", ext", func(t *testing.T) {
 					provider := &Provider{
-						name:      providerName,
-						userType:  userType,
-						groupType: groupType,
+						name: providerName,
 						ldapProvider: &mockLdapProvider{
 							providerName:     providerName,
 							isLdapConfigured: tt.isLdapConfigured,
 						},
 					}
 
-					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &ext.Token{})
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, extToken)
 					require.NoError(t, err)
 					require.Len(t, results, len(tt.principals))
 					for _, principal := range results {
@@ -359,7 +422,6 @@ func TestSearchPrincipalsNonPrime(t *testing.T) {
 	} {
 		t.Run(providerName, func(t *testing.T) {
 			userType := providerName + "_user"
-			groupType := providerName + "_group"
 
 			t.Setenv("RANCHER_VERSION_TYPE", "")
 
@@ -379,20 +441,28 @@ func TestSearchPrincipalsNonPrime(t *testing.T) {
 				},
 			}
 
+			token := &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "adfs_user://00ux3opnquJigzHYx697",
+					},
+					LoginName:     "developer",
+					PrincipalType: "user",
+				},
+			}
+
 			for _, tt := range tests {
 				tt := tt
 				t.Run(tt.desc, func(t *testing.T) {
 					provider := &Provider{
-						name:      providerName,
-						userType:  userType,
-						groupType: groupType,
+						name: providerName,
 						ldapProvider: &mockLdapProvider{
 							providerName:     providerName,
 							isLdapConfigured: tt.isLdapConfigured,
 						},
 					}
 
-					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, token)
 					require.NoError(t, err)
 					require.Len(t, results, len(tt.principals))
 					for _, principal := range results {
@@ -403,16 +473,14 @@ func TestSearchPrincipalsNonPrime(t *testing.T) {
 				// same behaviour for ext tokens
 				t.Run(tt.desc+", ext", func(t *testing.T) {
 					provider := &Provider{
-						name:      providerName,
-						userType:  userType,
-						groupType: groupType,
+						name: providerName,
 						ldapProvider: &mockLdapProvider{
 							providerName:     providerName,
 							isLdapConfigured: tt.isLdapConfigured,
 						},
 					}
 
-					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &ext.Token{})
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, token)
 					require.NoError(t, err)
 					require.Len(t, results, len(tt.principals))
 					for _, principal := range results {
@@ -461,14 +529,16 @@ func TestLogoutAllInvalidFinalRedirectURL(t *testing.T) {
 	body := bytes.NewBufferString(`{"finalRedirectUrl":"` + invalidRedirect + `"}`)
 	req := httptest.NewRequest(http.MethodPost, "/v1-saml/"+providerName+"/logout", body)
 	res := httptest.NewRecorder()
-	token := &fakeToken{authProvider: providerName}
+	token := &fakeToken{
+		userPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://" + userName}},
+	}
 
 	err = provider.LogoutAll(res, req, token)
 	assert.ErrorContains(t, err, "Invalid redirect URL 400: failed to logout")
 }
 
 func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
-	providerName := "test-provider"
+	providerName := OKTAName
 	finalRedirect := "https://rancher.example.com/dashboard"
 	publicKey := "rsa-public-key"
 	requestID := "req-12345"
@@ -495,9 +565,12 @@ func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
 	}
 
 	clientState := newRecordingClientState()
+	authConfigs, authConfigLister := authconfigtest.New(t, samlAuthConfig(providerName, client.OKTAConfigType, true))
 	provider := &Provider{
-		serviceProvider: serviceProvider,
-		clientState:     clientState,
+		serviceProvider:  serviceProvider,
+		clientState:      clientState,
+		authConfigs:      authConfigs,
+		authConfigLister: authConfigLister,
 	}
 
 	originalProvider, exists := SamlProviders[providerName]
@@ -540,15 +613,20 @@ func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
 }
 
 func TestPerformSamlLoginRejectsInvalidRedirect(t *testing.T) {
-	providerName := "test-provider"
+	providerName := OKTAName
 
 	metadataURL, err := url.Parse("https://rancher.example.com/v1-saml/" + providerName + "/metadata")
 	require.NoError(t, err)
 
+	authConfigs, authConfigLister := authconfigtest.New(t, samlAuthConfig(providerName, client.OKTAConfigType, true))
 	provider := &Provider{
-		serviceProvider: &saml.ServiceProvider{MetadataURL: *metadataURL},
-		clientState:     newRecordingClientState(),
+		serviceProvider:  &saml.ServiceProvider{MetadataURL: *metadataURL},
+		clientState:      newRecordingClientState(),
+		authConfigs:      authConfigs,
+		authConfigLister: authConfigLister,
 	}
+	setupSamlProviderTypes(t)
+	setSamlProvider(providerName, provider)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1-saml/"+providerName+"/login", nil)
 	res := httptest.NewRecorder()
@@ -664,7 +742,7 @@ func (m *fakeUserManager) UserAttributeCreateOrUpdateNoGroups(userID, provider s
 var _ accessor.TokenAccessor = (*fakeToken)(nil)
 
 type fakeToken struct {
-	authProvider string
+	userPrincipal apiv3.Principal
 }
 
 func (m *fakeToken) GetLabels() map[string]string { return nil }
@@ -679,7 +757,7 @@ func (m *fakeToken) GetIsEnabled() bool { return true }
 
 func (m *fakeToken) GetIsDerived() bool { return false }
 
-func (m *fakeToken) GetAuthProvider() string { return m.authProvider }
+func (m *fakeToken) GetAuthProvider() string { return "" }
 
 func (m *fakeToken) GetUserID() string { return "" }
 
@@ -687,7 +765,7 @@ func (m *fakeToken) GetProviderInfo() map[string]string { return nil }
 
 func (m *fakeToken) ObjClusterName() string { return "" }
 
-func (m *fakeToken) GetUserPrincipal() apiv3.Principal { return apiv3.Principal{} }
+func (m *fakeToken) GetUserPrincipal() apiv3.Principal { return m.userPrincipal }
 
 func (m *fakeToken) GetGroupPrincipals() []apiv3.Principal { return nil }
 
@@ -745,7 +823,17 @@ func (p *mockLdapProvider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (p *mockLdapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	panic("GetPrincipal Unimplemented!")
+	if !p.isLdapConfigured {
+		return apiv3.Principal{}, ldap.ErrorNotConfigured{}
+	}
+
+	return apiv3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+		DisplayName:   "Bob",
+		LoginName:     "bob",
+		PrincipalType: common.UserPrincipalType,
+		Provider:      p.providerName,
+	}, nil
 }
 
 func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
@@ -771,7 +859,7 @@ func (p *mockLdapProvider) GetUserExtraAttributesFromToken(token accessor.TokenA
 	panic("GetUserExtraAttributesFromToken Unimplemented!")
 }
 
-func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
+func (p *mockLdapProvider) IsDisabledProvider(string) (bool, error) {
 	panic("IsDisabledProvider Unimplemented!")
 }
 
@@ -782,7 +870,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 		{
 			ObjectMeta:   metav1.ObjectMeta{Name: "u-ping1"},
 			DisplayName:  "Test UserOne",
-			PrincipalIDs: []string{"ping_user://uid-0001", "local://u-ping1"},
+			PrincipalIDs: []string{"ping-eu_user://uid-0001", "local://u-ping1"},
 		},
 		{
 			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta1"},
@@ -792,9 +880,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 	}
 
 	provider := &Provider{
-		name:      PingName,
-		userType:  PingName + "_user",
-		groupType: PingName + "_group",
+		name: PingName,
 		userSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
 				return users, nil
@@ -814,13 +900,13 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.UserPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://uid-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: common.UserPrincipalType,
 					Provider:      PingName,
 				},
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.UserPrincipalType,
@@ -833,20 +919,20 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			searchKey: "testu",
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://uid-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: common.UserPrincipalType,
 					Provider:      PingName,
 				},
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.UserPrincipalType,
 					Provider:      PingName,
 				},
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_group://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_group://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.GroupPrincipalType,
@@ -860,7 +946,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.UserPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://UserFromOkta"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://UserFromOkta"},
 					DisplayName:   "UserFromOkta",
 					LoginName:     "UserFromOkta",
 					PrincipalType: common.UserPrincipalType,
@@ -874,7 +960,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.UserPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://uid-0001"},
 					DisplayName:   "uid-0001",
 					LoginName:     "uid-0001",
 					PrincipalType: common.UserPrincipalType,
@@ -888,7 +974,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.GroupPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_group://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_group://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.GroupPrincipalType,
@@ -898,11 +984,21 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 		},
 	}
 
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping-eu_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := provider.SearchPrincipals(test.searchKey, test.principalType, &apiv3.Token{})
+			got, err := provider.SearchPrincipals(test.searchKey, test.principalType, token)
 			require.NoError(t, err)
 			assert.Equal(t, test.want, got)
 		})
@@ -913,12 +1009,20 @@ func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
 	t.Parallel()
 
 	provider := &Provider{
-		name:      PingName,
-		userType:  PingName + "_user",
-		groupType: PingName + "_group",
+		name: PingName,
 	}
 
-	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, token)
 	require.NoError(t, err)
 	assert.Equal(t, []apiv3.Principal{
 		{
@@ -935,9 +1039,7 @@ func TestSearchPrincipalsUserSearchError(t *testing.T) {
 	t.Parallel()
 
 	provider := &Provider{
-		name:      PingName,
-		userType:  PingName + "_user",
-		groupType: PingName + "_group",
+		name: PingName,
 		userSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
 				return nil, errors.New("cache is not synced")
@@ -945,7 +1047,17 @@ func TestSearchPrincipalsUserSearchError(t *testing.T) {
 		}),
 	}
 
-	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, token)
 	require.ErrorContains(t, err, "cache is not synced")
 	assert.Nil(t, got)
 }
@@ -966,4 +1078,376 @@ func TestTransformToAuthProviderGenericSAML(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login",
 		out[publicclient.GenericSAMLProviderFieldRedirectURL])
+}
+
+func TestTransformToAuthProvider(t *testing.T) {
+	authConfig := map[string]any{
+		client.OKTAConfigFieldRancherAPIHost: "https://rancher.example.com",
+		"metadata": map[string]any{
+			"name": "okta-1",
+		},
+	}
+
+	p := &Provider{name: OKTAName}
+	out, err := p.TransformToAuthProvider(authConfig)
+	require.NoError(t, err)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/okta-1/login",
+		out[publicclient.OKTAProviderFieldRedirectURL])
+}
+
+func TestLogoutUsesConfigFromToken(t *testing.T) {
+	const configName = "ping-eu"
+
+	for _, name := range []string{PingName, configName} {
+		original, exists := SamlProviders[name]
+		t.Cleanup(func() {
+			if exists {
+				SamlProviders[name] = original
+				return
+			}
+			delete(SamlProviders, name)
+		})
+	}
+	SamlProviders[PingName] = &Provider{name: PingName, sloForced: false}
+	SamlProviders[configName] = &Provider{name: PingName, sloForced: true}
+
+	// The principal records the provider type, but logout must use the settings of
+	// the config that issued it.
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: configName + "_user://testu"},
+			Provider:   PingName,
+		},
+	}
+
+	p := &Provider{name: PingName}
+	err := p.Logout(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", nil), token)
+	assert.ErrorContains(t, err, "configured for forced SLO")
+}
+
+func TestPerformSamlLoginResolvesConfigName(t *testing.T) {
+	newProvider := func(configName string) (*Provider, *recordingClientState) {
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+		clientState := newRecordingClientState()
+
+		return &Provider{
+			name:        OKTAName,
+			clientState: clientState,
+			serviceProvider: &saml.ServiceProvider{
+				Key:         privateKey,
+				MetadataURL: testParseURL(t, "https://rancher.example.com/v1-saml/"+configName+"/saml/metadata"),
+				AcsURL:      testParseURL(t, "https://rancher.example.com/v1-saml/"+configName+"/saml/acs"),
+				IDPMetadata: &saml.EntityDescriptor{
+					IDPSSODescriptors: []saml.IDPSSODescriptor{{
+						SingleSignOnServices: []saml.Endpoint{{
+							Binding:  saml.HTTPRedirectBinding,
+							Location: "https://idp.example.com/sso",
+						}},
+					}},
+				},
+			},
+		}, clientState
+	}
+
+	tests := map[string]struct {
+		configName string
+		enabled    map[string]bool
+		// wantUsed is the config whose state the login should set, or empty
+		// if the login should be rejected.
+		wantUsed    string
+		wantStatus  int
+		wantMessage string
+	}{
+		"type-only login uses the only enabled config": {
+			enabled:  map[string]bool{"okta-eu": true, "ping": true},
+			wantUsed: "okta-eu",
+		},
+		"type-only login with no enabled config is rejected": {
+			enabled:     map[string]bool{"ping": true},
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantMessage: "no auth config is enabled for provider okta, specify configName",
+		},
+		// Released CLIs send no configName. Their logins keep going to the
+		// config named after the provider while it is enabled.
+		"type-only login with several enabled configs uses the config named after the provider": {
+			enabled:  map[string]bool{"okta": true, "okta-eu": true, "ping": true},
+			wantUsed: "okta",
+		},
+		"type-only login with several enabled configs, but not the one named after the provider, is rejected": {
+			enabled:     map[string]bool{"okta-eu": true, "okta-apac": true, "ping": true},
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantMessage: "several auth configs are enabled for provider okta, specify configName as one of: okta-apac, okta-eu",
+		},
+		"login with configName uses that config": {
+			configName: "okta-eu",
+			enabled:    map[string]bool{"okta": true, "okta-eu": true},
+			wantUsed:   "okta-eu",
+		},
+		"login with configName of a disabled config is rejected": {
+			configName:  "okta",
+			enabled:     map[string]bool{"okta-eu": true},
+			wantStatus:  http.StatusUnauthorized,
+			wantMessage: "authentication failed",
+		},
+		"login with configName of an unknown config is rejected": {
+			configName:  "okta-missing",
+			enabled:     map[string]bool{"okta": true},
+			wantStatus:  http.StatusUnauthorized,
+			wantMessage: "authentication failed",
+		},
+		"login with configName of a config of another provider is rejected": {
+			configName:  "ping",
+			enabled:     map[string]bool{"okta": true, "ping": true},
+			wantStatus:  http.StatusUnauthorized,
+			wantMessage: "authentication failed",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			setupSamlProviderTypes(t, OKTAName)
+			samlProviderTypes[OKTAName].authConfigs, samlProviderTypes[OKTAName].authConfigLister = authconfigtest.New(t,
+				samlAuthConfig("okta", client.OKTAConfigType, tt.enabled["okta"]),
+				samlAuthConfig("okta-eu", client.OKTAConfigType, tt.enabled["okta-eu"]),
+				samlAuthConfig("okta-apac", client.OKTAConfigType, tt.enabled["okta-apac"]),
+				samlAuthConfig("ping", client.PingConfigType, tt.enabled["ping"]),
+			)
+			states := map[string]*recordingClientState{}
+			for _, configName := range []string{"okta", "okta-eu"} {
+				provider, state := newProvider(configName)
+				setSamlProvider(configName, provider)
+				states[configName] = state
+			}
+
+			loginInput := &apiv3.SamlLoginInput{
+				GenericLogin:     apiv3.GenericLogin{Name: OKTAName, ConfigName: tt.configName},
+				FinalRedirectURL: "https://rancher.example.com/dashboard",
+			}
+			req := httptest.NewRequest(http.MethodPost, "/v3-public/oktaProviders/okta?action=login", nil)
+
+			err := PerformSamlLogin(req, httptest.NewRecorder(), OKTAName, loginInput, samlProviderTypes[OKTAName])
+
+			if tt.wantUsed == "" {
+				authconfigtest.RequireLoginRejected(t, err, tt.wantStatus, tt.wantMessage)
+				for configName, state := range states {
+					assert.Empty(t, state.states, "the state for %s should not be used", configName)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			for configName, state := range states {
+				if configName == tt.wantUsed {
+					assert.Equal(t, "/v1-saml/"+configName+"/saml/acs", state.path)
+					assert.Equal(t, loginAction, state.states["Rancher_Action"])
+					continue
+				}
+				assert.Empty(t, state.states, "the state for %s should not be used", configName)
+			}
+		})
+	}
+}
+
+func samlAuthConfig(name, configType string, enabled bool) map[string]any {
+	return map[string]any{
+		"metadata": map[string]any{"name": name},
+		"type":     configType,
+		"enabled":  enabled,
+	}
+}
+
+func TestPerformSamlLoginNotInitialized(t *testing.T) {
+	setupSamlProviderTypes(t, OKTAName)
+	samlProviderTypes[OKTAName].authConfigs, samlProviderTypes[OKTAName].authConfigLister = authconfigtest.New(t,
+		samlAuthConfig(OKTAName, client.OKTAConfigType, true),
+		samlAuthConfig("okta-eu", client.OKTAConfigType, true),
+	)
+	// The base provider is registered for the default config before the
+	// config is initialized.
+	setSamlProvider(OKTAName, samlProviderTypes[OKTAName])
+
+	loginInput := &apiv3.SamlLoginInput{
+		GenericLogin:     apiv3.GenericLogin{ConfigName: OKTAName},
+		FinalRedirectURL: "https://rancher.example.com/dashboard",
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v3-public/oktaProviders/okta?action=login", nil)
+
+	err := PerformSamlLogin(req, httptest.NewRecorder(), OKTAName, loginInput, samlProviderTypes[OKTAName])
+	assert.ErrorContains(t, err, "not initialized")
+
+	err = PerformSamlLogin(req, httptest.NewRecorder(), OKTAName, &apiv3.SamlLoginInput{
+		GenericLogin:     apiv3.GenericLogin{ConfigName: "okta-eu"},
+		FinalRedirectURL: "https://rancher.example.com/dashboard",
+	}, samlProviderTypes[OKTAName])
+	assert.ErrorContains(t, err, "okta-eu not initialized")
+}
+
+func TestGetPrincipal(t *testing.T) {
+	newToken := func(principalID string) *apiv3.Token {
+		return &apiv3.Token{
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+				DisplayName:   "Alice",
+				LoginName:     "alice@example.com",
+				PrincipalType: common.UserPrincipalType,
+			},
+		}
+	}
+	defaultToken := newToken("ping_user://alice")
+	token := newToken("ping-eu_user://alice")
+
+	tests := []struct {
+		name         string
+		providerName string
+		ldapProvider *mockLdapProvider
+		principalID  string
+		token        accessor.TokenAccessor
+		want         apiv3.Principal
+		wantErr      string
+	}{
+		{
+			name:        "user principal for the default config",
+			principalID: "ping_user://bob",
+			token:       defaultToken,
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://bob"},
+				DisplayName:   "bob",
+				LoginName:     "bob",
+				PrincipalType: common.UserPrincipalType,
+				Provider:      PingName,
+			},
+		},
+		{
+			name:        "user principal for another config than the token",
+			principalID: "ping-us_user://bob",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "group principal for another config than the token",
+			principalID: "ping-us_group://admins",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:        "default config principal with a token from an additional config",
+			principalID: "ping_user://bob",
+			token:       token,
+			wantErr:     "not issued by",
+		},
+		{
+			name:         "LDAP search principal for another config than the token",
+			providerName: OKTAName,
+			ldapProvider: &mockLdapProvider{providerName: OKTAName, isLdapConfigured: true},
+			principalID:  "okta-us_user://bob",
+			token:        newToken("okta-eu_user://alice"),
+			wantErr:      "not issued by",
+		},
+		{
+			name:        "user principal matching the token",
+			principalID: "ping-eu_user://alice",
+			token:       token,
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://alice"},
+				DisplayName:   "Alice",
+				LoginName:     "alice@example.com",
+				PrincipalType: common.UserPrincipalType,
+				Provider:      PingName,
+				Me:            true,
+			},
+		},
+		{
+			name:        "group principal for an additional config",
+			principalID: "ping-eu_group://admins",
+			token:       token,
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_group://admins"},
+				DisplayName:   "admins",
+				LoginName:     "admins",
+				PrincipalType: common.GroupPrincipalType,
+				Provider:      PingName,
+			},
+		},
+		{
+			name:        "invalid principal type",
+			principalID: "ping-eu_other://admins",
+			token:       token,
+			wantErr:     "Invalid principal type",
+		},
+		{
+			name:        "invalid principal ID",
+			principalID: "admins",
+			token:       token,
+			wantErr:     "invalid principal id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &Provider{name: cmp.Or(tt.providerName, PingName), userMGR: &fakeUserManager{}}
+			if tt.ldapProvider != nil {
+				provider.ldapProvider = tt.ldapProvider
+			}
+
+			got, err := provider.GetPrincipal(tt.principalID, tt.token)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestLogoutAllowedForRemovedConfig(t *testing.T) {
+	setupSamlProviderTypes(t, PingName)
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "ping-eu_user://testu"},
+			Provider:   PingName,
+		},
+	}
+
+	p := &Provider{name: PingName}
+	err := p.Logout(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", nil), token)
+	assert.NoError(t, err, "SLO can't be forced for a config that is disabled or deleted")
+}
+
+func TestDefaultLoginConfigName(t *testing.T) {
+	tests := map[string]struct {
+		configName string
+		configs    []map[string]any
+		want       string
+	}{
+		"a login that names a config keeps it": {
+			configName: "okta-eu",
+			configs:    []map[string]any{samlAuthConfig("okta", client.OKTAConfigType, true)},
+			want:       "okta-eu",
+		},
+		"the enabled config named after the provider": {
+			configs: []map[string]any{samlAuthConfig("okta", client.OKTAConfigType, true)},
+			want:    "okta",
+		},
+		"the disabled config named after the provider isn't used": {
+			configs: []map[string]any{samlAuthConfig("okta", client.OKTAConfigType, false)},
+		},
+		"a config named after the provider but of another provider isn't used": {
+			configs: []map[string]any{samlAuthConfig("okta", client.PingConfigType, true)},
+		},
+		"no config named after the provider": {
+			configs: []map[string]any{samlAuthConfig("okta-eu", client.OKTAConfigType, true)},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := &Provider{name: OKTAName, authConfigLister: authconfigtest.NewLister(t, tt.configs...)}
+
+			assert.Equal(t, tt.want, p.defaultLoginConfigName(tt.configName))
+		})
+	}
 }

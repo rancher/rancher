@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -33,6 +34,7 @@ var CACertsValidKey = CACertsValidContextKey{}
 
 type CertificateAuthorityValidator struct {
 	clusterName  string
+	clusterUID   types.UID
 	clusterCache mgmtv3controllers.ClusterCache
 	clusters     mgmtv3controllers.ClusterClient
 }
@@ -53,6 +55,7 @@ func Register(ctx context.Context, downstream *config.UserContext) error {
 
 	c := &CertificateAuthorityValidator{
 		clusterName:  downstream.ClusterName,
+		clusterUID:   downstream.ClusterUID,
 		clusterCache: downstream.Management.Wrangler.Mgmt.Cluster().Cache(),
 		clusters:     downstream.Management.Wrangler.Mgmt.Cluster(),
 	}
@@ -70,6 +73,10 @@ func (c *CertificateAuthorityValidator) onStvAggregationSecret(key string, obj *
 		mgmtCluster, err := c.clusterCache.Get(c.clusterName)
 		if err != nil {
 			return err
+		}
+		if !config.MatchesClusterUID(c.clusterUID, mgmtCluster) {
+			// The cluster was removed and created again under the same name; this one isn't ours.
+			return nil
 		}
 		mgmtCluster = mgmtCluster.DeepCopy()
 

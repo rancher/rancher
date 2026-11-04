@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/buildconfig"
-	util "github.com/rancher/rancher/pkg/cluster"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/settings"
 )
 
@@ -49,7 +49,7 @@ func Resolve(image string) string {
 // It will use the cluster level registry if one is found, or the system default registry if no cluster level registry is found.
 // If either is not found, it returns the image.
 func ResolveWithCluster(image string, cluster *apisv3.Cluster) string {
-	reg := util.GetPrivateRegistryURL(cluster)
+	reg := pkgcluster.GetPrivateRegistryURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		// Images from Dockerhub Library repo, we add rancher prefix when using private registry
 		if !strings.Contains(image, "/") {
@@ -145,7 +145,7 @@ func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) 
 		// Used by Audit Log feature - sourced from build.yaml
 		addSourceToImage(imagesSet, buildconfig.ChartAuditLogImage, imageSourceCore)
 		// kube-api-auth is required for ACE.
-		addSourceToImage(imagesSet, apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth, imageSourceSystem)
+		addSourceToImage(imagesSet, buildconfig.DefaultKubeAPIAuthImage, imageSourceSystem)
 	}
 }
 

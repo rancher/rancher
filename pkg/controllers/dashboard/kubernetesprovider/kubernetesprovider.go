@@ -2,10 +2,11 @@ package kubernetesprovider
 
 import (
 	"context"
+	"errors"
 
 	detector "github.com/rancher/kubernetes-provider-detector"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/client-go/kubernetes"
 )
@@ -16,13 +17,13 @@ const (
 
 type handler struct {
 	ctx                context.Context
-	clusters           v32.ClusterClient
+	clusters           mgmtcontrollers.ClusterClient
 	localClusterClient kubernetes.Interface
 	mcm                wrangler.MultiClusterManager
 }
 
 func Register(ctx context.Context,
-	clusters v32.ClusterController,
+	clusters mgmtcontrollers.ClusterController,
 	localClusterClient kubernetes.Interface,
 	mcm wrangler.MultiClusterManager,
 ) {
@@ -35,15 +36,20 @@ func Register(ctx context.Context,
 	clusters.OnChange(ctx, "kubernetes-provider", h.OnChange)
 }
 
-func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil || (cluster.Status.Provider != "" && cluster.Labels[ProviderKey] != "") {
+func (h *handler) OnChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	if cluster == nil {
+		return nil, nil
+	}
+
+	if cluster.Status.Provider != "" && cluster.Labels[ProviderKey] != "" {
 		// if cluster has windows enabled and provider is not rke.windows, continue to detect if it has windows nodes
-		if cluster == nil || !cluster.Spec.WindowsPreferedCluster || cluster.Status.Provider == "rke.windows" {
+		if !cluster.Spec.WindowsPreferedCluster || cluster.Status.Provider == "rke.windows" {
 			return cluster, nil
 		}
 	}
 
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	// Downstream cluster must be reachable through client
+	if !apimgmtv3.ClusterConditionProbeSucceeded.IsTrue(cluster) {
 		return cluster, nil
 	}
 
@@ -63,15 +69,17 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 	}
 
 	provider, err := detector.DetectProvider(h.ctx, client)
-	if err == detector.ErrUnknownProvider {
+	if errors.Is(err, detector.ErrUnknownProvider) {
 		return cluster, nil
 	} else if err != nil {
 		return cluster, err
 	}
+
 	cluster = cluster.DeepCopy()
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
 	}
+
 	if cluster.Labels[ProviderKey] != provider {
 		cluster.Labels[ProviderKey] = provider
 		cluster, err = h.clusters.Update(cluster)
@@ -79,9 +87,11 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 			return cluster, err
 		}
 	}
+
 	if cluster.Status.Provider != provider {
 		cluster.Status.Provider = provider
 		return h.clusters.UpdateStatus(cluster)
 	}
+
 	return cluster, nil
 }

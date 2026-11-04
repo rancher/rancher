@@ -1,6 +1,7 @@
 package githubapp
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -30,8 +31,8 @@ import (
 )
 
 const (
-	// Name is used to reference the Provider.
-	Name = "githubapp"
+	// ProviderName is used to reference the Provider.
+	ProviderName = "githubapp"
 
 	userType = "user"
 	teamType = "team"
@@ -51,7 +52,7 @@ type githubClient interface {
 
 type tokensManager interface {
 	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, description string, request *types.APIContext) error
 }
 
 type userManager interface {
@@ -62,21 +63,23 @@ type userManager interface {
 }
 
 type Provider struct {
-	authConfigs  v3.AuthConfigInterface
-	secrets      wcorev1.SecretController
-	getConfig    func() (*apiv3.GithubAppConfig, error)
-	githubClient githubClient
-	userManager  userManager
-	tokenMGR     tokensManager
+	authConfigs      v3.AuthConfigInterface
+	authConfigLister v3.AuthConfigLister
+	secrets          wcorev1.SecretController
+	getConfig        func(string) (*apiv3.GithubAppConfig, error)
+	githubClient     githubClient
+	userManager      userManager
+	tokenMGR         tokensManager
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userManager user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	provider := &Provider{
-		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
-		secrets:      mgmtCtx.Wrangler.Core.Secret(),
-		githubClient: &githubAppClient{httpClient: common.NewHTTPClientWithTimeouts()},
-		userManager:  userManager,
-		tokenMGR:     tokenMGR,
+		authConfigs:      mgmtCtx.Management.AuthConfigs(""),
+		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
+		secrets:          mgmtCtx.Wrangler.Core.Secret(),
+		githubClient:     &githubAppClient{httpClient: common.NewHTTPClientWithTimeouts()},
+		userManager:      userManager,
+		tokenMGR:         tokenMGR,
 	}
 	provider.getConfig = provider.getGithubAppConfigCR
 
@@ -99,7 +102,7 @@ func (g *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor
 }
 
 func (g *Provider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 func (g *Provider) CustomizeSchema(schema *types.Schema) {
@@ -124,8 +127,17 @@ func (g *Provider) AuthenticateUser(_ http.ResponseWriter, req *http.Request, in
 
 func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, config *apiv3.GithubAppConfig, test bool) (apiv3.Principal, []apiv3.Principal, string, error) {
 	var err error
+	configName := githubCredential.ConfigName
+	if config != nil {
+		configName = cmp.Or(configName, config.Name)
+	}
 	if config == nil {
-		config, err = g.getConfig()
+		configName, err = common.LoginConfigName(g.authConfigLister, configName, ProviderName)
+		if err != nil {
+			return apiv3.Principal{}, nil, "", err
+		}
+		logrus.Debugf("Loading GithubApp config %s", configName)
+		config, err = g.getConfig(configName)
 		if err != nil {
 			return apiv3.Principal{}, nil, "", err
 		}
@@ -145,7 +157,7 @@ func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, c
 	if err != nil {
 		return apiv3.Principal{}, nil, "", err
 	}
-	userPrincipal := g.toPrincipal(userType, user, nil)
+	userPrincipal := g.toPrincipal(userType, user, configName, nil)
 	userPrincipal.Me = true
 
 	var groupPrincipals []apiv3.Principal
@@ -154,7 +166,7 @@ func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, c
 		return apiv3.Principal{}, nil, "", err
 	}
 	for _, orgAcct := range orgAccts {
-		groupPrincipal := g.toPrincipal(orgType, orgAcct, nil)
+		groupPrincipal := g.toPrincipal(orgType, orgAcct, configName, nil)
 		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -164,7 +176,7 @@ func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, c
 		return apiv3.Principal{}, nil, "", err
 	}
 	for _, teamAcct := range teamAccts {
-		groupPrincipal := g.toPrincipal(teamType, teamAcct, nil)
+		groupPrincipal := g.toPrincipal(teamType, teamAcct, configName, nil)
 		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -188,7 +200,12 @@ func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, c
 
 // The Secret parameter is unused in this provider.
 func (g *Provider) RefetchGroupPrincipals(principalID string, _ string) ([]apiv3.Principal, error) {
-	config, err := g.getConfig()
+	configName, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := g.getConfig(configName)
 	if err != nil {
 		return nil, err
 	}
@@ -200,31 +217,36 @@ func (g *Provider) UsesUserSecrets() bool      { return false }
 func (g *Provider) CanRefreshPrincipals() bool { return true }
 
 func (g *Provider) getGroupPrincipals(principalID string, config *apiv3.GithubAppConfig) ([]apiv3.Principal, error) {
-	_, id, err := parsePrincipalID(principalID)
-	if err != nil {
-		return nil, err
-	}
-
 	var groupPrincipals []apiv3.Principal
 	data, err := getAppDataWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
-	member := data.findMemberByID(id)
+	_, _, externalID, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	memberID, err := strconv.Atoi(externalID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid github app principal ID %s: %w", principalID, err)
+	}
+
+	member := data.findMemberByID(memberID)
 	if member == nil {
 		return groupPrincipals, nil
 	}
 
 	orgAccts := data.listOrgsForUser(member.Login)
 	for _, orgAcct := range orgAccts {
-		groupPrincipal := g.toPrincipal(orgType, orgAcct, nil)
+		groupPrincipal := g.toPrincipal(orgType, orgAcct, config.Name, nil)
 		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
 
 	teamAccts := data.listTeamsForUser(member.Login)
 	for _, teamAcct := range teamAccts {
-		groupPrincipal := g.toPrincipal(teamType, teamAcct, nil)
+		groupPrincipal := g.toPrincipal(teamType, teamAcct, config.Name, nil)
 		groupPrincipal.MemberOf = true
 		groupPrincipals = append(groupPrincipals, groupPrincipal)
 	}
@@ -236,7 +258,11 @@ func (g *Provider) getGroupPrincipals(principalID string, config *apiv3.GithubAp
 //
 // The principalType can be user or group.
 func (g *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	config, err := g.getConfig()
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return nil, err
+	}
+	config, err := g.getConfig(configName)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +280,7 @@ func (g *Provider) SearchPrincipals(searchKey, principalType string, token acces
 		if pType == "organization" {
 			pType = orgType
 		}
-		principals = append(principals, g.toPrincipal(pType, acct, token))
+		principals = append(principals, g.toPrincipal(pType, acct, configName, token))
 	}
 
 	if principalType == "" || principalType == "group" {
@@ -263,7 +289,7 @@ func (g *Provider) SearchPrincipals(searchKey, principalType string, token acces
 			return nil, err
 		}
 		for _, acct := range teamAccts {
-			p := g.toPrincipal(teamType, acct, token)
+			p := g.toPrincipal(teamType, acct, configName, token)
 			principals = append(principals, p)
 		}
 	}
@@ -272,46 +298,55 @@ func (g *Provider) SearchPrincipals(searchKey, principalType string, token acces
 }
 
 func (g *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	config, err := g.getConfig()
+	configName, err := common.ConfigNameForPrincipalLookup(principalID, token)
 	if err != nil {
 		return apiv3.Principal{}, err
 	}
+	config, err := g.getConfig(configName)
+	if err != nil {
+		return apiv3.Principal{}, err
+	}
+
+	_, principalType, externalID, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return apiv3.Principal{}, err
+	}
+
+	memberID, err := strconv.Atoi(externalID)
+	if err != nil {
+		return apiv3.Principal{}, fmt.Errorf("invalid github app principal ID %s: %w", principalID, err)
+	}
+
 	ctx := context.Background()
-
-	principalType, externalID, err := parsePrincipalID(principalID)
-	if err != nil {
-		return apiv3.Principal{}, err
-	}
-
 	switch principalType {
 	case userType, orgType:
-		acct, err := g.githubClient.getUserOrgByID(ctx, externalID, config)
+		acct, err := g.githubClient.getUserOrgByID(ctx, memberID, config)
 		if err != nil {
 			return apiv3.Principal{}, err
 		}
-		return g.toPrincipal(principalType, acct, token), nil
+		return g.toPrincipal(principalType, acct, configName, token), nil
 	case teamType:
-		acct, err := g.githubClient.getTeamByID(ctx, externalID, config)
+		acct, err := g.githubClient.getTeamByID(ctx, memberID, config)
 		if err != nil {
 			return apiv3.Principal{}, err
 		}
-		return g.toPrincipal(principalType, acct, token), nil
+		return g.toPrincipal(principalType, acct, configName, token), nil
 	default:
 		return apiv3.Principal{}, fmt.Errorf("cannot get the github account due to invalid externalID Type %v", principalType)
 	}
 }
 
-func (g *Provider) toPrincipal(principalType string, acct common.GitHubAccount, token accessor.TokenAccessor) apiv3.Principal {
+func (g *Provider) toPrincipal(principalType string, acct common.GitHubAccount, configName string, token accessor.TokenAccessor) apiv3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Login
 	}
 
 	princ := apiv3.Principal{
-		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + principalType + "://" + strconv.Itoa(acct.ID)},
+		ObjectMeta:     metav1.ObjectMeta{Name: configName + "_" + principalType + "://" + strconv.Itoa(acct.ID)},
 		DisplayName:    displayName,
 		LoginName:      acct.Login,
-		Provider:       Name,
+		Provider:       ProviderName,
 		Me:             false,
 		ProfilePicture: acct.AvatarURL,
 	}
@@ -332,9 +367,12 @@ func (g *Provider) toPrincipal(principalType string, acct common.GitHubAccount, 
 }
 
 func (g *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
-	config, err := g.getConfig()
+	configName, _, _, err := common.SplitPrincipalID(userPrincipalID)
 	if err != nil {
-		logrus.Errorf("Error fetching github config: %v", err)
+		return false, err
+	}
+	config, err := g.getConfig(configName)
+	if err != nil {
 		return false, err
 	}
 
@@ -346,29 +384,30 @@ func (g *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[str
 }
 
 // IsDisabledProvider checks if the GitHub auth provider is currently disabled in Rancher.
-func (g *Provider) IsDisabledProvider() (bool, error) {
-	ghConfig, err := g.getConfig()
+func (g *Provider) IsDisabledProvider(configName string) (bool, error) {
+	ghConfig, err := g.getConfig(configName)
 	if err != nil {
 		return false, err
 	}
 	return !ghConfig.Enabled, nil
 }
 
-func (g *Provider) getGithubAppConfigCR() (*apiv3.GithubAppConfig, error) {
-	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
+func (g *Provider) getGithubAppConfigCR(configName string) (*apiv3.GithubAppConfig, error) {
+	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(configName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("getting GithubAppConfig, error: %v", err)
+		return nil, fmt.Errorf("failed to retrieve GithubAppConfig %s: %w", configName, err)
 	}
 	u, ok := authConfigObj.(runtime.Unstructured)
 	if !ok {
-		return nil, fmt.Errorf("parsing GithubAppConfig, cannot read k8s Unstructured data")
+		return nil, fmt.Errorf("failed to retrieve GithubAppConfig %s: cannot read k8s Unstructured data", configName)
 	}
+
 	storedGithubAppConfigMap := u.UnstructuredContent()
 
 	storedGithubAppConfig := &apiv3.GithubAppConfig{}
 	err = common.Decode(storedGithubAppConfigMap, storedGithubAppConfig)
 	if err != nil {
-		return nil, fmt.Errorf("decode GithubApp Config: %w", err)
+		return nil, fmt.Errorf("decode GithubApp Config %s: %w", configName, err)
 	}
 
 	if storedGithubAppConfig.ClientSecret != "" {
@@ -404,18 +443,26 @@ func (g *Provider) getGithubAppConfigCR() (*apiv3.GithubAppConfig, error) {
 }
 
 func (g *Provider) saveGithubAppConfig(config *apiv3.GithubAppConfig) error {
-	storedGithubAppConfig, err := g.getGithubAppConfigCR()
+	getStoredMeta := func() (metav1.ObjectMeta, error) {
+		storedGithubAppConfig, err := g.getGithubAppConfigCR(config.GetName())
+		if err != nil {
+			return metav1.ObjectMeta{}, err
+		}
+		return storedGithubAppConfig.ObjectMeta, nil
+	}
+
+	storedMeta, err := getStoredMeta()
 	if err != nil {
 		return err
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.GithubAppConfigType
-	config.ObjectMeta = storedGithubAppConfig.ObjectMeta
+	config.ObjectMeta = storedMeta
 
 	secretInfo := convert.ToString(config.ClientSecret)
 	field := strings.ToLower(client.GithubAppConfigFieldClientSecret)
-	name, err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type))
+	name, err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, common.SecretNamePrefix(config.Name, config.Type))
 	if err != nil {
 		return err
 	}
@@ -423,19 +470,14 @@ func (g *Provider) saveGithubAppConfig(config *apiv3.GithubAppConfig) error {
 
 	privateKeyInfo := convert.ToString(config.PrivateKey)
 	privateKeyField := strings.ToLower(client.GithubAppConfigFieldPrivateKey)
-	privateKeyName, err := common.CreateOrUpdateSecrets(g.secrets, privateKeyInfo, privateKeyField, strings.ToLower(config.Type))
+	privateKeyName, err := common.CreateOrUpdateSecrets(g.secrets, privateKeyInfo, privateKeyField, common.SecretNamePrefix(config.Name, config.Type))
 	if err != nil {
 		return err
 	}
 
 	config.PrivateKey = privateKeyName
 
-	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return common.UpdateAuthConfig(g.authConfigs, config, &config.ObjectMeta, getStoredMeta)
 }
 
 func getAppDataWithConfig(ctx context.Context, config *apiv3.GithubAppConfig) (*gitHubAppData, error) {
@@ -472,29 +514,4 @@ func chooseClientID(host string, sourceConfig *apiv3.GithubAppConfig) *apiv3.Git
 	config.ClientSecret = secretID
 
 	return &config
-}
-
-// parsePrincipalID parses a Principal ID of the form provider_group://<external-id> and
-// returns "group" and the external ID value as an integer.
-//
-// IDs not matching will result in an error.
-func parsePrincipalID(s string) (kind string, id int, err error) {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 {
-		return "", 0, fmt.Errorf("invalid id %s", s)
-	}
-	externalID := strings.TrimPrefix(parts[1], "//")
-	parts = strings.SplitN(parts[0], "_", 2)
-	if len(parts) != 2 {
-		return "", 0, fmt.Errorf("invalid id %s", s)
-	}
-
-	principalType := parts[1]
-
-	principalID, err := strconv.Atoi(externalID)
-	if err != nil {
-		return "", 0, fmt.Errorf("invalid id %s", s)
-	}
-
-	return principalType, principalID, nil
 }

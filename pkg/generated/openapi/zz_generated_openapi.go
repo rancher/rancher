@@ -418,7 +418,14 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 					},
 					"includeDefaultEntry": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IncludeDefaultEntry controls whether the default \"rancher\" cluster/user/context entry pointing directly to the Rancher server URL is included in the generated kubeconfig. When nil or true (the default), the entry is included for backward compatibility. When false, the entry is omitted.",
+							Description: "IncludeDefaultEntry controls whether the default \"rancher\" cluster/user/context entry pointing directly to the Rancher server URL is included in the generated kubeconfig. When nil or true (the default), the entry is included for backward compatibility. When false, the entry is omitted. It can't be changed after create. If omitted on update, the stored value is kept.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"preferRancherProxy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PreferRancherProxy controls the current-context of the generated kubeconfig when the cluster selected by CurrentContext has the Authorized Cluster Endpoint (ACE) enabled. When true, the current-context is the context that points to the cluster through the Rancher server proxy. When false, it's the ACE context: the FQDN if set, otherwise the first ready control plane node, or the Rancher proxy context if no control plane node is ready. It has no effect for clusters without ACE, which always use the Rancher proxy context. If omitted on create, the value of the kubeconfig-prefer-rancher-proxy setting is used and stored. It's not set for kubeconfigs created before this field was added; those use the ACE context. It can't be changed after create. If omitted on update, the stored value is kept.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -993,7 +1000,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token.",
+							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token. The value \"session\" is reserved for Rancher and is rejected on create.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -1008,7 +1015,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the token, in milliseconds. Setting a value < 0 represents +infinity, i.e. a token which does not expire. The default is indicated by the value `0`. This default is provided by the `auth-token-default-ttl-minutes` setting. A value < 0 there enables non-expiring tokens, if not disallowed by the max. That is, both the ttl here and the default are subject to the `auth-token-max-ttl-minutes` setting, i.e. will be clamped to it if they represent a larger value than that.",
+							Description: "TTL is the time-to-live of the token, in milliseconds. Setting a value < 0 represents +infinity, i.e. a token which does not expire. The default is indicated by the value `0`. This default is provided by the `auth-token-default-ttl-minutes` setting. A value < 0 there enables non-expiring tokens, if not disallowed by the max. That is, both the ttl here and the default are subject to the `auth-token-max-ttl-minutes` setting, i.e. will be clamped to it if they represent a larger value than that. For tokens of kind \"session\" the `auth-user-session-ttl-minutes` setting provides both the default and the max instead. For tokens of kind \"kubeconfig\" the default comes from the `kubeconfig-default-token-ttl-minutes` setting, and the max is the smaller of the `kubeconfig-max-token-ttl-minutes` and `auth-token-max-ttl-minutes` settings, where `0` is no limit.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",

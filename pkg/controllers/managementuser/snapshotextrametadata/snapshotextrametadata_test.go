@@ -151,7 +151,8 @@ func turtlesMgmtCluster() *apimgmtv3.Cluster {
 // annotation.
 func administratedMgmtCluster() *apimgmtv3.Cluster {
 	cluster := mgmtCluster()
-	cluster.Annotations = map[string]string{administratedAnnotation: "true"}
+	cluster.Annotations = map[string]string{apimgmtv3.ClusterAdministratedAnnotation: "true"}
+	cluster.Status.Driver = apimgmtv3.ClusterDriverImported
 	return cluster
 }
 
@@ -1025,5 +1026,39 @@ func TestOnControlPlaneChange(t *testing.T) {
 		out, err := h.onControlPlaneChange(controlPlane(capiClusterNS, capiClusterName))
 		assert.ErrorIs(t, err, expectedErr)
 		assert.Nil(t, out)
+	})
+}
+
+// A cluster removed and created again under the same name is not the one this controller was started for: its
+// configmap must not be written with the old cluster's clients.
+func TestSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T) {
+	t.Parallel()
+
+	t.Run("on a management cluster change", func(t *testing.T) {
+		t.Parallel()
+
+		h, _, _, _ := newTestHandler(t, nil)
+		h.clusterUID = "uid-old"
+		cluster := mgmtCluster()
+		cluster.UID = "uid-new"
+
+		out, err := h.onChange("", cluster)
+		require.NoError(t, err)
+		assert.Same(t, cluster, out)
+	})
+
+	t.Run("on a CAPI cluster change", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		h.clusterUID = "uid-old"
+		cluster := turtlesMgmtCluster()
+		cluster.UID = "uid-new"
+		mgmtClusters.EXPECT().Get(clusterName).Return(cluster, nil)
+
+		in := capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP)
+		out, err := h.onCAPIClusterChange("", in)
+		require.NoError(t, err)
+		assert.Same(t, in, out)
 	})
 }

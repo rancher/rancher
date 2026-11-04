@@ -105,3 +105,61 @@ func generateValidPEM(t *testing.T) []byte {
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 }
+
+func Test_connectBackoff(t *testing.T) {
+	tests := []struct {
+		name    string
+		min     string
+		max     string
+		wantMin time.Duration
+		wantMax time.Duration
+	}{
+		{
+			name:    "unset uses the default minimum and no ceiling",
+			wantMin: 10 * time.Second,
+			wantMax: 0,
+		},
+		{
+			name:    "minimum alone gives a fixed delay",
+			min:     "5s",
+			wantMin: 5 * time.Second,
+			wantMax: 0,
+		},
+		{
+			name:    "minimum below maximum is kept as given",
+			min:     "5s",
+			max:     "5m",
+			wantMin: 5 * time.Second,
+			wantMax: 5 * time.Minute,
+		},
+		{
+			name:    "maximum below minimum clamps the minimum to the ceiling",
+			min:     "5m",
+			max:     "30s",
+			wantMin: 30 * time.Second,
+			wantMax: 30 * time.Second,
+		},
+		{
+			name:    "invalid values fall back to the defaults",
+			min:     "30",
+			max:     "nonsense",
+			wantMin: 10 * time.Second,
+			wantMax: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CATTLE_CONNECT_RETRY_MIN", tc.min)
+			t.Setenv("CATTLE_CONNECT_RETRY_MAX", tc.max)
+
+			got := connectBackoff()
+			if got.Min != tc.wantMin {
+				t.Errorf("Min = %s, want %s", got.Min, tc.wantMin)
+			}
+			if got.Max != tc.wantMax {
+				t.Errorf("Max = %s, want %s", got.Max, tc.wantMax)
+			}
+		})
+	}
+}

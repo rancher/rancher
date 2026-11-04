@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	pkgcluster "github.com/rancher/rancher/pkg/cluster"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -42,10 +44,6 @@ const (
 	mgmtClusterKey      = rkev1.SnapshotResourceMgmtCluster
 	provClusterKey      = rkev1.SnapshotResourceProvCluster
 	rke2ControlPlaneKey = rkev1.SnapshotResourceRKE2ControlPlane
-
-	// administratedAnnotation marks a mgmt v3 Cluster shell whose real configuration lives on a
-	// provisioning cluster. Matches the check in pkg/operations/imported.go.
-	administratedAnnotation = "provisioning.cattle.io/administrated"
 )
 
 // errUnsupportedClusterType is returned when a cluster is managed by something this controller has
@@ -79,6 +77,7 @@ type dynamicClient interface {
 
 type handler struct {
 	clusterName string
+	clusterUID  types.UID
 
 	configMap        corecontrollers.ConfigMapClient
 	dynamic          dynamicClient
@@ -92,6 +91,7 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 
 	h := &handler{
 		clusterName:      userContext.ClusterName,
+		clusterUID:       userContext.ClusterUID,
 		configMap:        userContext.Corew.ConfigMap(),
 		dynamic:          userContext.Management.Wrangler.Dynamic,
 		provClusterCache: userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
@@ -121,7 +121,7 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	// The handler is registered per downstream cluster but watches every mgmt Cluster, so ignore
 	// the ones this agent is not responsible for.
-	if cluster == nil || cluster.Name != h.clusterName {
+	if cluster == nil || cluster.Name != h.clusterName || !config.MatchesClusterUID(h.clusterUID, cluster) {
 		return cluster, nil
 	}
 
@@ -211,6 +211,10 @@ func (h *handler) capiOwner() (*apimgmtv3.Cluster, string, string, error) {
 	}
 	if err != nil {
 		return nil, "", "", err
+	}
+	if !config.MatchesClusterUID(h.clusterUID, cluster) {
+		// A cluster created again under the same name is not this controller's.
+		return nil, "", "", nil
 	}
 
 	ownerName := cluster.Labels[capr.CAPIClusterOwnerLabel]
@@ -358,7 +362,7 @@ func (h *handler) turtlesAdapter(cluster *apimgmtv3.Cluster) (adapter, error) {
 // by the administrated annotation on the mgmt cluster shell, by tracing mgmt Cluster -> provv1
 // Cluster through the ByCluster index. Returns (nil, nil) when the annotation is not set.
 func (h *handler) administratedAdapter(cluster *apimgmtv3.Cluster) (adapter, error) {
-	if cluster.Annotations[administratedAnnotation] != "true" {
+	if !pkgcluster.IsAdministrated(cluster) {
 		return nil, nil
 	}
 
