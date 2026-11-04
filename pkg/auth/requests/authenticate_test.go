@@ -1677,3 +1677,74 @@ func testGeneratePrivateKey(t *testing.T) *rsa.PrivateKey {
 
 	return privateKey
 }
+
+func TestGetUserExtraInfoKeepsOnlyUserExtraKeys(t *testing.T) {
+	t.Parallel()
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "u-abcde"},
+		Username:     "alice",
+		PrincipalIDs: []string{"okta_user://alice", "local://u-abcde"},
+	}
+	attribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "u-abcde"},
+		ExtraByProvider: map[string]map[string][]string{
+			"okta": {
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice@example.com"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+			"github": {
+				common.UserAttributePrincipalID: {"github_user://42"},
+				common.UserAttributeUserName:    {"alice-gh"},
+				"extra":                         {"value"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		authProvider string
+		want         map[string][]string
+	}{
+		{
+			name:         "provider token",
+			authProvider: "okta",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice@example.com"},
+			},
+		},
+		{
+			name:         "local token",
+			authProvider: "local",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42"},
+				common.UserAttributeUserName:    {"alice@example.com", "alice-gh"},
+			},
+		},
+		{
+			name:         "token without provider",
+			authProvider: "",
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice", "github_user://42"},
+				common.UserAttributeUserName:    {"alice@example.com", "alice-gh"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			token := &apiv3.Token{AuthProvider: tt.authProvider}
+
+			got := getUserExtraInfo(token, user, attribs)
+
+			require.Len(t, got, len(tt.want))
+			for key, values := range tt.want {
+				assert.ElementsMatch(t, values, got[key], key)
+			}
+		})
+	}
+}
