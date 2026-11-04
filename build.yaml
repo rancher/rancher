@@ -15,7 +15,7 @@ machineProvisionImage: rancher/machine:v0.15.0-rancher146-rc.7
 systemAgentVersion: v0.16.0-rc.5
 winsAgentVersion: v0.16.0-rc.9
 # Charts Versions
-fleetVersion: 111.0.0+up0.17.0-beta.2
+fleetVersion: 111.0.0+up0.17.0-beta.3
 remoteDialerProxyVersion: 111.0.0+up0.9.1-rc.1
 turtlesVersion: 111.0.0+up0.28.0-rc.3
 # Notes: tracks the CAPI version used by turtles
