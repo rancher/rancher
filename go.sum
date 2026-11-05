@@ -1001,8 +1001,8 @@ k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b h1:MloQ9/bdJyIu9lb1PzujOP
 k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b/go.mod h1:UZ2yyWbFTpuhSbFhv24aGNOdoRdJZgsIObGBUaYVsts=
 k8s.io/kubectl v0.34.9 h1:nGNmsw1m9Q1lop2HtMk1jzM+JVNlQLj6gZr82vT1AmQ=
 k8s.io/kubectl v0.34.9/go.mod h1:8FvYj6BPfeo1YPn6rvPs0kOTFBzRne89rG8LnyWPIlY=
-k8s.io/kubernetes v1.34.12 h1:eHYdIJRfF+xypl5TuP3M+a+PzFZcDYWY9wH9pbW8Vko=
-k8s.io/kubernetes v1.34.12/go.mod h1:kOPVDSkvFrxbLPI6u/Qg/FAXhs8ZcJx6Nor08s3hhLM=
+k8s.io/kubernetes v1.34.13 h1:iP32fBfuhqFp/wb7GM35FhuSA3j9q7bP95JXauNvZmU=
+k8s.io/kubernetes v1.34.13/go.mod h1:kOPVDSkvFrxbLPI6u/Qg/FAXhs8ZcJx6Nor08s3hhLM=
 k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 h1:SjGebBtkBqHFOli+05xYbK8YF1Dzkbzn+gDM4X9T4Ck=
 k8s.io/utils v0.0.0-20251002143259-bc988d571ff4/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 modernc.org/cc/v4 v4.26.5 h1:xM3bX7Mve6G8K8b+T11ReenJOT+BmVqQj0FY5T4+5Y4=
