@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/machineconfigcleanup"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -35,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
@@ -57,6 +59,7 @@ const (
 	migrateRKE2PrimeAnnotation                        = "migraterke2primeannotation"
 	migrateCRTTokensToSecrets                         = "migratecrtttokenstosecrets"
 	migrateLegacyClusterAutoscalerSettingsConfig      = "migratelegacyclusterautoscalersettings"
+	legacyMachineConfigCleanupMigration               = "legacymachineconfigcleanupmigration"
 	rancherVersionKey                                 = "rancherVersion"
 	projectsCreatedKey                                = "projectsCreated"
 	namespacesAssignedKey                             = "namespacesAssigned"
@@ -71,6 +74,7 @@ const (
 	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
 	crtTokensToSecretsMigratedKey                     = "crtTokensToSecretsMigrated"
 	legacyClusterAutoscalerSettingsMigratedKey        = "legacyClusterAutoscalerSettingsMigrated"
+	legacyMachineConfigCleanupRemovedKey              = "legacyMachineConfigCleanupRemoved"
 	clusterAutoscalerChartRepository                  = "cluster-autoscaler-chart-repository"
 	clusterAutoscalerImage                            = "cluster-autoscaler-image"
 )
@@ -124,7 +128,35 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		return err
 	}
 
+	removeLegacyMachineConfigCleanupObjects(wranglerContext.Core.ConfigMap(), wranglerContext.K8s)
+
 	return rkeResourcesCleanup(wranglerContext)
+}
+
+// removeLegacyMachineConfigCleanupObjects removes the rke2-machineconfig-cleanup cronjob, config map, and service
+// account that Rancher v2.13.x and earlier created in fleet-default. Since v2.14 they are created in fleet-local.
+func removeLegacyMachineConfigCleanupObjects(configMapController controllerv1.ConfigMapController, k8s kubernetes.Interface) {
+	cm, err := getConfigMap(configMapController, legacyMachineConfigCleanupMigration)
+	if err != nil || cm == nil {
+		if err != nil {
+			logrus.Errorf("Failed to get %s configmap: %v", legacyMachineConfigCleanupMigration, err)
+		}
+		return
+	}
+
+	if cm.Data[legacyMachineConfigCleanupRemovedKey] == "true" {
+		return
+	}
+
+	if err := machineconfigcleanup.RemoveLegacyObjects(context.TODO(), k8s); err != nil {
+		logrus.Errorf("Failed to remove legacy rke2-machineconfig-cleanup objects: %v", err)
+		return
+	}
+
+	cm.Data[legacyMachineConfigCleanupRemovedKey] = "true"
+	if err := createOrUpdateConfigMap(configMapController, cm); err != nil {
+		logrus.Errorf("Failed to record %s migration: %v", legacyMachineConfigCleanupMigration, err)
+	}
 }
 
 func migrateLegacyClusterAutoscalerSettings(configMapController controllerv1.ConfigMapController, settingController v3.SettingController) error {
