@@ -625,8 +625,8 @@ github.com/rancher/apiserver v0.10.1 h1:BYZYPcwIq2FFgbFqKJsk8Y8q4ARpqvMHzgxSltd+
 github.com/rancher/apiserver v0.10.1/go.mod h1:rv07gkraa5bE3cuLvYG+W911/One4pbzqZbzWz87on4=
 github.com/rancher/channelserver v0.12.1 h1:Gq0Dew8fAtFdL/gl0X2H5r0faqtHddhOukL/uGEhLk0=
 github.com/rancher/channelserver v0.12.1/go.mod h1:h1NKVlEsH5oZkoHQzpCq/OCoxjHh204zHIbbxtoTC48=
-github.com/rancher/cluster-api-provider-rke2 v0.27.0 h1:b+hbT5CM0fw3WA95L26T7KDXsQTm/z8LW+5tLdWj3iI=
-github.com/rancher/cluster-api-provider-rke2 v0.27.0/go.mod h1:HcAdzQ+MvTyv4iOLto+yFLMPqoJLlxaRo+1Vj3DC5nM=
+github.com/rancher/cluster-api-provider-rke2 v0.27.1 h1:pBQ0rgTixfHdyIj3Tbf6E7hiWxnQsEr4zfqCe4wV6LA=
+github.com/rancher/cluster-api-provider-rke2 v0.27.1/go.mod h1:LgqHwxJLlLpWJK/nFAMHKNgqGLYK1I0SAFdOdkHyjh4=
 github.com/rancher/dynamiclistener v0.10.0-rc.1 h1:lr6CKsAUBQu6ojt9yz+7pljR7y+ybUoRvyKxniRDCzE=
 github.com/rancher/dynamiclistener v0.10.0-rc.1/go.mod h1:0ENsD5eVC1+IC7nWJ5dXc6X8kYOfo+49ClD1KIg7GP8=
 github.com/rancher/eks-operator v1.16.0-rc.3 h1:4qI9Chcgl1zPL7Mr9Ty3zKndhxo+UeWlP/A+FA4DqyE=
@@ -1061,10 +1061,10 @@ sigs.k8s.io/aws-iam-authenticator v0.7.24 h1:C15/T2qwbqP4xwbLqv8FMBg5zGBpT9gN/xF
 sigs.k8s.io/aws-iam-authenticator v0.7.24/go.mod h1:OAyb9pCr7RM7BWANgc70HGq8QH51rc8ESd+huy8g2yg=
 sigs.k8s.io/cli-utils v0.37.2 h1:GOfKw5RV2HDQZDJlru5KkfLO1tbxqMoyn1IYUxqBpNg=
 sigs.k8s.io/cli-utils v0.37.2/go.mod h1:V+IZZr4UoGj7gMJXklWBg6t5xbdThFBcpj4MrZuCYco=
-sigs.k8s.io/cluster-api v1.14.3 h1:xc2krMm7SfUV7/sVo3XcHwNz33fkYupy+iSD/W/TA/Q=
-sigs.k8s.io/cluster-api v1.14.3/go.mod h1:NB3GmqTA/hlMaGDv01gt36/5k0DJ+ixGTJFHUe5Ib3Q=
-sigs.k8s.io/cluster-api/api v1.14.3 h1:lTjHLULtlJHRXvroECdeiM2fXZOsvu93y+LYRjm/5II=
-sigs.k8s.io/cluster-api/api v1.14.3/go.mod h1:LJ/5hdS9tqTBi9YqyLRnd1t53Sn/cXsa7rEVaY0bBms=
+sigs.k8s.io/cluster-api v1.14.4 h1:KdTftMu6XGD9kJsxwVH6gSmPLXrDkQAYf/oP8AL2EV0=
+sigs.k8s.io/cluster-api v1.14.4/go.mod h1:vhozg2hhpHZl8oG6MXW19mq5NiwpejsgxIEeJ9s1DBQ=
+sigs.k8s.io/cluster-api/api v1.14.4 h1:8TDHZxuQYa5oKJatmZhiDJgoxHlxtjwHJSFxA2RM5Ew=
+sigs.k8s.io/cluster-api/api v1.14.4/go.mod h1:z3AwenIQGB9MUQdUtGppb4vDNgsdTVOFtyRHAGvnnFA=
 sigs.k8s.io/controller-runtime v0.25.1 h1:BKgU9OeE8xv8EbbM8cY0NVzTQs35rokkdq1jh12fMb4=
 sigs.k8s.io/controller-runtime v0.25.1/go.mod h1:4QqLdT6z/L6Olj8JJCtvztid4/fnIiYsfaTFScegctc=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=

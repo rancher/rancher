@@ -17,7 +17,7 @@ winsAgentVersion: v0.16.0-rc.9
 # Charts Versions
 fleetVersion: 111.0.0+up0.17.0-beta.3
 remoteDialerProxyVersion: 111.0.0+up0.9.1-rc.1
-turtlesVersion: 111.0.0+up0.28.0-rc.3
+turtlesVersion: 111.0.0+up0.28.0-rc.4
 # Notes: tracks the CAPI version used by turtles
-clusterAPIControllerImage: rancher/cluster-api-controller:v1.14.3
+clusterAPIControllerImage: rancher/cluster-api-controller:v1.14.4
 webhookVersion: 111.0.0+up0.12.1-rc.16

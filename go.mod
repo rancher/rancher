@@ -122,7 +122,7 @@ require (
 	github.com/rancher/ali-operator v1.16.0-rc.3
 	github.com/rancher/apiserver v0.10.1
 	github.com/rancher/channelserver v0.12.1
-	github.com/rancher/cluster-api-provider-rke2 v0.27.0
+	github.com/rancher/cluster-api-provider-rke2 v0.27.1
 	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.16.0-rc.3
 	github.com/rancher/fleet/pkg/apis v0.17.0-beta.3
@@ -179,8 +179,8 @@ require (
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	oras.land/oras-go/v2 v2.7.0
 	sigs.k8s.io/aws-iam-authenticator v0.7.24
-	sigs.k8s.io/cluster-api v1.14.3
-	sigs.k8s.io/cluster-api/api v1.14.3
+	sigs.k8s.io/cluster-api v1.14.4
+	sigs.k8s.io/cluster-api/api v1.14.4
 	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2
 	sigs.k8s.io/yaml v1.6.0
