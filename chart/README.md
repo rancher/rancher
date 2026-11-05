@@ -205,3 +205,24 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `customLogos.storageClass`               | ""                                                                        | ***string*** - Set custom logos persistentVolumeClaim storage class. Required for dynamic pv                                                                                                                                                                                            |
 | `customLogos.accessMode`                 | "ReadWriteOnce"                                                           | ***string*** - Set custom persistentVolumeClaim access mode                                                                                                                                                                                                                             |
 | `customLogos.size`                       | "1Gi"                                                                     | ***string*** - Set custom persistentVolumeClaim size                                                                                                                                                                                                                                    |
+| `hostNetwork` | false | ***bool*** - Enable host networking for Rancher pods. |
+| `httpListenPort` | 80 | ***int*** - HTTP listener port inside the pod (1–65535). |
+| `httpsListenPort` | 443 | ***int*** - HTTPS listener port inside the pod (1–65534). The internal HTTPS listener uses this port plus one. |
+
+#### Host Networking with Custom Listen Ports
+
+When Rancher uses host networking, its listener ports must be available on the node.
+For example, to avoid a conflict with another process using port 80, use:
+
+```yaml
+hostNetwork: true
+httpListenPort: 8080
+httpsListenPort: 8443
+```
+
+This configures Rancher to listen on HTTP port 8080, HTTPS port 8443, and internal
+HTTPS port 8444. All three health probes use the configured HTTP port. The public
+Service continues to expose ports 80 and 443, and the internal Service continues
+to expose port 443; their target ports follow the configured listeners.
+Choose distinct listener ports, including the internal HTTPS port, that are
+available on every node where Rancher runs.
