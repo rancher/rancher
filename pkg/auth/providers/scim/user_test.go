@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/scimconfig"
@@ -18,6 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func TestBoolUnmarshalJSON(t *testing.T) {
@@ -829,10 +831,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			[]v3.Principal{},
 			map[string][]string{
 				"username":    {"john.doe"},
 				"externalid":  {"ext-12345"},
@@ -902,14 +903,14 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-def456"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-def456",
 			provider,
-			[]v3.Principal{},
 			map[string][]string{
 				"username":    {"jane.doe"},
 				"externalid":  {"ext-67890"},
 				"principalid": {"okta_user://jane.doe"},
+				"email":       {""},
 			},
 		).Return(nil)
 
@@ -1110,10 +1111,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			gomock.Any(),
 			gomock.Any(),
 		).Return(fmt.Errorf("failed to create attributes"))
 
@@ -1155,10 +1155,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			gomock.Any(),
 			gomock.Any(),
 		).Return(nil)
 
@@ -1373,7 +1372,7 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1476,7 +1475,7 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1528,7 +1527,7 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1548,6 +1547,226 @@ func TestCreateUser(t *testing.T) {
 		srv.CreateUser(w, r)
 		require.Equal(t, http.StatusCreated, w.Code)
 	})
+}
+
+func TestCreateUserMatchingExternalID(t *testing.T) {
+	const (
+		provider   = "okta"
+		userID     = "u-alice"
+		externalID = "ext-alice"
+	)
+
+	tests := []struct {
+		name            string
+		mode            string
+		enabled         bool
+		loggedIn        bool
+		principalID     string
+		storedUserName  string
+		payloadUserName string
+		wantCode        int
+		wantDetail      string
+		wantEnsure      string
+		wantReprovision bool
+		wantActive      bool
+	}{
+		{
+			name:            "externalId mode, active user who logged in with a different login name",
+			mode:            scimconfig.UserIDExternalID,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice.login",
+			payloadUserName: "alice",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://" + externalID,
+			wantActive:      true,
+		},
+		{
+			name:            "userName mode, active user who logged in with a different login name",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice.login",
+			payloadUserName: "alice",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://alice",
+			wantActive:      true,
+		},
+		{
+			name:            "externalId mode, active user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDExternalID,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "User with username alice already exists",
+		},
+		{
+			name:            "userName mode, active user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "User with username alice already exists",
+		},
+		{
+			name:            "externalId mode, active user who never logged in, new userName",
+			mode:            scimconfig.UserIDExternalID,
+			enabled:         true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice",
+			payloadUserName: "alice.new",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "Active user with externalId " + externalID + " already exists",
+		},
+		{
+			name:            "userName mode, active user who never logged in, new userName",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			principalID:     provider + "_user://alice.new",
+			storedUserName:  "alice",
+			payloadUserName: "alice.new",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "Active user with externalId " + externalID + " already exists",
+		},
+		{
+			name:            "userName mode, active user who logged in, userName differs from the login name and the principal",
+			mode:            scimconfig.UserIDUserName,
+			enabled:         true,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice.login",
+			payloadUserName: "alice.other",
+			wantCode:        http.StatusConflict,
+			wantDetail:      "Active user with externalId " + externalID + " already exists",
+		},
+		{
+			name:            "externalId mode, disabled user who logged in with a different login name",
+			mode:            scimconfig.UserIDExternalID,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice.login",
+			payloadUserName: "alice",
+			wantCode:        http.StatusOK,
+			wantReprovision: true,
+			wantActive:      true,
+		},
+		{
+			name:            "externalId mode, disabled user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDExternalID,
+			loggedIn:        true,
+			principalID:     provider + "_user://" + externalID,
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusOK,
+			wantReprovision: true,
+			wantActive:      true,
+		},
+		{
+			name:            "userName mode, disabled user who logged in with the login name equal to userName",
+			mode:            scimconfig.UserIDUserName,
+			loggedIn:        true,
+			principalID:     provider + "_user://alice",
+			storedUserName:  "alice",
+			payloadUserName: "alice",
+			wantCode:        http.StatusCreated,
+			wantEnsure:      provider + "_user://alice",
+			wantActive:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			existingUser := &v3.User{
+				ObjectMeta:   metav1.ObjectMeta{Name: userID},
+				Enabled:      ptr.To(tt.enabled),
+				PrincipalIDs: []string{tt.principalID, "local://" + userID},
+			}
+			existingAttr := &v3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: userID},
+				ExtraByProvider: map[string]map[string][]string{
+					provider: {
+						"principalid": {tt.principalID},
+						"username":    {tt.storedUserName},
+						"externalid":  {externalID},
+						"email":       {"alice@example.com"},
+					},
+				},
+			}
+			if tt.loggedIn {
+				existingAttr.LastLogin = &metav1.Time{Time: time.Now()}
+			}
+
+			userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+			userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+			userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+			userMGR := mocks.NewMockManager(ctrl)
+			if tt.wantEnsure != "" {
+				userMGR.EXPECT().EnsureUser(tt.wantEnsure, tt.payloadUserName).Return(existingUser, nil)
+				userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(userID, provider, gomock.Any()).Return(nil)
+			}
+
+			userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+			userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+			if tt.wantReprovision {
+				userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+					return attr, nil
+				})
+				userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.True(t, *u.Enabled)
+					return u, nil
+				})
+			}
+
+			srv := &SCIMServer{
+				userCache:          userCache,
+				users:              userClient,
+				userAttributeCache: userAttributeCache,
+				userAttributes:     userAttrClient,
+				userMGR:            userMGR,
+				getConfig: func(string) scimconfig.Config {
+					return scimconfig.Config{UserIDAttribute: tt.mode}
+				},
+			}
+
+			body := fmt.Sprintf(`{
+				"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+				"userName": %q,
+				"externalId": %q
+			}`, tt.payloadUserName, externalID)
+			r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+			r.SetPathValue("provider", provider)
+			w := httptest.NewRecorder()
+
+			srv.CreateUser(w, r)
+			require.Equal(t, tt.wantCode, w.Code, w.Body.String())
+
+			if tt.wantDetail != "" {
+				var resp Error
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, tt.wantDetail, resp.Detail)
+				return
+			}
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, userID, resp["id"])
+			assert.Equal(t, tt.wantActive, resp["active"])
+		})
+	}
 }
 
 func TestUpdateUser(t *testing.T) {
