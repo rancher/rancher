@@ -40,9 +40,16 @@ type KeyCloakClient struct {
 
 func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, config *apiv3.OIDCConfig) ([]account, error) {
 	var accounts []account
-	sURL, err := getSearchURL(config.Issuer)
-	if err != nil {
-		return accounts, err
+	var sURL string
+	var err error
+
+	if config.AdminEndpoint != "" {
+		sURL = config.AdminEndpoint
+	} else {
+		sURL, err = getSearchURL(config.Issuer)
+		if err != nil {
+			return accounts, err
+		}
 	}
 	if principalType == "" || principalType == UserType {
 		var userAccounts []account
@@ -128,13 +135,19 @@ func getSubGroups(group Group) []Group {
 
 func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, config *apiv3.OIDCConfig) (account, error) {
 	var searchResult account
+	var sURL string
+	var err error
 
 	if principalID == "" {
 		return searchResult, errors.Errorf("invalid id %v", principalID)
 	}
-	sURL, err := getSearchURL(config.Issuer)
-	if err != nil {
-		return searchResult, nil
+	if config.AdminEndpoint != "" {
+		sURL = config.AdminEndpoint
+	} else {
+		sURL, err = getSearchURL(config.Issuer)
+		if err != nil {
+			return searchResult, nil
+		}
 	}
 	// this will use the keycloak search endpoint with an id
 	if principalType == UserType {
