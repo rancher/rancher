@@ -100,7 +100,6 @@ func Test_Provisioning_SetA_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +153,8 @@ func Test_Provisioning_SetA_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.
 						ControlPlaneRole: true,
 						WorkerRole:       true,
 						Quantity:         &defaults.One,
-					}},
+					},
+				},
 			},
 			ClusterAgentDeploymentCustomization: &provisioningv1api.AgentDeploymentCustomization{
 				OverrideAffinity: &corev1.Affinity{
