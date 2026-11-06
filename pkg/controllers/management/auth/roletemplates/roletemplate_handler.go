@@ -29,6 +29,10 @@ var (
 		"nodepools":                   "management.cattle.io",
 		"projects":                    "management.cattle.io",
 		"etcdsnapshots":               "rke.cattle.io",
+		"etcdsnapshotsaves":           "operation.cattle.io",
+		"etcdsnapshotrestores":        "operation.cattle.io",
+		"encryptionkeyrotations":      "operation.cattle.io",
+		"certificaterotations":        "operation.cattle.io",
 	}
 	projectManagementPlaneResources = map[string]string{
 		"projectroletemplatebindings": "management.cattle.io",
