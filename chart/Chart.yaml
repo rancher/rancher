@@ -1,8 +1,8 @@
 apiVersion: v2
 name: rancher
 description: Install Rancher Server to manage Kubernetes clusters across providers.
-version: %VERSION%
-appVersion: %APP_VERSION%
+version: 0.0.0-VERSION
+appVersion: "%APP_VERSION%"
 kubeVersion: < 1.38.0-0
 home: https://rancher.com
 icon: https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg
@@ -13,3 +13,15 @@ sources:
 maintainers:
   - name: Rancher Labs
     email: charts@rancher.com
+annotations:
+  # Images used by the files of this chart, see HIP-0015. Generated from build.yaml
+  # by go generate; %APP_VERSION% is replaced by the chart build.
+  helm.sh/images: |
+    - name: rancher
+      image: rancher/rancher:%APP_VERSION%
+    - name: rancher-assets
+      image: rancher/rancher-assets:v2.16-20261027T2136Z-dev
+    - name: shell
+      image: rancher/shell:v0.9.0-rc.1
+    - name: mirrored-bci-micro
+      image: rancher/mirrored-bci-micro:16.0-15.11
