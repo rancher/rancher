@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/capr"
 	planapi "github.com/rancher/rancher/pkg/plan"
 )
 
@@ -71,7 +72,7 @@ func GenerateIdempotencyCleanupInstruction(provisioningDir, key string) planapi.
 			Command: "/bin/sh",
 			Args: []string{
 				"-c",
-				fmt.Sprintf("rm -rf %s/idempotence/%s", provisioningDir, key),
+				fmt.Sprintf("rm -rf %s", capr.ShellQuote(fmt.Sprintf("%s/idempotence/%s", provisioningDir, key))),
 			},
 		},
 	}
