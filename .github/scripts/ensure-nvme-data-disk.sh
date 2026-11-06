@@ -65,7 +65,7 @@ containerd_pid() {
 # containerd_root PID prints the root of the containerd running as PID, honoring the --config and
 # --root it was started with.
 containerd_root() {
-    local pid=$1 bin cfg=() root="" prev="" arg
+    local pid=$1 bin cfg=() root="" prev="" arg dump=""
     bin=$(readlink "/proc/$pid/exe") || die "can't read containerd's binary from /proc/$pid/exe"
     while IFS= read -r -d '' arg; do
         case "$prev" in
@@ -79,10 +79,12 @@ containerd_root() {
         prev=$arg
     done < "/proc/$pid/cmdline"
     if [ -z "$root" ]; then
-        root=$("$bin" "${cfg[@]}" config dump 2>/dev/null | awk -F'"' '/^root *=/ { print $2; exit }') ||
-            die "can't dump the config of containerd ($pid)"
+        # Dumped in full first: awk exiting early could SIGPIPE containerd and trip pipefail.
+        dump=$("$bin" "${cfg[@]}" config dump 2>&1) || die "can't dump the config of containerd ($pid): $dump"
+        # containerd 1.x quotes strings with "...", 2.x with '...'.
+        root=$(awk '/^root *=/ { sub(/^root *= */, ""); gsub(/["\047]/, ""); print; exit }' <<< "$dump")
     fi
-    [ -n "$root" ] || die "can't find containerd's root in its config"
+    [ -n "$root" ] || die "can't find containerd's root in its config (${cfg[*]:-default config}): $(grep -m1 '^root' <<< "$dump" || echo 'no top-level root key')"
     echo "$root"
 }
 
