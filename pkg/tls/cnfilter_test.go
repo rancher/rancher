@@ -555,3 +555,36 @@ func TestPodIPTracker_RejectsArbitraryHostnameInjection(t *testing.T) {
 		t.Errorf("filter(pod IP + extra hostnames) = %v, want only the live pod IP kept", got)
 	}
 }
+
+func TestRancherPodSelector(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected string
+	}{
+		{
+			name:     "uses IMPERATIVE_API_APP_SELECTOR when set to the fullname",
+			envValue: "rancher-install",
+			expected: "app=rancher-install",
+		},
+		{
+			name:     "uses the value verbatim for a plain release name",
+			envValue: "rancher",
+			expected: "app=rancher",
+		},
+		{
+			name:     "falls back to app=rancher when empty or unset",
+			envValue: "",
+			expected: "app=rancher",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(imperativeAPIAppSelectorEnvVar, tt.envValue)
+			if got := rancherPodSelector(); got != tt.expected {
+				t.Errorf("rancherPodSelector() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}

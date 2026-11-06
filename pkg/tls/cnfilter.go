@@ -3,6 +3,7 @@ package tls
 import (
 	"context"
 	"net"
+	"os"
 	"strings"
 	"sync/atomic"
 
@@ -11,6 +12,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// imperativeAPIAppSelectorEnvVar carries the value of the "app" label on the
+// Rancher server pods. The Helm chart templates it from the release fullname,
+// which is what the pods are actually labeled with -- not the literal
+// "rancher". See chart/templates/deployment.yaml.
+const imperativeAPIAppSelectorEnvVar = "IMPERATIVE_API_APP_SELECTOR"
 
 // podIPTracker watches pods matching the given label selector in a single
 // namespace and maintains a snapshot of their current pod IPs. The snapshot
@@ -276,12 +283,22 @@ func unionFilterCN(primary, allowlist func(...string) []string) func(...string) 
 }
 
 // newRancherPodIPFilter wires a podIPTracker to the upstream Rancher
-// server's pods (app=rancher in cattle-system) and returns its
-// FilterExistingCN closure. handlerName distinguishes each listener's
-// tracker instance (e.g. for metrics/logging) since this is called once per
-// listener (:443 and :444).
+// server's pods (the app=<fullname> label in cattle-system, resolved by
+// rancherPodSelector) and returns its FilterExistingCN closure. handlerName
+// distinguishes each listener's tracker instance (e.g. for metrics/logging)
+// since this is called once per listener (:443 and :444).
 func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodController, handlerName string) func(...string) []string {
-	return newPodIPTracker(ctx, namespace.System, "app=rancher", pods, handlerName)
+	return newPodIPTracker(ctx, namespace.System, rancherPodSelector(), pods, handlerName)
+}
+
+// rancherPodSelector returns the label selector for the Rancher server pods.
+// The chart sets IMPERATIVE_API_APP_SELECTOR to rancher.fullname, the same
+// value used for the pods' "app" label; fall back to "app=rancher" when unset.
+func rancherPodSelector() string {
+	if v := os.Getenv(imperativeAPIAppSelectorEnvVar); v != "" {
+		return "app=" + v
+	}
+	return "app=rancher"
 }
 
 // newRancherInternalCNFilter builds the FilterCN used for the
