@@ -103,13 +103,22 @@ func createService(clients *clients.Clients, name string) error {
 			Namespace: registryNamespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Name:        "http",
-				Protocol:    corev1.ProtocolTCP,
-				AppProtocol: &[]string{"https"}[0],
-				Port:        5000,
-				TargetPort:  intstr.FromInt(5000),
-			}},
+			Ports: []corev1.ServicePort{
+				{
+					Name:        "http",
+					Protocol:    corev1.ProtocolTCP,
+					AppProtocol: &[]string{"https"}[0],
+					Port:        5000,
+					TargetPort:  intstr.FromInt(5000),
+				},
+				{
+					Name:        "push",
+					Protocol:    corev1.ProtocolTCP,
+					AppProtocol: &[]string{"https"}[0],
+					Port:        5050,
+					TargetPort:  intstr.FromInt(5050),
+				},
+			},
 			Selector: map[string]string{
 				"app": name,
 			},
@@ -121,13 +130,13 @@ func createService(clients *clients.Clients, name string) error {
 	return err
 }
 
-func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) (*corev1.Pod, error) {
+func createOrGetPod(clients *clients.Clients, podName string) (*corev1.Pod, error) {
 	pod, err := clients.Core.Pod().Get(registryNamespace, podName, metav1.GetOptions{})
 	if err == nil || !apierrors.IsNotFound(err) {
 		return pod, err
 	}
 
-	podEnv := []corev1.EnvVar{
+	baseEnv := []corev1.EnvVar{
 		{
 			Name:  "REGISTRY_AUTH",
 			Value: "htpasswd",
@@ -150,14 +159,34 @@ func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) 
 		},
 	}
 
-	// Configure the pod as a pull-through cache, if necessary. When proxy.remoteUrl on the registry config, it will
-	// act as a proxy for the upstream registry and cache images it downloads, but you will not be able to push images
-	// to it! For that, you'd need another registry.
-	if pullThrough {
-		podEnv = append(podEnv, corev1.EnvVar{
-			Name:  "REGISTRY_PROXY_REMOTEURL",
-			Value: "https://registry-1.docker.io",
-		})
+	// The cache container (5000) acts as a pull-through cache for docker.io, which means it rejects pushes. The push
+	// container (5050) is a plain registry used to push locally built images. Both share the same storage, so images
+	// pushed to 5050 are served by 5000 whenever the tag does not exist upstream.
+	cacheEnv := append(append([]corev1.EnvVar{}, baseEnv...), corev1.EnvVar{
+		Name:  "REGISTRY_PROXY_REMOTEURL",
+		Value: "https://registry-1.docker.io",
+	})
+	pushEnv := append(append([]corev1.EnvVar{}, baseEnv...),
+		corev1.EnvVar{
+			Name:  "REGISTRY_HTTP_ADDR",
+			Value: "0.0.0.0:5050",
+		},
+		corev1.EnvVar{
+			Name:  "REGISTRY_HTTP_DEBUG_ADDR",
+			Value: "0.0.0.0:5051",
+		},
+	)
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "htpasswd",
+			ReadOnly:  true,
+			MountPath: "/etc/auth",
+		},
+		{
+			Name:      "registry-data",
+			MountPath: "/var/lib/registry",
+		},
 	}
 
 	pod, err = clients.Core.Pod().Create(&corev1.Pod{
@@ -170,29 +199,46 @@ func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) 
 		},
 		Spec: corev1.PodSpec{
 			EnableServiceLinks: new(bool),
-			Volumes: []corev1.Volume{{
-				Name: "htpasswd",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: podName,
+			Volumes: []corev1.Volume{
+				{
+					Name: "htpasswd",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: podName,
+						},
 					},
 				},
-			}},
+				{
+					Name: "registry-data",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
-					Name:  "cache",
-					Image: "registry",
-					Env:   podEnv,
-					VolumeMounts: []corev1.VolumeMount{{
-						Name:      "htpasswd",
-						ReadOnly:  true,
-						MountPath: "/etc/auth",
-					}},
+					Name:         "cache",
+					Image:        "registry",
+					Env:          cacheEnv,
+					VolumeMounts: volumeMounts,
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: 5000,
 							HostPort:      5000,
+						},
+					},
+				},
+				{
+					Name:         "push",
+					Image:        "registry",
+					Env:          pushEnv,
+					VolumeMounts: volumeMounts,
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "push",
+							ContainerPort: 5050,
+							HostPort:      5050,
 						},
 					},
 				},
@@ -205,7 +251,7 @@ func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) 
 	return pod, err
 }
 
-func createSharedObjects(clients *clients.Clients, podName string, pullThrough bool) (*corev1.Secret, error) {
+func createSharedObjects(clients *clients.Clients, podName string) (*corev1.Secret, error) {
 	cacheLock.Lock()
 	defer cacheLock.Unlock()
 
@@ -214,7 +260,7 @@ func createSharedObjects(clients *clients.Clients, podName string, pullThrough b
 		return nil, err
 	}
 
-	pod, err := createOrGetPod(clients, podName, pullThrough)
+	pod, err := createOrGetPod(clients, podName)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +281,7 @@ func createSharedObjects(clients *clients.Clients, podName string, pullThrough b
 // and returns the CA certificate bytes. Use this for imported clusters that need the CA cert
 // written to their filesystem via registries.yaml rather than through RKEConfig.
 func EnsureRegistryCache(clients *clients.Clients) ([]byte, error) {
-	secret, err := createSharedObjects(clients, "registry-cache", false)
+	secret, err := createSharedObjects(clients, "registry-cache")
 	if err != nil {
 		return nil, err
 	}
@@ -244,10 +290,10 @@ func EnsureRegistryCache(clients *clients.Clients) ([]byte, error) {
 
 // CreateOrGetRegistry gets existing registry config, or creates a new one and returns the config. The registry will
 // be created with the given name in the "default" namespace, and its secrets will be created in the given namespace so
-// that pods created in that namespace can rely on images sourced from the new registry. If pullThrough is set to true,
-// the registry will be configured as a proxy (a.k.a pull-through cache) for docker.io.
-func CreateOrGetRegistry(clients *clients.Clients, namespace, name string, pullThrough bool) (rkev1.Registry, error) {
-	registrySecret, err := createSharedObjects(clients, name, pullThrough)
+// that pods created in that namespace can rely on images sourced from the new registry. The returned config points
+// docker.io at the pull-through cache on port 5000.
+func CreateOrGetRegistry(clients *clients.Clients, namespace, name string) (rkev1.Registry, error) {
+	registrySecret, err := createSharedObjects(clients, name)
 	if err != nil {
 		return rkev1.Registry{}, err
 	}

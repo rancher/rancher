@@ -105,7 +105,7 @@ echo "Using Rancher agent image $CATTLE_AGENT_IMAGE, checking to see if it exist
 
 # checking to see if the image exists - since the tests will timeout if not.
 # checks in the local daemon first (in the case of loading the image direct from the CI build)
-if ! ( docker image inspect 172.17.0.2:5000/$CATTLE_AGENT_IMAGE >/dev/null 2>&1 || docker pull $CATTLE_AGENT_IMAGE >/dev/null 2>&1 ) ; then
+if ! ( docker image inspect 172.17.0.2:5050/$CATTLE_AGENT_IMAGE >/dev/null 2>&1 || docker pull $CATTLE_AGENT_IMAGE >/dev/null 2>&1 ) ; then
     echo "Rancher agent image $CATTLE_AGENT_IMAGE not found - exiting"
     exit 1
   else
@@ -268,9 +268,9 @@ push_cattle_agent_image()
   # we're referring to the docker IP of the current pod...but since the docker socket is from the host localhost
   # won't work. so we refer to it by the internal docker IP of the container to make it all work.
   echo "setting up credentials"
-  docker login -u admin -p admin https://172.17.0.2:5000
+  docker login -u admin -p admin https://172.17.0.2:5050
   echo "pushing ${CATTLE_AGENT_IMAGE}"
-  docker push 172.17.0.2:5000/$CATTLE_AGENT_IMAGE
+  docker push 172.17.0.2:5050/$CATTLE_AGENT_IMAGE
   echo "successfully pushed $CATTLE_AGENT_IMAGE to registry-cache"
 }
 
