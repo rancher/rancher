@@ -140,6 +140,26 @@ jobs:
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
         run: |
           set -eo pipefail
+          
+          if ! command -v iostat >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y sysstat
+          fi
+
+          mkdir -p build
+          LC_ALL=C stdbuf -oL iostat -x -z -y -t 5 > build/iostat.log &
+          IOSTAT_PID=$!
+
+          stop_iostat() {
+            if kill -0 "$IOSTAT_PID" 2>/dev/null; then
+              kill "$IOSTAT_PID"
+              wait "$IOSTAT_PID" || true # Expected SIGTERM exit.
+            else
+              echo "::warning::iostat exited before test completion"
+            fi
+          }
+          trap stop_iostat EXIT
+
           ./scripts/container-run provisioning-tests | tee provtest_output.txt
       - name: Move test results for upload
         if: always()
@@ -162,6 +182,15 @@ jobs:
         with:
           name: "Test Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
+          if-no-files-found: warn
+      - name: Upload IOSTATS Rsults
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: "IOSTATS Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
+          path: |
+            /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*
+            build/iostat.log
           if-no-files-found: warn
       - name: Upload logdump artifact if we had some tests failures
         if: failure()
