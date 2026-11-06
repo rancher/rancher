@@ -34,3 +34,6 @@ jobs:
           pip install tox flake8
       - name: Validate (modules and flake8)
         run: ./scripts/validate
+      - name: Validate (generated build config)
+        if: ${{ !cancelled() }}
+        run: ./scripts/validate-generated
