@@ -89,7 +89,7 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
 FROM --platform=$BUILDPLATFORM go-builder AS images
 ARG TARGETARCH
 WORKDIR /src
-ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.2+k3s1
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
@@ -191,7 +191,7 @@ ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.9
 ENV CATTLE_MACHINE_CHECKSUM_amd64=4b29740046e7309dfbf3664fad6d4fe304f4dc8da8bff4d4e0344f8796ee4050
 ENV CATTLE_MACHINE_CHECKSUM_arm64=d181e58b78931970fe0a098d819b6bde60ff6d1176ccc04c04c8c0d6c088abbe
-ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.2+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.3.0
@@ -401,7 +401,7 @@ COPY --chown=root:root --chmod=0755 \
     --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 #
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.37.1-k3s1 \
+COPY --from=rancher/k3s:v1.37.2-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
