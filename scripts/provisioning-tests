@@ -196,6 +196,9 @@ if ! mountpoint -q "$ETCD_DIR"; then
     || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
 fi
 
+sysctl -w fs.inotify.max_user_instances=8192
+sysctl -w fs.inotify.max_user_watches=1048576
+
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep -m1 '^machineProvisionImage:' build.yaml | cut -d ' ' -f2 >> /var/lib/rancher/$DIST/agent/images/pull.txt
