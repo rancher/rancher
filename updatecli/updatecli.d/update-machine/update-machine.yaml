@@ -105,6 +105,12 @@ targets:
       environments:
         - name: HOME
         - name: PATH
+      changedif:
+        kind: file/checksum
+        spec:
+          files:
+            - 'go.mod'
+            - 'go.sum'
 
   tidy-pkg-apis-go-modules:
     name: 'Run go mod tidy in pkg/apis after updating Rancher Machine'
@@ -118,6 +124,12 @@ targets:
       environments:
         - name: HOME
         - name: PATH
+      changedif:
+        kind: file/checksum
+        spec:
+          files:
+            - 'pkg/apis/go.mod'
+            - 'pkg/apis/go.sum'
 
   update-dockerfile-runtime-machine-version:
     name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in Dockerfile.runtime'
