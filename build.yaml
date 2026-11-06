@@ -13,7 +13,7 @@ rke2ChartDefaultBranch: main
 # The updatecli bump pipelines refresh them; when bumping by hand, update them too or the image build fails.
 machineProvisionImage: rancher/machine:v0.15.0-rancher146-rc.9
 systemAgentVersion: v0.16.0-rc.6
-winsAgentVersion: v0.16.0-rc.9
+winsAgentVersion: v0.16.0-rc.10
 # Charts Versions
 fleetVersion: 111.0.0+up0.17.0-beta.3
 remoteDialerProxyVersion: 111.0.0+up0.9.1-rc.1
