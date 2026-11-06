@@ -18,5 +18,5 @@ const (
 	SystemAgentVersion        = "v0.16.0-rc.6"
 	TurtlesVersion            = "111.0.0+up0.28.0-rc.4"
 	WebhookVersion            = "111.0.0+up0.12.1-rc.16"
-	WinsAgentVersion          = "v0.16.0-rc.9"
+	WinsAgentVersion          = "v0.16.0-rc.10"
 )
