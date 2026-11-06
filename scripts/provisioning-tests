@@ -76,7 +76,7 @@ if [ -z "${V2PROV_TEST_RUN_REGEX}" ]; then
 fi
 
 # Restrict to regex characters so the value can't smuggle extra `go test` flags.
-if ! printf '%s' "${V2PROV_TEST_RUN_REGEX}" | grep -qE '^[A-Za-z0-9_()|.^$*]+$'; then
+if ! printf '%s' "${V2PROV_TEST_RUN_REGEX}" | grep -qE '^[][A-Za-z0-9_()|.^$*?]+$'; then
   echo "error: invalid characters in V2PROV_TEST_RUN_REGEX: ${V2PROV_TEST_RUN_REGEX}" >&2
   exit 1
 fi
@@ -196,6 +196,11 @@ if ! mountpoint -q "$ETCD_DIR"; then
     || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
 fi
 
+# Bump up inode limits to prevent file exhaustion issues during provisioning tests.
+# low inode limits can prevent kubelets from coming up, causing probes to stall.
+sysctl -w fs.inotify.max_user_instances=8192
+sysctl -w fs.inotify.max_user_watches=1048576
+
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep -m1 '^machineProvisionImage:' build.yaml | cut -d ' ' -f2 >> /var/lib/rancher/$DIST/agent/images/pull.txt
@@ -209,14 +214,14 @@ build_and_run_rancher()
     RESTART_COUNT=0
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
-            echo Rancher died
+            echo "$(date -u) Rancher died"
             dump_rancher_logs
-            echo K3s logs were:
+            echo "$(date -u) K3s logs were:"
             echo -e "-----K3S-LOG-DUMP-START-----"
             cat build/testdata/k3s.log | gzip | base64 -w 0
             echo -e "\n-----K3S-LOG-DUMP-END-----"
             set +e
-            echo Attempting to kill K3s
+            echo "$(date -u) Attempting to kill K3s"
             pkill -e k3s
             set -e
             PID=-1
@@ -228,7 +233,7 @@ build_and_run_rancher()
             sleep 5
         fi
         if [ "$PID" = "-1" ]; then
-          echo Starting rancher server using run
+          echo "$(date -u) Starting rancher server using run"
           ./scripts/run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
@@ -374,6 +379,15 @@ if [ -z "${V2PROV_TEST_PARALLELISM}" ]; then
   V2PROV_TEST_PARALLELISM=1
 fi
 
+if [ -z "${V2PROV_TEST_TIMEOUT}" ]; then
+  V2PROV_TEST_TIMEOUT=60m
+fi
+
+if ! printf '%s' "${V2PROV_TEST_TIMEOUT}" | grep -qE '^[0-9]+[mh]$'; then
+  echo "error: V2PROV_TEST_TIMEOUT must be a whole number of minutes or hours (e.g. 300m, 5h), got: ${V2PROV_TEST_TIMEOUT}" >&2
+  exit 1
+fi
+
 if [ -z "${V2PROV_PACKAGE_PARALLELISM}" ]; then
   # The value 3 was chosen based off of the
   # GHA Runner configuration and test suite of rancher/rancher,
@@ -402,9 +416,10 @@ render_test_json() {
     '. as $line | try ($line | fromjson | select(.Action == "output" or .Action == "build-output") | .Output) catch ($line + "\n")'
 }
 
-echo "Running go test with package level parallelism of ${V2PROV_PACKAGE_PARALLELISM} and test parallelism of ${V2PROV_TEST_PARALLELISM}"
+echo "Running go test with package level parallelism of ${V2PROV_PACKAGE_PARALLELISM}, test parallelism of ${V2PROV_TEST_PARALLELISM}, and timeout of ${V2PROV_TEST_TIMEOUT}"
+date -u
 
-go test -run "${V2PROV_TEST_RUN_REGEX}" -json -v -failfast -timeout 60m -p "${V2PROV_PACKAGE_PARALLELISM}" -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... \
+go test -run "${V2PROV_TEST_RUN_REGEX}" -json -v -failfast -timeout "${V2PROV_TEST_TIMEOUT}" -p "${V2PROV_PACKAGE_PARALLELISM}" -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... \
   2> >(tee -a /tmp/out.txt >&2) \
   | tee /tmp/out.json \
   | render_test_json \

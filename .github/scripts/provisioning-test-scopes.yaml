@@ -23,12 +23,26 @@
 #       to carve out a stricter rule for just that file, while every other file in that directory
 #       keeps triggering unconditionally via package-paths.
 #
-#   scopes.<name>.tests : the matrix rows to run when this scope is selected. Each row:
-#       dist        (required) -> V2PROV_TEST_DIST        (k3s | rke2)
-#       regex       (required) -> V2PROV_TEST_RUN_REGEX   (go test -run regex)
-#       features    (optional) -> CATTLE_FEATURES         (omit when unused)
-#       cpus        (optional) -> V2PROV_TEST_CPUS        (16 by default)
-#       parallelism (optional) -> V2PROV_TEST_PARALLELISM (1 by default)
+#   scopes.<name>.tests : the matrix rows to run when this scope is selected. Each row uses
+#       environment variable names directly:
+#       V2PROV_TEST_DIST        (optional, k3s | rke2; defaults to both)
+#       V2PROV_TEST_RUN_REGEX   (required; go test -run regex)
+#       CATTLE_FEATURES         (optional; omitted when unused)
+#       V2PROV_TEST_CPUS        (optional; defaults to 16)
+#       V2PROV_TEST_PARALLELISM (optional; defaults to 1)
+#       V2PROV_TEST_TIMEOUT     (optional; overrides the scope's meta value, see below)
+#       V2PROV_RUNNER_FAMILY    (optional; overrides the scope's meta value, see below)
+#
+#   scopes.<name>.meta : optional defaults applied to every row in the scope (explicit scopes
+#       accept the same block). A row that sets the same key keeps its own value.
+#       V2PROV_TEST_TIMEOUT  : a go duration in minutes or hours (e.g. 300m or 5h). It becomes the
+#           go test -timeout in place of the 60m default. The GitHub job itself is still capped
+#           at 360 minutes, which also has to cover cluster setup before go test starts.
+#       V2PROV_RUNNER_FAMILY : a RunsOn EC2 family (e.g. c6id) for the runner; without one the
+#           runner is c7i-flex on EBS. Setting one requires local NVMe: the job fails if the
+#           instance has none. Families with local NVMe (the "d" variants) get it mounted by RunsOn
+#           over /var/lib/docker, /home/runner and /tmp; the imported etcd tests are limited by
+#           EBS write throughput and run about 25% faster on it.
 #
 #   Tests within a specific scope can be sharded by adding additional test entries,
 #   however care must be taken to ensure that the regexes are mutually exclusive.
@@ -49,35 +63,42 @@
 #            This list is useful when you want to define a test matrix, but don't want it
 #            to be considered when determining what tests to run for a given PR (even if ALL=1).
 #            This can also be useful to track tests that downstream repositories should execute
-#            when importing the provisioning tests.
+#            when importing the provisioning tests. Explicit scopes take the same 'meta' block as
+#            regular scopes, plus 'meta.branches'.
 
 explicit:
   - name: nightly
     meta:
+      V2PROV_TEST_TIMEOUT: 200m
+      V2PROV_RUNNER_FAMILY: c6id
       branches:
         - main
         - release/v2.15
     tests:
       # Give restore and lifecycle-hook tests separate package timeout budgets.
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetE_Imported.*$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetE_Imported.*$' }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
-      - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
-      - { dist: rke2, regex: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
-      - { dist: k3s,  regex: '^Test_Operation_(SetA|SetC)_.*$' }
-      - { dist: k3s,  regex: '^Test_Operation_SetB_.*$' }
-      - { dist: rke2, regex: '^Test_Operation_SetA_.*$', parallelism: 2 }
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation_Service_Argument|ImportedCertificateRotation_Mixed_Role_Service_Argument)$', cpus: 8 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation_Service_Argument|ImportedCertificateRotation_RKE2_TLS_Args|ImportedCertificateRotation_Mixed_Role_Service_Argument)$' }
-      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetE_Imported.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetE_Imported.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetA_.*$', V2PROV_TEST_PARALLELISM: 2 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation_Service_Argument|ImportedCertificateRotation_Mixed_Role_Service_Argument)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneLocal|KubernetesVersionLocal|KubernetesVersionLocalHA|AllLocal)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneS3|KubernetesVersionS3|AllS3)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation_Service_Argument|ImportedCertificateRotation_RKE2_TLS_Args|ImportedCertificateRotation_Mixed_Role_Service_Argument)$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneLocal|KubernetesVersionLocal|KubernetesVersionLocalHA|AllLocal)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneS3|KubernetesVersionS3|AllS3)$', V2PROV_TEST_CPUS: 8 }
 # This field could also track scopes for repos
 # which import the provisioning tests.
 # - name: kdm
@@ -175,8 +196,8 @@ scopes:
           - 'CATTLE_K3S_VERSION'
       - path: '^trigger-basic-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-      - { dist: k3s, regex: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', parallelism: 3 }
+      - { V2PROV_TEST_DIST: k3s, V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', V2PROV_TEST_PARALLELISM: 3 }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
@@ -191,11 +212,11 @@ scopes:
     file-paths:
       - path: '^trigger-operations-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-      - { dist: k3s,  regex: '^Test_Operation_(SetA|SetC)_.*$' }
-      - { dist: k3s,  regex: '^Test_Operation_SetB_.*$' }
-      - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$'}
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetA_.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$', V2PROV_RUNNER_FAMILY: c6id}
 
   imported:
     package-paths:
@@ -209,13 +230,13 @@ scopes:
     file-paths:
       - path: '^trigger-imported-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', cpus: 8 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ETCDSnapshotRestoreModeKubernetesVersionLocalHA|ETCDSnapshotRestoreModeAllS3)$', cpus: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ETCDSnapshotRestoreModeKubernetesVersionLocalHA|ETCDSnapshotRestoreModeAllS3)$', V2PROV_TEST_CPUS: 8 }
 
   prebootstrap:
     package-paths:
@@ -224,8 +245,8 @@ scopes:
     file-paths:
       - path: '^trigger-prebootstrap-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      # rke2 runs this via basic's General row.
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_General_PreBootstrap_.*$', V2PROV_TEST_CPUS: 8 }
 
 full:
   - path: '^build.yaml'
