@@ -245,3 +245,54 @@ func TestIdentifyGRBs(t *testing.T) {
 		})
 	}
 }
+
+func TestIdentifyGRBsMultipleWorkunits(t *testing.T) {
+	t.Parallel()
+
+	workunitList := []migrateUserWorkUnit{
+		{
+			duplicateUsers: []*v3.User{{
+				ObjectMeta: metav1.ObjectMeta{Name: "duplicate-a"},
+			}},
+		},
+		{
+			duplicateUsers: []*v3.User{{
+				ObjectMeta: metav1.ObjectMeta{Name: "duplicate-b"},
+			}},
+		},
+	}
+
+	grb := v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "grb-b"},
+		UserName:   "duplicate-b",
+	}
+	grbList := v3.GlobalRoleBindingList{
+		Items: []v3.GlobalRoleBinding{grb},
+	}
+
+	identifyGRBs(&workunitList, &grbList)
+
+	assert.Empty(t, workunitList[0].duplicateLocalGRBs)
+	assert.Equal(t, []v3.GlobalRoleBinding{grb}, workunitList[1].duplicateLocalGRBs)
+}
+
+func TestIdentifyGRBsMultipleDuplicates(t *testing.T) {
+	t.Parallel()
+
+	workunitList := []migrateUserWorkUnit{{
+		duplicateUsers: []*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "duplicate-a"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "duplicate-b"}},
+		},
+	}}
+	grb := v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "grb-b"},
+		UserName:   "duplicate-b",
+	}
+	grbList := v3.GlobalRoleBindingList{Items: []v3.GlobalRoleBinding{grb}}
+
+	if !assert.NotPanics(t, func() { identifyGRBs(&workunitList, &grbList) }) {
+		return
+	}
+	assert.Equal(t, []v3.GlobalRoleBinding{grb}, workunitList[0].duplicateLocalGRBs)
+}
