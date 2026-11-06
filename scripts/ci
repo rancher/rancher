@@ -11,6 +11,7 @@ if ./only-ui-bumps.sh; then
 fi
 
 ./validate
+./validate-generated
 ./build
 ./package
 ./test
