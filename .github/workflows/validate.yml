@@ -36,3 +36,6 @@ jobs:
         # only use cache on pull requests
       - name: Validate (modules)
         run: ./scripts/validate
+      - name: Validate (generated build config)
+        if: ${{ !cancelled() }}
+        run: ./scripts/validate-generated
