@@ -228,7 +228,10 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	chart, err := index.Get(chartName, version)
 	if err != nil {
 		return nil, err
+	} else if len(chart.URLs) == 0 {
+		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chart.Name, chart.Version, validation.NotFound)
 	}
+	chartURL := chart.URLs[0]
 
 	// Retrieve the clusterRepo
 	repo, err := c.getRepo(namespace, name)
@@ -236,24 +239,26 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	// If the commit status of the repository is not an empty string
-	// Return the Chart through Git without checking the secret
+	// Git-based ClusterRepos load local charts from the checkout. Remote charts (OCI or HTTP)
+	// are pulled from their respective remote locations.
 	if repo.status.Commit != "" {
-		content, err := git.Chart(namespace, name, repo.status.URL, chart)
-		return content, notReady(err)
+		if isLocalChart(chartURL, repo.status.URL) {
+			content, err := git.Chart(namespace, name, repo.status.URL, chart)
+			return content, notReady(err)
+		}
+
+		// The ClusterRepo's secret holds git credentials, never send them to remote registries.
+		switch {
+		case registry.IsOCI(chart.URLs[0]):
+			return oci.Chart(nil, chart, *repo.spec)
+		default:
+			return helmhttp.Chart(nil, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+		}
 	}
 
 	secret, err := catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
 	if err != nil {
 		return nil, err
-	}
-
-	// Check if chart is nil and has at least one URL
-	if chart == nil {
-		return nil, errors.New("chart is nil")
-	}
-	if len(chart.URLs) <= 0 {
-		return nil, errors.New("chart has no urls specified")
 	}
 
 	switch {
@@ -286,6 +291,18 @@ func notReady(err error) error {
 func IsNotReady(err error) bool {
 	var apiErr *apierror.APIError
 	return errors.As(err, &apiErr) && errors.Is(apiErr.Cause, git.ErrNotCheckedOut)
+}
+
+// isLocalChart reports whether a chart URL points to a file inside the local Git repository checkout.
+// Relative paths, file:// URLs, and URLs matching the Git repository URL itself are resolved locally.
+func isLocalChart(chartURL, gitURL string) bool {
+	if !strings.Contains(chartURL, "://") || strings.HasPrefix(chartURL, "file://") {
+		return true
+	}
+	if gitURL != "" && strings.HasPrefix(chartURL, gitURL) {
+		return true
+	}
+	return false
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.
