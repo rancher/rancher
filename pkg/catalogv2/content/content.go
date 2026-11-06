@@ -241,14 +241,17 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 
 	// Git-based ClusterRepos load local charts from the checkout. Remote charts (OCI or HTTP)
 	// are pulled from their respective remote locations, with a local-first check for bundled assets.
+	var secret *corev1.Secret
 	if repo.status.Commit != "" {
 		if !git.IsCheckedOut(name, repo.status.URL) {
 			return nil, notReady(git.ErrNotCheckedOut)
 		}
 
+		// Classic git-based ClusterRepo, charts served from the checkout.
 		if isLocalChart(chartURL, repo.status.URL) {
 			return git.Chart(namespace, name, repo.status.URL, chart)
 		}
+		// otherwise, chart URL is remote
 
 		// Local-first: Check if chart archive is bundled locally in the checkout and matches digest.
 		if localChart, err := git.LocalChart(namespace, name, repo.status.URL, chart); err == nil {
@@ -257,26 +260,21 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 			logrus.Debugf("local-first lookup for chart %s version %s in ClusterRepo %s not served locally: %v", chart.Name, chart.Version, name, err)
 		}
 
-		// The ClusterRepo's secret holds git credentials, never send them to remote registries.
-		switch {
-		case registry.IsOCI(chart.URLs[0]):
-			return oci.Chart(nil, chart, *repo.spec)
-		default:
-			return helmhttp.Chart(nil, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+		// NOTE: OCI chart URLs from a git-based ClusterRepo do not support authentication.
+		// .spec.ClientSecret is overloaded, used to provide secrets for both git and OCI ClusterRepo types.
+		// It is not safe to use this secret for OCI URLs in git-based repos.
+		// We could make an exception with the system charts repository, and inject the default registry auth secret,
+		// but that would too much anticipation, it is not necessary at the moment.
+	} else {
+		secret, err = catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	secret, err := catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
-	if err != nil {
-		return nil, err
-	}
-
 	switch {
-	// For OCI based helm repositories, there is no index.yaml.
-	// We generate index.yaml for it. While generating the index.yaml
-	// we only set index 0 of chart.URLs.
-	case registry.IsOCI(chart.URLs[0]):
-		return oci.Chart(secret, chart, *repo.spec)
+	case registry.IsOCI(chartURL):
+		return oci.Chart(secret, chartURL, *repo.spec)
 	default:
 		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 	}
