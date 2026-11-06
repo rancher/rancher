@@ -196,8 +196,8 @@ scopes:
           - 'CATTLE_K3S_VERSION'
       - path: '^trigger-basic-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-#      - { V2PROV_TEST_DIST: k3s, V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', V2PROV_TEST_PARALLELISM: 3 }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: k3s, V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', V2PROV_TEST_PARALLELISM: 3 }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
@@ -212,10 +212,10 @@ scopes:
     file-paths:
       - path: '^trigger-operations-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-#      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$' }
-#      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$' }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetA_.*$' }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetA_.*$' }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', V2PROV_TEST_PARALLELISM: 3 }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$', V2PROV_RUNNER_FAMILY: c6id}
 
   imported:
@@ -230,13 +230,13 @@ scopes:
     file-paths:
       - path: '^trigger-imported-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
-#      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', V2PROV_TEST_CPUS: 8 }
-#      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_CPUS: 8 }
-#      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_CPUS: 8 }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_PARALLELISM: 3 }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', V2PROV_TEST_PARALLELISM: 3 }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_PARALLELISM: 3 }
-#      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ETCDSnapshotRestoreModeKubernetesVersionLocalHA|ETCDSnapshotRestoreModeAllS3)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', V2PROV_TEST_PARALLELISM: 3 }
+      - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ETCDSnapshotRestoreModeKubernetesVersionLocalHA|ETCDSnapshotRestoreModeAllS3)$', V2PROV_TEST_CPUS: 8 }
 
   prebootstrap:
     package-paths:
