@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/norman/objectclient"
+	rbacv1client "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/types/config"
+
 	normanFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
@@ -1161,4 +1165,63 @@ func TestGrantManagementPlanePrivilegesPRTBWithProjectRoleTemplateNamedCRTTokenR
 			}
 		})
 	}
+}
+
+type fakeRBACInterface struct {
+	rbacv1client.Interface
+	roleBindings func(namespace string) rbacv1client.RoleBindingInterface
+}
+
+func (f *fakeRBACInterface) RoleBindings(namespace string) rbacv1client.RoleBindingInterface {
+	return f.roleBindings(namespace)
+}
+
+// TestEnsureProjectMembershipBindingIgnoresOtherNamespaces verifies that a membership RoleBinding
+// with the same role and subject in another cluster namespace does not prevent creating the
+// binding in the target namespace.
+func TestEnsureProjectMembershipBindingIgnoresOtherNamespaces(t *testing.T) {
+	subject := rbacv1.Subject{APIGroup: rbacv1.GroupName, Kind: "Group", Name: "openldap_group://my-group"}
+	roleName := "demo-projectmember"
+	otherRB := &rbacv1.RoleBinding{
+		ObjectMeta: v1.ObjectMeta{Name: "rb-other", Namespace: "c-m-1"},
+		RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: roleName},
+		Subjects:   []rbacv1.Subject{subject},
+	}
+
+	rbIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		membershipBindingOwnerIndex: func(obj interface{}) ([]string, error) {
+			return rbObjectKeys(obj.(*rbacv1.RoleBinding))
+		},
+		rbByRoleAndSubjectIndex: func(obj interface{}) ([]string, error) {
+			return rbByRoleAndSubject(obj.(*rbacv1.RoleBinding))
+		},
+	})
+	require.NoError(t, rbIndexer.Add(otherRB))
+
+	var created []*rbacv1.RoleBinding
+	rbClient := &rbacFakes.RoleBindingInterfaceMock{
+		CreateFunc: func(rb *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+			created = append(created, rb)
+			return rb, nil
+		},
+		ObjectClientFunc: func() *objectclient.ObjectClient { return nil },
+	}
+	var createdNamespaces []string
+	rbac := &fakeRBACInterface{roleBindings: func(ns string) rbacv1client.RoleBindingInterface {
+		createdNamespaces = append(createdNamespaces, ns)
+		return rbClient
+	}}
+
+	m := &manager{
+		rbIndexer:  rbIndexer,
+		mgmt:       &config.ManagementContext{RBAC: rbac},
+		controller: "test",
+	}
+	project := &v3.Project{ObjectMeta: v1.ObjectMeta{Name: "demo"}}
+
+	err := m.ensureProjectMembershipBinding(roleName, "c-m-2/prtb", "c-m-2", project, false, subject)
+	require.NoError(t, err)
+	require.Len(t, created, 1)
+	assert.Equal(t, roleName, created[0].RoleRef.Name)
+	assert.Contains(t, createdNamespaces, "c-m-2")
 }
