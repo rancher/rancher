@@ -240,11 +240,21 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	}
 
 	// Git-based ClusterRepos load local charts from the checkout. Remote charts (OCI or HTTP)
-	// are pulled from their respective remote locations.
+	// are pulled from their respective remote locations, with a local-first check for bundled assets.
 	if repo.status.Commit != "" {
+		if !git.IsCheckedOut(name, repo.status.URL) {
+			return nil, notReady(git.ErrNotCheckedOut)
+		}
+
 		if isLocalChart(chartURL, repo.status.URL) {
-			content, err := git.Chart(namespace, name, repo.status.URL, chart)
-			return content, notReady(err)
+			return git.Chart(namespace, name, repo.status.URL, chart)
+		}
+
+		// Local-first: Check if chart archive is bundled locally in the checkout and matches digest.
+		if localChart, err := git.LocalChart(namespace, name, repo.status.URL, chart); err == nil {
+			return localChart, nil
+		} else if !errors.Is(err, validation.NotFound) {
+			logrus.Debugf("local-first lookup for chart %s version %s in ClusterRepo %s not served locally: %v", chart.Name, chart.Version, name, err)
 		}
 
 		// The ClusterRepo's secret holds git credentials, never send them to remote registries.
