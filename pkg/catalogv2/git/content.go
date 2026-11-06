@@ -39,9 +39,10 @@ func Chart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.
 	if !IsCheckedOut(name, gitURL) {
 		return nil, ErrNotCheckedOut
 	}
+	return loadChart(RepoDir(namespace, name, gitURL), gitURL, chartVersion)
+}
 
-	dir := RepoDir(namespace, name, gitURL)
-
+func loadChart(dir, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, error) {
 	if len(chartVersion.URLs) == 0 {
 		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chartVersion.Name, chartVersion.Version, validation.NotFound)
 	}
