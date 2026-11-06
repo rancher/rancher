@@ -280,6 +280,8 @@ func createSharedObjects(clients *clients.Clients, podName string) (*corev1.Secr
 // EnsureRegistryCache ensures the shared registry-cache pod, service, and TLS secret exist
 // and returns the CA certificate bytes. Use this for imported clusters that need the CA cert
 // written to their filesystem via registries.yaml rather than through RKEConfig.
+// scripts/provisioning-tests normally creates these objects before the tests run (via
+// tests/v2prov/cmd/ensure-registry-cache), in which case they are reused here.
 func EnsureRegistryCache(clients *clients.Clients) ([]byte, error) {
 	secret, err := createSharedObjects(clients, "registry-cache")
 	if err != nil {

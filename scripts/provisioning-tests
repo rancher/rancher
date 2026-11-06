@@ -252,25 +252,19 @@ export -f dump_rancher_logs
 
 push_cattle_agent_image()
 {
-  echo "pushing local cattle-agent image - waiting for registry-cache to be available"
-
-  ./scripts/retry \
-    --timeout 300 \
-    --sleep 2 \
-    --message "registry-cache was not available after {{elapsed}} seconds" \
-    --message-interval 30 \
-    --exit-command "echo registry-cache never came up. RIP" \
-    "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pod registry-cache -n default &>/dev/null"
-
-  echo "registry-cache pod found! waiting for pod to be running"
-  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=ready pod/registry-cache -n default
+  # The registry-cache pod is created before this runs (see ensure-registry-cache below).
+  # This function is called on the left of `||`, which disables `set -e`, so every
+  # step returns explicitly on failure.
+  echo "pushing local cattle-agent image - waiting for registry-cache to be ready"
+  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=ready pod/registry-cache -n default --timeout=120s || return 1
 
   # we're referring to the docker IP of the current pod...but since the docker socket is from the host localhost
   # won't work. so we refer to it by the internal docker IP of the container to make it all work.
   echo "setting up credentials"
-  docker login -u admin -p admin https://172.17.0.2:5050
+  timeout 120 ./scripts/retry --timeout 90 --sleep 5 "docker login -u admin -p admin https://172.17.0.2:5050" || return 1
   echo "pushing ${CATTLE_AGENT_IMAGE}"
-  docker push 172.17.0.2:5050/$CATTLE_AGENT_IMAGE
+  # Retry briefly in case the registry has only just started.
+  timeout 120 ./scripts/retry --timeout 90 --sleep 5 "docker push 172.17.0.2:5050/$CATTLE_AGENT_IMAGE" || return 1
   echo "successfully pushed $CATTLE_AGENT_IMAGE to registry-cache"
 }
 
@@ -321,6 +315,12 @@ echo "Pre-compiling provisioning test binaries in the background"
 ) >/tmp/precompile.log 2>&1 &
 PRECOMPILE_PID=$!
 
+# Build the helper that creates the shared registry-cache before the tests run.
+echo "Building registry-cache helper in the background"
+go build -o /tmp/ensure-registry-cache ./tests/v2prov/cmd/ensure-registry-cache \
+  >/tmp/ensure-registry-cache-build.log 2>&1 &
+ENSURE_REGISTRY_BUILD_PID=$!
+
 # The remotedialer-proxy is pulled in by the api-extension deployment
 echo "Waiting up to 5 minutes for the api-extension deployment"
 ./scripts/retry \
@@ -360,9 +360,25 @@ echo "Waiting up to 5 minutes for capi-controller-manager deployment"
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-capi-system &>/dev/null \
     && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-capi-system deploy/capi-controller-manager &>/dev/null"
 
+# Create the shared registry-cache pod/service/secret before any test starts, so the agent
+# image is in the registry before tests need it and a broken registry fails setup quickly
+# instead of timing out the tests. The tests reuse these objects.
+echo "Ensuring registry-cache exists before running tests"
+wait "$ENSURE_REGISTRY_BUILD_PID" || {
+  echo "failed to build registry-cache helper:"
+  cat /tmp/ensure-registry-cache-build.log || true
+  exit 1
+}
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml timeout 600 /tmp/ensure-registry-cache || {
+  echo "registry-cache could not be created"
+  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml describe pod registry-cache -n default || true
+  dump_rancher_logs
+  exit 1
+}
+
 # only push the image if we're not using the default image:tag
 if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
-  ( push_cattle_agent_image & )
+  push_cattle_agent_image || { echo "failed to push ${CATTLE_AGENT_IMAGE}"; exit 1; }
 fi
 
 echo Running provisioning-tests: "${V2PROV_TEST_RUN_REGEX}"
