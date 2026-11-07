@@ -1,8 +1,6 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.26.0
-
-toolchain go1.26.10
+go 1.26.10
 
 replace (
 	k8s.io/api => k8s.io/api v0.35.6
@@ -40,7 +38,7 @@ require (
 	github.com/rancher/eks-operator v1.14.7
 	github.com/rancher/fleet/pkg/apis v0.15.8
 	github.com/rancher/gke-operator v1.14.8
-	github.com/rancher/norman v0.8.9
+	github.com/rancher/norman v0.8.10
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/wrangler/v3 v3.6.1
 	github.com/sirupsen/logrus v1.9.4
