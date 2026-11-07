@@ -1,6 +1,9 @@
 package git
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,9 +42,10 @@ func Chart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.
 	if !IsCheckedOut(name, gitURL) {
 		return nil, ErrNotCheckedOut
 	}
+	return loadChart(RepoDir(namespace, name, gitURL), gitURL, chartVersion)
+}
 
-	dir := RepoDir(namespace, name, gitURL)
-
+func loadChart(dir, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, error) {
 	if len(chartVersion.URLs) == 0 {
 		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chartVersion.Name, chartVersion.Version, validation.NotFound)
 	}
@@ -59,6 +63,54 @@ func Chart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.
 	}
 
 	return archive.Open()
+}
+
+// LocalChart returns a chart version from the local repository checkout when its index entry points
+// at a remote URL (such as an oci:// or http(s):// reference). The chart is looked up at the
+// conventional assets/<name>/<name>-<version>.tgz path and verified against chartVersion.Digest.
+func LocalChart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, error) {
+	if !IsCheckedOut(name, gitURL) {
+		return nil, ErrNotCheckedOut
+	}
+	assetPath := path.Join("assets", chartVersion.Name, fmt.Sprintf("%s-%s.tgz", chartVersion.Name, chartVersion.Version))
+	return openChartArchive(RepoDir(namespace, name, gitURL), gitURL, assetPath, chartVersion.Digest)
+}
+
+// openChartArchive resolves a relative path inside the repository checkout, opens the chart archive,
+// and verifies its SHA-256 digest against expectedDigest if provided.
+func openChartArchive(dir, gitURL, chartPath, expectedDigest string) (io.ReadCloser, error) {
+	file, err := relative(dir, gitURL, chartPath)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.Open(file)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("failed to find chart at %s: %w", file, validation.NotFound)
+		}
+		return nil, err
+	}
+
+	if expectedDigest != "" {
+		h := sha256.New()
+		if _, err := io.Copy(h, f); err != nil {
+			f.Close()
+			return nil, err
+		}
+		actual := hex.EncodeToString(h.Sum(nil))
+		expected := strings.TrimPrefix(strings.ToLower(expectedDigest), "sha256:")
+		if !strings.EqualFold(actual, expected) {
+			f.Close()
+			return nil, fmt.Errorf("chart %s has digest %s, index expects %s: %w", file, actual, expectedDigest, validation.NotFound)
+		}
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			f.Close()
+			return nil, err
+		}
+	}
+
+	return f, nil
 }
 
 func relative(base, publicURL, path string) (string, error) {
