@@ -31,7 +31,7 @@ jobs:
       TARGET_BRANCH: ${{ matrix.branch }}
     steps:
       - name: Get App secrets
-        uses: rancher-eio/read-vault-secrets@dfae8acd43a9e170fca5f90168da22f814fe4e9a # main
+        uses: rancher-eio/read-vault-secrets@4c8f4e741954651c502bb7739c46ae1bad26b44d # main
         with:
           # We use Renovate's App token, because it has the same permissions
           # needed and serves the same purpose.
