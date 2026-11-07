@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -25,6 +26,7 @@ func TestServeHTTP(t *testing.T) {
 		ctx                            func() context.Context
 		wantHeader                     http.Header
 		wantErr                        string
+		wantForwardedHost              string
 	}{
 		"get impersonation token": {
 			header: map[string][]string{},
@@ -137,17 +139,60 @@ func TestServeHTTP(t *testing.T) {
 			wantHeader: map[string][]string{},
 			wantErr:    "Unauthorized 401",
 		},
+		"upgrade request host propagation": {
+			header: map[string][]string{
+				"Upgrade": {"websocket"},
+			},
+			ctx: func() context.Context {
+				ctx := context.TODO()
+				ctx = request.WithUser(ctx, &user.DefaultInfo{
+					Name: "user",
+					UID:  "user",
+				})
+				return ctx
+			},
+			impersonatorAccountTokenGetter: func(_ user.Info, _ ClusterContextGetter, _ string) (string, error) {
+				return "fake-token", nil
+			},
+			wantHeader: map[string][]string{
+				"Authorization": {"Bearer fake-token"},
+				"Upgrade":       {"websocket"},
+			},
+			wantErr:          "",
+			wantForwardedHost: "target-host.com",
+		},
+		"normal request host propagation": {
+			header: map[string][]string{},
+			ctx: func() context.Context {
+				ctx := context.TODO()
+				ctx = request.WithUser(ctx, &user.DefaultInfo{
+					Name: "user",
+					UID:  "user",
+				})
+				return ctx
+			},
+			impersonatorAccountTokenGetter: func(_ user.Info, _ ClusterContextGetter, _ string) (string, error) {
+				return "fake-token", nil
+			},
+			wantHeader: map[string][]string{
+				"Authorization": {"Bearer fake-token"},
+			},
+			wantErr:          "",
+			wantForwardedHost: "target-host.com",
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			mt := &mockTransport{}
 			r := RemoteService{
 				transport: func() (http.RoundTripper, error) {
-					return http.DefaultTransport, nil
+					return mt, nil
 				},
 				url: func() (url.URL, error) {
-					return url.URL{}, nil
+					u, _ := url.Parse("https://target-host.com")
+					return *u, nil
 				},
 				cluster: &v3.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
@@ -169,6 +214,10 @@ func TestServeHTTP(t *testing.T) {
 			r.ServeHTTP(rw, req)
 
 			assert.Equal(t, test.wantHeader, req.Header)
+			if test.wantForwardedHost != "" {
+				assert.NotNil(t, mt.lastReq)
+				assert.Equal(t, test.wantForwardedHost, mt.lastReq.Host)
+			}
 			if test.wantErr != "" {
 				bodyBytes, err := io.ReadAll(rw.Body)
 				assert.NoError(t, err)
@@ -176,5 +225,16 @@ func TestServeHTTP(t *testing.T) {
 			}
 		})
 	}
+}
 
+type mockTransport struct {
+	lastReq *http.Request
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	m.lastReq = req
+	return &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(strings.NewReader("ok")),
+	}, nil
 }
