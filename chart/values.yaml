@@ -235,7 +235,6 @@ certmanager:
 customLogos:
   enabled: false
   volumeSubpaths:
-    emberUi: "ember"
     vueUi: "vue"
   ## Volume kind to use for persistence: persistentVolumeClaim, configMap
   volumeKind: persistentVolumeClaim
