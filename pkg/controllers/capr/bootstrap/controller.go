@@ -565,7 +565,7 @@ func (h *handler) OnRemove(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEB
 // object, which is used to prevent premature tear down of infrastructure before it is ready to be teared down, i.e.
 // allowing removal of an etcd member without causing quorum loss.
 // The pre-terminate hook will be set on the machine object if the machine and bootstrap are not deleting, the corresponding
-// CAPI cluster and RKEControlPlane are not deleting, and the force remove annotation is not set on the bootstrap.
+// CAPI cluster and RKEControlPlane are not deleting, and an explicit force-remove annotation is not set on the bootstrap.
 // The annotation will be removed from the machine to allow infrastructure cleanup in the following cases:
 // * The machine is deleting and the "safe remove" logic has fired and removed the etcd member from the etcd cluster
 // * The bootstrap is missing the CAPI cluster label || the CAPI cluster controlPlaneRef is nil || the machine noderef is nil

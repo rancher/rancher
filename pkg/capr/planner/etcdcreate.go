@@ -147,7 +147,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 	case rkev1.ETCDSnapshotPhaseStarted:
 		var stateSet bool
 		var finErrs []error
-		found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
+		found, joinServer, _, err := p.findInitNodeForOperation(controlPlane, clusterPlan)
 		if err != nil {
 			logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during etcd snapshot creation: %v", controlPlane.Namespace, controlPlane.Name, err)
 			return status, err

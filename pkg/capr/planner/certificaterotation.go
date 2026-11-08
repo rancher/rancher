@@ -20,7 +20,9 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		return status, nil
 	}
 
-	found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
+	// During a protected etcd hand-off there is no usable init node, so a rotation waits here.
+	// A rotation that already paused the CAPI cluster stays paused until someone unpauses it.
+	found, joinServer, _, err := p.findInitNodeForOperation(controlPlane, clusterPlan)
 	if err != nil {
 		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during certificate rotation: %v", controlPlane.Namespace, controlPlane.Name, err)
 		return status, err
