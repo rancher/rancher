@@ -1,18 +1,16 @@
 module github.com/rancher/rancher/pkg/client
 
-go 1.26.0
-
-toolchain go1.26.10
+go 1.26.10
 
 require (
-	github.com/rancher/norman v0.9.11
+	github.com/rancher/norman v0.9.14
 	k8s.io/apimachinery v0.36.6
 )
 
 require (
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.6 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rancher/wrangler/v3 v3.7.2 // indirect
