@@ -114,7 +114,7 @@ func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *t
 
 	proof.delete(t)
 
-	op := RunETCDSnapshotRestoreOperationTest(t, cs, fx.MgmtClusterName, restoreName, fx.MgmtClusterRef(),
+	op := RunETCDSnapshotRestoreOperationTest(t, cs, fx.MgmtClusterName, restoreName, fx.MgmtClusterRef(), "",
 		WithRestoreMode(rkev1.RestoreRKEConfigKubernetesVersion),
 		WithRestoreTTL(-1))
 	require.NotNil(t, op)
@@ -172,7 +172,7 @@ func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeAll(t *testing.T) {
 
 	proof.delete(t)
 
-	op := RunETCDSnapshotRestoreOperationTest(t, cs, fx.MgmtClusterName, restoreName, fx.MgmtClusterRef(),
+	op := RunETCDSnapshotRestoreOperationTest(t, cs, fx.MgmtClusterName, restoreName, fx.MgmtClusterRef(), "",
 		WithRestoreMode(rkev1.RestoreRKEConfigAll),
 		WithRestoreTTL(-1))
 	require.NotNil(t, op)
