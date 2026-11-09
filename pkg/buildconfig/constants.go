@@ -10,7 +10,7 @@ const (
 	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.4"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4-rc.1"
 	DefaultShellVersion       = "rancher/shell:v0.9.1-rc.2"
-	FleetVersion              = "111.0.0+up0.17.0-beta.3"
+	FleetVersion              = "111.0.0+up0.17.0-rc.1"
 	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.9"
 	PartnerChartDefaultBranch = "main"
 	RemoteDialerProxyVersion  = "111.0.0+up0.9.1-rc.1"
