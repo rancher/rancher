@@ -1033,6 +1033,12 @@ echo "===== crictl ps -a"; cri ps -a 2>&1`,
   echo "===== $f"
   case "$f" in *.gz) zcat "$f" ;; *) cat "$f" ;; esac
 done`,
+	// Matches on the unit or the syslog identifier, since journald can fail to attribute a nested systemd node's processes to
+	// their unit. The header shows how far back the in-memory journal still goes, in case the entries rotated out.
+	"systemAgentLogs": `echo "===== systemctl status"; systemctl status rancher-system-agent --no-pager 2>&1 | head -n 12
+echo "===== journal usage"; journalctl --disk-usage 2>&1
+echo "===== oldest journal entry"; journalctl --no-pager -q -o short-precise 2>&1 | head -n 1
+echo "===== journalctl"; journalctl --no-pager -o short-precise _SYSTEMD_UNIT=rancher-system-agent.service + UNIT=rancher-system-agent.service + SYSLOG_IDENTIFIER=rancher-system-agent 2>&1`,
 }
 
 // GatherImportedDownstreamData collects the downstream cluster's view of an imported cluster whose nodes run as pods in
