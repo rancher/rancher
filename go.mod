@@ -126,8 +126,8 @@ require (
 	github.com/rancher/cluster-api-provider-rke2 v0.27.1
 	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.16.0-rc.3
-	github.com/rancher/fleet/pkg/apis v0.17.0-beta.3
-	github.com/rancher/fleet/pkg/helmvalues v0.17.0-beta.3
+	github.com/rancher/fleet/pkg/apis v0.17.0-rc.1
+	github.com/rancher/fleet/pkg/helmvalues v0.17.0-rc.1
 	github.com/rancher/gke-operator v1.16.0-rc.4
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
@@ -167,9 +167,9 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	helm.sh/helm/v4 v4.3.1
-	k8s.io/api v0.37.1
+	k8s.io/api v0.37.2
 	k8s.io/apiextensions-apiserver v0.37.1
-	k8s.io/apimachinery v0.37.1
+	k8s.io/apimachinery v0.37.2
 	k8s.io/apiserver v0.37.1
 	k8s.io/cli-runtime v0.37.1
 	k8s.io/client-go v12.0.0+incompatible
