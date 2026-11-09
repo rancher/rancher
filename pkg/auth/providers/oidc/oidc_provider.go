@@ -1129,11 +1129,10 @@ func getRawClaim(idToken *oidc.IDToken, name string) (any, error) {
 }
 
 func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
-	isSecure := req.URL.Scheme == "https"
 	pkceCookie := &http.Cookie{
 		Name:     pkceVerifierCookieName,
 		Value:    "",
-		Secure:   isSecure,
+		Secure:   true,
 		Path:     "/",
 		HttpOnly: true,
 		// Lax is the default in most browsers; setting it
@@ -1148,11 +1147,10 @@ func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
 // SetPKCEVerifier sets Cookie with the PKCE Verification token which is needed
 // when the user's browser is redirected back to exchange the token.
 func SetPKCEVerifier(req *http.Request, w http.ResponseWriter, value string) {
-	isSecure := req.URL.Scheme == "https"
 	pkceCookie := &http.Cookie{
 		Name:     pkceVerifierCookieName,
 		Value:    value,
-		Secure:   isSecure,
+		Secure:   true,
 		Path:     "/",
 		HttpOnly: true,
 		// Lax is the default in most browsers; setting it
@@ -1165,11 +1163,10 @@ func SetPKCEVerifier(req *http.Request, w http.ResponseWriter, value string) {
 }
 
 func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
-	isSecure := req.URL.Scheme == "https"
 	tokenCookie := &http.Cookie{
 		Name:     IDTokenCookie,
 		Value:    token,
-		Secure:   isSecure,
+		Secure:   true,
 		Path:     "/",
 		HttpOnly: true,
 		// Lax is the default in most browsers; setting it

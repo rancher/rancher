@@ -734,7 +734,8 @@ func TestLogoutAll(t *testing.T) {
 func TestSetIDTokenCookie(t *testing.T) {
 	t.Parallel()
 
-	r := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/", nil)
+	// Server-side requests carry no URL scheme, so Secure must not depend on it.
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	setIDTokenCookie(r, w, "my.id.token")
 
@@ -750,6 +751,8 @@ func TestSetIDTokenCookie(t *testing.T) {
 	require.NotNil(t, found, "expected %s cookie to be set", IDTokenCookie)
 	assert.Equal(t, "my.id.token", found.Value)
 	assert.True(t, found.HttpOnly)
+	assert.True(t, found.Secure)
+	assert.Equal(t, http.SameSiteLaxMode, found.SameSite)
 }
 
 func TestGetPrincipalRejectsOtherConfig(t *testing.T) {
