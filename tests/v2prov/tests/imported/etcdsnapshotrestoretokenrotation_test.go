@@ -224,7 +224,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreTokenRotation(t *te
 	// plan reuse across operations: the refused restore left its preflight plan on the machine-plan
 	// secret, so unless this operation's plan is distinct from it the node is never asked to hash its
 	// token again and this restore is refused on the previous operation's output.
-	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.ns.Name, snapshot.Name, fx.clusterRef, fx.ns.Name)
+	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.ns.Name, snapshot.Name, fx.clusterRef)
 	t.Logf("snapshot restore operation %s/%s completed", restoreOp.Namespace, restoreOp.Name)
 
 	cm.assertRestored(t, fx)
