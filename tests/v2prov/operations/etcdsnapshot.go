@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,11 +44,7 @@ func configMapNamespace(configMap corev1.ConfigMap) string {
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
 	defer func() {
 		if t.Failed() {
-			data, newErr := cluster.GatherDebugData(clients, c)
-			if newErr != nil {
-				logrus.Error(newErr)
-			}
-			fmt.Printf("cluster %s etcd snapshot creation operation failed\ncluster %s test data bundle: \n%s\n", c.Name, c.Name, data)
+			PrintDebugData(clients, c, "etcd snapshot creation operation")
 		}
 	}()
 
@@ -250,11 +245,7 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 	defer func() {
 		if t.Failed() {
-			data, newErr := cluster.GatherDebugData(clients, c)
-			if newErr != nil {
-				logrus.Error(newErr)
-			}
-			fmt.Printf("cluster %s etcd snapshot restore operation failed\ncluster %s test data bundle: \n%s\n", c.Name, c.Name, data)
+			PrintDebugData(clients, c, "etcd snapshot restore operation")
 		}
 	}()
 
