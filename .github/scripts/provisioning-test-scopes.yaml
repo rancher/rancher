@@ -209,6 +209,7 @@ scopes:
       - '^pkg/operations/'                            # also imported
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
+      - '^tests/v2prov/tests/operations/'
     file-paths:
       - path: '^trigger-operations-ci$' # created by the 'Create CI Testing PR' workflow
     tests:

@@ -200,8 +200,18 @@ func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) s
 }
 
 func handleError(t *testing.T, clients *clients.Clients, name string, err error) {
+	handleErrorWithDownstream(t, clients, name, "", err)
+}
+
+// handleErrorWithDownstream is handleError that, when nodeNamespace is set, also includes the downstream cluster's pods and
+// cattle-cluster-agent logs, gathered from the imported node pods in nodeNamespace.
+func handleErrorWithDownstream(t *testing.T, clients *clients.Clients, name, nodeNamespace string, err error) {
 	if err != nil {
 		objs := map[string]any{}
+
+		if nodeNamespace != "" {
+			objs["downstream"] = cluster.GatherImportedDownstreamData(clients, nodeNamespace)
+		}
 
 		c, newErr := clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
 		if newErr != nil {

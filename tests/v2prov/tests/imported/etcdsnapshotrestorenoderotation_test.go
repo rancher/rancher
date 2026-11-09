@@ -94,7 +94,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 
 	proof.delete(t, fx)
 
-	RunETCDSnapshotRestoreOperationTest(t, cs, fx.mgmtCluster.Name, restoreName, fx.clusterRef)
+	RunETCDSnapshotRestoreOperationTest(t, cs, fx.mgmtCluster.Name, restoreName, fx.clusterRef, fx.ns.Name)
 
 	proof.assertRestored(t, fx)
 	assertImportedServersConverged(t, cs, fx, importedETCDPods(t, cs, fx), version)

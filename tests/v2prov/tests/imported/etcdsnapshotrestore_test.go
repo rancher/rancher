@@ -142,7 +142,7 @@ func runRestoreScenario(
 	if restoreByCRName {
 		restoreName = snapshot.Name
 	}
-	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.ns.Name, restoreName, fx.clusterRef)
+	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.ns.Name, restoreName, fx.clusterRef, fx.ns.Name)
 	t.Logf("snapshot restore operation %s/%s completed", restoreOp.Namespace, restoreOp.Name)
 
 	cm.assertRestored(t, fx)
