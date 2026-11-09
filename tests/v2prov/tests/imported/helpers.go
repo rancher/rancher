@@ -86,15 +86,19 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 		t.Fatal(err)
 	}
 
+	endPhase := phase(t, "setup/registry")
 	registryCACert, err := registry.EnsureRegistryCache(clients)
 	if err != nil {
 		t.Fatal(err)
 	}
+	endPhase()
 
+	endPhase = phase(t, "setup/pods")
 	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, k8sVersion, pools, nil, registryCACert, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
+	endPhase()
 
 	// Sanity-check the pool sum matches what came back; downstream tests index pods[0] as the init
 	// node and would fail with a confusing nil deref if the pool/pod counts diverged.
@@ -143,16 +147,19 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 
 	// Poll the inner API server. The kubeconfig file appears slightly before the API is actually
 	// serving; without this loop the import-command exec races and intermittently fails.
-	for i := 0; i < 60; i++ {
+	endPhase = phase(t, "setup/api")
+	limit := 120
+	for i := 0; i < limit; i++ {
 		_, err := execKubectl(t, "kubectl get nodes")
 		if err == nil {
 			break
 		}
-		if i == 59 {
+		if i == limit-1 {
 			t.Fatalf("timed out waiting for %s API server to be ready: %v", distro, err)
 		}
 		time.Sleep(5 * time.Second)
 	}
+	endPhase()
 
 	fx := &importedClusterFixture{
 		ns:          ns,
@@ -167,9 +174,12 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 		kubectlEnv:  kubectlEnv,
 	}
 	if beforeImport != nil {
+		endPhase = phase(t, "setup/before-import")
 		beforeImport(fx)
+		endPhase()
 	}
 
+	endPhase = phase(t, "setup/import")
 	if out, err := execKubectl(t, importCmd); err != nil {
 		t.Fatalf("import command failed: %v\noutput: %s", err, out)
 	}
@@ -179,9 +189,25 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
 	})
 	handleError(t, clients, mgmtCluster.Name, err)
+	endPhase()
 
 	fx.mgmtCluster = mgmtCluster
 	return fx
+}
+
+// phase logs a start marker for the named phase and returns a func that logs its end. The markers
+// carry UTC timestamps so a run's phases can be lined up with host telemetry. A phase with a start
+// and no end was in progress when the test failed.
+func phase(t *testing.T, name string) func() {
+	t.Helper()
+
+	start := time.Now()
+	t.Logf("PHASE %s start %s", name, start.UTC().Format(time.RFC3339Nano))
+	return func() {
+		t.Helper()
+		end := time.Now()
+		t.Logf("PHASE %s end %s elapsed=%s", name, end.UTC().Format(time.RFC3339Nano), end.Sub(start).Round(time.Millisecond))
+	}
 }
 
 // initNodeDataDirFromPools returns the configured data directory of the bootstrap etcd pool (the
@@ -200,8 +226,18 @@ func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) s
 }
 
 func handleError(t *testing.T, clients *clients.Clients, name string, err error) {
+	handleErrorWithDownstream(t, clients, name, "", err)
+}
+
+// handleErrorWithDownstream is handleError that, when nodeNamespace is set, also includes the downstream cluster's pods and
+// cattle-cluster-agent logs, gathered from the imported node pods in nodeNamespace.
+func handleErrorWithDownstream(t *testing.T, clients *clients.Clients, name, nodeNamespace string, err error) {
 	if err != nil {
 		objs := map[string]any{}
+
+		if nodeNamespace != "" {
+			objs["downstream"] = cluster.GatherImportedDownstreamData(clients, nodeNamespace)
+		}
 
 		c, newErr := clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
 		if newErr != nil {
