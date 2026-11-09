@@ -728,6 +728,26 @@ func TestGetManagementPlaneRules(t *testing.T) {
 					APIGroups: []string{"rke.cattle.io"},
 					Verbs:     []string{"*"},
 				},
+				{
+					Resources: []string{"etcdsnapshotsaves"},
+					APIGroups: []string{"operation.cattle.io"},
+					Verbs:     []string{"*"},
+				},
+				{
+					Resources: []string{"etcdsnapshotrestores"},
+					APIGroups: []string{"operation.cattle.io"},
+					Verbs:     []string{"*"},
+				},
+				{
+					Resources: []string{"encryptionkeyrotations"},
+					APIGroups: []string{"operation.cattle.io"},
+					Verbs:     []string{"*"},
+				},
+				{
+					Resources: []string{"certificaterotations"},
+					APIGroups: []string{"operation.cattle.io"},
+					Verbs:     []string{"*"},
+				},
 			},
 		},
 		{
