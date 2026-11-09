@@ -64,6 +64,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreStaleAddressOutsideLeaderCe
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	requireHostIPFamilies(t, cs, []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol})
 

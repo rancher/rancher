@@ -49,6 +49,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},

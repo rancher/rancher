@@ -29,6 +29,7 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	newNs, err := namespace.Random(clients)
 	if err != nil {

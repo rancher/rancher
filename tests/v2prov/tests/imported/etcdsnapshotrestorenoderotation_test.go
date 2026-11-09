@@ -46,6 +46,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	const displayName = "test-imported-restore-rotated-s3"
 	version := defaults.SomeK8sVersion
