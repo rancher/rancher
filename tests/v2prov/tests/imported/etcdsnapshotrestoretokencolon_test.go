@@ -128,7 +128,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreColonToken(t *testi
 	cm.delete(t, fx)
 
 	// The token has not changed since the snapshot was taken, so this restore must succeed.
-	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.ns.Name, snapshot.Name, fx.clusterRef, fx.ns.Name)
+	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.ns.Name, snapshot.Name, fx.clusterRef)
 	t.Logf("snapshot restore operation %s/%s completed", restoreOp.Namespace, restoreOp.Name)
 
 	cm.assertRestored(t, fx)

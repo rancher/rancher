@@ -168,7 +168,7 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	if opts.UseSnapshotFileName {
 		snapshotRef = snapshot.SnapshotFile.Name
 	}
-	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.Namespace, snapshotRef, capiClusterRef, "")
+	restoreOp := RunETCDSnapshotRestoreOperationTest(t, cs, fx.Namespace, snapshotRef, capiClusterRef)
 	t.Logf("snapshot restore operation %s/%s completed (snapshotRef=%s)", restoreOp.Namespace, restoreOp.Name, snapshotRef)
 
 	// Poll the configmap back into existence. The apiserver bounces during a restore so the first

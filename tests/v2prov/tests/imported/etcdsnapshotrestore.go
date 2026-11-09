@@ -194,9 +194,8 @@ func buildSnapshotRestoreOp(namespace, snapshotName string, clusterRef corev1.Ob
 // RunETCDSnapshotRestoreOperationTest creates an ETCDSnapshotRestore operation targeting the given
 // clusterRef and waits for it to reach the Succeeded phase. Mirrors RunETCDSnapshotSaveOperationTest
 // — exercises the operation.cattle.io/v1alpha1 ETCDSnapshotRestore controller end-to-end. Pass
-// options (e.g. WithRestoreLabels) to mutate the operation object before creation. nodeNamespace, when set, is the
-// namespace of the imported node pods, used to include the downstream cluster's view in the failure bundle.
-func RunETCDSnapshotRestoreOperationTest(t *testing.T, clients *clients.Clients, namespace, snapshotName string, clusterRef corev1.ObjectReference, nodeNamespace string, opts ...SnapshotRestoreOption) *opv1alpha1.ETCDSnapshotRestore {
+// options (e.g. WithRestoreLabels) to mutate the operation object before creation.
+func RunETCDSnapshotRestoreOperationTest(t *testing.T, clients *clients.Clients, namespace, snapshotName string, clusterRef corev1.ObjectReference, opts ...SnapshotRestoreOption) *opv1alpha1.ETCDSnapshotRestore {
 	t.Helper()
 
 	op, err := clients.Operation.ETCDSnapshotRestore().Create(buildSnapshotRestoreOp(namespace, snapshotName, clusterRef, opts...))
@@ -215,7 +214,7 @@ func RunETCDSnapshotRestoreOperationTest(t *testing.T, clients *clients.Clients,
 		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded, nil
 	})
 	if err != nil {
-		handleErrorWithDownstream(t, clients, clusterRef.Name, nodeNamespace, err)
+		handleError(t, clients, clusterRef.Name, err)
 	}
 
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
