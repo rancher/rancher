@@ -66,7 +66,6 @@ explicit:
   - name: nightly
     meta:
       V2PROV_TEST_TIMEOUT: 200m
-      V2PROV_RUNNER_FAMILY: c6id
       branches:
         - main
         - release/v2.15
@@ -77,6 +76,7 @@ explicit:
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_General_PreBootstrap_.*$', V2PROV_TEST_CPUS: 8 }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$' }
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$' }
@@ -97,8 +97,7 @@ explicit:
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneS3|KubernetesVersionS3|AllS3)$', V2PROV_TEST_CPUS: 8 }
   - name: kdm
     meta:
-      V2PROV_TEST_TIMEOUT: 200m
-      V2PROV_RUNNER_FAMILY: c6id
+      V2PROV_TEST_TIMEOUT: 60m
     tests:
       - { V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$', V2PROV_TEST_RUN_ON_RELEASE: true }
       - { V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$', V2PROV_TEST_RUN_ON_RELEASE: true }
