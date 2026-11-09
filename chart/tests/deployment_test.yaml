@@ -428,6 +428,9 @@ tests:
     - notExists:
         path: spec.template.spec.containers[0].lifecycle
 - it: should sleep in preStop when preStopSleepSeconds is set
+  capabilities:
+    majorVersion: 1
+    minorVersion: 30
   set:
     preStopSleepSeconds: 10
   asserts:
