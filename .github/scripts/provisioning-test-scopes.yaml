@@ -68,6 +68,7 @@ explicit:
       V2PROV_TEST_TIMEOUT: 200m
       branches:
         - main
+        - release/v2.16
         - release/v2.15
     tests:
       # Give restore and lifecycle-hook tests separate package timeout budgets.
