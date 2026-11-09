@@ -320,7 +320,6 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 
 func areSecretsSame(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
 	return reflect.DeepEqual(s1.Data, s2.Data) &&
-		s1.Labels[ProjectScopedSecretLabel] == s2.Labels[ProjectScopedSecretLabel] &&
-		s1.Labels[ProjectScopedSecretClusterLabel] == s2.Labels[ProjectScopedSecretLabel] &&
-		s1.Annotations[pssCopyAnnotation] == s2.Annotations[pssCopyAnnotation], s2
+		reflect.DeepEqual(s1.Annotations, s2.Annotations) &&
+		reflect.DeepEqual(s1.Labels, s2.Labels), s2
 }
