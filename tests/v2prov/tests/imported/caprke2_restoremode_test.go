@@ -83,6 +83,7 @@ import (
 // then restore selecting kubernetesVersion, after which the control plane is configured for and
 // running the snapshot's version again — on the same machines, with the cluster healthy.
 func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *testing.T) {
+	t.Parallel()
 	requireCAPRKE2(t)
 	requireTwoVersions(t)
 
@@ -136,6 +137,7 @@ func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *t
 // does not. That second assertion is the point of the test: it pins the upstream guard that stops a
 // downstream payload from rewriting arbitrary fields of its own control plane.
 func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeAll(t *testing.T) {
+	t.Parallel()
 	requireCAPRKE2(t)
 	requireTwoVersions(t)
 
