@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-logr/logr"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -13,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -95,6 +97,7 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 		return nil, err
 	}
 
+	ctrl.SetLogger(logr.Discard())
 	// Create controller-runtime client using the wrangler Scheme
 	ctrlRuntimeClient, err := client.New(rest, client.Options{
 		Scheme: wrangler.Scheme,

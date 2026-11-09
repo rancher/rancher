@@ -421,7 +421,7 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 		}
 
 		if cluster.Spec.RKEConfig.Registries == nil {
-			registryConfig, err := registry.CreateOrGetRegistry(clients, cluster.Namespace, "registry-cache", false)
+			registryConfig, err := registry.CreateOrGetRegistry(clients, cluster.Namespace, "registry-cache")
 			if err != nil {
 				return nil, err
 			}
@@ -1132,8 +1132,12 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 		configLines = append(configLines, "token: "+token)
 	}
 
+	var containerdBlock string
 	if dataDir != "" {
 		configLines = append(configLines, "data-dir: "+dataDir)
+		// systemdnode.New only mounts the containerd config drop-in under the default data-dir.
+		containerdBlock = fmt.Sprintf("mkdir -p %[1]s/agent/etc/containerd/config-v3.toml.d\ncp %[2]s %[1]s/agent/etc/containerd/config-v3.toml.d/\n",
+			dataDir, systemdnode.ContainerdDropInPath(distro))
 	}
 
 	if isInit && distro == capr.RuntimeK3S {
@@ -1233,8 +1237,8 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 			rancherDir, registryHost, registryHost, caPath, caPath, string(registryCACert))
 	}
 
-	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
-		configDir, configDir, configContent, nodeIPBlock, extraFiles.String(), registryBlock, installCmd, serviceName, serviceName)
+	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
+		configDir, configDir, configContent, nodeIPBlock, extraFiles.String(), registryBlock, containerdBlock, installCmd, serviceName, serviceName)
 }
 
 func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {

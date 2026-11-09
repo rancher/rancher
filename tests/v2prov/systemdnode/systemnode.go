@@ -11,6 +11,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ContainerdDropInFile is placed in <data-dir>/agent/etc/containerd/config-v3.toml.d, which RKE2/K3s import into
+	// the containerd config they generate. Distros that predate drop-in support ignore the directory.
+	ContainerdDropInFile = "99-test.toml"
+	// Drop the compressed layer blobs once they are unpacked into the snapshotter, rather than keeping both
+	// copies on disk. Every node pod shares the host's disk, so this halves what each image pull writes.
+	containerdDropIn = `version = 3
+
+[plugins.'io.containerd.cri.v1.images']
+  discard_unpacked_layers = true
+`
+	// Keep each node's journal in memory rather than on the host disk shared by every node pod. Tests still read it
+	// with journalctl while the node runs; the cap bounds the RAM it can take.
+	journaldDropIn = `[Journal]
+Storage=volatile
+RuntimeMaxUse=128M
+`
+)
+
+// ContainerdDropInPath returns where New mounts ContainerdDropInFile for distro's default data-dir.
+func ContainerdDropInPath(distro string) string {
+	return fmt.Sprintf("/var/lib/rancher/%s/agent/etc/containerd/config-v3.toml.d/%s", distro, ContainerdDropInFile)
+}
+
 // New is used to create a new instance of systemd-node as a pod in a Kubernetes cluster. Notably, this is used for the
 // v2prov integration tests for custom clusters to simulate custom cluster nodes. If extraDirs is defined, it expects a slice of elements of format "host-source:pod-mount".
 func New(clients *clients.Clients, namespace, script string, labels map[string]string, extraDirs []string) (*corev1.Pod, error) {
@@ -20,7 +44,9 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 			GenerateName: "test-node-data-",
 		},
 		Data: map[string]string{
-			"user-data": script,
+			"user-data":            script,
+			ContainerdDropInFile:   containerdDropIn,
+			"journald-dropin.conf": journaldDropIn,
 		},
 	}
 	cm, err := clients.Core.ConfigMap().Create(cm)
@@ -141,6 +167,12 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 			MountPath: etcdPath,
 		})
 	}
+
+	pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts,
+		corev1.VolumeMount{Name: "seed", MountPath: ContainerdDropInPath("rke2"), SubPath: ContainerdDropInFile},
+		corev1.VolumeMount{Name: "seed", MountPath: ContainerdDropInPath("k3s"), SubPath: ContainerdDropInFile},
+		corev1.VolumeMount{Name: "seed", MountPath: "/etc/systemd/journald.conf.d/99-test.conf", SubPath: "journald-dropin.conf"},
+	)
 
 	for i, v := range extraDirs {
 		hostSource, mountPath, ok := strings.Cut(v, ":")

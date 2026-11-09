@@ -20,6 +20,7 @@ allowed_env_vars=(
     V2PROV_TEST_DIST
     V2PROV_TEST_RUN_REGEX
     V2PROV_TEST_PARALLELISM
+    V2PROV_TEST_TIMEOUT
     V2PROV_PACKAGE_PARALLELISM
     V2PROV_DISTRO_DATA_DIR
     V2PROV_PROVISIONING_DATA_DIR
@@ -101,7 +102,13 @@ for name in "${allowed_env_vars[@]}"; do
 done
 
 if ! docker image inspect "${runtime_image}" >/dev/null 2>&1; then
-    TAG="${runtime_hash}" ARCH="${runtime_arch}" docker buildx bake runtime
+    docker buildx build \
+        --build-arg "RUNTIME_HOST_ARCH=${runtime_arch}" \
+        --file "${runtime_dockerfile}" \
+        --load \
+        --platform "linux/${runtime_arch}" \
+        --tag "${runtime_image}" \
+        "${repo_root}"
 fi
 
 docker_args=(
