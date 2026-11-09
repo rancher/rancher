@@ -70,6 +70,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreColonToken(t *testi
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-restore-colon-token", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},

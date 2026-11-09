@@ -161,6 +161,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreTokenRotation(t *te
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-restore-token-rotation", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
