@@ -107,7 +107,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 	endPhase = phase(t, "P6/restore")
 	proof.delete(t, fx)
 
-	RunETCDSnapshotRestoreOperationTest(t, cs, fx.mgmtCluster.Name, restoreName, fx.clusterRef, fx.ns.Name)
+	RunETCDSnapshotRestoreOperationTest(t, cs, fx.mgmtCluster.Name, restoreName, fx.clusterRef)
 	endPhase()
 
 	endPhase = phase(t, "P7/assert-restored")

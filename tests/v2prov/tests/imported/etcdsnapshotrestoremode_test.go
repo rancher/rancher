@@ -511,7 +511,7 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	stopWatchingServerArgs := watchRestoreServerArgs(t, clients, fx.mgmtCluster.Name)
 	defer stopWatchingServerArgs()
 
-	op := RunETCDSnapshotRestoreOperationTest(t, clients, fx.mgmtCluster.Name, snapshot.Name, fx.clusterRef, fx.ns.Name,
+	op := RunETCDSnapshotRestoreOperationTest(t, clients, fx.mgmtCluster.Name, snapshot.Name, fx.clusterRef,
 		WithRestoreMode(mode),
 		WithRestoreTTL(-1))
 	require.NotNil(t, op)
@@ -831,7 +831,7 @@ func assertImportedClusterHealthy(t *testing.T, clients *clients.Clients, fx *im
 	err := wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, fx.mgmtCluster, func(obj runtime.Object) (bool, error) {
 		return mgmtv3.ClusterConditionReady.IsTrue(obj.(*mgmtv3.Cluster)), nil
 	})
-	handleErrorWithDownstream(t, clients, fx.mgmtCluster.Name, fx.ns.Name, err)
+	handleError(t, clients, fx.mgmtCluster.Name, err)
 
 	waitForImportedNodesOnVersion(t, clients, fx, version)
 }

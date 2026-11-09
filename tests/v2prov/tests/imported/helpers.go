@@ -54,8 +54,8 @@ type importedClusterFixture struct {
 //  5. Executes the import command on the init pod so cattle-cluster-agent registers upward.
 //  6. Waits for the mgmt cluster to reach Ready.
 //
-// On any failure it routes through handleError so the dumped object bundle includes everything we
-// might need to triage the bring-up.
+// If the test fails at any point after the mgmt cluster is created, a debug bundle covering both the
+// mgmt cluster and the downstream cluster is printed when clients is closed.
 func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool) *importedClusterFixture {
 	t.Helper()
 
@@ -122,6 +122,7 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 	if err != nil {
 		t.Fatal(err)
 	}
+	printDebugDataOnFailure(t, clients, mgmtCluster.Name, ns.Name)
 
 	importCmd, err := cluster.ImportCommand(clients, mgmtCluster)
 	handleError(t, clients, mgmtCluster.Name, err)
@@ -226,83 +227,97 @@ func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) s
 }
 
 func handleError(t *testing.T, clients *clients.Clients, name string, err error) {
-	handleErrorWithDownstream(t, clients, name, "", err)
-}
-
-// handleErrorWithDownstream is handleError that, when nodeNamespace is set, also includes the downstream cluster's pods and
-// cattle-cluster-agent logs, gathered from the imported node pods in nodeNamespace.
-func handleErrorWithDownstream(t *testing.T, clients *clients.Clients, name, nodeNamespace string, err error) {
 	if err != nil {
-		objs := map[string]any{}
-
-		if nodeNamespace != "" {
-			objs["downstream"] = cluster.GatherImportedDownstreamData(clients, nodeNamespace)
-		}
-
-		c, newErr := clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
-		if newErr != nil {
-			logrus.Error(newErr)
-		} else {
-			objs["mgmtCluster"] = c
-			nodes, newErr := clients.Mgmt.Node().List(c.Name, metav1.ListOptions{})
-			if newErr != nil {
-				logrus.Error(newErr)
-			} else {
-				objs["mgmtNodes"] = nodes
-			}
-
-			beacon, newErr := clients.Plan.Beacon().Get(c.Name, c.Name, metav1.GetOptions{})
-			if newErr != nil {
-				logrus.Error(newErr)
-			} else {
-				objs["beacon"] = beacon
-			}
-
-			secrets, newErr := clients.Core.Secret().List(c.Name, metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name),
-				FieldSelector: fmt.Sprintf("type=%s", capr.SecretTypeMachinePlan),
-			})
-			if newErr != nil {
-				logrus.Error(newErr)
-			} else {
-				objs["machinePlans"] = secrets
-			}
-
-			creates, newErr := clients.Operation.ETCDSnapshotSave().List(c.Name, metav1.ListOptions{})
-			if newErr != nil {
-				logrus.Error(newErr)
-			} else {
-				objs["ETCDSnapshotSave"] = creates
-			}
-
-			restores, newErr := clients.Operation.ETCDSnapshotRestore().List(c.Name, metav1.ListOptions{})
-			if newErr != nil {
-				logrus.Error(newErr)
-			} else {
-				objs["ETCDSnapshotRestore"] = restores
-			}
-		}
-
-		features, newErr := clients.Mgmt.Feature().List(metav1.ListOptions{})
-		if newErr != nil {
-			logrus.Error(newErr)
-		} else {
-			objs["features"] = features
-		}
-
-		settings, newErr := clients.Mgmt.Setting().List(metav1.ListOptions{})
-		if newErr != nil {
-			logrus.Error(newErr)
-		} else {
-			objs["settings"] = settings
-		}
-
-		data, newErr := snapshotutil.CompressInterface(objs)
-		if newErr != nil {
-			logrus.Error(newErr)
-		}
 		//nolint:revive
-		err = fmt.Errorf("cluster %s operation wait failed on: %w\ncluster %s test data bundle: \n%s\n", name, err, name, data)
+		err = fmt.Errorf("cluster %s operation wait failed on: %w\ncluster %s test data bundle: \n%s\n", name, err, name, gatherDebugData(clients, name, ""))
 		t.Fatal(err)
 	}
+}
+
+// printDebugDataOnFailure registers a hook on clients that prints a debug bundle for the imported cluster name if t has
+// failed by the time clients is closed, including the downstream cluster's view gathered from the node pods in
+// nodeNamespace. It runs ahead of the hooks registered before it, so register it after the node namespace is created to
+// gather from it before it is deleted.
+func printDebugDataOnFailure(t *testing.T, clients *clients.Clients, name, nodeNamespace string) {
+	clients.OnClose(func() {
+		if !t.Failed() {
+			return
+		}
+		fmt.Printf("cluster %s test failed\ncluster %s test data bundle: \n%s\n", name, name, gatherDebugData(clients, name, nodeNamespace))
+	})
+}
+
+// gatherDebugData returns a gzip compressed + base64 encoded json bundle of the mgmt-side state of the imported cluster
+// name. When nodeNamespace is set it also includes the downstream cluster's pods and cattle-cluster-agent logs, gathered
+// from the imported node pods in nodeNamespace.
+func gatherDebugData(clients *clients.Clients, name, nodeNamespace string) string {
+	objs := map[string]any{}
+
+	if nodeNamespace != "" {
+		objs["downstream"] = cluster.GatherImportedDownstreamData(clients, nodeNamespace)
+	}
+
+	c, newErr := clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
+	if newErr != nil {
+		logrus.Error(newErr)
+	} else {
+		objs["mgmtCluster"] = c
+		nodes, newErr := clients.Mgmt.Node().List(c.Name, metav1.ListOptions{})
+		if newErr != nil {
+			logrus.Error(newErr)
+		} else {
+			objs["mgmtNodes"] = nodes
+		}
+
+		beacon, newErr := clients.Plan.Beacon().Get(c.Name, c.Name, metav1.GetOptions{})
+		if newErr != nil {
+			logrus.Error(newErr)
+		} else {
+			objs["beacon"] = beacon
+		}
+
+		secrets, newErr := clients.Core.Secret().List(c.Name, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name),
+			FieldSelector: fmt.Sprintf("type=%s", capr.SecretTypeMachinePlan),
+		})
+		if newErr != nil {
+			logrus.Error(newErr)
+		} else {
+			objs["machinePlans"] = secrets
+		}
+
+		creates, newErr := clients.Operation.ETCDSnapshotSave().List(c.Name, metav1.ListOptions{})
+		if newErr != nil {
+			logrus.Error(newErr)
+		} else {
+			objs["ETCDSnapshotSave"] = creates
+		}
+
+		restores, newErr := clients.Operation.ETCDSnapshotRestore().List(c.Name, metav1.ListOptions{})
+		if newErr != nil {
+			logrus.Error(newErr)
+		} else {
+			objs["ETCDSnapshotRestore"] = restores
+		}
+	}
+
+	features, newErr := clients.Mgmt.Feature().List(metav1.ListOptions{})
+	if newErr != nil {
+		logrus.Error(newErr)
+	} else {
+		objs["features"] = features
+	}
+
+	settings, newErr := clients.Mgmt.Setting().List(metav1.ListOptions{})
+	if newErr != nil {
+		logrus.Error(newErr)
+	} else {
+		objs["settings"] = settings
+	}
+
+	data, newErr := snapshotutil.CompressInterface(objs)
+	if newErr != nil {
+		logrus.Error(newErr)
+	}
+	return data
 }
