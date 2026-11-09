@@ -233,9 +233,17 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 		return nil
 	}
 
-	objs, err := m.rbIndexer.ByIndex(rbByRoleAndSubjectIndex, key)
+	indexed, err := m.rbIndexer.ByIndex(rbByRoleAndSubjectIndex, key)
 	if err != nil {
 		return err
+	}
+
+	// The index key has no namespace, so only consider bindings in the target namespace.
+	var objs []interface{}
+	for _, o := range indexed {
+		if iRB, ok := o.(*v1.RoleBinding); ok && iRB.Namespace == namespace {
+			objs = append(objs, iRB)
+		}
 	}
 
 	if len(objs) == 0 {
