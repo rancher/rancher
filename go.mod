@@ -121,10 +121,10 @@ require (
 	github.com/prometheus/client_model v0.6.3
 	github.com/rancher/aks-operator v1.16.0-rc.5
 	github.com/rancher/ali-operator v1.16.0-rc.3
-	github.com/rancher/apiserver v0.10.1
+	github.com/rancher/apiserver v0.10.2
 	github.com/rancher/channelserver v0.12.1
 	github.com/rancher/cluster-api-provider-rke2 v0.27.1
-	github.com/rancher/dynamiclistener v0.10.0-rc.1
+	github.com/rancher/dynamiclistener v0.10.1
 	github.com/rancher/eks-operator v1.16.0-rc.3
 	github.com/rancher/fleet/pkg/apis v0.17.0-rc.1
 	github.com/rancher/fleet/pkg/helmvalues v0.17.0-rc.1
@@ -134,14 +134,14 @@ require (
 	github.com/rancher/lasso v0.2.10
 	github.com/rancher/machine v0.15.0-rancher146-rc.9
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.10.1
+	github.com/rancher/norman v0.10.2
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
-	github.com/rancher/remotedialer v0.6.2-rc.2
+	github.com/rancher/remotedialer v0.6.2
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20261021194219-25800d4c8ac6
-	github.com/rancher/steve v0.10.10
+	github.com/rancher/steve v0.10.11
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260923180507-96eced818739
 	github.com/rancher/wrangler/v3 v3.8.0
 	github.com/robfig/cron v1.2.0
@@ -153,7 +153,7 @@ require (
 	github.com/vmware/govmomi v0.56.2
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v2 v2.4.4
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.58.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.62.0
@@ -325,7 +325,7 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
-	github.com/matryer/moq v0.6.0 // indirect
+	github.com/matryer/moq v0.8.1 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
