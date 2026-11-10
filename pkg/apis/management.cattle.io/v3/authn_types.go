@@ -1,6 +1,7 @@
 package v3
 
 import (
+	"math"
 	"strings"
 	"time"
 
@@ -126,7 +127,12 @@ func (t *Token) GetIsExpired() bool {
 	created := t.ObjectMeta.CreationTimestamp.Time
 	durationElapsed := time.Since(created)
 
-	ttlDuration := time.Duration(t.TTLMillis) * time.Millisecond
+	// Saturate instead of overflowing time.Duration (about 292 years), which would turn a very
+	// long ttl into an arbitrary, possibly negative, duration.
+	ttlDuration := time.Duration(math.MaxInt64)
+	if t.TTLMillis < math.MaxInt64/int64(time.Millisecond) {
+		ttlDuration = time.Duration(t.TTLMillis) * time.Millisecond
+	}
 	return durationElapsed.Seconds() >= ttlDuration.Seconds()
 }
 

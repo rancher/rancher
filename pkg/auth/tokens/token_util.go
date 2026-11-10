@@ -14,6 +14,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
@@ -34,8 +35,7 @@ func SplitTokenParts(tokenID string) (string, string) {
 func SetTokenExpiresAt(token *apiv3.Token) {
 	if token.TTLMillis != 0 {
 		created := token.ObjectMeta.CreationTimestamp.Time
-		ttlDuration := time.Duration(token.TTLMillis) * time.Millisecond
-		expiresAtTime := created.Add(ttlDuration)
+		expiresAtTime := created.Add(exttokenstore.TTLToDuration(token.TTLMillis))
 		token.ExpiresAt = expiresAtTime.UTC().Format(time.RFC3339)
 	}
 }
