@@ -3,11 +3,11 @@
   "extends": ["github>rancher/renovate-config//default#main"],
   "baseBranchPatterns": [
     "main",
+    "release/v2.16",
     "release/v2.15",
     "release/v2.14",
     "release/v2.13",
-    "release/v2.12",
-    "release/v2.11"
+    "release/v2.12"
   ],
   "ignoreDeps": [
     "go.qase.io/client"
@@ -21,6 +21,14 @@
       ],
       "extends": [
         "github>rancher/renovate-config//rancher-main#main"
+      ]
+    },
+    {
+      "matchBaseBranches": [
+        "release/v2.16"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-2.16#main"
       ]
     },
     {
@@ -67,11 +75,11 @@
       "description": "Activate automerge for eligible updates",
       "matchBaseBranches": [
         "main",
+        "release/v2.16",
         "release/v2.15",
         "release/v2.14",
         "release/v2.13",
-        "release/v2.12",
-        "release/v2.11"
+        "release/v2.12"
       ],
       "extends": [
         "github>rancher/renovate-config//automerge#main"
