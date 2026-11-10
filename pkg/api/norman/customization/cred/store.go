@@ -17,6 +17,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/store"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/yaml"
@@ -58,7 +59,12 @@ func configExists(data map[string]interface{}) bool {
 	return false
 }
 
-func decodeNonPasswordFields(data map[string]interface{}) error {
+// Note: the check above accepts any "*Config" suffix, including "genericConfig".
+// This means generic (non-cloud-provider) credentials are supported as long as
+// callers include a "genericConfig" field in their data, e.g.:
+//   { "genericConfig": { "apiKey": "...", "username": "..." } }
+
+func decodeNonPasswordFields(data data.Object) error {
 	for key, val := range data {
 		if strings.HasSuffix(key, "Config") {
 			ans := convert.ToMapInterface(val)
@@ -159,12 +165,19 @@ func (s *Store) processHarvesterCloudCredential(data map[string]any) error {
 	return nil
 }
 
-func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if err := s.processHarvesterCloudCredential(data); err != nil {
+func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}) (map[string]interface{}, error) {
+	if err := s.processHarvesterCloudCredential(obj); err != nil {
 		return nil, fmt.Errorf("failed to process harvester cloud credential: %w", err)
 	}
 
-	return s.Store.Create(apiContext, schema, data)
+	// Stamp the credential with the creating user's ID so it can be filtered by owner.
+	// This label is used for auditing and owner-based list filtering; access control
+	// is still enforced via Kubernetes RBAC on the underlying secret.
+	if apiContext.Request != nil {
+		userID := apiContext.Request.Header.Get("Impersonate-User")
+		data.PutValue(obj, userID, "metadata", "labels", "cattle.io/creator")
+	}
+	return s.Store.Create(apiContext, schema, obj)
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
