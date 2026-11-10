@@ -1094,6 +1094,20 @@ func GatherImportedDownstreamData(clients *clients.Clients, namespace string) ma
 		data["queriedFrom"] = nodePod.Name
 		data["pods"] = pods
 		data["podLogs"] = podLogs
+
+		// ClusterRepo status shows whether rancher-charts finished downloading, and the cattle-system ReplicaSets show
+		// whether the cluster agent was redeployed while it was. Raw JSON keeps the objects as they were served.
+		for key, args := range map[string][]string{
+			"clusterRepos": {"get", "clusterrepos.catalog.cattle.io", "-o", "json"},
+			"replicaSets":  {"-n", "cattle-system", "get", "replicasets", "-o", "json"},
+		} {
+			out, err := kubectl(args...)
+			if err != nil || !json.Valid([]byte(out)) {
+				errs = append(errs, fmt.Sprintf("%s: failed to get downstream %s: %v: %s", nodePod.Name, key, err, out))
+				continue
+			}
+			data[key] = json.RawMessage(out)
+		}
 		break
 	}
 	if len(errs) > 0 {
