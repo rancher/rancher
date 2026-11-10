@@ -64,14 +64,6 @@
       ]
     },
     {
-      "matchBaseBranches": [
-        "release/v2.11"
-      ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.11#main"
-      ]
-    },
-    {
       "description": "Activate automerge for eligible updates",
       "matchBaseBranches": [
         "main",
