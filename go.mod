@@ -121,7 +121,7 @@ require (
 	github.com/prometheus/client_model v0.6.3
 	github.com/rancher/aks-operator v1.16.0-rc.5
 	github.com/rancher/ali-operator v1.16.0-rc.3
-	github.com/rancher/apiserver v0.10.2
+	github.com/rancher/apiserver v0.11.0
 	github.com/rancher/channelserver v0.12.1
 	github.com/rancher/cluster-api-provider-rke2 v0.27.1
 	github.com/rancher/dynamiclistener v0.10.1
@@ -134,14 +134,14 @@ require (
 	github.com/rancher/lasso v0.2.10
 	github.com/rancher/machine v0.15.0-rancher146-rc.9
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.10.2
+	github.com/rancher/norman v0.11.1
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
 	github.com/rancher/remotedialer v0.6.2
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20261021194219-25800d4c8ac6
-	github.com/rancher/steve v0.10.11
+	github.com/rancher/steve v0.11.1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260923180507-96eced818739
 	github.com/rancher/wrangler/v3 v3.8.0
 	github.com/robfig/cron v1.2.0
@@ -423,7 +423,7 @@ require (
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.61.0 // indirect
+	modernc.org/sqlite v1.61.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.36.0 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect

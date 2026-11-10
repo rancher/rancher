@@ -3,7 +3,7 @@ module github.com/rancher/rancher/pkg/client
 go 1.27.3
 
 require (
-	github.com/rancher/norman v0.10.2
+	github.com/rancher/norman v0.11.1
 	k8s.io/apimachinery v0.37.2
 )
 
