@@ -3,6 +3,7 @@ package operations
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -44,9 +45,26 @@ func GatherDownstreamDebugData(clients *clients.Clients, c *v1.Cluster) (string,
 		}
 	}
 
+	// ClusterRepo status shows whether rancher-charts finished downloading, and the cattle-system ReplicaSets show whether
+	// the cluster agent was redeployed while it was.
+	ctx, cancel := context.WithTimeout(context.TODO(), downstreamDebugTimeout)
+	defer cancel()
+	clusterRepos, newErr := clientset.Discovery().RESTClient().Get().AbsPath("/apis/catalog.cattle.io/v1/clusterrepos").DoRaw(ctx)
+	if newErr != nil {
+		logrus.Errorf("failed to list downstream clusterrepos for cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+		clusterRepos = nil
+	}
+	replicaSets, newErr := clientset.AppsV1().ReplicaSets("cattle-system").List(ctx, metav1.ListOptions{})
+	if newErr != nil {
+		logrus.Errorf("failed to list downstream cattle-system replicasets for cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+		replicaSets = nil
+	}
+
 	return snapshotutil.CompressInterface(map[string]interface{}{
-		"pods":    pods,
-		"podLogs": podLogs,
+		"pods":         pods,
+		"podLogs":      podLogs,
+		"clusterRepos": json.RawMessage(clusterRepos),
+		"replicaSets":  replicaSets,
 	})
 }
 
