@@ -57,41 +57,40 @@ func Test_loadChart(t *testing.T) {
 	}
 }
 
-func Test_localChart(t *testing.T) {
+func Test_chartAssetPath(t *testing.T) {
+	assert.Equal(t, "assets/fleet/fleet-108.0.0.tgz", chartAssetPath("fleet", "108.0.0"))
+	assert.Equal(t, "assets/rancher-monitoring/rancher-monitoring-102.0.0+up19.0.3.tgz", chartAssetPath("rancher-monitoring", "102.0.0+up19.0.3"))
+}
+
+func Test_openChartArchive(t *testing.T) {
 	const gitURL = "https://git.rancher.io/charts"
 	content := []byte("chart-bytes")
 	sum := sha256.Sum256(content)
 	digest := hex.EncodeToString(sum[:])
 
+	fleetAsset := chartAssetPath("fleet", "108.0.0+up0.14.0")
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "assets", "fleet"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "assets", "fleet", "fleet-108.0.0+up0.14.0.tgz"), content, 0o644))
-
-	chartVersion := func(name, version, digest string) *repo.ChartVersion {
-		return &repo.ChartVersion{
-			Metadata: &chart.Metadata{Name: name, Version: version},
-			Digest:   digest,
-			URLs:     []string{"oci://registry.suse.com/rancher/charts/" + name + ":" + version},
-		}
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, fleetAsset), content, 0o644))
 
 	tests := []struct {
 		name         string
-		chartVersion *repo.ChartVersion
+		chartPath    string
+		digest       string
 		wantErr      bool
 		wantNotFound bool
 	}{
-		{name: "found without digest", chartVersion: chartVersion("fleet", "108.0.0+up0.14.0", "")},
-		{name: "found with matching digest", chartVersion: chartVersion("fleet", "108.0.0+up0.14.0", digest)},
-		{name: "found with matching digest prefixed with sha256:", chartVersion: chartVersion("fleet", "108.0.0+up0.14.0", "sha256:"+digest)},
-		{name: "digest mismatch", chartVersion: chartVersion("fleet", "108.0.0+up0.14.0", "deadbeef"), wantErr: true, wantNotFound: true},
-		{name: "missing version", chartVersion: chartVersion("fleet", "108.0.1+up0.14.1", ""), wantErr: true, wantNotFound: true},
-		{name: "path traversal", chartVersion: chartVersion("../../etc", "1.0.0", ""), wantErr: true},
+		{name: "found without digest", chartPath: fleetAsset, digest: ""},
+		{name: "found with matching digest", chartPath: fleetAsset, digest: digest},
+		{name: "found with matching digest prefixed with sha256:", chartPath: fleetAsset, digest: "sha256:" + digest},
+		{name: "digest mismatch", chartPath: fleetAsset, digest: "deadbeef", wantErr: true, wantNotFound: true},
+		{name: "missing version", chartPath: chartAssetPath("fleet", "108.0.1+up0.14.1"), digest: "", wantErr: true, wantNotFound: true},
+		{name: "path traversal", chartPath: "assets/../../etc/passwd", digest: "", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rc, err := localChart(dir, gitURL, tt.chartVersion)
+			rc, err := openChartArchive(dir, gitURL, tt.chartPath, tt.digest)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.wantNotFound {

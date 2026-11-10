@@ -65,6 +65,12 @@ func loadChart(dir, gitURL string, chartVersion *repo.ChartVersion) (io.ReadClos
 	return archive.Open()
 }
 
+// chartAssetPath returns the conventional relative path where a packaged chart archive
+// is stored in a repository checkout (assets/<name>/<name>-<version>.tgz).
+func chartAssetPath(name, version string) string {
+	return path.Join("assets", name, fmt.Sprintf("%s-%s.tgz", name, version))
+}
+
 // LocalChart returns a chart version from the local repository checkout when its index entry points
 // at a remote URL (such as an oci:// or http(s):// reference). The chart is looked up at the
 // conventional assets/<name>/<name>-<version>.tgz path and verified against chartVersion.Digest.
@@ -72,7 +78,7 @@ func LocalChart(namespace, name, gitURL string, chartVersion *repo.ChartVersion)
 	if !IsCheckedOut(name, gitURL) {
 		return nil, ErrNotCheckedOut
 	}
-	assetPath := path.Join("assets", chartVersion.Name, fmt.Sprintf("%s-%s.tgz", chartVersion.Name, chartVersion.Version))
+	assetPath := chartAssetPath(chartVersion.Name, chartVersion.Version)
 	return openChartArchive(RepoDir(namespace, name, gitURL), gitURL, assetPath, chartVersion.Digest)
 }
 
