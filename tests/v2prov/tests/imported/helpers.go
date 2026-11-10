@@ -1,8 +1,10 @@
 package imported
 
 import (
+	"context"
 	"fmt"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/rancher/tests/v2prov/namespace"
+	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/registry"
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/sirupsen/logrus"
@@ -194,6 +197,26 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 
 	fx.mgmtCluster = mgmtCluster
 	return fx
+}
+
+// kubectl adapts execKubectl to operations.Kubectl, for helpers that take one. This allows
+// us to run the same helper against a cluster reachable only via kubectl on one of its nodes, or against a
+// cluster reachable directly via the mgmt cluster's kubeconfig.
+func (fx *importedClusterFixture) kubectl(t *testing.T) operations.Kubectl {
+	return func(_ context.Context, args ...string) ([]byte, error) {
+		t.Helper()
+		quoted := make([]string, len(args))
+		for i, arg := range args {
+			quoted[i] = shellQuote(arg)
+		}
+		out, err := fx.execKubectl(t, "kubectl "+strings.Join(quoted, " "))
+		return []byte(out), err
+	}
+}
+
+// shellQuote wraps value in single quotes so it is passed through `sh -c` as one literal argument.
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 // phase logs a start marker for the named phase and returns a func that logs its end. The markers

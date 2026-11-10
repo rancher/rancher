@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -41,9 +42,12 @@ func WithSaveLabels(labels map[string]string) SnapshotSaveOption {
 // clusterRef and waits for it to reach the Succeeded phase. This tests the operation.cattle.io/v1alpha1
 // ETCDSnapshotSave controller which manages snapshot lifecycle through beacons and plan secrets.
 // Pass options (e.g. WithSaveLabels) to mutate the operation object before creation — useful for
-// driving non-default code paths like lifecycle hooks.
-func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
+// driving non-default code paths like lifecycle hooks. kubectl reaches the downstream cluster so the
+// snapshot waits for its system charts to settle; see operations.WaitForSystemChartsSettled.
+func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, kubectl operations.Kubectl, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
 	t.Helper()
+
+	operations.WaitForSystemChartsSettledKubectl(t, kubectl)
 
 	op := &opv1alpha1.ETCDSnapshotSave{
 		ObjectMeta: metav1.ObjectMeta{
@@ -87,8 +91,10 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 // intermediate steps — callers thread the returned op through WaitForSnapshotSaveHookPause and
 // AdvancePastSnapshotSaveHook to walk the operation forward one checkpoint at a time. Use
 // RunETCDSnapshotSaveOperationTest instead when you just want the snapshot to succeed.
-func CreateETCDSnapshotSaveOp(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
+func CreateETCDSnapshotSaveOp(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, kubectl operations.Kubectl, opts ...SnapshotSaveOption) *opv1alpha1.ETCDSnapshotSave {
 	t.Helper()
+
+	operations.WaitForSystemChartsSettledKubectl(t, kubectl)
 
 	op := &opv1alpha1.ETCDSnapshotSave{
 		ObjectMeta: metav1.ObjectMeta{
