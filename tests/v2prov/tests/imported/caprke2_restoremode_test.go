@@ -320,7 +320,7 @@ func saveCAPRKE2Snapshot(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2F
 	t.Helper()
 
 	validAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.MgmtClusterName, fx.MgmtClusterRef())
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.MgmtClusterName, fx.MgmtClusterRef(), caprke2Kubectl(t, cs, fx))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	snapshot := waitForCAPRKE2S3Snapshot(t, cs, fx, validAfter)

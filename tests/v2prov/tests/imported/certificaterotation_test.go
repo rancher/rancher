@@ -329,11 +329,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	assertCertificateMetadataUnchanged(t, before, after, unchangedPaths)
 }
 
-// shellQuote wraps value in single quotes so it is passed through `sh -c` as one literal argument.
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
-}
-
 // Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook validates that a
 // delegate registered on the Rotate step hook and the Succeeded phase hook actually pauses the
 // operation at each hook point, and that the operation still completes after each hook is

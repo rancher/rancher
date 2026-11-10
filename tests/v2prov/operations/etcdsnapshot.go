@@ -89,6 +89,8 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		t.Fatal(err)
 	}
 
+	WaitForSystemChartsSettled(t, clientset)
+
 	snapshotsValidTime := time.Now()
 
 	// Create an etcd snapshot
