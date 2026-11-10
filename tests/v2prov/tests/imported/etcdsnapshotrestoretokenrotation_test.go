@@ -177,7 +177,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreTokenRotation(t *te
 	// Take the snapshot that the rest of the test restores from. It is stamped with a hash of the
 	// token the cluster currently runs with.
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, 1)
 	snapshot := waitForBackpopulatedSnapshot(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, "imported-init-0", snapshotsValidAfter)

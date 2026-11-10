@@ -76,7 +76,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 	proof.create(t, fx)
 
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	RunETCDSnapshotSaveOperationTest(t, cs, fx.mgmtCluster.Name, fx.clusterRef)
+	RunETCDSnapshotSaveOperationTest(t, cs, fx.mgmtCluster.Name, fx.clusterRef, fx.kubectl(t))
 	endPhase()
 
 	endPhase = phase(t, "P3/s3-snapshot")

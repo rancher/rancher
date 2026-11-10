@@ -111,7 +111,7 @@ func runRestoreScenario(
 	// shared cluster run doesn't get picked up by the wait helpers. The 30-second backdating
 	// compensates for clock skew between the test runner and the in-cluster controller.
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, expectedSnapshotCount)
@@ -348,7 +348,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 	cm.create(t, fx)
 
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, 1)
 	snapshot := waitForBackpopulatedSnapshotForStorage(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotbackpopulate.Local, snapshotsValidAfter)

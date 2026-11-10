@@ -467,7 +467,7 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	proof.create(t, fx)
 
 	before := time.Now()
-	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
+	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef, fx.kubectl(t))
 	var snapshot *rkev1.ETCDSnapshot
 	if restoreNode != "" {
 		snapshot = waitForBackpopulatedLocalSnapshotOnNode(t, clients, fx.mgmtCluster.Name, restoreNode, before)
