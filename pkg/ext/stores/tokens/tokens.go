@@ -515,7 +515,7 @@ func printToken(token *ext.Token, options printers.GenerateOptions) ([]metav1.Ta
 			token.Name,
 			token.Spec.UserID,
 			token.Spec.Kind,
-			duration.HumanDuration(time.Duration(token.Spec.TTL) * time.Millisecond),
+			duration.HumanDuration(TTLToDuration(token.Spec.TTL)),
 			translateTimestampSince(token.CreationTimestamp),
 			token.Spec.Description,
 		},
@@ -741,6 +741,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
 			token.Name, err))
+	}
+	if err := ValidateTTL(token.Spec.TTL); err != nil {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl: %s", err))
 	}
 
 	// Return early as the user does not wish to actually change anything.
@@ -1038,6 +1041,13 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	secret, err := toSecret(token)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
+	}
+	// Only a changed TTL is checked, so that tokens stored before the limit existed can
+	// still be updated, e.g. disabled.
+	if token.Spec.TTL != oldToken.Spec.TTL {
+		if err := ValidateTTL(token.Spec.TTL); err != nil {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl: %s", err))
+		}
 	}
 
 	// The stored hash was carried through toSecret above; never return it to
@@ -1765,7 +1775,7 @@ func setExpired(token *ext.Token) error {
 		return nil
 	}
 
-	expiresAt := token.ObjectMeta.CreationTimestamp.Add(time.Duration(token.Spec.TTL) * time.Millisecond)
+	expiresAt := token.ObjectMeta.CreationTimestamp.Add(TTLToDuration(token.Spec.TTL))
 	token.Status.Expired = time.Now().After(expiresAt)
 	token.Status.ExpiresAt = expiresAt.Format(time.RFC3339)
 	return nil
@@ -1777,7 +1787,8 @@ func setExpired(token *ext.Token) error {
 // Login tokens follow the login session lifetime, as v3 login tokens do. Every other token is
 // limited by auth-token-max-ttl-minutes. Kubeconfig tokens are further limited by
 // kubeconfig-max-token-ttl-minutes. A max setting of 0 is no limit at its level. A default of 0
-// falls back to the max, and a default above the max is capped to it.
+// falls back to the max, and a default above the max is capped to it. A finite default is also
+// capped to MaxTTL, so that a misconfigured default setting doesn't make token creation fail.
 func TTLLimits(kind string) (defaultTTL, maxTTL int64, err error) {
 	var defaultSetting settings.Setting
 	switch kind {
@@ -1805,7 +1816,12 @@ func TTLLimits(kind string) (defaultTTL, maxTTL int64, err error) {
 		return 0, 0, err
 	}
 
-	return ClampToMaxTTL(DefaultTTL(defaultTTL, maxTTL), maxTTL), maxTTL, nil
+	defaultTTL = ClampToMaxTTL(DefaultTTL(defaultTTL, maxTTL), maxTTL)
+	if defaultTTL > MaxTTL {
+		defaultTTL = MaxTTL
+	}
+
+	return defaultTTL, maxTTL, nil
 }
 
 // parseMaxTTL returns a max TTL setting in milliseconds, with -1 for no limit.

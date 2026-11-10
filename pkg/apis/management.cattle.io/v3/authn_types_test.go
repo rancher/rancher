@@ -2,8 +2,10 @@ package v3
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestUserIsSystem(t *testing.T) {
@@ -112,4 +114,58 @@ func TestLdapConfigSearchAttributes(t *testing.T) {
 
 	assert.Equal(t, []string{"dn", "memberOf", "inetOrgPerson", "uid", "cn", "nsAccountLock", "entryUUID", "objectClass"}, config.GetUserSearchAttributes("objectClass"))
 	assert.Equal(t, []string{"entryDN", "groupOfNames", "uid", "cn", "cn", "gidNumber", "objectClass"}, config.GetGroupSearchAttributes("objectClass"))
+}
+
+func TestTokenGetIsExpired(t *testing.T) {
+	const day = int64(24 * time.Hour / time.Millisecond)
+
+	tests := []struct {
+		name      string
+		createdAt time.Time
+		ttl       int64
+		want      bool
+	}{
+		{
+			name:      "never expires",
+			createdAt: time.Now().Add(-365 * 24 * time.Hour),
+			ttl:       0,
+			want:      false,
+		},
+		{
+			name:      "not yet expired",
+			createdAt: time.Now(),
+			ttl:       day,
+			want:      false,
+		},
+		{
+			name:      "expired",
+			createdAt: time.Now().Add(-2 * 24 * time.Hour),
+			ttl:       day,
+			want:      true,
+		},
+		{
+			// Without saturation the duration wraps around to about -268 years.
+			name:      "ttl above the range of time.Duration",
+			createdAt: time.Now(),
+			ttl:       10_000_000_000_000, // about 317 years
+			want:      false,
+		},
+		{
+			// Without saturation the duration wraps around to a fraction of a millisecond.
+			name:      "ttl wrapping to a small positive duration",
+			createdAt: time.Now().Add(-time.Hour),
+			ttl:       18_446_744_073_710,
+			want:      false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			token := &Token{
+				ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.NewTime(test.createdAt)},
+				TTLMillis:  test.ttl,
+			}
+			assert.Equal(t, test.want, token.GetIsExpired())
+		})
+	}
 }

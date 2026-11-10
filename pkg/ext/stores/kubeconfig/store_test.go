@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -1559,6 +1560,61 @@ func TestStoreCreate(t *testing.T) {
 			kubeconfigMaxMinutes:     "0",
 			kubeconfigDefaultMinutes: "0",
 			wantTTLSeconds:           90 * 24 * 3600,
+		},
+		{
+			name:                     "no limit at any level, ttl at the hard limit",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               exttokens.MaxTTL / 1000,
+			wantTTLSeconds:           exttokens.MaxTTL / 1000,
+		},
+		{
+			name:                     "no limit at any level, ttl above the hard limit",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               exttokens.MaxTTL/1000 + 1,
+			wantErr:                  "exceeds the maximum of 315360000 (10 years)",
+		},
+		{
+			name:                     "no limit at any level, ttl above the range of time.Duration",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               10_000_000_000, // about 317 years
+			wantErr:                  "exceeds the maximum of 315360000 (10 years)",
+		},
+		{
+			name:                     "no limit at any level, ttl overflowing when converted to milliseconds",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               math.MaxInt64,
+			wantErr:                  "exceeds the maximum of 315360000 (10 years)",
+		},
+		{
+			name:                     "no limit at any level, negative ttl wrapping to zero when converted to milliseconds",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               math.MinInt64,
+			wantErr:                  "spec.ttl can't be negative",
+		},
+		{
+			name:                     "no limit at any level, negative ttl wrapping to positive when converted to milliseconds",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "43200",
+			ttlSeconds:               math.MinInt64/1000 - 1,
+			wantErr:                  "spec.ttl can't be negative",
+		},
+		{
+			name:                     "no limit at any level, default above the hard limit is capped to it",
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "6000000", // about 11.4 years
+			wantTTLSeconds:           exttokens.MaxTTL / 1000,
 		},
 		{
 			name:                     "no limit at any level still needs a ttl",
