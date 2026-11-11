@@ -28,11 +28,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := updateChartValues(cfg); err != nil {
+	if err := updateChartValues(cfg, "chart"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := updateChartYaml(cfg); err != nil {
+	if err := updateChartYaml(cfg, "chart"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -102,7 +102,16 @@ func updateDockerfiles(cfg map[string]string) error {
 // primeEnv is the env var Rancher uses to tell Prime builds apart, see pkg/version.
 const primeEnv = "RANCHER_VERSION_TYPE"
 
-func updateChartYaml(cfg map[string]string) error {
+// chartDirEnv overrides the directory of the chart to update, see chartTarget.
+const chartDirEnv = "CHART_DIR"
+
+// chartTarget returns the chart directory to update and whether the files of the
+// repository (outside the chart) must be generated too.
+func chartTarget(getenv func(string) string) (chartDir string, repoFiles bool) {
+	return "chart", true
+}
+
+func updateChartYaml(cfg map[string]string, chartDir string) error {
 	in, err := os.ReadFile("chart/Chart.yaml")
 	if err != nil {
 		return err
@@ -184,7 +193,7 @@ const (
 	return writer.Run()
 }
 
-func updateChartValues(cfg map[string]string) error {
+func updateChartValues(cfg map[string]string, chartDir string) error {
 	// Read chart/values.yaml
 	chartValues, err := os.Open("chart/values.yaml")
 	if err != nil {
