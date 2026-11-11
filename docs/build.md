@@ -80,7 +80,8 @@ In the Prime repository, run `go generate` with `RANCHER_VERSION_TYPE=prime` to 
 By default `go generate` updates `chart/` along with the other files derived from build.yaml. To generate for a build copy of the
 chart instead, such as the Prime chart, set `CHART_DIR` to the directory of the copy. Only `Chart.yaml` and `values.yaml` of that
 directory are updated, and the files of the repository are left untouched, so the repository stays clean. Keep the copy in a
-git-ignored directory such as `build/`:
+git-ignored directory such as `build/`. A relative path is resolved from the root of the repo. The generator
+fails early if the directory is missing, has no `Chart.yaml` and `values.yaml`, or is the repository's own `chart/`:
 
 ```shell
 cp -r chart build/chart-prime
