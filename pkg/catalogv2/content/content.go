@@ -243,10 +243,6 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	// are pulled from their respective remote locations, with a local-first check for bundled assets.
 	var secret *corev1.Secret
 	if repo.status.Commit != "" {
-		if !git.IsCheckedOut(name, repo.status.URL) {
-			return nil, notReady(git.ErrNotCheckedOut)
-		}
-
 		// Classic git-based ClusterRepo, charts served from the checkout.
 		if isLocalChart(chartURL, repo.status.URL) {
 			return git.Chart(namespace, name, repo.status.URL, chart)
@@ -255,7 +251,12 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 
 		// Local-first: Check if chart archive is bundled locally in the checkout and matches digest.
 		if localChart, err := git.LocalChart(namespace, name, repo.status.URL, chart); err == nil {
+			// "cache hit"
 			return localChart, nil
+		} else if errors.Is(err, git.ErrNotCheckedOut) {
+			// We must return when repository is not ready, because we cannot serve the chart from the local checkout.
+			// This is the only option available for clusters with no internet access.
+			return nil, notReady(err)
 		} else if !errors.Is(err, validation.NotFound) {
 			logrus.Debugf("local-first lookup for chart %s version %s in ClusterRepo %s not served locally: %v", chart.Name, chart.Version, name, err)
 		}
