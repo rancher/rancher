@@ -580,7 +580,7 @@ func protectedHandoffWithoutPlanSecrets(t *testing.T, initMarked ...string) (*mo
 	// Each pass renders the cluster-agent manifest for the "management" cluster, so it needs the same token and cluster stubs as the certificate-rotation tests.
 	mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(ClusterRegToken, "management").Return([]*apisv3.ClusterRegistrationToken{{ObjectMeta: metav1.ObjectMeta{Namespace: "management", Name: "default-token"}, Status: apisv3.ClusterRegistrationTokenStatus{TokenSecretName: "crt-token-default-token"}}}, nil).AnyTimes()
 	mp.secretCache.EXPECT().Get("management", "crt-token-default-token").Return(&corev1.Secret{Data: map[string][]byte{"token": []byte("lol")}}, nil).AnyTimes()
-	mp.managementClusters.EXPECT().Get("management").Return(&apisv3.Cluster{}, nil).AnyTimes()
+	mp.managementClusters.EXPECT().Get("management").Return(&apisv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "management"}}, nil).AnyTimes()
 	controlPlane.OwnerReferences = []metav1.OwnerReference{{APIVersion: capi.GroupVersion.String(), Kind: "Cluster", Name: "cluster"}}
 	controlPlane.Status.Initialization.ControlPlaneInitialized = ptr.To(true)
 	controlPlane.Status.AgentConnected = true

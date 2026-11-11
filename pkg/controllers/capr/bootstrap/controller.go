@@ -743,6 +743,17 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		machine.Namespace, machine.Name,
 	)
 
+	// CAPI deletes the downstream Node right after this bootstrap is released. Its Node deletion
+	// timeout is measured from Machine deletion and has usually expired while the Machine was
+	// protected, so a disconnected CAPI client would skip Node deletion. Wait until CAPI can reach the cluster.
+	if !bootstrap.DeletionTimestamp.IsZero() && !conditions.IsTrue(capiCluster, capi.ClusterRemoteConnectionProbeCondition) {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cannot reach cluster %s/%s yet, delaying release of machine %s/%s so CAPI can delete node %s",
+			bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name,
+			machine.Namespace, machine.Name, machine.Status.NodeRef.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
+		return bootstrap, generic.ErrSkip
+	}
+
 	// Member removal is asynchronous; keep the hook until the downstream controller confirms completion.
 	removed, err := etcdmgmt.SafelyRemoved(restConfig, capr.GetRuntimeCommand(cp.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
 	if err != nil {
