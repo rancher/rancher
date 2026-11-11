@@ -283,17 +283,24 @@ func run(ctx context.Context) error {
 		}
 	}
 
+	backoff := connectBackoff()
+	monitor := newTunnelMonitor(backoff)
+	go monitor.watch(topContext)
+
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
+		monitor.connected(ctx)
 		connected()
 
 		if writeCertsOnly {
 			exitCertWriter(ctx)
 		}
 
+		start := time.Now()
 		err = rancher.Run(topContext)
 		if err != nil {
 			logrus.Fatal(err)
 		}
+		logrus.Debugf("[tunnel] rancher.Run returned after %s", time.Since(start).Round(time.Millisecond))
 		return nil
 	}
 
@@ -314,10 +321,15 @@ func run(ctx context.Context) error {
 		}
 		return wsURL
 	}
+	nextURL := func() string {
+		u := wsURLFor()
+		monitor.attemptStarted(u)
+		return u
+	}
 
 	logrus.Infof("Connecting to %s with token starting with %s", wsURLFor(), token[:len(token)/2])
 	// Reconnects internally, so it only returns once the context is cancelled.
-	return remotedialer.ClientConnectWithOpts(ctx, "", headers, nil, func(proto, address string) bool {
+	return remotedialer.ClientConnectWithOpts(ctx, "", headers, monitor.dialer(), func(proto, address string) bool {
 		switch proto {
 		case "tcp":
 			return true
@@ -328,8 +340,8 @@ func run(ctx context.Context) error {
 		}
 		return false
 	}, onConnect, &remotedialer.ConnectOpts{
-		URL:     wsURLFor,
-		Backoff: connectBackoff(),
+		URL:     nextURL,
+		Backoff: backoff,
 	})
 }
 
