@@ -736,3 +736,27 @@ func TestGetRepoDisabled(t *testing.T) {
 		})
 	}
 }
+
+func TestIsLocalChart(t *testing.T) {
+	const gitURL = "https://git.rancher.io/charts"
+	tests := []struct {
+		name     string
+		chartURL string
+		gitURL   string
+		want     bool
+	}{
+		{name: "relative path", chartURL: "assets/fleet/fleet-108.0.0.tgz", gitURL: gitURL, want: true},
+		{name: "file URL", chartURL: "file://assets/fleet/fleet-108.0.0.tgz", gitURL: gitURL, want: true},
+		{name: "git repo URL", chartURL: "https://git.rancher.io/charts/assets/fleet/fleet-108.0.0.tgz", gitURL: gitURL, want: true},
+		{name: "different git repo URL", chartURL: "https://git.other.io/charts/assets/fleet/fleet-108.0.0.tgz", gitURL: gitURL, want: false},
+		{name: "other http URL", chartURL: "https://charts.example.com/fleet-108.0.0.tgz", gitURL: gitURL, want: false},
+		{name: "OCI URL", chartURL: "oci://registry.rancher.com/rancher/charts/fleet:108.0.0", gitURL: gitURL, want: false},
+		{name: "OCI URL with digest", chartURL: "oci://registry.rancher.com/rancher/charts/fleet:108.0.0@sha256:abc", gitURL: gitURL, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isLocalChart(tt.chartURL, tt.gitURL))
+		})
+	}
+}
