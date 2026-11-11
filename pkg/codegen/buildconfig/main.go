@@ -32,6 +32,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if err := updateChartYaml(cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	if err := updateToolsSystemImages(cfg); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -93,6 +97,28 @@ func updateDockerfiles(cfg map[string]string) error {
 		}
 	}
 	return nil
+}
+
+// primeEnv is the env var Rancher uses to tell Prime builds apart, see pkg/version.
+const primeEnv = "RANCHER_VERSION_TYPE"
+
+func updateChartYaml(cfg map[string]string) error {
+	in, err := os.ReadFile("chart/Chart.yaml")
+	if err != nil {
+		return err
+	}
+	// Render in memory first so a failure never truncates the existing file.
+	buf := new(bytes.Buffer)
+	writer := ChartYamlWriter{
+		Config: cfg,
+		Prime:  os.Getenv(primeEnv) == "prime",
+		Chart:  bytes.NewReader(in),
+		Output: buf,
+	}
+	if err := writer.Run(); err != nil {
+		return fmt.Errorf("chart/Chart.yaml: %w", err)
+	}
+	return os.WriteFile("chart/Chart.yaml", buf.Bytes(), 0644)
 }
 
 const toolsSystemImagesPath = "pkg/apis/management.cattle.io/v3/tools_system_images.go"

@@ -8,5 +8,9 @@ if [ -n "$(git status --porcelain)" ]; then
     echo
     echo "The following generated files did differ after regeneration:"
     git status --porcelain
+    echo
+    echo "Changes made by regeneration:"
+    git --no-pager diff --stat
+    git --no-pager diff
     exit 1
 fi
