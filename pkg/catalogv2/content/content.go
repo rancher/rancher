@@ -35,12 +35,14 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/catalogv2/helm"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
+	"github.com/rancher/rancher/pkg/catalogv2/internal/cache"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 	"helm.sh/helm/v4/pkg/registry"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -61,6 +63,8 @@ type Manager struct {
 	discovery    discovery.DiscoveryInterface        // An interface to the Kubernetes Discovery API. Provides information about the Kubernetes API server.
 	IndexCache   map[string]indexCache               // cache for Helm repository index files. Used to store and retrieve index files for faster access.
 	lock         sync.RWMutex                        // read-write mutex used to ensure that some Manager's operations are thread-safe.
+	chartCache   cache.CAS                           // Content-addressable storage cache for chart archives keyed by sha256 digest.
+	sf           singleflight.Group                  // Single-flight group to deduplicate concurrent remote chart fetches.
 }
 
 // indexCache - used to cache helm chart indexes
@@ -82,14 +86,24 @@ func NewManager(
 	discovery discovery.DiscoveryInterface,
 	configMaps corecontrollers.ConfigMapCache,
 	secrets corecontrollers.SecretCache,
-	clusterRepos catalogcontrollers.ClusterRepoCache) *Manager {
+	clusterRepos catalogcontrollers.ClusterRepoCache) (*Manager, error) {
+	chartCache, err := cache.NewDiskCAS("")
+	if err != nil {
+		return nil, err
+	}
 	return &Manager{
 		discovery:    discovery,
 		configMaps:   configMaps,
 		secrets:      secrets,
 		clusterRepos: clusterRepos,
 		IndexCache:   map[string]indexCache{},
-	}
+		chartCache:   chartCache,
+	}, nil
+}
+
+// SetChartCache overrides the CAS chart cache implementation (primarily used in tests).
+func (c *Manager) SetChartCache(chartCache cache.CAS) {
+	c.chartCache = chartCache
 }
 
 // Index (thread-safe) retrieves the Helm repository information for a specific namespace and name.
@@ -232,6 +246,15 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chart.Name, chart.Version, validation.NotFound)
 	}
 	chartURL := chart.URLs[0]
+	digest := chart.Digest
+
+	// CAS disk cache hit: If this chart archive was previously downloaded and verified, serve it directly.
+	canUseCache := digest != "" && c.chartCache != nil
+	if canUseCache {
+		if cached, err := c.chartCache.Get(digest); err == nil {
+			return cached, nil
+		}
+	}
 
 	// Retrieve the clusterRepo
 	repo, err := c.getRepo(namespace, name)
@@ -273,12 +296,31 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		}
 	}
 
-	switch {
-	case registry.IsOCI(chartURL):
-		return oci.Chart(secret, chartURL, *repo.spec)
-	default:
-		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+	fetchRemote := func() (io.ReadCloser, error) {
+		switch {
+		case registry.IsOCI(chartURL):
+			return oci.Chart(secret, chartURL, *repo.spec)
+		default:
+			return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+		}
 	}
+
+	if !canUseCache {
+		return fetchRemote()
+	}
+
+	if _, err, _ := c.sf.Do(digest, func() (any, error) {
+		remoteReader, err := fetchRemote()
+		if err != nil {
+			return nil, err
+		}
+		defer remoteReader.Close()
+
+		return nil, c.chartCache.Put(digest, remoteReader)
+	}); err != nil {
+		return nil, err
+	}
+	return c.chartCache.Get(digest)
 }
 
 // NotReadyRetryAfter is the delay clients are asked to wait, through Retry-After, before asking again
