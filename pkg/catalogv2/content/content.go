@@ -228,7 +228,10 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	chart, err := index.Get(chartName, version)
 	if err != nil {
 		return nil, err
+	} else if len(chart.URLs) == 0 {
+		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chart.Name, chart.Version, validation.NotFound)
 	}
+	chartURL := chart.URLs[0]
 
 	// Retrieve the clusterRepo
 	repo, err := c.getRepo(namespace, name)
@@ -236,32 +239,43 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	// If the commit status of the repository is not an empty string
-	// Return the Chart through Git without checking the secret
+	// Git-based ClusterRepos load local charts from the checkout. Remote charts (OCI or HTTP)
+	// are pulled from their respective remote locations, with a local-first check for bundled assets.
+	var secret *corev1.Secret
 	if repo.status.Commit != "" {
-		content, err := git.Chart(namespace, name, repo.status.URL, chart)
-		return content, notReady(err)
-	}
+		// Classic git-based ClusterRepo, charts served from the checkout.
+		if isLocalChart(chartURL, repo.status.URL) {
+			return git.Chart(namespace, name, repo.status.URL, chart)
+		}
+		// otherwise, chart URL is remote
 
-	secret, err := catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
-	if err != nil {
-		return nil, err
-	}
+		// Local-first: Check if chart archive is bundled locally in the checkout and matches digest.
+		if localChart, err := git.LocalChart(namespace, name, repo.status.URL, chart); err == nil {
+			// "cache hit"
+			return localChart, nil
+		} else if errors.Is(err, git.ErrNotCheckedOut) {
+			// We must return when repository is not ready, because we cannot serve the chart from the local checkout.
+			// This is the only option available for clusters with no internet access.
+			return nil, notReady(err)
+		} else if !errors.Is(err, validation.NotFound) {
+			logrus.Debugf("local-first lookup for chart %s version %s in ClusterRepo %s not served locally: %v", chart.Name, chart.Version, name, err)
+		}
 
-	// Check if chart is nil and has at least one URL
-	if chart == nil {
-		return nil, errors.New("chart is nil")
-	}
-	if len(chart.URLs) <= 0 {
-		return nil, errors.New("chart has no urls specified")
+		// NOTE: OCI chart URLs from a git-based ClusterRepo do not support authentication.
+		// .spec.ClientSecret is overloaded, used to provide secrets for both git and OCI ClusterRepo types.
+		// It is not safe to use this secret for OCI URLs in git-based repos.
+		// We could make an exception with the system charts repository, and inject the default registry auth secret,
+		// but that would too much anticipation, it is not necessary at the moment.
+	} else {
+		secret, err = catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	switch {
-	// For OCI based helm repositories, there is no index.yaml.
-	// We generate index.yaml for it. While generating the index.yaml
-	// we only set index 0 of chart.URLs.
-	case registry.IsOCI(chart.URLs[0]):
-		return oci.Chart(secret, chart, *repo.spec)
+	case registry.IsOCI(chartURL):
+		return oci.Chart(secret, chartURL, *repo.spec)
 	default:
 		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 	}
@@ -286,6 +300,18 @@ func notReady(err error) error {
 func IsNotReady(err error) bool {
 	var apiErr *apierror.APIError
 	return errors.As(err, &apiErr) && errors.Is(apiErr.Cause, git.ErrNotCheckedOut)
+}
+
+// isLocalChart reports whether a chart URL points to a file inside the local Git repository checkout.
+// Relative paths, file:// URLs, and URLs matching the Git repository URL itself are resolved locally.
+func isLocalChart(chartURL, gitURL string) bool {
+	if !strings.Contains(chartURL, "://") || strings.HasPrefix(chartURL, "file://") {
+		return true
+	}
+	if gitURL != "" && strings.HasPrefix(chartURL, gitURL) {
+		return true
+	}
+	return false
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.
