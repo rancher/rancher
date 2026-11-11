@@ -13,11 +13,16 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
+	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// ErrIdentifierAttributeMissing is returned by AttributesToPrincipal when the entry has no value for
+// the configured user or group ID attribute.
+var ErrIdentifierAttributeMissing = errors.New("identifier attribute not found")
 
 type ConfigAttributes struct {
 	GroupMemberMappingAttribute string
@@ -166,7 +171,7 @@ func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, provi
 	if identifierAttribute != "" {
 		values := GetAttributeValuesByName(attribs, identifierAttribute)
 		if len(values) == 0 || values[0] == "" {
-			return nil, fmt.Errorf("ldap: configured identifier attribute %q not found on entry %s", identifierAttribute, dnStr)
+			return nil, fmt.Errorf("ldap: %w: %q on entry %s", ErrIdentifierAttributeMissing, identifierAttribute, dnStr)
 		}
 		externalID = values[0]
 	}
@@ -438,4 +443,16 @@ func IsValidAttr(attr string) bool {
 		return true
 	}
 	return false
+}
+
+// IdentifierAttributeConfigError returns a 422 error that names userIDAttribute when err is a login
+// error whose cause is ErrIdentifierAttributeMissing. It returns any other error unchanged. The
+// provider setup actions need it: the norman API handler that serves them reports an
+// apierror.APIError from their test login as a 500.
+func IdentifierAttributeConfigError(err error) error {
+	var apiErr *apierror.APIError
+	if errors.As(err, &apiErr) && errors.Is(apiErr.Cause, ErrIdentifierAttributeMissing) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("invalid userIDAttribute: %v", apiErr.Cause))
+	}
+	return err
 }

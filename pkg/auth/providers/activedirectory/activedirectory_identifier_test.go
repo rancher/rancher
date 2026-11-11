@@ -3,9 +3,12 @@ package activedirectory
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
+	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
@@ -80,6 +83,7 @@ func TestADProviderSearchPrincipalByAttribute(t *testing.T) {
 		want       *v3.Principal
 		wantErr    string
 		wantNotFnd bool
+		wantStatus int
 	}{
 		{
 			name:       "user found",
@@ -137,6 +141,7 @@ func TestADProviderSearchPrincipalByAttribute(t *testing.T) {
 			wantBase:   baseDN,
 			wantFilter: "(&(objectClass=person)(sAMAccountName=jdoe))",
 			wantErr:    "multiple entries found for sAMAccountName=jdoe",
+			wantStatus: http.StatusConflict,
 		},
 		{
 			name:       "disabled user",
@@ -190,6 +195,11 @@ func TestADProviderSearchPrincipalByAttribute(t *testing.T) {
 			case tt.wantErr != "":
 				require.ErrorContains(t, err, tt.wantErr)
 				assert.Nil(t, got)
+				if tt.wantStatus != 0 {
+					var apiErr *httperror.APIError
+					require.True(t, errors.As(err, &apiErr), "want APIError, got %v", err)
+					assert.Equal(t, tt.wantStatus, apiErr.Code.Status)
+				}
 			default:
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
@@ -280,6 +290,30 @@ func TestADProviderLoginUserWithIDAttributes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestADProviderLoginUserMissingUserIDAttributeIsUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	provider := adProvider{tokenMGR: &tokens.Manager{}}
+
+	config := identifierTestConfig()
+	// The user entry has no employeeID, the configured user ID attribute.
+	config.UserIDAttribute = "employeeID"
+
+	conn := &ldapFakes.FakeLdapConn{
+		SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adUserEntry(userDN, userName, "512")}}, nil
+		},
+	}
+
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+	_, _, err := provider.loginUser(conn, &credentials, &config)
+
+	apiErr, ok := err.(*apierror.APIError)
+	require.True(t, ok, "want *apierror.APIError, got %T: %v", err, err)
+	assert.Equal(t, http.StatusUnauthorized, apiErr.Code.Status)
+	assert.ErrorIs(t, apiErr.Cause, ldapFakes.ErrIdentifierAttributeMissing)
 }
 
 func TestADProviderGetGroupPrincipalsFromSearchBindFailure(t *testing.T) {

@@ -512,7 +512,7 @@ func (p *ldapProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalI
 	if len(result.Entries) < 1 {
 		return nil, &common.NonTransientError{Err: httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s=%s not found", identifierAttribute, externalID))}
 	} else if len(result.Entries) > 1 {
-		return nil, fmt.Errorf("ldap: multiple entries found for %s=%s", identifierAttribute, externalID)
+		return nil, httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("multiple entries found for %s=%s", identifierAttribute, externalID))
 	}
 
 	entry := result.Entries[0]

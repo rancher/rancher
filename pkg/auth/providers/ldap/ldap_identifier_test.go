@@ -3,9 +3,12 @@ package ldap
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
+	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
@@ -93,6 +96,7 @@ func TestLDAPProviderSearchPrincipalByAttribute(t *testing.T) {
 		wantName   string
 		wantErr    string
 		wantNotFnd bool
+		wantStatus int
 	}{
 		{
 			name:       "user found",
@@ -132,6 +136,7 @@ func TestLDAPProviderSearchPrincipalByAttribute(t *testing.T) {
 			wantBase:   usersBase,
 			wantFilter: "(&(objectClass=inetOrgPerson)(uid=jdoe))",
 			wantErr:    "multiple entries found for uid=jdoe",
+			wantStatus: http.StatusConflict,
 		},
 		{
 			name:       "search error",
@@ -177,6 +182,11 @@ func TestLDAPProviderSearchPrincipalByAttribute(t *testing.T) {
 			case tt.wantErr != "":
 				require.ErrorContains(t, err, tt.wantErr)
 				assert.Nil(t, got)
+				if tt.wantStatus != 0 {
+					var apiErr *httperror.APIError
+					require.True(t, errors.As(err, &apiErr), "want APIError, got %v", err)
+					assert.Equal(t, tt.wantStatus, apiErr.Code.Status)
+				}
 			default:
 				require.NoError(t, err)
 				assert.Equal(t, tt.wantName, got.Name)
@@ -344,6 +354,116 @@ func TestLDAPProviderLoginUserWithIDAttributes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLDAPProviderLoginUserMissingUserIDAttributeIsUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	provider := openldapProvider()
+	provider.tokenMGR = &tokens.Manager{}
+
+	config := identifierTestConfig()
+	config.UserLoginAttribute = "cn"
+
+	// The user entry has no uid, the configured user ID attribute.
+	userEntry := &ldapv3.Entry{
+		DN: userDN,
+		Attributes: []*ldapv3.EntryAttribute{
+			{Name: ObjectClass, Values: []string{userObjectClassName}},
+			{Name: "cn", Values: []string{userName}},
+			{Name: "entryDN", Values: []string{userDN}},
+		},
+	}
+	conn := &ldapFakes.FakeLdapConn{
+		SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{userEntry}}, nil
+		},
+	}
+
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+	_, _, err := provider.loginUser(conn, &credentials, &config)
+
+	apiErr, ok := err.(*apierror.APIError)
+	require.True(t, ok, "want *apierror.APIError, got %T: %v", err, err)
+	assert.Equal(t, http.StatusUnauthorized, apiErr.Code.Status)
+	assert.ErrorIs(t, apiErr.Cause, ldapFakes.ErrIdentifierAttributeMissing)
+}
+
+func TestLDAPProviderLoginUserSkipsGroupWithoutGroupIDAttribute(t *testing.T) {
+	t.Parallel()
+
+	const (
+		groupDN   = "cn=group," + groupsBase
+		noIDGroup = "cn=noid," + groupsBase
+	)
+
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().CheckAccess(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil)
+
+	provider := openldapProvider()
+	provider.userMGR = userManager
+	provider.tokenMGR = &tokens.Manager{}
+
+	config := identifierTestConfig()
+	config.GroupIDAttribute = "gidNumber"
+
+	conn := &ldapFakes.FakeLdapConn{
+		SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{ldapUserEntry(userDN, userName)}}, nil
+		},
+		SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			if searchRequest.Filter != "(&(member="+userDN+")(objectClass=groupOfNames))" {
+				return &ldapv3.SearchResult{}, nil
+			}
+			// The second group has no gidNumber, the configured group ID attribute.
+			return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{
+				ldapGroupEntry(groupDN, "group"),
+				{
+					DN: noIDGroup,
+					Attributes: []*ldapv3.EntryAttribute{
+						{Name: ObjectClass, Values: []string{"groupOfNames"}},
+						{Name: "cn", Values: []string{"noid"}},
+						{Name: "entryDN", Values: []string{noIDGroup}},
+					},
+				},
+			}}, nil
+		},
+	}
+
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+	userPrincipal, groupPrincipals, err := provider.loginUser(conn, &credentials, &config)
+	require.NoError(t, err)
+
+	assert.Equal(t, OpenLdapName+"_user://user", userPrincipal.Name)
+	require.Len(t, groupPrincipals, 1)
+	assert.Equal(t, OpenLdapName+"_group://1001", groupPrincipals[0].Name)
+}
+
+func TestLDAPProviderSearchLdapSkipsEntryWithoutIdentifier(t *testing.T) {
+	t.Parallel()
+
+	provider := openldapProvider()
+	config := identifierTestConfig()
+
+	// The second user has no uid, the configured user ID attribute.
+	noIDUser := &ldapv3.Entry{
+		DN: "cn=noid," + usersBase,
+		Attributes: []*ldapv3.EntryAttribute{
+			{Name: ObjectClass, Values: []string{userObjectClassName}},
+			{Name: "cn", Values: []string{"noid"}},
+		},
+	}
+	conn := &ldapFakes.FakeLdapConn{
+		SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{ldapUserEntry("cn=jdoe,"+usersBase, "jdoe"), noIDUser}}, nil
+		},
+	}
+
+	users, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope(&config), &config, conn)
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	assert.Equal(t, OpenLdapName+"_user://jdoe", users[0].Name)
 }
 
 func TestValidateIDAttributesUnchanged(t *testing.T) {

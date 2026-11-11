@@ -9,6 +9,7 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
+	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
@@ -83,6 +84,10 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(lConn, config, result)
 	if err != nil {
+		if errors.Is(err, ldap.ErrIdentifierAttributeMissing) {
+			logrus.Warnf("loginUser: %s", err)
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
+		}
 		return v3.Principal{}, nil, err
 	}
 
@@ -492,7 +497,7 @@ func (p *adProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalID,
 	if len(result.Entries) < 1 {
 		return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s=%s not found", identifierAttribute, externalID))}
 	} else if len(result.Entries) > 1 {
-		return nil, fmt.Errorf("activedirectory: multiple entries found for %s=%s", identifierAttribute, externalID)
+		return nil, httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("multiple entries found for %s=%s", identifierAttribute, externalID))
 	}
 
 	entry := result.Entries[0]
