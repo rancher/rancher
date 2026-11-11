@@ -73,7 +73,9 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 	if features.ProvisioningV2.Enabled() {
 		kubeconfigManager := kubeconfig.New(clients)
-		provisioningv2.EarlyRegister(ctx, clients, kubeconfigManager)
+		if err := provisioningv2.EarlyRegister(ctx, clients, kubeconfigManager); err != nil {
+			return err
+		}
 		if features.RKE2.Enabled() {
 			if err := capr.EarlyRegister(ctx, clients); err != nil {
 				return fmt.Errorf("failed to register capr controllers")

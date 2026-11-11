@@ -1,25 +1,38 @@
 package content
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/apiserver/pkg/apierror"
+	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/git"
+	"github.com/rancher/rancher/pkg/catalogv2/internal/cache"
+	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
-
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/version"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestFilterReleasesSemver(t *testing.T) {
@@ -708,6 +721,13 @@ type fakeClusterRepoCache struct {
 
 func (f fakeClusterRepoCache) Get(string) (*v1.ClusterRepo, error) { return f.repo, nil }
 
+type fakeConfigMapCache struct {
+	corecontrollers.ConfigMapCache
+	cm *corev1.ConfigMap
+}
+
+func (f fakeConfigMapCache) Get(string, string) (*corev1.ConfigMap, error) { return f.cm, nil }
+
 func TestGetRepoDisabled(t *testing.T) {
 	enabled, disabled := true, false
 
@@ -722,12 +742,12 @@ func TestGetRepoDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewManager(nil, nil, nil, fakeClusterRepoCache{repo: &v1.ClusterRepo{
+			m, err := NewManager(nil, nil, nil, fakeClusterRepoCache{repo: &v1.ClusterRepo{
 				Spec: v1.RepoSpec{Enabled: tt.enabled},
 			}})
+			require.NoError(t, err)
 
-			_, err := m.getRepo("", "repo")
-
+			_, err = m.getRepo("", "repo")
 			if tt.expectFound {
 				assert.NoError(t, err)
 			} else {
@@ -759,4 +779,146 @@ func TestIsLocalChart(t *testing.T) {
 			assert.Equal(t, tt.want, isLocalChart(tt.chartURL, tt.gitURL))
 		})
 	}
+}
+
+func TestManager_Chart_CASCacheHit(t *testing.T) {
+	dir := t.TempDir()
+	cas, err := cache.NewDiskCAS(dir)
+	require.NoError(t, err)
+
+	content := []byte("cached chart archive content")
+	sum := sha256.Sum256(content)
+	digest := hex.EncodeToString(sum[:])
+
+	err = cas.Put(digest, bytes.NewReader(content))
+	require.NoError(t, err)
+
+	indexFile := &repo.IndexFile{
+		Entries: map[string]repo.ChartVersions{
+			"fleet": {
+				{
+					Metadata: &chart.Metadata{Name: "fleet", Version: "108.0.0"},
+					URLs:     []string{"oci://registry.example.com/rancher/charts/fleet:108.0.0"},
+					Digest:   digest,
+				},
+			},
+		},
+	}
+
+	cm := &corev1.ConfigMap{
+		ResourceVersion: "1",
+		OwnerReferences: []metav1.OwnerReference{
+			{UID: "test-repo-uid"},
+		},
+	}
+
+	cr := &v1.ClusterRepo{
+		Name: "test-repo",
+		UID:  "test-repo-uid",
+		Status: v1.RepoStatus{
+			IndexConfigMapNamespace: "cattle-system",
+			IndexConfigMapName:      "test-repo-index",
+		},
+	}
+
+	fakeDiscovery := fake.NewSimpleClientset().Discovery().(*fakediscovery.FakeDiscovery)
+	fakeDiscovery.FakedServerVersion = &version.Info{
+		GitVersion: "v1.38.0",
+	}
+	m, err := NewManager(fakeDiscovery, fakeConfigMapCache{cm: cm}, nil, fakeClusterRepoCache{repo: cr})
+	require.NoError(t, err)
+
+	m.SetChartCache(cas)
+	m.IndexCache["cattle-system/test-repo-index"] = indexCache{
+		index:    indexFile,
+		revision: "1",
+	}
+
+	// Request the chart. It should hit the CAS cache directly.
+	chartReader, err := m.Chart("", "test-repo", "fleet", "108.0.0", true)
+	require.NoError(t, err)
+	defer chartReader.Close()
+
+	readBytes, err := io.ReadAll(chartReader)
+	require.NoError(t, err)
+	assert.Equal(t, content, readBytes)
+}
+
+func TestManager_Chart_CacheMissAndPopulate(t *testing.T) {
+	content := []byte("remote chart archive content")
+	sum := sha256.Sum256(content)
+	digest := hex.EncodeToString(sum[:])
+
+	var remoteCalls int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&remoteCalls, 1)
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(content)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	cas, err := cache.NewDiskCAS(dir)
+	require.NoError(t, err)
+
+	indexFile := &repo.IndexFile{
+		Entries: map[string]repo.ChartVersions{
+			"fleet": {
+				{
+					Metadata: &chart.Metadata{Name: "fleet", Version: "108.0.0"},
+					URLs:     []string{server.URL + "/fleet-108.0.0.tgz"},
+					Digest:   digest,
+				},
+			},
+		},
+	}
+
+	cm := &corev1.ConfigMap{
+		ResourceVersion: "1",
+		OwnerReferences: []metav1.OwnerReference{
+			{UID: "test-repo-uid"},
+		},
+	}
+
+	cr := &v1.ClusterRepo{
+		Name: "test-repo",
+		UID:  "test-repo-uid",
+		Status: v1.RepoStatus{
+			IndexConfigMapNamespace: "cattle-system",
+			IndexConfigMapName:      "test-repo-index",
+		},
+	}
+
+	fakeDiscovery := fake.NewSimpleClientset().Discovery().(*fakediscovery.FakeDiscovery)
+	fakeDiscovery.FakedServerVersion = &version.Info{
+		GitVersion: "v1.38.0",
+	}
+
+	m, err := NewManager(fakeDiscovery, fakeConfigMapCache{cm: cm}, nil, fakeClusterRepoCache{repo: cr})
+	require.NoError(t, err)
+	m.SetChartCache(cas)
+	m.IndexCache["cattle-system/test-repo-index"] = indexCache{
+		index:    indexFile,
+		revision: "1",
+	}
+
+	// 1. First call: Cache miss -> fetches from HTTP server -> populates CAS cache
+	assert.False(t, cas.Has(digest))
+	rc1, err := m.Chart("", "test-repo", "fleet", "108.0.0", true)
+	require.NoError(t, err)
+	data1, err := io.ReadAll(rc1)
+	_ = rc1.Close()
+	require.NoError(t, err)
+	assert.Equal(t, content, data1)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&remoteCalls))
+	assert.True(t, cas.Has(digest), "chart should now be stored in CAS cache")
+
+	// 2. Second call: Cache hit -> served from CAS cache without hitting HTTP server
+	rc2, err := m.Chart("", "test-repo", "fleet", "108.0.0", true)
+	require.NoError(t, err)
+	data2, err := io.ReadAll(rc2)
+	_ = rc2.Close()
+	require.NoError(t, err)
+	assert.Equal(t, content, data2)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&remoteCalls), "remote server should not be called again")
 }
