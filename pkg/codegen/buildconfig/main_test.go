@@ -17,6 +17,7 @@ func TestChartTarget(t *testing.T) {
 	}{
 		{name: "default", wantDir: "chart", wantRepoFiles: true},
 		{name: "empty override", env: map[string]string{chartDirEnv: ""}, wantDir: "chart", wantRepoFiles: true},
+		{name: "trailing slash is cleaned", env: map[string]string{chartDirEnv: "build/chart-prime/"}, wantDir: "build/chart-prime", wantRepoFiles: false},
 		{name: "override", env: map[string]string{chartDirEnv: "build/chart-prime"}, wantDir: "build/chart-prime", wantRepoFiles: false},
 	}
 	for _, tt := range tests {
@@ -90,4 +91,44 @@ func TestUpdateChartValuesInDir(t *testing.T) {
 	after, err := os.ReadFile(filepath.Join(dir, "values.yaml"))
 	require.NoError(t, err)
 	require.NotEqual(t, string(before), string(after))
+}
+
+func TestValidateChartDir(t *testing.T) {
+	// The repository root, with its own chart directory, is the working directory.
+	root := t.TempDir()
+	t.Chdir(root)
+	newChart := func(dir string) {
+		require.NoError(t, os.MkdirAll(dir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Chart.yaml"), nil, 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "values.yaml"), nil, 0644))
+	}
+	newChart("chart")
+	newChart("build/chart-prime")
+	require.NoError(t, os.MkdirAll("build/empty", 0755))
+	require.NoError(t, os.WriteFile("build/file", nil, 0644))
+	require.NoError(t, os.Symlink(filepath.Join(root, "chart"), "build/link-to-chart"))
+
+	tests := []struct {
+		name    string
+		dir     string
+		wantErr string
+	}{
+		{name: "chart copy", dir: "build/chart-prime"},
+		{name: "missing", dir: "build/nope", wantErr: "build/nope"},
+		{name: "not a directory", dir: "build/file", wantErr: "not a directory"},
+		{name: "no chart files", dir: "build/empty", wantErr: "Chart.yaml"},
+		{name: "repository chart", dir: "chart", wantErr: "repository chart"},
+		{name: "repository chart, unclean path", dir: "./build/../chart/", wantErr: "repository chart"},
+		{name: "repository chart through symlink", dir: "build/link-to-chart", wantErr: "repository chart"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateChartDir(tt.dir)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
