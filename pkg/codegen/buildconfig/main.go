@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	// Read build.yaml once
+	fmt.Println("Reading build.yaml")
 	cfg, err := loadBuildConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -27,23 +27,31 @@ func main() {
 
 	chartDir, repoFiles := chartTarget(os.Getenv)
 
-	steps := []func() error{
-		func() error { return updateChartValues(cfg, chartDir) },
-		func() error { return updateChartYaml(cfg, chartDir) },
+	type step struct {
+		name string
+		run  func() error
 	}
+	chartSteps := []step{
+		{"Updating " + chartDir + "/values.yaml", func() error { return updateChartValues(cfg, chartDir) }},
+		{"Updating " + chartDir + "/Chart.yaml", func() error { return updateChartYaml(cfg, chartDir) }},
+	}
+	steps := chartSteps
 	if repoFiles {
-		steps = append([]func() error{func() error { return generateGoConstantsFile(cfg) }},
-			append(steps,
-				func() error { return updateToolsSystemImages(cfg) },
-				func() error { return updateDockerfiles(cfg) },
-			)...)
+		steps = []step{{"Updating Go constants", func() error { return generateGoConstantsFile(cfg) }}}
+		steps = append(steps, chartSteps...)
+		steps = append(steps,
+			step{"Updating tools system images", func() error { return updateToolsSystemImages(cfg) }},
+			step{"Updating Dockerfiles", func() error { return updateDockerfiles(cfg) }},
+		)
 	}
-	for _, step := range steps {
-		if err := step(); err != nil {
+	for _, s := range steps {
+		fmt.Println(s.name)
+		if err := s.run(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	}
+	fmt.Println("Done")
 }
 
 // dockerfileTargets lists the Dockerfiles that carry build.yaml-managed ENV lines.
