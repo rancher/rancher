@@ -118,21 +118,56 @@ const primeEnv = "RANCHER_VERSION_TYPE"
 
 // chartDirEnv overrides the directory of the chart to update, see chartTarget. It is used to
 // generate for a build copy of the chart (e.g. Prime) without touching the repository.
-const chartDirEnv = "CHART_DIR"
+const (
+	chartDirEnv     = "CHART_DIR"
+	defaultChartDir = "chart"
+)
 
 // chartTarget returns the chart directory to update and whether the files of the
 // repository (outside the chart) must be generated too.
 func chartTarget(getenv func(string) string) (chartDir string, repoFiles bool) {
 	if dir := getenv(chartDirEnv); dir != "" {
-		return dir, false
+		return filepath.Clean(dir), false
 	}
-	return "chart", true
+	return defaultChartDir, true
 }
 
 // validateChartDir checks that a CHART_DIR override is a chart directory other than the
 // repository's own chart, so mistakes fail early with a clear message.
 func validateChartDir(dir string) error {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("%s %q: %w", chartDirEnv, dir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s %q is not a directory", chartDirEnv, dir)
+	}
+	for _, name := range []string{"Chart.yaml", "values.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			return fmt.Errorf("%s %q is not a chart directory: %w", chartDirEnv, dir, err)
+		}
+	}
+	same, err := sameDir(dir, defaultChartDir)
+	if err != nil {
+		return err
+	}
+	if same {
+		return fmt.Errorf("%s %q is the repository chart, unset it to generate the repository files", chartDirEnv, dir)
+	}
 	return nil
+}
+
+// sameDir reports whether two paths resolve to the same directory, following symlinks.
+func sameDir(a, b string) (bool, error) {
+	ai, err := os.Stat(a)
+	if err != nil {
+		return false, err
+	}
+	bi, err := os.Stat(b)
+	if err != nil {
+		return false, err
+	}
+	return os.SameFile(ai, bi), nil
 }
 
 func updateChartYaml(cfg map[string]string, chartDir string) error {
