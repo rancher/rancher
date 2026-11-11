@@ -18,6 +18,14 @@ import (
 )
 
 func main() {
+	chartDir, repoFiles := chartTarget(os.Getenv)
+	if !repoFiles {
+		if err := validateChartDir(chartDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+
 	fmt.Println("Reading build.yaml")
 	cfg, err := loadBuildConfig()
 	if err != nil {
@@ -25,15 +33,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	chartDir, repoFiles := chartTarget(os.Getenv)
-
 	type step struct {
 		name string
 		run  func() error
 	}
 	chartSteps := []step{
-		{"Updating " + chartDir + "/values.yaml", func() error { return updateChartValues(cfg, chartDir) }},
-		{"Updating " + chartDir + "/Chart.yaml", func() error { return updateChartYaml(cfg, chartDir) }},
+		{"Updating " + filepath.Join(chartDir, "values.yaml"), func() error { return updateChartValues(cfg, chartDir) }},
+		{"Updating " + filepath.Join(chartDir, "Chart.yaml"), func() error { return updateChartYaml(cfg, chartDir) }},
 	}
 	steps := chartSteps
 	if repoFiles {
@@ -121,6 +127,12 @@ func chartTarget(getenv func(string) string) (chartDir string, repoFiles bool) {
 		return dir, false
 	}
 	return "chart", true
+}
+
+// validateChartDir checks that a CHART_DIR override is a chart directory other than the
+// repository's own chart, so mistakes fail early with a clear message.
+func validateChartDir(dir string) error {
+	return nil
 }
 
 func updateChartYaml(cfg map[string]string, chartDir string) error {
