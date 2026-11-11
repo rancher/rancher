@@ -12,6 +12,11 @@ var chartYamlConfig = map[string]string{
 	"defaultAssetsImage":  "rancher/rancher-assets:v1",
 	"defaultShellVersion": "rancher/shell:v2",
 	"chartAuditLogImage":  "rancher/mirrored-bci-micro:3",
+
+	"defaultKubeAPIAuthImage": "rancher/kube-api-auth:v4",
+	"systemAgentVersion":      "v5",
+	"winsAgentVersion":        "v6",
+	"machineProvisionImage":   "rancher/machine:v7",
 }
 
 const chartYamlInput = `apiVersion: v2
@@ -47,6 +52,16 @@ annotations:
       image: rancher/shell:v2
     - name: mirrored-bci-micro
       image: rancher/mirrored-bci-micro:3
+    - name: kube-api-auth
+      image: rancher/kube-api-auth:v4
+    - name: rancher-agent
+      image: rancher/rancher-agent:%APP_VERSION%
+    - name: system-agent
+      image: rancher/system-agent:v5
+    - name: wins
+      image: rancher/wins:v6
+    - name: machine
+      image: rancher/machine:v7
 
   after: key
 `
@@ -80,6 +95,15 @@ func TestChartYamlWriterErrors(t *testing.T) {
 	t.Run("missing build.yaml value", func(t *testing.T) {
 		w := &main.ChartYamlWriter{Config: map[string]string{"x": "y"}, Chart: bytes.NewBufferString(chartYamlInput), Output: new(bytes.Buffer)}
 		require.ErrorContains(t, w.Run(), "defaultAssetsImage")
+	})
+	t.Run("missing version", func(t *testing.T) {
+		cfg := map[string]string{}
+		for k, v := range chartYamlConfig {
+			cfg[k] = v
+		}
+		delete(cfg, "winsAgentVersion")
+		w := &main.ChartYamlWriter{Config: cfg, Chart: bytes.NewBufferString(chartYamlInput), Output: new(bytes.Buffer)}
+		require.ErrorContains(t, w.Run(), "winsAgentVersion")
 	})
 	t.Run("image without tag", func(t *testing.T) {
 		cfg := map[string]string{}

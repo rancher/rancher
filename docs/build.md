@@ -67,10 +67,10 @@ The exported resulting environment variables should be like standard ENV_VARS.
 [HIP-0015](https://github.com/helm/community/blob/main/hips/hip-0015.md)) from build.yaml. The list of images lives in
 `pkg/codegen/buildconfig/chart_yaml_writer.go`.
 
-The annotation only lists images used by the chart's own templates. Images that Rancher deploys at runtime, such as
-the agents or the Turtles CAPI controller, do not belong in it, as Rancher has no subcharts. Entries carry the standard
-`name` and `image` fields, and `dependency` for images of a real subchart. The rancher image keeps the `%APP_VERSION%`
-placeholder, which the chart build replaces, along with the `0.0.0-VERSION` chart version.
+The annotation lists the images used by the chart's own templates, plus the ones Rancher deploys at runtime:
+`rancher-agent`, `system-agent`, `wins` and `machine`. Rancher has no subcharts, so entries do not use the
+`dependency` field. Entries carry the standard `name` and `image` fields. The rancher and rancher-agent images keep the
+`%APP_VERSION%` placeholder, which the chart build replaces, along with the `0.0.0-VERSION` chart version.
 
 In the Prime repository, run `go generate` with `RANCHER_VERSION_TYPE=prime` to prefix the images with
 `registry.rancher.com/`.

@@ -36,23 +36,32 @@ type chartImage struct {
 	Key string
 	// Ref is a fixed reference, used when the image is not tracked in build.yaml.
 	Ref string
+	// Repository and VersionKey build the reference from a repository and a build.yaml
+	// key holding only the tag, for images tracked by version rather than by reference.
+	Repository string
+	VersionKey string
 	// Dependency is the subchart that deploys the image, see annotationImage.
 	Dependency string
 }
 
-// chartImages lists the images used by the files of the Rancher chart.
+// chartImages lists the images of the Rancher chart: the ones used by the chart's own
+// files, and the ones Rancher deploys at runtime (agents, machine, system-agent, wins),
+// which are listed so that air-gapped installs can mirror them.
 //
-// WARNING: HIP-0015 only covers the images and resources used by the chart's own files,
-// as rendered with every optional deployment enabled, plus those of real subcharts, which
-// are cited with the dependency field. Do not add images that Rancher deploys at runtime,
-// such as the agents, machine, kube-api-auth, scc-operator or the Turtles CAPI controller:
-// they never appear in the rendered templates. Rancher has no real subcharts, it installs
-// charts like Turtles after it first boots.
+// WARNING: HIP-0015 itself only covers the images used by the chart's own files, plus those
+// of real subcharts, which are cited with the dependency field. Rancher has no real
+// subcharts, it installs charts like Turtles after it first boots, so do not use dependency
+// for the runtime images.
 var chartImages = []chartImage{
 	{Name: "rancher", Ref: "rancher/rancher:" + appVersionPlaceholder}, // deployment.yaml
 	{Name: "rancher-assets", Key: "defaultAssetsImage"},                // deployment.yaml, init container and env
 	{Name: "shell", Key: "defaultShellVersion"},                        // pre-upgrade and post-delete hook jobs
 	{Name: "mirrored-bci-micro", Key: "chartAuditLogImage"},            // deployment.yaml, audit log sidecar
+	{Name: "kube-api-auth", Key: "defaultKubeAPIAuthImage"},
+	{Name: "rancher-agent", Ref: "rancher/rancher-agent:" + appVersionPlaceholder}, // runtime, tagged like rancher
+	{Name: "system-agent", Repository: "rancher/system-agent", VersionKey: "systemAgentVersion"},
+	{Name: "wins", Repository: "rancher/wins", VersionKey: "winsAgentVersion"},
+	{Name: "machine", Key: "machineProvisionImage"},
 }
 
 // ChartYamlWriter updates the helm.sh/images annotation of chart/Chart.yaml
@@ -187,6 +196,13 @@ func (w *ChartYamlWriter) renderImages(indent int) (string, error) {
 func (w *ChartYamlWriter) imageRef(img chartImage) (string, error) {
 	if img.Ref != "" {
 		return img.Ref, nil
+	}
+	if img.VersionKey != "" {
+		v := w.Config[img.VersionKey]
+		if v == "" {
+			return "", fmt.Errorf("build.yaml has no value for %s", img.VersionKey)
+		}
+		return img.Repository + ":" + v, nil
 	}
 	v := w.Config[img.Key]
 	if v == "" {
