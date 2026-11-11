@@ -191,6 +191,9 @@ func TestADProviderSearchPrincipalByAttribute(t *testing.T) {
 			case tt.wantNotFnd:
 				var nonTransient *common.NonTransientError
 				require.True(t, errors.As(err, &nonTransient), "want NonTransientError, got %v", err)
+				var apiErr *httperror.APIError
+				require.True(t, errors.As(err, &apiErr), "want APIError, got %v", err)
+				assert.Equal(t, http.StatusNotFound, apiErr.Code.Status)
 				assert.Nil(t, got)
 			case tt.wantErr != "":
 				require.ErrorContains(t, err, tt.wantErr)

@@ -421,7 +421,7 @@ func (p *adProvider) getPrincipal(externalID string, scope string, config *v3.Ac
 	result, err := lConn.Search(search)
 	if err != nil {
 		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == ldapv3.LDAPResultNoSuchObject {
-			return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", externalID))}
+			return nil, &common.NonTransientError{Err: httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s not found", externalID))}
 		}
 		return nil, apierror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), validation.ServerError, "Internal server error")
 	}
@@ -495,7 +495,7 @@ func (p *adProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalID,
 	}
 
 	if len(result.Entries) < 1 {
-		return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s=%s not found", identifierAttribute, externalID))}
+		return nil, &common.NonTransientError{Err: httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s=%s not found", identifierAttribute, externalID))}
 	} else if len(result.Entries) > 1 {
 		return nil, httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("multiple entries found for %s=%s", identifierAttribute, externalID))
 	}
