@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"text/template"
@@ -24,25 +25,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := generateGoConstantsFile(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	chartDir, repoFiles := chartTarget(os.Getenv)
+
+	steps := []func() error{
+		func() error { return updateChartValues(cfg, chartDir) },
+		func() error { return updateChartYaml(cfg, chartDir) },
 	}
-	if err := updateChartValues(cfg, "chart"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if repoFiles {
+		steps = append([]func() error{func() error { return generateGoConstantsFile(cfg) }},
+			append(steps,
+				func() error { return updateToolsSystemImages(cfg) },
+				func() error { return updateDockerfiles(cfg) },
+			)...)
 	}
-	if err := updateChartYaml(cfg, "chart"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if err := updateToolsSystemImages(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if err := updateDockerfiles(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	for _, step := range steps {
+		if err := step(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -102,17 +102,22 @@ func updateDockerfiles(cfg map[string]string) error {
 // primeEnv is the env var Rancher uses to tell Prime builds apart, see pkg/version.
 const primeEnv = "RANCHER_VERSION_TYPE"
 
-// chartDirEnv overrides the directory of the chart to update, see chartTarget.
+// chartDirEnv overrides the directory of the chart to update, see chartTarget. It is used to
+// generate for a build copy of the chart (e.g. Prime) without touching the repository.
 const chartDirEnv = "CHART_DIR"
 
 // chartTarget returns the chart directory to update and whether the files of the
 // repository (outside the chart) must be generated too.
 func chartTarget(getenv func(string) string) (chartDir string, repoFiles bool) {
+	if dir := getenv(chartDirEnv); dir != "" {
+		return dir, false
+	}
 	return "chart", true
 }
 
 func updateChartYaml(cfg map[string]string, chartDir string) error {
-	in, err := os.ReadFile("chart/Chart.yaml")
+	path := filepath.Join(chartDir, "Chart.yaml")
+	in, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -125,9 +130,9 @@ func updateChartYaml(cfg map[string]string, chartDir string) error {
 		Output: buf,
 	}
 	if err := writer.Run(); err != nil {
-		return fmt.Errorf("chart/Chart.yaml: %w", err)
+		return fmt.Errorf("%s: %w", path, err)
 	}
-	return os.WriteFile("chart/Chart.yaml", buf.Bytes(), 0644)
+	return os.WriteFile(path, buf.Bytes(), 0644)
 }
 
 const toolsSystemImagesPath = "pkg/apis/management.cattle.io/v3/tools_system_images.go"
@@ -194,8 +199,8 @@ const (
 }
 
 func updateChartValues(cfg map[string]string, chartDir string) error {
-	// Read chart/values.yaml
-	chartValues, err := os.Open("chart/values.yaml")
+	path := filepath.Join(chartDir, "values.yaml")
+	chartValues, err := os.Open(path)
 	if err != nil {
 		return err
 	}
@@ -224,7 +229,7 @@ func updateChartValues(cfg map[string]string, chartDir string) error {
 	}
 
 	// Replace original using the safe cross-device rename helper
-	if err := safeRename(tempPath, "chart/values.yaml"); err != nil {
+	if err := safeRename(tempPath, path); err != nil {
 		return err
 	}
 
