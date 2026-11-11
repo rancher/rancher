@@ -159,7 +159,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 	})
 
 	if !hasDownloadCondition {
-		repo, err = setCondition(repo, nil, newStatus, repoCondition, "downloading", r.clusterRepos)
+		repo, err = setConditionGeneration(repo, nil, newStatus, repoCondition, "downloading", r.clusterRepos, false)
 		if err != nil {
 			return setErrorCondition(repo, err, newStatus, interval, repoCondition, r.clusterRepos)
 		}
@@ -543,12 +543,26 @@ func setConditionWithInterval(clusterRepo *catalog.ClusterRepo,
 	return clusterRepo, nil
 }
 
+// setCondition sets the condition in the status while bumping the observed generation
 func setCondition(clusterRepo *catalog.ClusterRepo,
 	err error,
 	newStatus *catalog.RepoStatus,
 	cond catalog.RepoCondition,
 	condMessage string,
 	controller catalogcontrollers.ClusterRepoController,
+) (*catalog.ClusterRepo, error) {
+	return setConditionGeneration(clusterRepo, err, newStatus, cond, condMessage, controller, true)
+}
+
+// setConditionGeneration behaves like setCondition, but lets the caller decide whether
+// ObservedGeneration should be bumped to the current Generation.
+func setConditionGeneration(clusterRepo *catalog.ClusterRepo,
+	err error,
+	newStatus *catalog.RepoStatus,
+	cond catalog.RepoCondition,
+	condMessage string,
+	controller catalogcontrollers.ClusterRepoController,
+	bumpObservedGeneration bool,
 ) (*catalog.ClusterRepo, error) {
 	newErr := errors.New(condMessage)
 	downloaded := condition.Cond(cond)
@@ -558,7 +572,9 @@ func setCondition(clusterRepo *catalog.ClusterRepo,
 	}
 	downloaded.SetError(newStatus, "", newErr)
 
-	newStatus.ObservedGeneration = clusterRepo.Generation
+	if bumpObservedGeneration {
+		newStatus.ObservedGeneration = clusterRepo.Generation
+	}
 	if !equality.Semantic.DeepEqual(newStatus, &clusterRepo.Status) {
 		//Since status has changed, update the lastUpdatedTime
 		downloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
