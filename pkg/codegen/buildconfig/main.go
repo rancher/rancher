@@ -18,46 +18,75 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	chartDir, repoFiles := chartTarget(os.Getenv)
 	if !repoFiles {
 		if err := validateChartDir(chartDir); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			return err
 		}
 	}
 
 	fmt.Println("Reading build.yaml")
 	cfg, err := loadBuildConfig()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 
-	type step struct {
-		name string
-		run  func() error
-	}
-	chartSteps := []step{
-		{"Updating " + filepath.Join(chartDir, "values.yaml"), func() error { return updateChartValues(cfg, chartDir) }},
-		{"Updating " + filepath.Join(chartDir, "Chart.yaml"), func() error { return updateChartYaml(cfg, chartDir) }},
-	}
-	steps := chartSteps
-	if repoFiles {
-		steps = []step{{"Updating Go constants", func() error { return generateGoConstantsFile(cfg) }}}
-		steps = append(steps, chartSteps...)
-		steps = append(steps,
-			step{"Updating tools system images", func() error { return updateToolsSystemImages(cfg) }},
-			step{"Updating Dockerfiles", func() error { return updateDockerfiles(cfg) }},
-		)
-	}
-	for _, s := range steps {
-		fmt.Println(s.name)
-		if err := s.run(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+	for _, step := range generationSteps(cfg, chartDir) {
+		if step.repoOnly && !repoFiles {
+			continue
+		}
+		fmt.Println(step.name)
+		if err := step.run(); err != nil {
+			return err
 		}
 	}
 	fmt.Println("Done")
+	return nil
+}
+
+// step is one file (or group of files) generated from build.yaml.
+type step struct {
+	name string
+	// repoOnly steps write files of the repository outside the chart, so they are skipped
+	// when generating for a copy of the chart, see chartTarget.
+	repoOnly bool
+	run      func() error
+}
+
+// generationSteps lists, in order, everything that is generated from build.yaml.
+func generationSteps(cfg map[string]string, chartDir string) []step {
+	return []step{
+		{
+			name:     "Updating Go constants",
+			repoOnly: true,
+			run:      func() error { return generateGoConstantsFile(cfg) },
+		},
+		{
+			name: "Updating " + filepath.Join(chartDir, "values.yaml"),
+			run:  func() error { return updateChartValues(cfg, chartDir) },
+		},
+		{
+			name: "Updating " + filepath.Join(chartDir, "Chart.yaml"),
+			run:  func() error { return updateChartYaml(cfg, chartDir) },
+		},
+		{
+			name:     "Updating tools system images",
+			repoOnly: true,
+			run:      func() error { return updateToolsSystemImages(cfg) },
+		},
+		{
+			name:     "Updating Dockerfiles",
+			repoOnly: true,
+			run:      func() error { return updateDockerfiles(cfg) },
+		},
+	}
 }
 
 // dockerfileTargets lists the Dockerfiles that carry build.yaml-managed ENV lines.
@@ -113,18 +142,19 @@ func updateDockerfiles(cfg map[string]string) error {
 	return nil
 }
 
-// primeEnv is the env var Rancher uses to tell Prime builds apart, see pkg/version.
-const primeEnv = "RANCHER_VERSION_TYPE"
-
-// chartDirEnv overrides the directory of the chart to update, see chartTarget. It is used to
-// generate for a build copy of the chart (e.g. Prime) without touching the repository.
 const (
-	chartDirEnv     = "CHART_DIR"
+	// primeEnv is the env var Rancher uses to tell Prime builds apart, see pkg/version.
+	primeEnv = "RANCHER_VERSION_TYPE"
+	// chartDirEnv overrides the directory of the chart to update. It is used to generate
+	// for a build copy of the chart (e.g. Prime) without touching the repository.
+	chartDirEnv = "CHART_DIR"
+	// defaultChartDir is the chart of the repository.
 	defaultChartDir = "chart"
 )
 
 // chartTarget returns the chart directory to update and whether the files of the
-// repository (outside the chart) must be generated too.
+// repository (outside the chart) must be generated too. Only the default chart is
+// generated along with the repository files.
 func chartTarget(getenv func(string) string) (chartDir string, repoFiles bool) {
 	if dir := getenv(chartDirEnv); dir != "" {
 		return filepath.Clean(dir), false
@@ -147,27 +177,15 @@ func validateChartDir(dir string) error {
 			return fmt.Errorf("%s %q is not a chart directory: %w", chartDirEnv, dir, err)
 		}
 	}
-	same, err := sameDir(dir, defaultChartDir)
+	// Also catches the repository chart reached through an unclean path or a symlink.
+	repoChart, err := os.Stat(defaultChartDir)
 	if err != nil {
 		return err
 	}
-	if same {
+	if os.SameFile(info, repoChart) {
 		return fmt.Errorf("%s %q is the repository chart, unset it to generate the repository files", chartDirEnv, dir)
 	}
 	return nil
-}
-
-// sameDir reports whether two paths resolve to the same directory, following symlinks.
-func sameDir(a, b string) (bool, error) {
-	ai, err := os.Stat(a)
-	if err != nil {
-		return false, err
-	}
-	bi, err := os.Stat(b)
-	if err != nil {
-		return false, err
-	}
-	return os.SameFile(ai, bi), nil
 }
 
 func updateChartYaml(cfg map[string]string, chartDir string) error {
