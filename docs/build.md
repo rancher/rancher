@@ -68,7 +68,7 @@ The exported resulting environment variables should be like standard ENV_VARS.
 `pkg/codegen/buildconfig/chart_yaml_writer.go`.
 
 The annotation lists the images used by the chart's own templates, plus the ones Rancher deploys at runtime:
-`rancher-agent`, `system-agent`, `wins` and `machine`. Rancher has no subcharts, so entries do not use the
+`rancher-agent`, `system-agent`, `wins` and `machine`, and for Prime only `scc-operator`. Rancher has no subcharts, so entries do not use the
 `dependency` field. Entries carry the standard `name` and `image` fields. The rancher and rancher-agent images keep the
 `%APP_VERSION%` placeholder, which the chart build replaces, along with the `0.0.0-VERSION` chart version.
 

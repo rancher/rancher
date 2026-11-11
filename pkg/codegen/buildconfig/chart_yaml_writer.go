@@ -42,10 +42,12 @@ type chartImage struct {
 	VersionKey string
 	// Dependency is the subchart that deploys the image, see annotationImage.
 	Dependency string
+	// PrimeOnly lists the image only when generating for Prime.
+	PrimeOnly bool
 }
 
 // chartImages lists the images of the Rancher chart: the ones used by the chart's own
-// files, and the ones Rancher deploys at runtime (agents, machine, system-agent, wins),
+// files, and the ones Rancher deploys at runtime (agents, machine, system-agent, wins, and scc-operator on Prime),
 // which are listed so that air-gapped installs can mirror them.
 //
 // WARNING: HIP-0015 itself only covers the images used by the chart's own files, plus those
@@ -62,6 +64,7 @@ var chartImages = []chartImage{
 	{Name: "system-agent", Repository: "rancher/system-agent", VersionKey: "systemAgentVersion"},
 	{Name: "wins", Repository: "rancher/wins", VersionKey: "winsAgentVersion"},
 	{Name: "machine", Key: "machineProvisionImage"},
+	{Name: "scc-operator", Key: "defaultSccOperatorImage", PrimeOnly: true},
 }
 
 // ChartYamlWriter updates the helm.sh/images annotation of chart/Chart.yaml
@@ -163,6 +166,9 @@ func indentOf(line string) int {
 func (w *ChartYamlWriter) renderImages(indent int) (string, error) {
 	var entries []annotationImage
 	for _, img := range chartImages {
+		if img.PrimeOnly && !w.Prime {
+			continue
+		}
 		ref, err := w.imageRef(img)
 		if err != nil {
 			return "", err

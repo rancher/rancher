@@ -17,6 +17,7 @@ var chartYamlConfig = map[string]string{
 	"systemAgentVersion":      "v5",
 	"winsAgentVersion":        "v6",
 	"machineProvisionImage":   "rancher/machine:v7",
+	"defaultSccOperatorImage": "rancher/scc-operator:v8",
 }
 
 const chartYamlInput = `apiVersion: v2
@@ -83,6 +84,16 @@ func TestChartYamlWriterPrime(t *testing.T) {
 	require.Contains(t, out.String(), "image: registry.rancher.com/rancher/rancher:%APP_VERSION%\n")
 	require.Contains(t, out.String(), "image: registry.rancher.com/rancher/shell:v2\n")
 	require.NotContains(t, out.String(), "image: rancher/")
+	require.Contains(t, out.String(), "image: registry.rancher.com/rancher/scc-operator:v8\n")
+}
+
+func TestChartYamlWriterNonPrimeOmitsSccOperator(t *testing.T) {
+	t.Parallel()
+
+	out := new(bytes.Buffer)
+	w := &main.ChartYamlWriter{Config: chartYamlConfig, Chart: bytes.NewBufferString(chartYamlInput), Output: out}
+	require.NoError(t, w.Run())
+	require.NotContains(t, out.String(), "scc-operator")
 }
 
 func TestChartYamlWriterErrors(t *testing.T) {
