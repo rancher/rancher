@@ -1,14 +1,14 @@
 name: Rancher Assets Auto-Approve
 
-# Approves the rancher/rancher-assets/.github/workflows/push-to-rancher.yml
-# generated bump PRs in rancher/rancher once their checks are green,
-# and re-runs failed checks (rancher/rancher's CI is known-flaky).
+# Approves and enables auto-merge on the
+# rancher/rancher-assets/.github/workflows/push-to-rancher.yml generated bump
+# PRs in rancher/rancher, and re-runs failed checks (rancher/rancher's CI is
+# known-flaky).
 # Scheduled, not event-triggered - rancher/rancher's required checks run
-# too long for a single polling job. push-to-rancher.yml creates the PR
-# and requests auto-merge; native GitHub auto-merge (already enabled on
-# rancher/rancher) does the actual merging once approval and checks are
-# both satisfied. This job only supplies the approval and nudges flaky
-# failures, snapshot-style, every run - never waits in-job.
+# too long for a single polling job. Native GitHub auto-merge does the actual
+# merging once approval and checks are both satisfied. This job supplies the
+# approval and auto-merge request and nudges flaky failures, snapshot-style,
+# every run - never waits in-job.
 
 on:
   schedule:
@@ -93,7 +93,7 @@ jobs:
           done
 
   approve:
-    name: Approve Rancher Assets Release PRs
+    name: Approve and Auto-Merge Rancher Assets Release PRs
     permissions:
       id-token: write # Allow Vault action to authenticate with GitHub OIDC.
       pull-requests: read # Read PR restrictions and review state.
@@ -111,11 +111,11 @@ jobs:
             --author "rancher-pr-actions-write[bot]" \
             --base main \
             --limit 50 \
-            --json number,title,reviewDecision \
-            --jq '.[] | select(.title | contains("Update rancher-assets to")) | select(.reviewDecision != "APPROVED") | .number')
+            --json number,title \
+            --jq '.[] | select(.title | contains("Update rancher-assets to")) | .number')
 
           if [[ -z "$eligible_prs" ]]; then
-            echo "No eligible rancher-assets bump PRs to approve."
+            echo "No eligible rancher-assets bump PRs."
             printf 'eligible_prs=\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -129,7 +129,7 @@ jobs:
           secrets: |
             github/token/rancher--rancher--auto-approve--contents--pull_requests--write token | APPROVE_TOKEN
 
-      - name: Approve PR
+      - name: Approve and enable auto-merge
         if: steps.eligibility.outputs.eligible_prs != ''
         env:
           GH_TOKEN: ${{ env.APPROVE_TOKEN }}
@@ -138,17 +138,23 @@ jobs:
         run: |
           set -euo pipefail
 
+          failed=0
           for pr_number in $PR_NUMBERS; do
             review_decision=$(gh pr view "$pr_number" --repo "$REPO" \
               --json reviewDecision --jq '.reviewDecision')
 
-            if [[ "$review_decision" == "APPROVED" ]]; then
-              echo "PR #$pr_number is currently approved."
-              continue
+            if [[ "$review_decision" != "APPROVED" ]]; then
+              gh pr review "$pr_number" \
+                --repo "$REPO" \
+                --approve \
+                --body "Auto-approving Rancher Assets PR with auto-merge enabled."
             fi
 
-            gh pr review "$pr_number" \
-              --repo "$REPO" \
-              --approve \
-              --body "Auto-approving Rancher Assets PR with auto-merge enabled."
+            # Re-requested every run: idempotent, and covers PRs approved before auto-merge worked.
+            gh pr merge "$pr_number" --repo "$REPO" --auto --squash || {
+              echo "::error::Failed to enable auto-merge on PR #$pr_number."
+              failed=1
+            }
           done
+
+          exit "$failed"
