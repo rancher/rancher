@@ -88,7 +88,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 				Output: "generateKubeconfigOutput",
 			}
 			schema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
-				if request.Name == "local" && request.Link == "shell" {
+				if request.Link == "shell" {
 					requestUser, ok := k8srequest.UserFrom(request.Request.Context())
 					if !ok || requestUser == nil || requestUser.GetName() == "" {
 						return types.APIObject{}, validation.Unauthorized
