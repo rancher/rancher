@@ -2,15 +2,19 @@ package drivers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
@@ -18,26 +22,31 @@ import (
 
 type DynamicDriver struct {
 	BaseDriver
+	AssetDir string
 }
 
 var DockerMachineDriverPrefix = "docker-machine-driver-"
 
 const ExecutionTimeout = time.Second * 5
 
-func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
+func NewDynamicDriver(builtin bool, name, url, hash string) (*DynamicDriver, error) {
 	d := &DynamicDriver{
-		BaseDriver{
+		BaseDriver: BaseDriver{
 			Builtin:      builtin,
 			DriverName:   name,
 			URL:          url,
 			DriverHash:   hash,
 			BinaryPrefix: DockerMachineDriverPrefix,
+			DevMode:      os.Getenv("CATTLE_DEV_MODE") != "",
 		},
 	}
 	if !strings.HasPrefix(d.DriverName, DockerMachineDriverPrefix) {
 		d.DriverName = DockerMachineDriverPrefix + d.DriverName
 	}
-	return d
+	if len(hash) > 0 && d.getHasher() == nil {
+		return nil, fmt.Errorf("invalid hash format: %s", hash)
+	}
+	return d, nil
 }
 
 func (d *DynamicDriver) Install() error {
@@ -49,11 +58,45 @@ func (d *DynamicDriver) Install() error {
 		return err
 	}
 
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
+	if d.DevMode {
 		return nil
 	}
 
-	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIDashboardPath.Get(), d.DriverName))
+	return d.copyTo(d.assetPath())
+}
+
+func (d *DynamicDriver) assetPath() string {
+	if d.AssetDir != "" {
+		return filepath.Join(d.AssetDir, d.DriverName)
+	}
+	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
+}
+
+// Valid returns whether the driver binary is correctly downloaded and installed
+func (d *DynamicDriver) Valid() bool {
+	if !d.Exists() {
+		return false
+	} else if d.Builtin {
+		return true
+	}
+
+	expectedHash, err := os.ReadFile(d.srcBinHashFile())
+	if err != nil {
+		return false
+	}
+	hasher := sha256.New()
+
+	f, err := os.Open(d.assetPath())
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return false
+	}
+	_, matches := compare(hasher, string(expectedHash))
+	return matches
 }
 
 func (d *BaseDriver) copyTo(dest string) error {
@@ -139,4 +182,47 @@ func (d *BaseDriver) Executable() error {
 	}
 
 	return nil
+}
+
+// GetDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
+// If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
+func GetDriverDownloadURL(nd *v3.NodeDriver) (string, string, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	driverName := nd.Spec.DisplayName
+	if driverName == "" {
+		driverName = nd.Name
+	}
+	if !strings.HasPrefix(driverName, DockerMachineDriverPrefix) {
+		driverName = DockerMachineDriverPrefix + driverName
+	}
+
+	path := filepath.Join(settings.UIDashboardPath.Get(), "assets", driverName)
+	if _, err := os.Stat(path); err != nil {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	hash, err := sha256sum(path)
+	if err != nil {
+		return "", "", err
+	}
+
+	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName), hash, nil
+}
+
+func sha256sum(path string) (string, error) {
+	hasher := sha256.New()
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
