@@ -104,6 +104,10 @@ func (o *Client) parseURL() error {
 	// Remove the oci scheme from the start of the URL
 	url = strings.TrimPrefix(url, "oci://")
 
+	// Convert + to _ in tags for git-oci ClusterRepos with OCI chart URLs in index.yaml.
+	// registry.ParseReference rejects tags containing +, so conversion must happen before parsing.
+	url = convertOCITag(url)
+
 	// If the URL contains a slash, then it must have a repository and/or tag
 	if strings.Contains(url, "/") {
 		var ref registry.Reference
