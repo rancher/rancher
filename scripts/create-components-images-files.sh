@@ -30,17 +30,7 @@ if [ ! -d $ASSETS_REPO_DIR ]; then
 fi
 
 # Reads chart-versions.<minor>.upstream-refs.<env>.charts.commit from lock.yaml.
-CHARTS_COMMIT=$(awk -v minor="$ASSETS_MINOR" -v env="$ASSETS_ENV" '
-    { match($0, /^ */); indent = RLENGTH; key = $1; gsub(/[":]/, "", key) }
-    indent == 0 { in_versions = (key == "chart-versions"); in_minor = in_env = in_charts = 0; next }
-    !in_versions { next }
-    indent == 4 { in_minor = (key == minor); in_env = in_charts = 0; next }
-    !in_minor { next }
-    indent == 12 { in_env = (key == env); in_charts = 0; next }
-    !in_env { next }
-    indent == 16 { in_charts = (key == "charts"); next }
-    in_charts && indent == 20 && key == "commit" { print $2; exit }
-' $ASSETS_REPO_DIR/lock.yaml)
+CHARTS_COMMIT=$(MINOR=$ASSETS_MINOR ENV=$ASSETS_ENV yq '.chart-versions[strenv(MINOR)].upstream-refs[strenv(ENV)].charts.commit // ""' $ASSETS_REPO_DIR/lock.yaml)
 if [ -z "$CHARTS_COMMIT" ]; then
     echo "Could not find charts commit for ${ASSETS_MINOR}/${ASSETS_ENV} in $ASSETS_REPO_DIR/lock.yaml (assets tag ${ASSETS_TAG})" >&2
     exit 1
