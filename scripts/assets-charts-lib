@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Sourced helper that traces the Rancher Assets image in build.yaml back to the exact rancher/charts commit baked into it:
+#   assets image tag -> rancher-assets repo at that tag -> lock.yaml -> charts commit -> rancher/charts checkout
+# Requires yq. After calling checkout_assets_charts, CHARTS_REPO_PATH points at the charts repo checked out at that commit.
+
+ASSETS_CHARTS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+ASSETS_CHARTS_BUILD_DIR="${ASSETS_CHARTS_ROOT}/bin/build"
+
+checkout_assets_charts() {
+    local build_file="${ASSETS_CHARTS_ROOT}/build.yaml"
+    local assets_image tag minor env assets_dir
+
+    assets_image=${ASSETS_IMAGE:-$(grep -m1 "^defaultAssetsImage:" "$build_file" | cut -d ' ' -f2)}
+    tag=${assets_image##*:}   # e.g. v2.16-20261027T2136Z-dev
+    minor=${tag#v}
+    minor=${minor%%-*}        # e.g. 2.16
+    if [[ $tag == *-dev ]]; then env=dev; else env=prod; fi
+
+    assets_dir="${ASSETS_CHARTS_BUILD_DIR}/rancher-assets"
+    CHARTS_REPO_PATH="${ASSETS_CHARTS_BUILD_DIR}/charts"
+    mkdir -p "$ASSETS_CHARTS_BUILD_DIR"
+
+    if [ ! -d "$assets_dir" ]; then
+        git clone --depth 1 --branch "$tag" https://github.com/rancher/rancher-assets "$assets_dir"
+    fi
+
+    CHARTS_COMMIT=$(MINOR=$minor ENV=$env yq '.chart-versions[strenv(MINOR)].upstream-refs[strenv(ENV)].charts.commit // ""' "$assets_dir/lock.yaml")
+    if [ -z "$CHARTS_COMMIT" ]; then
+        echo "Could not find charts commit for ${minor}/${env} in $assets_dir/lock.yaml (assets tag ${tag})" >&2
+        return 1
+    fi
+
+    if [ ! -d "$CHARTS_REPO_PATH" ]; then
+        git clone --branch "$(grep -m1 "^chartDefaultBranch:" "$build_file" | cut -d ' ' -f2)" https://github.com/rancher/charts "$CHARTS_REPO_PATH"
+    fi
+    git -C "$CHARTS_REPO_PATH" fetch origin "$CHARTS_COMMIT"
+    git -C "$CHARTS_REPO_PATH" checkout --detach "$CHARTS_COMMIT"
+}
