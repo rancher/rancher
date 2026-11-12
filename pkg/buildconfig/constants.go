@@ -16,7 +16,7 @@ const (
 	RemoteDialerProxyVersion  = "111.0.0+up0.9.1-rc.2"
 	Rke2ChartDefaultBranch    = "main"
 	SystemAgentVersion        = "v0.16.0-rc.8"
-	TurtlesVersion            = "111.0.0+up0.28.0-rc.4"
+	TurtlesVersion            = "111.0.0+up0.28.0-rc.5"
 	WebhookVersion            = "111.0.0+up0.12.1-rc.17"
 	WinsAgentVersion          = "v0.16.0-rc.10"
 )
