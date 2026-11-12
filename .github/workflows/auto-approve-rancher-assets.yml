@@ -54,7 +54,9 @@ jobs:
 
           valid_prs=()
           for pr_number in $pr_numbers; do
-            title=$(gh pr view "$pr_number" --repo "$REPO" --json title --jq '.title')
+            # Pin the validated head; approve and merge only act on this commit.
+            read -r head_sha title < <(gh pr view "$pr_number" --repo "$REPO" \
+              --json headRefOid,title --jq '"\(.headRefOid) \(.title)"')
             title_tag=$(grep -oE "$tag_re\$" <<<"$title" || true)
 
             files=$(gh pr view "$pr_number" --repo "$REPO" --json files \
@@ -76,7 +78,12 @@ jobs:
               continue
             fi
 
-            valid_prs+=("$pr_number")
+            if [[ "$(gh pr view "$pr_number" --repo "$REPO" --json headRefOid --jq '.headRefOid')" != "$head_sha" ]]; then
+              echo "::warning::PR #$pr_number head changed during validation, skipping."
+              continue
+            fi
+
+            valid_prs+=("$pr_number:$head_sha")
           done
 
           echo "Valid PRs: ${valid_prs[*]:-none}"
@@ -102,7 +109,8 @@ jobs:
           set -euo pipefail
 
           failed_runs=()
-          for pr_number in $PR_NUMBERS; do
+          for entry in $PR_NUMBERS; do
+            pr_number="${entry%%:*}"
             checks_json=$(gh pr checks "$pr_number" --repo "$REPO" --json name,bucket,link) || continue
 
             links=$(jq -r '.[] | select(.bucket != "pass") | .link' <<<"$checks_json")
@@ -164,19 +172,23 @@ jobs:
           set -euo pipefail
 
           failed=0
-          for pr_number in $PR_NUMBERS; do
+          for entry in $PR_NUMBERS; do
+            pr_number="${entry%%:*}"
+            head_sha="${entry#*:}"
+
             review_decision=$(gh pr view "$pr_number" --repo "$REPO" \
               --json reviewDecision --jq '.reviewDecision')
 
             if [[ "$review_decision" != "APPROVED" ]]; then
-              gh pr review "$pr_number" \
-                --repo "$REPO" \
-                --approve \
-                --body "Auto-approving Rancher Assets PR: diff validated as an assets image bump."
+              gh api --method POST "repos/$REPO/pulls/$pr_number/reviews" \
+                -f commit_id="$head_sha" \
+                -f event=APPROVE \
+                -f body="Auto-approving Rancher Assets PR: diff validated as an assets image bump." \
+                > /dev/null
             fi
 
             # Re-requested every run: idempotent, and covers PRs approved before auto-merge worked.
-            gh pr merge "$pr_number" --repo "$REPO" --auto --squash || {
+            gh pr merge "$pr_number" --repo "$REPO" --auto --squash --match-head-commit "$head_sha" || {
               echo "::error::Failed to enable auto-merge on PR #$pr_number."
               failed=1
             }
