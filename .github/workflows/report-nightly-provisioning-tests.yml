@@ -46,15 +46,15 @@ jobs:
   #
   # actions: write is only here because gh-aw always compiles a conclusion job that requests it,
   # and a caller granting less fails the entire run at startup.
+  # copilot-requests: write lets the analysis bill Copilot to the org through the Actions token.
   analyze:
     needs: collect
     permissions:
       actions: write
       contents: read
+      copilot-requests: write
     if: needs.collect.outputs.any-failures == 'true'
     uses: $/.github/workflows/nightly-prov-analysis.lock.yml
-    secrets:
-      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
   notify-slack:
     needs: [collect, analyze]
@@ -105,4 +105,4 @@ jobs:
         env:
           SLACK_PAYLOAD: ${{ steps.generate.outputs.slack-payload }}
         run: |
-          curl -sf -X POST -H 'Content-type: application/json' --data "$SLACK_PAYLOAD" "SLACK_WEBHOOK_URL"
+          curl -sf -X POST -H 'Content-type: application/json' --data "$SLACK_PAYLOAD" "$SLACK_WEBHOOK_URL"

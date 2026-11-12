@@ -33,6 +33,7 @@ on:
 permissions:
   contents: read
   actions: read # needed so we can download the test failure bundle
+  copilot-requests: write # bill Copilot inference to the org via the Actions token, no PAT needed
 
 engine:
   id: copilot
