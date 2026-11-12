@@ -235,6 +235,42 @@ func TestNewClient(t *testing.T) {
 				InsecurePlainHTTP: true,
 			},
 		},
+		{
+			name:               "converts + to _ in chart version tag",
+			url:                "oci://example.com/charts/longhorn:112.0.0+up1.7.2",
+			repoSpec:           v1.RepoSpec{},
+			expectedRegistry:   "example.com",
+			expectedRepository: "charts/longhorn",
+			expectedTag:        "112.0.0_up1.7.2",
+			expectedErr:        nil,
+		},
+		{
+			name:               "converts + to _ in chart version with RC prerelease",
+			url:                "oci://stgregistry.suse.com/rancher/catalog/rancher-webhook:112.0.0+up0.13.0-rc.7",
+			repoSpec:           v1.RepoSpec{},
+			expectedRegistry:   "stgregistry.suse.com",
+			expectedRepository: "rancher/catalog/rancher-webhook",
+			expectedTag:        "112.0.0_up0.13.0-rc.7",
+			expectedErr:        nil,
+		},
+		{
+			name:               "handles tag without + unchanged",
+			url:                "oci://example.com/charts/etcd:1.0.0",
+			repoSpec:           v1.RepoSpec{},
+			expectedRegistry:   "example.com",
+			expectedRepository: "charts/etcd",
+			expectedTag:        "1.0.0",
+			expectedErr:        nil,
+		},
+		{
+			name:               "handles empty tag (no conversion needed)",
+			url:                "oci://example.com/charts/etcd",
+			repoSpec:           v1.RepoSpec{},
+			expectedRegistry:   "example.com",
+			expectedRepository: "charts/etcd",
+			expectedTag:        "",
+			expectedErr:        nil,
+		},
 	}
 
 	assert := assert.New(t)

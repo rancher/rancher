@@ -645,3 +645,43 @@ func createTestManifest(helmChartPath string, t *testing.T) (ocispec.Descriptor,
 	assert.NoError(t, err)
 	return layerDesc, ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromBytes(manifestJSON), Size: int64(len(manifestJSON))}, manifestJSON, nil
 }
+func TestConvertOCITag(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "converts + to _ in chart version",
+			input:    "112.0.0+up1.7.2",
+			expected: "112.0.0_up1.7.2",
+		},
+		{
+			name:     "converts + to _ in chart version with RC",
+			input:    "112.0.0+up0.13.0-rc.7",
+			expected: "112.0.0_up0.13.0-rc.7",
+		},
+		{
+			name:     "handles tag without + unchanged",
+			input:    "1.0.0",
+			expected: "1.0.0",
+		},
+		{
+			name:     "handles empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "handles multiple + characters",
+			input:    "1.0.0+up1.2.3+patch",
+			expected: "1.0.0_up1.2.3_patch",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertOCITag(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
