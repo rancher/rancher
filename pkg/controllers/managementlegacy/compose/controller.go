@@ -24,7 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	"go.yaml.in/yaml/v2"
+	"go.yaml.in/yaml/v4"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
