@@ -15,13 +15,17 @@ checkout_assets_charts() {
     minor=${tag#v}
     minor=${minor%%-*}        # e.g. 2.16
     if [[ $tag == *-dev ]]; then env=dev; else env=prod; fi
+    echo "Rancher Assets image: ${assets_image} (tag: ${tag}, minor: ${minor}, env: ${env})"
 
     assets_dir="${ASSETS_CHARTS_BUILD_DIR}/rancher-assets"
     CHARTS_REPO_PATH="${ASSETS_CHARTS_BUILD_DIR}/charts"
     mkdir -p "$ASSETS_CHARTS_BUILD_DIR"
 
-    if [ ! -d "$assets_dir" ]; then
+    # Re-clone when the cached checkout was made for a different assets tag.
+    if [ "$(cat "$assets_dir/.checked-out-tag" 2>/dev/null)" != "$tag" ]; then
+        rm -rf "$assets_dir"
         git clone --depth 1 --branch "$tag" https://github.com/rancher/rancher-assets "$assets_dir"
+        echo "$tag" > "$assets_dir/.checked-out-tag"
     fi
 
     CHARTS_COMMIT=$(MINOR=$minor ENV=$env yq '.chart-versions[strenv(MINOR)].upstream-refs[strenv(ENV)].charts.commit // ""' "$assets_dir/lock.yaml")
