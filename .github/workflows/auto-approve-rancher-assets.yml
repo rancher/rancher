@@ -127,7 +127,7 @@ jobs:
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
-            github/token/rancher--rancher--auto-approve--pull_requests--write token | APPROVE_TOKEN
+            github/token/rancher--rancher--auto-approve--contents--pull_requests--write token | APPROVE_TOKEN
 
       - name: Approve PR
         if: steps.eligibility.outputs.eligible_prs != ''
