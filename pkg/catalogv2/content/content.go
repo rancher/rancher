@@ -245,7 +245,8 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	if repo.status.Commit != "" {
 		// Classic git-based ClusterRepo, charts served from the checkout.
 		if isLocalChart(chartURL, repo.status.URL) {
-			return git.Chart(namespace, name, repo.status.URL, chart)
+			r, err := git.Chart(namespace, name, repo.status.URL, chart)
+			return r, notReady(err)
 		}
 		// otherwise, chart URL is remote
 
