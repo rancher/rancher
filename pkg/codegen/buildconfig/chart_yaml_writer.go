@@ -27,6 +27,8 @@ type annotationImage struct {
 	// Dependency is the name of the subchart that uses the image. Only use it for real
 	// subcharts listed in Chart.yaml, Rancher currently has none, see chartImages.
 	Dependency string `yaml:"dependency,omitempty"`
+	// OS this is the operating system of the image - unset means linux
+	OS string `yaml:"os,omitempty"`
 }
 
 // chartImage describes how to build an annotationImage from build.yaml.
@@ -44,6 +46,7 @@ type chartImage struct {
 	Dependency string
 	// PrimeOnly lists the image only when generating for Prime.
 	PrimeOnly bool
+	OS        string
 }
 
 // chartImages lists the images of the Rancher chart: the ones used by the chart's own
@@ -62,7 +65,7 @@ var chartImages = []chartImage{
 	{Name: "kube-api-auth", Key: "defaultKubeAPIAuthImage"},
 	{Name: "rancher-agent", Ref: "rancher/rancher-agent:" + appVersionPlaceholder}, // runtime, tagged like rancher
 	{Name: "system-agent", Repository: "rancher/system-agent", VersionKey: "systemAgentVersion"},
-	{Name: "wins", Repository: "rancher/wins", VersionKey: "winsAgentVersion"},
+	{Name: "wins", Repository: "rancher/wins", VersionKey: "winsAgentVersion", OS: "windows"},
 	{Name: "machine", Key: "machineProvisionImage"},
 	{Name: "scc-operator", Key: "defaultSccOperatorImage", PrimeOnly: true},
 }
@@ -176,7 +179,11 @@ func (w *ChartYamlWriter) renderImages(indent int) (string, error) {
 		if w.Prime {
 			ref = primeRegistry + ref
 		}
-		entries = append(entries, annotationImage{Name: img.Name, Image: ref, Dependency: img.Dependency})
+		entry := annotationImage{Name: img.Name, Image: ref, Dependency: img.Dependency}
+		if img.OS != "" {
+			entry.OS = img.OS
+		}
+		entries = append(entries, entry)
 	}
 
 	var buf bytes.Buffer
