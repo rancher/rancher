@@ -30,6 +30,13 @@ import (
 // maxHelmRepoIndexSize defines what is the max size of helm repo index file we support.
 var maxHelmRepoIndexSize = 30 * 1024 * 1024 // 30 MiB
 
+// convertOCITag converts + to _ in OCI tags since OCI registries do not support + in tags.
+// Helm stores chart versions with + as _ (see https://github.com/helm/helm/issues/10166).
+// For example: chart version 112.0.0+up0.13.0 becomes tag 112.0.0_up0.13.0 in the registry.
+func convertOCITag(tag string) string {
+	return strings.ReplaceAll(tag, "+", "_")
+}
+
 // Chart returns an io.ReadCloser of the chart tar that is requested.
 // It uses oras Go library to download the manifest of the OCI artifact
 // checks if it is a Helm chart and then return the chart tar layer.
@@ -339,7 +346,7 @@ func addToHelmRepoIndex(ociClient Client, indexFile *repo.IndexFile, orasReposit
 
 	// Make sure to convert + to _ since OCI registries do not support + in tags and Helm converts it to _ while fetching the chart.
 	originalTag := ociClient.tag
-	ociClient.tag = strings.ReplaceAll(ociClient.tag, "+", "_")
+	ociClient.tag = convertOCITag(ociClient.tag)
 
 	// Fetch the helm chart tar to get the Chart.yaml
 	filePath, err = ociClient.fetchChart(orasRepository)
