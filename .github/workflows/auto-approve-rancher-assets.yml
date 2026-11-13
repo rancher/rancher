@@ -2,9 +2,9 @@ name: Rancher Assets Auto-Approve
 
 # Approves and enables auto-merge on the
 # rancher/rancher-assets/.github/workflows/push-to-rancher.yml generated bump
-# PRs in rancher/rancher, and re-runs failed checks (rancher/rancher's CI is
-# known-flaky). Only PRs whose diff is exactly the rancher-assets image bump
-# are touched.
+# PRs in rancher/rancher (main and release/vX.Y), and re-runs failed checks
+# (rancher/rancher's CI is known-flaky). Only PRs whose diff is exactly the
+# rancher-assets image bump are touched.
 # Scheduled, not event-triggered - rancher/rancher's required checks run
 # too long for a single polling job. Native GitHub auto-merge does the actual
 # merging once approval and checks are both satisfied. This job supplies the
@@ -45,19 +45,29 @@ jobs:
           tag_re='v2\.[0-9]+-[0-9]{8}T[0-9]{4}Z(-dev)?'
           added_re="^\+(defaultAssetsImage: rancher/rancher-assets:${tag_re}|  tag: ${tag_re}|"$'\t'"DefaultAssetsImage += \"rancher/rancher-assets:${tag_re}\")$"
 
+          # Bump PRs target main or a release/vX.Y branch, titled "[main] ..." or "[vX.Y] ...".
+          # shellcheck disable=SC2016 # $base is a jq variable.
           pr_numbers=$(gh pr list --repo "$REPO" --state open \
             --author "rancher-pr-actions-write[bot]" \
-            --base main \
             --limit 50 \
-            --json number,title,isCrossRepository \
-            --jq '.[] | select(.isCrossRepository | not) | select(.title | contains("Update rancher-assets to")) | .number')
+            --json number,title,baseRefName,isCrossRepository \
+            --jq '.[] | select(.isCrossRepository | not)
+              | select(.baseRefName == "main" or (.baseRefName | test("^release/v[0-9]+\\.[0-9]+$")))
+              | select(.baseRefName as $base | .title | startswith("[" + ($base | sub("^release/"; "")) + "] Update rancher-assets to "))
+              | .number')
 
           valid_prs=()
           for pr_number in $pr_numbers; do
             # Pin the validated head; approve and merge only act on this commit.
-            read -r head_sha title < <(gh pr view "$pr_number" --repo "$REPO" \
-              --json headRefOid,title --jq '"\(.headRefOid) \(.title)"')
+            read -r head_sha base title < <(gh pr view "$pr_number" --repo "$REPO" \
+              --json headRefOid,baseRefName,title --jq '"\(.headRefOid) \(.baseRefName) \(.title)"')
             title_tag=$(grep -oE "$tag_re\$" <<<"$title" || true)
+
+            # A release/vX.Y branch only takes vX.Y assets.
+            if [[ "$base" == release/v* && "$title_tag" != "${base#release/}-"* ]]; then
+              echo "::warning::PR #$pr_number tag '$title_tag' does not match base branch $base, skipping."
+              continue
+            fi
 
             files=$(gh pr view "$pr_number" --repo "$REPO" --json files \
               --jq '[.files[] | "\(.path) \(.additions) \(.deletions)"] | sort | join(",")')
