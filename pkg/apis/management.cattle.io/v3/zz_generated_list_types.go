@@ -502,6 +502,23 @@ func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// MigrationList is a list of Migration resources
+type MigrationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []Migration `json:"items"`
+}
+
+func NewMigration(namespace, name string, obj Migration) *Migration {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Migration").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NodeList is a list of Node resources
 type NodeList struct {
 	metav1.TypeMeta `json:",inline"`

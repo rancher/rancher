@@ -56,6 +56,7 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
+	MigrationResourceName                                 = "migrations"
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	OIDCClientResourceName                                = "oidcclients"
@@ -155,6 +156,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
+		&Migration{},
+		&MigrationList{},
 		&Node{},
 		&NodeList{},
 		&NodeDriver{},
