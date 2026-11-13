@@ -3,7 +3,7 @@ chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
 defaultShellVersion: rancher/shell:v0.9.1-rc.2
 defaultSccOperatorImage: rancher/scc-operator:v0.5.4-rc.1
 # Notes: ClusterRepo asset and branch versions
-defaultAssetsImage: rancher/rancher-assets:v2.16-20261027T2136Z-dev
+defaultAssetsImage: rancher/rancher-assets:v2.16-20261112T2241Z-dev
 defaultKubeAPIAuthImage: rancher/kube-api-auth:v0.16.0-rc.5
 chartDefaultBranch: dev-v2.16
 partnerChartDefaultBranch: main
