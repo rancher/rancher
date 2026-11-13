@@ -11,5 +11,9 @@ if [ -n "$drift" ]; then
   echo "Generated files are out of date with build.yaml."
   echo "Run 'go generate' and commit the result. The files that differ are:"
   echo "$drift"
+  echo
+  echo "Changes made by regeneration:"
+  git --no-pager diff --stat
+  git --no-pager diff
   exit 1
 fi

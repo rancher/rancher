@@ -60,3 +60,31 @@ The following are examples of files that often refer to newly added configuratio
 It's better to follow the standard Kubernetes convention of preferring camelCase keys in the YAML file.
 
 The exported resulting environment variables should be like standard ENV_VARS.
+
+### Chart images annotation
+
+`go generate` also fills the `helm.sh/images` annotation of [chart/Chart.yaml](../chart/Chart.yaml) (see
+[HIP-0015](https://github.com/helm/community/blob/main/hips/hip-0015.md)) from build.yaml. The list of images lives in
+`pkg/codegen/buildconfig/chart_yaml_writer.go`.
+
+The annotation lists the images used by the chart's own templates, plus the ones Rancher deploys at runtime:
+`rancher-agent`, `system-agent`, `wins` and `machine`, and for Prime only `scc-operator`. Rancher has no subcharts, so entries do not use the
+`dependency` field. Entries carry the standard `name` and `image` fields. The rancher and rancher-agent images keep the
+`%APP_VERSION%` placeholder, which the chart build replaces, along with the `0.0.0-VERSION` chart version.
+
+In the Prime repository, run `go generate` with `RANCHER_VERSION_TYPE=prime` to prefix the images with
+`registry.rancher.com/`.
+
+#### Generating for a copy of the chart
+
+By default `go generate` updates `chart/` along with the other files derived from build.yaml. To generate for a build copy of the
+chart instead, such as the Prime chart, set `CHART_DIR` to the directory of the copy. Only `Chart.yaml` and `values.yaml` of that
+directory are updated, and the files of the repository are left untouched, so the repository stays clean. Keep the copy in a
+git-ignored directory such as `build/`. A relative path is resolved from the root of the repo. The generator
+fails early if the directory is missing, has no `Chart.yaml` and `values.yaml`, or is the repository's own `chart/`:
+
+```shell
+cp -r chart build/chart-prime
+CHART_DIR=build/chart-prime RANCHER_VERSION_TYPE=prime scripts/generate-buildconfig
+scripts/chart/build build/chart-prime
+```
