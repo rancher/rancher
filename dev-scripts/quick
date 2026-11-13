@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## This script builds the Rancher server image exclusively, sans Dapper
+## This script builds the Rancher images, sans Dapper.
 
 set -eo pipefail
 set -x
@@ -125,6 +125,17 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
     --tag "${REPO}"/rancher:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target server \
+    --file ./package/Dockerfile .
+fi
+
+# The demo image is the server image with k3s embedded, and an entrypoint that runs it, so that
+# Rancher can run outside of Kubernetes. The server image refuses to start outside of Kubernetes.
+if [ -z "$TARGET" ] || [ "$TARGET" = "demo" ]; then
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    --tag "${REPO}"/rancher:"${TAG}" \
+    --platform="${OS}/${ARCH}" \
+    --target demo \
     --file ./package/Dockerfile .
 
   if [ "$PUSH" = "true" ]; then

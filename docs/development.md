@@ -12,6 +12,14 @@ from the Rancher project root:
 REPO="localhost:5000/my-test-repo/image" TAG="tag" make quick
 ```
 
+This builds three images:
+- `${REPO}/rancher-server:${TAG}`, to run Rancher in Kubernetes, e.g. with the Helm chart.
+- `${REPO}/rancher:${TAG}`, to run Rancher in a Docker container with `docker run --privileged`. The
+  `rancher-server` image only runs in Kubernetes.
+- `${REPO}/rancher-agent:${TAG}`.
+
+To build only one of them, use `make quick-server`, `make quick-demo` or `make quick-agent`.
+
 If you wish to cross-build for a different architecture, set the variable `ARCH`:
 ```shell
 REPO="localhost:5000/my-test-repo/image" \
