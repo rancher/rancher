@@ -30,7 +30,7 @@ annotations:
     - name: rancher-agent
       image: rancher/rancher-agent:%APP_VERSION%
     - name: system-agent
-      image: rancher/system-agent:v0.16.0-rc.8
+      image: rancher/system-agent:v0.16.0-rc.9
     - name: wins
       image: rancher/wins:v0.16.0-rc.10
       os: windows
