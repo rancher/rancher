@@ -3966,6 +3966,39 @@ func TestTTLLimits(t *testing.T) {
 			wantDefault:              never,
 			wantMax:                  never,
 		},
+		{
+			name:           "derived, no max, default above the hard limit is capped to it",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "6000000", // about 11.4 years
+			wantDefault:    MaxTTL,
+			wantMax:        never,
+		},
+		{
+			name:           "derived, max above the hard limit, default above the hard limit is capped to it",
+			kind:           "",
+			maxMinutes:     "7000000",
+			defaultMinutes: "6000000",
+			wantDefault:    MaxTTL,
+			wantMax:        7000000 * int64(time.Minute/time.Millisecond),
+		},
+		{
+			name:                     "kubeconfig, no max, default above the hard limit is capped to it",
+			kind:                     KindKubeconfig,
+			maxMinutes:               "0",
+			kubeconfigMaxMinutes:     "0",
+			kubeconfigDefaultMinutes: "6000000",
+			wantDefault:              MaxTTL,
+			wantMax:                  never,
+		},
+		{
+			name:           "derived, no max, never expiring default is kept",
+			kind:           "",
+			maxMinutes:     "0",
+			defaultMinutes: "-1",
+			wantDefault:    -int64(time.Minute / time.Millisecond),
+			wantMax:        never,
+		},
 	}
 
 	for _, test := range tests {
@@ -4238,6 +4271,78 @@ func TestSystemStoreUpdateTTL(t *testing.T) {
 	}
 }
 
+func TestSystemStoreUpdateTTLAboveMax(t *testing.T) {
+	const day = int64(24 * time.Hour / time.Millisecond)
+
+	tests := []struct {
+		name    string
+		oldTTL  int64
+		ttl     int64
+		wantErr bool
+	}{
+		{
+			name:    "changed ttl above the hard limit is rejected",
+			oldTTL:  30 * day,
+			ttl:     MaxTTL + 1,
+			wantErr: true,
+		},
+		{
+			name:   "changed ttl at the hard limit is kept",
+			oldTTL: 30 * day,
+			ttl:    MaxTTL,
+		},
+		{
+			// A token stored before the limit existed can still be updated, e.g. disabled.
+			name:   "unchanged ttl above the hard limit is kept",
+			oldTTL: 10_000_000_000_000,
+			ttl:    10_000_000_000_000,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTTLSettings(t, "0", "129600", "960")
+
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+
+			timer := NewMocktimeHandler(ctrl)
+			timer.EXPECT().Now().Return("this is a fake now")
+
+			if !test.wantErr {
+				secrets.EXPECT().Update(gomock.Any()).
+					DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+						assert.Equal(t, strconv.FormatInt(test.ttl, 10), secret.StringData[FieldTTL])
+						return &properSecret, nil
+					})
+			}
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, timer, NewMockhashHandler(ctrl), NewMockauthHandler(ctrl))
+
+			old := properToken.DeepCopy()
+			old.Spec.Kind = "" // derived, limited by auth-token-max-ttl-minutes
+			old.Spec.TTL = test.oldTTL
+			token := old.DeepCopy()
+			token.Spec.TTL = test.ttl
+
+			_, err := store.update("", true, old, token, &metav1.UpdateOptions{})
+			if test.wantErr {
+				require.Error(t, err)
+				assert.True(t, apierrors.IsBadRequest(err), "expected a bad request, got %v", err)
+				assert.ErrorContains(t, err, ErrTTLExceedsMax.Error())
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestSystemStoreCreateDryRun(t *testing.T) {
 	const (
 		hour = int64(time.Hour / time.Millisecond)
@@ -4245,14 +4350,40 @@ func TestSystemStoreCreateDryRun(t *testing.T) {
 	)
 
 	tests := []struct {
-		name string
-		kind string
-		ttl  int64
-		want int64
+		name       string
+		kind       string
+		maxMinutes string
+		ttl        int64
+		want       int64
+		wantErr    bool
 	}{
 		{
 			name: "default",
 			want: 90 * day,
+		},
+		{
+			name:       "no max, at the hard limit",
+			maxMinutes: "0",
+			ttl:        MaxTTL,
+			want:       MaxTTL,
+		},
+		{
+			name:       "no max, above the hard limit",
+			maxMinutes: "0",
+			ttl:        MaxTTL + 1,
+			wantErr:    true,
+		},
+		{
+			name:       "no max, above the range of time.Duration",
+			maxMinutes: "0",
+			ttl:        10_000_000_000_000, // about 317 years
+			wantErr:    true,
+		},
+		{
+			name:       "no max, never expires",
+			maxMinutes: "0",
+			ttl:        -1,
+			want:       -1,
 		},
 		{
 			name: "longer than the max",
@@ -4268,7 +4399,11 @@ func TestSystemStoreCreateDryRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			setTTLSettings(t, "129600", "129600", "960")
+			maxMinutes := test.maxMinutes
+			if maxMinutes == "" {
+				maxMinutes = "129600"
+			}
+			setTTLSettings(t, maxMinutes, "129600", "960")
 
 			ctrl := gomock.NewController(t)
 
@@ -4276,8 +4411,11 @@ func TestSystemStoreCreateDryRun(t *testing.T) {
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			secrets.EXPECT().Cache().Return(scache)
-			scache.EXPECT().Get(TokenNamespace, gomock.Any()).
-				Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "token"))
+			if !test.wantErr {
+				// The TTL is checked before the name is.
+				scache.EXPECT().Get(TokenNamespace, gomock.Any()).
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "token"))
+			}
 
 			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
@@ -4313,6 +4451,12 @@ func TestSystemStoreCreateDryRun(t *testing.T) {
 
 			opts := &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
 			created, err := store.Create(t.Context(), GVR.GroupResource(), token, opts, &mockUser{name: "world"})
+			if test.wantErr {
+				require.Error(t, err)
+				assert.True(t, apierrors.IsBadRequest(err), "expected a bad request, got %v", err)
+				assert.ErrorContains(t, err, ErrTTLExceedsMax.Error())
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, test.want, created.Spec.TTL)
 			assert.Empty(t, created.Status.Hash)

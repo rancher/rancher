@@ -108,6 +108,9 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 	if err != nil {
 		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating ttl against default and max: %w", err)
 	}
+	if err := exttokenstore.ValidateTTL(tokenTTL); err != nil {
+		return apiv3.Token{}, "", http.StatusBadRequest, err
+	}
 
 	var unhashedTokenKey string
 	derivedToken := &apiv3.Token{
