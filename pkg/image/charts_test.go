@@ -1,10 +1,83 @@
 package image
 
 import (
+	"archive/tar"
+	"compress/gzip"
+	"os"
+	"path/filepath"
 	"testing"
 
 	assertlib "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestImagesFromChartArchive(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "chart.tgz")
+	archive, err := os.Create(archivePath)
+	require.NoError(t, err)
+	gz := gzip.NewWriter(archive)
+	tw := tar.NewWriter(gz)
+	for _, file := range []struct{ name, contents string }{
+		{"chart/values.yaml", `systemUpgradeController:
+  image:
+    repository: rancher/system-upgrade-controller
+    tag: v0.20.2
+images:
+  - repository: rancher/linux
+    tag: 1.5
+  - repository: rancher/windows
+    tag: v1
+    os: windows
+  - repository: rancher/shared
+    tag: v2
+    os: windows,linux
+  - repository: rancher/ignored
+    tag: latest
+mixed:
+  42:
+    repository: rancher/mixed
+    tag: v3
+  repository: rancher/mixed-parent
+  tag: v4
+`},
+		{"chart/charts/subchart/values.yml", `image:
+  repository: rancher/subchart
+  tag: v5
+`},
+		{"chart/templates/ignored.yaml", "repository: rancher/template\ntag: v6\n"},
+	} {
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: file.name, Mode: 0600, Size: int64(len(file.contents))}))
+		_, err := tw.Write([]byte(file.contents))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tw.Close())
+	require.NoError(t, gz.Close())
+	require.NoError(t, archive.Close())
+
+	values, err := decodeValuesFilesInTgz(archivePath)
+	require.NoError(t, err)
+	require.Len(t, values, 2)
+	for _, tc := range []struct {
+		name   string
+		os     OSType
+		images []string
+	}{
+		{"linux", Linux, []string{"rancher/system-upgrade-controller:v0.20.2", "rancher/linux:1.5", "rancher/shared:v2", "rancher/mixed:v3", "rancher/mixed-parent:v4", "rancher/subchart:v5"}},
+		{"windows", Windows, []string{"rancher/windows:v1", "rancher/shared:v2"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := make(map[string]map[string]struct{})
+			for _, value := range values {
+				require.NoError(t, pickImagesFromValuesMap(actual, value, "chart:1.0.0", tc.os, "latest"))
+			}
+			expected := make(map[string]map[string]struct{})
+			for _, image := range tc.images {
+				expected[image] = map[string]struct{}{"chart:1.0.0": {}}
+			}
+			assertlib.Equal(t, expected, actual)
+		})
+	}
+}
 
 func TestPickImagesFromValuesMap(t *testing.T) {
 	testCases := []struct {
