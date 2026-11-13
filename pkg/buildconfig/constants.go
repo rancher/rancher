@@ -7,7 +7,7 @@ const (
 	CspAdapterMinVersion     = "107.0.0+up7.0.0"
 	DefaultSccOperatorImage  = "rancher/scc-operator:v0.5.4-rc.2"
 	DefaultShellVersion      = "rancher/shell:v0.5.6-rc.1"
-	FleetVersion             = "107.0.17+up0.13.17"
+	FleetVersion             = "107.0.18+up0.13.18-rc.2"
 	ProvisioningCAPIVersion  = "107.0.0+up0.8.0"
 	RemoteDialerProxyVersion = "106.0.5+up0.5.4-rc.1"
 	WebhookVersion           = "107.0.11+up0.8.13-rc.1"
