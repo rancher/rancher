@@ -20,7 +20,7 @@ annotations:
     - name: rancher
       image: rancher/rancher:%APP_VERSION%
     - name: rancher-assets
-      image: rancher/rancher-assets:v2.16-20261027T2136Z-dev
+      image: rancher/rancher-assets:v2.16-20261112T2241Z-dev
     - name: shell
       image: rancher/shell:v0.9.1-rc.2
     - name: mirrored-bci-micro
@@ -30,7 +30,7 @@ annotations:
     - name: rancher-agent
       image: rancher/rancher-agent:%APP_VERSION%
     - name: system-agent
-      image: rancher/system-agent:v0.16.0-rc.8
+      image: rancher/system-agent:v0.16.0-rc.6
     - name: wins
       image: rancher/wins:v0.16.0-rc.10
       os: windows
