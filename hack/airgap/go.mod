@@ -2,7 +2,7 @@ module github.com/rancher/rancher/airgap
 
 go 1.27.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require github.com/google/go-containerregistry v0.22.1
 

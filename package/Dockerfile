@@ -73,7 +73,7 @@ RUN zypper --installroot /chroot -n in --no-recommends \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/rancher/appco-go:1.27.3 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/rancher/appco-go:1.27.4 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
