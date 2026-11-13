@@ -307,6 +307,9 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, transport, true, false, er)
+	// Override the Host header with the target URL's host to avoid "421 Misdirected Request"
+	// errors from downstream ingresses that enforce host validation (e.g. Envoy in Gardener).
+	httpProxy.UseLocationHost = true
 	httpProxy.ServeHTTP(rw, req)
 }
 
@@ -333,6 +336,9 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	newReq := req.WithContext(req.Context())
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = &loc
+	// Override the Host header with the target URL's host to avoid "421 Misdirected Request"
+	// errors from downstream ingresses that enforce host validation (e.g. Envoy in Gardener).
+	newReq.Host = p.Location.Host
 
 	httpProxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: p.Location.Scheme, Host: p.Location.Host})
 	httpProxy.Transport = p.Transport
