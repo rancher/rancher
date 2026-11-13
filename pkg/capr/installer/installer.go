@@ -209,6 +209,11 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		if envVar.Value == "" {
 			continue
 		}
+		if envVar.Name == capr.SystemAgentDataDirEnvVar {
+			// This value comes from spec.dataDirectories.systemAgent, so PowerShell must not parse it.
+			envVarBuf.WriteString(fmt.Sprintf("$env:%s=%s\n", envVar.Name, capr.PowerShellQuote(envVar.Value)))
+			continue
+		}
 		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false) + "\n")
 	}
 	server := ""
@@ -235,11 +240,23 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 # Enables CSI Proxy
 $env:CSI_PROXY_URL = "%s"
 $env:CSI_PROXY_VERSION = "%s"
-$env:CSI_PROXY_KUBELET_PATH = "C:%s/bin/kubelet.exe"
+$env:CSI_PROXY_KUBELET_PATH = %s
 $env:STRICT_VERIFY = "%s"
 %s
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, dataDir, strictVerify, cattleRoleNone)), nil
+`,
+		data,
+		envVarBuf.String(),
+		binaryURL,
+		server,
+		ca,
+		tokenEnvVar,
+		csiProxyURL,
+		csiProxyVersion,
+		capr.PowerShellQuote("C:"+dataDir+"/bin/kubelet.exe"),
+		strictVerify,
+		cattleRoleNone,
+	)), nil
 }
