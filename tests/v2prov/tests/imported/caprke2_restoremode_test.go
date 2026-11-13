@@ -83,6 +83,7 @@ import (
 // then restore selecting kubernetesVersion, after which the control plane is configured for and
 // running the snapshot's version again — on the same machines, with the cluster healthy.
 func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *testing.T) {
+	t.Parallel()
 	requireCAPRKE2(t)
 	requireTwoVersions(t)
 
@@ -136,6 +137,7 @@ func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *t
 // does not. That second assertion is the point of the test: it pins the upstream guard that stops a
 // downstream payload from rewriting arbitrary fields of its own control plane.
 func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeAll(t *testing.T) {
+	t.Parallel()
 	requireCAPRKE2(t)
 	requireTwoVersions(t)
 
@@ -318,7 +320,7 @@ func saveCAPRKE2Snapshot(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2F
 	t.Helper()
 
 	validAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.MgmtClusterName, fx.MgmtClusterRef())
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.MgmtClusterName, fx.MgmtClusterRef(), caprke2Kubectl(t, cs, fx))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	snapshot := waitForCAPRKE2S3Snapshot(t, cs, fx, validAfter)

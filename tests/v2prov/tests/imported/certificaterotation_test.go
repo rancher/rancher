@@ -49,6 +49,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
@@ -326,11 +327,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	after := collectRequiredCertificateMetadata(t, fx, allPaths)
 	assertCertificateRotationMetadata(t, before, after, rotatingPaths)
 	assertCertificateMetadataUnchanged(t, before, after, unchangedPaths)
-}
-
-// shellQuote wraps value in single quotes so it is passed through `sh -c` as one literal argument.
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 // Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook validates that a

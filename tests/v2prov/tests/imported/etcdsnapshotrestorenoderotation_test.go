@@ -46,13 +46,16 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	const displayName = "test-imported-restore-rotated-s3"
 	version := defaults.SomeK8sVersion
 	pool := cluster.ImportedNodePool{ControlPlane: true, ETCD: true, Worker: true, Quantity: 3}
 
+	endPhase := phase(t, "P0/objectstore")
 	osInfo, err := objectstore.GetObjectStore(cs, "default", "imported-store0", "s3snapshots")
 	require.NoError(t, err, "setting up object store")
+	endPhase()
 	// One folder per run, so the snapshot this run restores is the only one the nodes can list.
 	folder := displayName + "-" + strings.ToLower(name.Hex(time.Now().String(), 8))
 	t.Logf("etcd snapshots go to s3://%s/%s at %s", osInfo.Bucket, folder, osInfo.Endpoint)
@@ -60,27 +63,34 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 	// The S3 settings are part of the distro config, not Rancher's, so every replacement node has to
 	// be given them too; NewImportedJoinNodePod is handed the same options for that reason.
 	opts := importedS3Options(version, osInfo, folder)
+	endPhase = phase(t, "P1/setup")
 	fx := setUpImportedClusterAtVersion(t, cs, displayName, []cluster.ImportedNodePool{pool}, version, opts)
+	endPhase()
 	t.Logf("created imported cluster %s", fx.mgmtCluster.Name)
 
 	originals := importedNodeNames(importedNodes(t, cs, fx))
 	require.Len(t, originals, 3)
 
+	endPhase = phase(t, "P2/save")
 	proof := newConfigMapProof()
 	proof.create(t, fx)
 
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	RunETCDSnapshotSaveOperationTest(t, cs, fx.mgmtCluster.Name, fx.clusterRef)
+	RunETCDSnapshotSaveOperationTest(t, cs, fx.mgmtCluster.Name, fx.clusterRef, fx.kubectl(t))
+	endPhase()
+
+	endPhase = phase(t, "P3/s3-snapshot")
 	snapshot := waitForBackpopulatedSnapshotForStorage(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotbackpopulate.S3, snapshotsValidAfter)
 	snapshotFile := snapshot.SnapshotFile.Name
 	require.NotEmpty(t, snapshotFile, "back-populated snapshot %s has no file name", snapshot.Name)
+	endPhase()
 
 	registryCACert, err := registry.EnsureRegistryCache(cs)
 	require.NoError(t, err)
 
 	rotation := newImportedNodeRotation(t, cs, fx, version, pool, registryCACert, opts)
 	for i, old := range originals {
-		rotation.replace(t, old, fmt.Sprintf("imported-rotated-%d", i))
+		rotation.replace(t, fmt.Sprintf("P4.%d", i), old, fmt.Sprintf("imported-rotated-%d", i))
 	}
 	replacements := importedNodeNames(importedNodes(t, cs, fx))
 	t.Logf("replaced nodes %v with %v", originals, replacements)
@@ -90,16 +100,28 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 
 	// The CR the snapshot was found under may have belonged to a node that is now gone; the file in
 	// the bucket is what survives, so find the CR that describes it now.
+	endPhase = phase(t, "P5/resolve-snapshot")
 	restoreName := waitForImportedS3SnapshotFile(t, cs, fx.mgmtCluster.Name, snapshotFile)
+	endPhase()
 
+	endPhase = phase(t, "P6/restore")
 	proof.delete(t, fx)
 
 	RunETCDSnapshotRestoreOperationTest(t, cs, fx.mgmtCluster.Name, restoreName, fx.clusterRef)
+	endPhase()
 
+	endPhase = phase(t, "P7/assert-restored")
 	proof.assertRestored(t, fx)
+	endPhase()
+
+	endPhase = phase(t, "P8/converged")
 	assertImportedServersConverged(t, cs, fx, importedETCDPods(t, cs, fx), version)
+	endPhase()
+
+	endPhase = phase(t, "P9/node-names")
 	waitForDownstreamNodeNames(t, fx, replacements)
 	waitForMgmtNodeNames(t, cs, fx.mgmtCluster.Name, replacements)
+	endPhase()
 }
 
 // importedNodeRotation replaces the nodes of an imported cluster one at a time, keeping
@@ -135,8 +157,12 @@ func newImportedNodeRotation(t *testing.T, cs *clients.Clients, fx *importedClus
 // replace adds a node named newName, waits until it is a voting etcd member, Ready, and registered
 // with Rancher, and only then takes oldName away, so the cluster never drops below three etcd members
 // and keeps quorum throughout.
-func (r *importedNodeRotation) replace(t *testing.T, oldName, newName string) {
+// Its steps are logged as sub-phases of phaseName.
+func (r *importedNodeRotation) replace(t *testing.T, phaseName, oldName, newName string) {
 	t.Helper()
+
+	endReplace := phase(t, phaseName)
+	defer endReplace()
 
 	nodes := importedNodes(t, r.cs, r.fx)
 	idx := slices.IndexFunc(nodes, func(n importedNode) bool { return n.name == oldName })
@@ -155,6 +181,7 @@ func (r *importedNodeRotation) replace(t *testing.T, oldName, newName string) {
 
 	t.Logf("replacing %s with %s, joining through %s", oldName, newName, via.name)
 
+	endPhase := phase(t, phaseName+"/join")
 	token, err := cluster.ImportedServerToken(r.cs, r.fx.ns.Name, via.pod.Name, r.dataDir)
 	require.NoError(t, err)
 	// The fixture's nodes run on their pods' primary addresses; see cluster.ImportedClusterOptions.Network.
@@ -166,12 +193,17 @@ func (r *importedNodeRotation) replace(t *testing.T, oldName, newName string) {
 
 	withNew := append(importedNodeNames(nodes), newName)
 	waitForImportedNodesReady(t, r.cs, r.fx.ns.Name, via.pod.Name, r.fx.kubectlEnv, withNew)
+	endPhase()
+
+	endPhase = phase(t, phaseName+"/member-added")
 	r.waitForETCDMembers(t, via.pod, withNew)
 	waitForMachinePlanSecret(t, r.cs, r.fx.mgmtCluster.Name, newName, true)
+	endPhase()
 
 	// Stop the node before deleting its Node object, so its kubelet cannot register it again. Deleting
 	// the Node is what makes the distro remove the node's etcd member, and Rancher its management Node
 	// and, with it, the machine-plan secret the management Node owns.
+	endPhase = phase(t, phaseName+"/remove-old")
 	old := nodes[idx].pod
 	r.deletePod(t, old)
 	r.fx.pods = slices.DeleteFunc(r.fx.pods, func(p *corev1.Pod) bool { return p.Name == old.Name })
@@ -182,16 +214,13 @@ func (r *importedNodeRotation) replace(t *testing.T, oldName, newName string) {
 	remaining := slices.DeleteFunc(withNew, func(n string) bool { return n == oldName })
 	r.waitForETCDMembers(t, via.pod, remaining)
 	waitForMachinePlanSecret(t, r.cs, r.fx.mgmtCluster.Name, oldName, false)
+	endPhase()
 }
 
 // useForKubectl points the fixture's kubectl at pod, which must be a server. execKubectl otherwise
 // keeps running on the init node, which the rotation takes away.
 func (r *importedNodeRotation) useForKubectl(pod *corev1.Pod) {
-	cs, ns, env := r.cs, r.fx.ns.Name, r.fx.kubectlEnv
-	r.fx.execKubectl = func(t *testing.T, cmd string) (string, error) {
-		t.Helper()
-		return cluster.ExecOnPod(cs, ns, pod.Name, "sh", "-c", fmt.Sprintf("export %s && %s", env, cmd))
-	}
+	r.fx.kubectlPod = pod
 }
 
 func (r *importedNodeRotation) deletePod(t *testing.T, pod *corev1.Pod) {

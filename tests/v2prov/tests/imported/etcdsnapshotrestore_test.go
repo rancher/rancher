@@ -1,6 +1,7 @@
 package imported
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -15,14 +16,14 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/objectstore"
-	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // configMapProof drives the standard "create CM → snapshot → delete CM → restore → CM is back"
@@ -110,7 +111,7 @@ func runRestoreScenario(
 	// shared cluster run doesn't get picked up by the wait helpers. The 30-second backdating
 	// compensates for clock skew between the test runner and the in-cluster controller.
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, expectedSnapshotCount)
@@ -160,6 +161,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-restore", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
@@ -180,9 +182,11 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3(t 
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
+	quantity := 3
 	fx := setUpImportedCluster(t, cs, "test-imported-restore-3-nodes-all-roles-s3", []cluster.ImportedNodePool{
-		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 3},
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: quantity},
 	})
 
 	t.Logf("created imported cluster %s", fx.mgmtCluster.Name)
@@ -228,30 +232,36 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3(t 
 	require.NoError(t, err, "setting etcd s3 config")
 
 	t.Log("etcd config applied")
-	t.Log("waiting for etcd config to apply to nodes")
 
-	// wait until present
-	err = wait.ClusterObject(cs.Ctx, cs.Mgmt.Cluster().Watch, fx.mgmtCluster, func(obj runtime.Object) (bool, error) {
-		nodes, err := cs.Mgmt.Node().List(fx.mgmtCluster.Name, metav1.ListOptions{})
+	poll := 5 * time.Second
+	deadline := 10 * time.Minute
+	t.Log("waiting for etcd config to apply to nodes, waiting for up to 10 minutes")
+
+	// poll for config application. Using a watch can be tricky as there isn't a clean label to filter on
+	// to limit the output to the current test fixture.
+	err = utilwait.PollUntilContextTimeout(cs.Ctx, poll, deadline, true, func(ctx context.Context) (bool, error) {
+		var nodes apimgmtv3.NodeList
+		err := cs.Client.List(ctx, &nodes, client.InNamespace(fx.mgmtCluster.Name))
 		if apierrors.IsNotFound(err) {
+			t.Log("nodes not found yet")
 			return false, nil
 		}
 		if err != nil {
 			return false, err
 		}
+		etcdNodes := 0
 		for _, node := range nodes.Items {
-			if node.Annotations == nil {
-				return false, nil
-			}
 			if !node.Spec.Etcd {
 				continue
 			}
+			etcdNodes++
 			if node.Annotations["management.cattle.io/applied-etcd-config-hash"] == "" {
 				return false, nil
 			}
 		}
-		return true, nil
+		return etcdNodes == quantity, nil
 	})
+	require.NoError(t, err, "waiting for etcd config to apply to all etcd nodes")
 	t.Log("etcd config applied to nodes")
 
 	// 3 etcd members → 3 snapshot files. Restore by the rkev1.ETCDSnapshot CR name so the
@@ -269,6 +279,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles(t *t
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-restore-3-nodes-all-roles", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 3},
@@ -289,6 +300,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *te
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-restore-3-nodes-1-each", []cluster.ImportedNodePool{
 		{ETCD: true, Quantity: 1},
@@ -324,6 +336,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-restore-lifecycle-hook", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
@@ -335,7 +348,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 	cm.create(t, fx)
 
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, 1)
 	snapshot := waitForBackpopulatedSnapshotForStorage(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotbackpopulate.Local, snapshotsValidAfter)

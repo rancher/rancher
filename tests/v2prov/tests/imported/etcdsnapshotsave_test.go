@@ -21,12 +21,13 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-imported-snapshot", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
-	RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 }
 
 // Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook brings up an imported single-node
@@ -75,7 +76,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testi
 	// Attach all three hook labels up front. Each prefix is scoped to a specific
 	// phase/step handler, so the controller only checks the relevant key when it enters that
 	// handler — they don't interfere with each other.
-	op := CreateETCDSnapshotSaveOp(t, cs, fx.ns.Name, fx.clusterRef, WithSaveLabels(map[string]string{
+	op := CreateETCDSnapshotSaveOp(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t), WithSaveLabels(map[string]string{
 		preflightHookKey: delegateName,
 		saveHookKey:      delegateName,
 		restartHookKey:   delegateName,

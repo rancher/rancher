@@ -275,11 +275,13 @@ func assertSnapshotOffersMode(t *testing.T, snapshot *rkev1.ETCDSnapshot, mode s
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneLocal verifies that a `none` restore from
 // a machine-local snapshot rolls etcd back and leaves the cluster's configuration alone.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneLocal(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTest(t, "rm-none-local", rkev1.RestoreRKEConfigNone, snapshotbackpopulate.Local)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3 is the S3 counterpart.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTest(t, "rm-none-s3", rkev1.RestoreRKEConfigNone, snapshotbackpopulate.S3)
 }
 
@@ -291,11 +293,13 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3(t *testing.T) {
 // version before `--cluster-reset`, because a newer server cannot reset onto etcd data written by an
 // older one.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocal(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTest(t, "rm-kv-local", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3 is the S3 counterpart.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTest(t, "rm-kv-s3", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.S3)
 }
 
@@ -303,11 +307,13 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3(t *
 // of the captured configuration too, not just the Kubernetes version — here, the cluster agent's
 // deployment customization, which the other two modes must leave at its post-snapshot value.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllLocal(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTest(t, "rm-all-local", rkev1.RestoreRKEConfigAll, snapshotbackpopulate.Local)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3 is the S3 counterpart.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTest(t, "rm-all-s3", rkev1.RestoreRKEConfigAll, snapshotbackpopulate.S3)
 }
 
@@ -329,6 +335,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3(t *testing.T) {
 // non-init server the restore leader: the init node — whose config has no `server:` and which
 // bootstrapped the cluster — then has to rejoin through the temporary drop-in like everyone else.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHA(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTestOn(t, "rm-kv-local-ha", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local,
 		[]cluster.ImportedNodePool{
 			{ETCD: true, ControlPlane: true, Quantity: 3},
@@ -354,6 +361,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalH
 //
 // Needs a dual-stack host cluster, and skips without one: see dev-scripts/k3d-dual-stack.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocalHAIPv6(t *testing.T) {
+	t.Parallel()
 	runImportedRestoreModeTestOn(t, "rm-kv-local-ha-v6", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local,
 		[]cluster.ImportedNodePool{
 			{ETCD: true, ControlPlane: true, Quantity: 3},
@@ -459,7 +467,7 @@ func runImportedRestoreModeTestOn(t *testing.T, displayName, mode string, storag
 	proof.create(t, fx)
 
 	before := time.Now()
-	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
+	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef, fx.kubectl(t))
 	var snapshot *rkev1.ETCDSnapshot
 	if restoreNode != "" {
 		snapshot = waitForBackpopulatedLocalSnapshotOnNode(t, clients, fx.mgmtCluster.Name, restoreNode, before)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"net"
@@ -758,6 +759,11 @@ func ImportCommand(clients *clients.Clients, mgmtCluster *v3.Cluster) (string, e
 }
 
 func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
+	return ExecOnPodContext(clients.Ctx, clients, namespace, podName, cmd...)
+}
+
+// ExecOnPodContext is ExecOnPod, stopping the exec when ctx is done.
+func ExecOnPodContext(ctx context.Context, clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
 	req := clients.K8s.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(namespace).
@@ -775,7 +781,7 @@ func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...strin
 	}
 
 	var stdout, stderr strings.Builder
-	err = executor.StreamWithContext(clients.Ctx, remotecommand.StreamOptions{
+	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
@@ -995,6 +1001,172 @@ func populatePodLogs(clients *clients.Clients, controlPlane *rkev1.RKEControlPla
 			logrus.Errorf("error while retrieving pod kubelet logs: %v", err)
 		} else {
 			logMap["kubeletLogs"] = kubeletLogs
+		}
+	}
+
+	return logMap
+}
+
+// importedNodeEnvScript detects the distro inside an imported node pod and defines kc (kubectl against the downstream
+// cluster) and cri (crictl against the node's containerd). A node's data-dir may be overridden in its config, so it is
+// resolved on the node rather than assumed.
+const importedNodeEnvScript = `if [ -d /etc/rancher/rke2 ]; then
+  dd=$(cat /etc/rancher/rke2/config.yaml /etc/rancher/rke2/config.yaml.d/*.yaml 2>/dev/null | sed -n 's/^data-dir:[[:space:]]*//p' | tail -n1 | tr -d "\"'")
+  dd=${dd:-/var/lib/rancher/rke2}
+  kubeconfig=/etc/rancher/rke2/rke2.yaml
+  kc() { KUBECONFIG=$kubeconfig "$dd/bin/kubectl" --request-timeout=20s "$@"; }
+  cri() { "$dd/bin/crictl" --runtime-endpoint unix:///run/k3s/containerd/containerd.sock "$@"; }
+else
+  kubeconfig=/etc/rancher/k3s/k3s.yaml
+  kc() { KUBECONFIG=$kubeconfig k3s kubectl --request-timeout=20s "$@"; }
+  cri() { k3s crictl "$@"; }
+fi
+`
+
+// importedKubectlScript runs kubectl against the downstream cluster from inside an imported node pod, passing its arguments
+// through. It fails on nodes without a kubeconfig, i.e. agent-only nodes.
+const importedKubectlScript = importedNodeEnvScript + `if [ ! -f "$kubeconfig" ]; then echo "not a server node" >&2; exit 3; fi
+kc "$@"`
+
+// importedNodeDiskCommands read the same information as the kubectl queries, but from the node itself, so they still work when
+// the downstream apiserver is down.
+var importedNodeDiskCommands = map[string]string{
+	"runtimePods": `echo "===== crictl pods"; cri pods 2>&1
+echo "===== crictl ps -a"; cri ps -a 2>&1`,
+	// Includes rotated, and possibly compressed, files, which hold the previous container instances' logs.
+	"agentLogs": `for f in $(find /var/log/pods -path '/var/log/pods/cattle-system_cattle-cluster-agent-*' -name '*.log*' -type f 2>/dev/null | sort); do
+  echo "===== $f"
+  case "$f" in *.gz) zcat "$f" ;; *) cat "$f" ;; esac
+done`,
+}
+
+// GatherImportedDownstreamData collects the downstream cluster's view of an imported cluster whose nodes run as pods in
+// namespace, focused on which pods are running and what the cattle-cluster-agent logged. It is gathered two ways so that as
+// much as possible survives a broken cluster:
+//
+//   - from every node's disk (nodes): the containerd pods and containers, and the cattle-cluster-agent pod logs under
+//     /var/log/pods. This doesn't need the apiserver.
+//   - through kubectl on the first server node that answers (pods, podLogs): every downstream pod and the cattle-cluster-agent
+//     logs. This goes around Rancher, since the agent tunnel it would use is often what's broken.
+//
+// Logs are compressed the same way as GatherDebugData's pod logs, so DEBUG.md applies.
+func GatherImportedDownstreamData(clients *clients.Clients, namespace string) map[string]any {
+	data := map[string]any{}
+
+	nodePods, err := clients.Core.Pod().List(namespace, metav1.ListOptions{LabelSelector: ImportedNodeNameLabel})
+	if err != nil {
+		data["errors"] = []string{fmt.Sprintf("failed to list imported node pods in %s: %v", namespace, err)}
+		return data
+	}
+
+	nodes := map[string]map[string]string{}
+	for _, nodePod := range nodePods.Items {
+		nodes[nodePod.Name] = gatherImportedNodeDiskData(clients, nodePod)
+	}
+	data["nodes"] = nodes
+
+	var errs []string
+	for _, nodePod := range nodePods.Items {
+		kubectl := func(args ...string) (string, error) {
+			cmd := append([]string{"timeout", "60", "sh", "-c", importedKubectlScript, "kubectl"}, args...)
+			return ExecOnPod(clients, nodePod.Namespace, nodePod.Name, cmd...)
+		}
+
+		out, err := kubectl("get", "pods", "-A", "-o", "json")
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: failed to list downstream pods: %v", nodePod.Name, err))
+			continue
+		}
+		pods := &corev1.PodList{}
+		if err := json.Unmarshal([]byte(out), pods); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: failed to decode downstream pods: %v", nodePod.Name, err))
+			continue
+		}
+
+		podLogs := map[string]map[string]string{}
+		for _, pod := range pods.Items {
+			if pod.Namespace == "cattle-system" && pod.Labels["app"] == "cattle-cluster-agent" {
+				podLogs[pod.Name] = importedDownstreamPodLogs(kubectl, pod)
+			}
+		}
+
+		data["queriedFrom"] = nodePod.Name
+		data["pods"] = pods
+		data["podLogs"] = podLogs
+
+		// ClusterRepo status shows whether rancher-charts finished downloading, and the cattle-system ReplicaSets show
+		// whether the cluster agent was redeployed while it was. Raw JSON keeps the objects as they were served.
+		for key, args := range map[string][]string{
+			"clusterRepos": {"get", "clusterrepos.catalog.cattle.io", "-o", "json"},
+			"replicaSets":  {"-n", "cattle-system", "get", "replicasets", "-o", "json"},
+		} {
+			out, err := kubectl(args...)
+			if err != nil || !json.Valid([]byte(out)) {
+				errs = append(errs, fmt.Sprintf("%s: failed to get downstream %s: %v: %s", nodePod.Name, key, err, out))
+				continue
+			}
+			data[key] = json.RawMessage(out)
+		}
+		break
+	}
+	if len(errs) > 0 {
+		data["errors"] = errs
+	}
+
+	return data
+}
+
+// gatherImportedNodeDiskData runs importedNodeDiskCommands on a node pod. Failures are recorded in place of the output so one
+// broken command doesn't hide the rest.
+func gatherImportedNodeDiskData(clients *clients.Clients, nodePod corev1.Pod) map[string]string {
+	logs := map[string]string{
+		"nodeName": nodePod.Labels[ImportedNodeNameLabel],
+	}
+	// The node pod's stdout carries rancher-system-agent's output.
+	if podLogs, err := getPodLogs(clients, nodePod.Namespace, nodePod.Name); err != nil {
+		logrus.Errorf("failed to collect logs for pod %s/%s: %v", nodePod.Namespace, nodePod.Name, err)
+	} else {
+		logs["logs"] = podLogs
+	}
+	for key, cmd := range importedNodeDiskCommands {
+		// Bound each exec so a wedged node can't stall the failure path indefinitely.
+		out, err := ExecOnPod(clients, nodePod.Namespace, nodePod.Name, "timeout", "120", "sh", "-c", importedNodeEnvScript+cmd)
+		if err != nil {
+			out = fmt.Sprintf("%s\nerror collecting %s: %v", out, key, err)
+		}
+		compressed, err := snapshotutil.CompressInterface(strings.ReplaceAll(out, "\n", "SnewlineG"))
+		if err != nil {
+			logrus.Errorf("failed to compress %s for pod %s/%s: %v", key, nodePod.Namespace, nodePod.Name, err)
+			continue
+		}
+		logs[key] = compressed
+	}
+	return logs
+}
+
+// importedDownstreamPodLogs collects the logs of a downstream pod, and those of the previous container instance if the pod has
+// restarted, since an agent that crashloops after a restore usually logs the cause before exiting.
+func importedDownstreamPodLogs(kubectl func(args ...string) (string, error), pod corev1.Pod) map[string]string {
+	logMap := map[string]string{}
+
+	collect := func(key string, extraArgs ...string) {
+		out, err := kubectl(append([]string{"-n", pod.Namespace, "logs", pod.Name, "--all-containers"}, extraArgs...)...)
+		if err != nil {
+			out = fmt.Sprintf("%s\nerror collecting %s: %v", out, key, err)
+		}
+		compressed, err := snapshotutil.CompressInterface(strings.ReplaceAll(out, "\n", "SnewlineG"))
+		if err != nil {
+			logrus.Errorf("failed to compress %s for downstream pod %s/%s: %v", key, pod.Namespace, pod.Name, err)
+			return
+		}
+		logMap[key] = compressed
+	}
+
+	collect("logs")
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.RestartCount > 0 {
+			collect("previousLogs", "--previous")
+			break
 		}
 	}
 
