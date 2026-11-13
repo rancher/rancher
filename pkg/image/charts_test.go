@@ -8,7 +8,7 @@ import (
 
 func TestPickImagesFromValuesMap(t *testing.T) {
 	testCases := []struct {
-		values              map[interface{}]interface{}
+		values              map[string]interface{}
 		expectedImagesSet   map[string]map[string]struct{}
 		description         string
 		chartNameAndVersion string
@@ -17,7 +17,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 	}{
 		{
 			description: "Want linux images",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "Linux",
@@ -33,7 +33,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description: "Want Windows images",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "windows,linux",
@@ -49,7 +49,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description: "No images of the given OS (want Windows, but images are Linux)",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "linux",
@@ -61,7 +61,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description: "No OS provided, default to Linux",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 			},
@@ -76,7 +76,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description: "Unsupported OS provided",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "unsupported-os",
@@ -88,7 +88,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description:         "Missing required information in values file",
-			values:              map[interface{}]interface{}{},
+			values:              map[string]interface{}{},
 			chartNameAndVersion: "chart:0.1.2",
 			osType:              Linux,
 			tagToIgnore:         "",
@@ -96,7 +96,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description: "Ignore an non-matching tag",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "Linux",
@@ -112,7 +112,7 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		},
 		{
 			description: "Ignore a matching tag",
-			values: map[interface{}]interface{}{
+			values: map[string]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "Linux",

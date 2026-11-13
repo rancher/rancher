@@ -229,8 +229,8 @@ func minMaxToConstraintStr(min, max string) string {
 }
 
 // pickImagesFromValuesMap walks a values map to find images, and add them to imagesSet.
-func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values map[interface{}]interface{}, chartNameAndVersion string, osType OSType, tagToIgnore string) error {
-	walkMap(values, func(inputMap map[interface{}]interface{}) {
+func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values map[string]interface{}, chartNameAndVersion string, osType OSType, tagToIgnore string) error {
+	walkMap(values, func(inputMap map[string]interface{}) {
 		repository, ok := inputMap["repository"].(string)
 		if !ok {
 			return
@@ -273,7 +273,7 @@ func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values ma
 }
 
 // decodeValueFilesInTgz reads tarball in tgzPath and returns a slice of values corresponding to values.yaml files found inside of it.
-func decodeValuesFilesInTgz(tgzPath string) ([]map[interface{}]interface{}, error) {
+func decodeValuesFilesInTgz(tgzPath string) ([]map[string]interface{}, error) {
 	tgz, err := os.Open(tgzPath)
 	if err != nil {
 		return nil, err
@@ -285,7 +285,7 @@ func decodeValuesFilesInTgz(tgzPath string) ([]map[interface{}]interface{}, erro
 	}
 	defer gzr.Close()
 	tr := tar.NewReader(gzr)
-	var valuesSlice []map[interface{}]interface{}
+	var valuesSlice []map[string]interface{}
 	for {
 		header, err := tr.Next()
 		switch {
@@ -294,7 +294,7 @@ func decodeValuesFilesInTgz(tgzPath string) ([]map[interface{}]interface{}, erro
 		case err != nil:
 			return nil, err
 		case header.Typeflag == tar.TypeReg && isValuesFile(header.Name):
-			var values map[interface{}]interface{}
+			var values map[string]interface{}
 			if err := decodeYAMLFile(tr, &values); err != nil {
 				return nil, err
 			}
@@ -306,10 +306,24 @@ func decodeValuesFilesInTgz(tgzPath string) ([]map[interface{}]interface{}, erro
 }
 
 // walkMap walks inputMap and calls the callback function on all map type nodes including the root node.
-func walkMap(inputMap interface{}, callback func(map[interface{}]interface{})) {
+// The YAML decoder produces map[string]interface{} for mappings with only string keys, and map[interface{}]interface{}
+// for mappings with any non-string key, so both are handled. Only the string keys of the latter are passed to callback,
+// since the keys it looks up (e.g. "repository" and "tag") are strings.
+func walkMap(inputMap interface{}, callback func(map[string]interface{})) {
 	switch data := inputMap.(type) {
-	case map[interface{}]interface{}:
+	case map[string]interface{}:
 		callback(data)
+		for _, value := range data {
+			walkMap(value, callback)
+		}
+	case map[interface{}]interface{}:
+		stringKeyed := make(map[string]interface{}, len(data))
+		for key, value := range data {
+			if k, ok := key.(string); ok {
+				stringKeyed[k] = value
+			}
+		}
+		callback(stringKeyed)
 		for _, value := range data {
 			walkMap(value, callback)
 		}
