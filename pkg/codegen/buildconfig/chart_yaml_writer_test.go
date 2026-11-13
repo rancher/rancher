@@ -61,6 +61,7 @@ annotations:
       image: rancher/system-agent:v5
     - name: wins
       image: rancher/wins:v6
+      os: windows
     - name: machine
       image: rancher/machine:v7
 
