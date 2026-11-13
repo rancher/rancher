@@ -759,6 +759,11 @@ func ImportCommand(clients *clients.Clients, mgmtCluster *v3.Cluster) (string, e
 }
 
 func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
+	return ExecOnPodContext(clients.Ctx, clients, namespace, podName, cmd...)
+}
+
+// ExecOnPodContext is ExecOnPod, stopping the exec when ctx is done.
+func ExecOnPodContext(ctx context.Context, clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
 	req := clients.K8s.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(namespace).
@@ -776,7 +781,7 @@ func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...strin
 	}
 
 	var stdout, stderr strings.Builder
-	err = executor.StreamWithContext(clients.Ctx, remotecommand.StreamOptions{
+	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})

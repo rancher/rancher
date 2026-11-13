@@ -37,9 +37,10 @@ type importedClusterFixture struct {
 	mgmtCluster *v3.Cluster
 	// clusterRef is the convenient corev1.ObjectReference used for snapshot save/restore ops.
 	clusterRef corev1.ObjectReference
-	// execKubectl runs a shell command on the init node with KUBECONFIG/PATH pre-exported so the
-	// caller can just write `kubectl ...` without re-deriving the distro paths.
-	execKubectl func(t *testing.T, cmd string) (string, error)
+	// cs is used to exec into kubectlPod.
+	cs *clients.Clients
+	// kubectlPod is the server node execKubectl runs on. It starts as the init node.
+	kubectlPod *corev1.Pod
 	// kubectlEnv is the "KUBECONFIG=... PATH=$PATH:..." prefix resolved for the init node's
 	// effective runtime binary location, so later helpers (e.g. rotation recovery) don't have to
 	// re-derive it and risk assuming the default data directory.
@@ -174,8 +175,9 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 			Kind:       "Cluster",
 			Name:       mgmtCluster.Name,
 		},
-		execKubectl: execKubectl,
-		kubectlEnv:  kubectlEnv,
+		cs:         clients,
+		kubectlPod: pods[0],
+		kubectlEnv: kubectlEnv,
 	}
 	if beforeImport != nil {
 		endPhase = phase(t, "setup/before-import")
@@ -199,19 +201,38 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 	return fx
 }
 
+// kubectlCallTimeout bounds each kubectl call made through kubectl, so a hung exec can't eat the caller's deadline.
+const kubectlCallTimeout = 30 * time.Second
+
 // kubectl adapts execKubectl to operations.Kubectl, for helpers that take one. This allows
 // us to run the same helper against a cluster reachable only via kubectl on one of its nodes, or against a
 // cluster reachable directly via the mgmt cluster's kubeconfig.
 func (fx *importedClusterFixture) kubectl(t *testing.T) operations.Kubectl {
-	return func(_ context.Context, args ...string) ([]byte, error) {
+	return func(ctx context.Context, args ...string) ([]byte, error) {
 		t.Helper()
+		ctx, cancel := context.WithTimeout(ctx, kubectlCallTimeout)
+		defer cancel()
+
 		quoted := make([]string, len(args))
 		for i, arg := range args {
 			quoted[i] = shellQuote(arg)
 		}
-		out, err := fx.execKubectl(t, "kubectl "+strings.Join(quoted, " "))
+		out, err := fx.execKubectlContext(ctx, "kubectl "+strings.Join(quoted, " "))
 		return []byte(out), err
 	}
+}
+
+// execKubectl runs a shell command on kubectlPod with KUBECONFIG/PATH pre-exported so the caller can
+// just write `kubectl ...` without re-deriving the distro paths.
+func (fx *importedClusterFixture) execKubectl(t *testing.T, cmd string) (string, error) {
+	t.Helper()
+	return fx.execKubectlContext(fx.cs.Ctx, cmd)
+}
+
+// execKubectlContext is execKubectl, stopping the exec when ctx is done.
+func (fx *importedClusterFixture) execKubectlContext(ctx context.Context, cmd string) (string, error) {
+	return cluster.ExecOnPodContext(ctx, fx.cs, fx.ns.Name, fx.kubectlPod.Name, "sh", "-c",
+		fmt.Sprintf("export %s && %s", fx.kubectlEnv, cmd))
 }
 
 // shellQuote wraps value in single quotes so it is passed through `sh -c` as one literal argument.
