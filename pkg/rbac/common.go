@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// ClusterRoleOwnerInstallUUIDLabel records which Rancher install created a RoleTemplate-owned ClusterRole.
+// The webhook rejects any update that modifies or removes it, so it must be carried over on updates.
+const ClusterRoleOwnerInstallUUIDLabel = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
+
 const (
 	NamespaceID                       = "namespaceId"
 	ProjectID                         = "projectId"
@@ -426,6 +430,42 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](d
 		if err != nil {
 			return fmt.Errorf("failed to update %s %s: %w", kind, desiredObj.GetName(), err)
 		}
+	}
+	return nil
+}
+
+// CreateOrUpdateClusterRole creates or updates the given ClusterRole like CreateOrUpdateResource, but keeps
+// the ClusterRoleOwnerInstallUUIDLabel of an existing ClusterRole. The legacy RoleTemplate controllers stamp
+// that label and the webhook rejects any update that modifies or removes it, so replacing the object
+// wholesale would fail for ClusterRoles previously managed by the legacy controllers.
+func CreateOrUpdateClusterRole(desiredCR *rbacv1.ClusterRole, client generic.NonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) error {
+	existingCR, err := client.Get(desiredCR.Name, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get ClusterRole %s: %w", desiredCR.Name, err)
+		}
+		logrus.Infof("ClusterRole %s is being created", desiredCR.Name)
+		if _, err := client.Create(desiredCR); err != nil {
+			return fmt.Errorf("failed to create ClusterRole %s: %w", desiredCR.Name, err)
+		}
+		return nil
+	}
+
+	if AreClusterRolesSame(existingCR, desiredCR) {
+		return nil
+	}
+
+	if installUUID, ok := existingCR.Labels[ClusterRoleOwnerInstallUUIDLabel]; ok {
+		desiredCR = desiredCR.DeepCopy()
+		if desiredCR.Labels == nil {
+			desiredCR.Labels = map[string]string{}
+		}
+		desiredCR.Labels[ClusterRoleOwnerInstallUUIDLabel] = installUUID
+	}
+
+	logrus.Infof("ClusterRole %s needs to be updated", desiredCR.Name)
+	if _, err := client.Update(desiredCR); err != nil {
+		return fmt.Errorf("failed to update ClusterRole %s: %w", desiredCR.Name, err)
 	}
 	return nil
 }
