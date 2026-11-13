@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/pkg/client
 
-go 1.26.10
+go 1.26.11
 
 replace github.com/rancher/wrangler/v3 => github.com/rancher/wrangler/v3 v3.2.2
 
