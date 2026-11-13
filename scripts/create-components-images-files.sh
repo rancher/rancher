@@ -16,11 +16,15 @@ mkdir -p ../dist
 
 cd ../bin
 
-if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
+# Image info comes from the helm.sh/images annotations in the branch's index.yaml.
+# Valid branches are "staging" and "production".
+CHARTS_BRANCH=${CHARTS_BRANCH:-staging}
+CHARTS_INDEX_DIR=build/charts-${CHARTS_BRANCH}
+if [ ! -d $CHARTS_INDEX_DIR ]; then
+    git clone --depth 1 --branch $CHARTS_BRANCH https://github.com/rancher/charts $CHARTS_INDEX_DIR
 fi
 
-CHARTS_DIRS="${CHARTS_DIRS:+${CHARTS_DIRS},}${CHART_REPO_DIR}"
+CHARTS_DIRS="${CHARTS_DIRS:+${CHARTS_DIRS},}${CHARTS_INDEX_DIR}"
 
 if [ ! -d $SMALL_FORK_REPO_DIR ]; then
     mkdir -p $SMALL_FORK_REPO_DIR
