@@ -220,11 +220,7 @@ func (r *importedNodeRotation) replace(t *testing.T, phaseName, oldName, newName
 // useForKubectl points the fixture's kubectl at pod, which must be a server. execKubectl otherwise
 // keeps running on the init node, which the rotation takes away.
 func (r *importedNodeRotation) useForKubectl(pod *corev1.Pod) {
-	cs, ns, env := r.cs, r.fx.ns.Name, r.fx.kubectlEnv
-	r.fx.execKubectl = func(t *testing.T, cmd string) (string, error) {
-		t.Helper()
-		return cluster.ExecOnPod(cs, ns, pod.Name, "sh", "-c", fmt.Sprintf("export %s && %s", env, cmd))
-	}
+	r.fx.kubectlPod = pod
 }
 
 func (r *importedNodeRotation) deletePod(t *testing.T, pod *corev1.Pod) {
