@@ -3,16 +3,105 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
-// clearInitNodeMark removes the init node label on the given machine and updates the machine directly against the api
-// server, effectively immediately demoting it from being an init node
+// protectedInitTarget returns the deleting init node that must remain the join target during ordinary reconciliation.
+func protectedInitTarget(controlPlane *rkev1.RKEControlPlane, plan *plan.Plan) *planEntry {
+	if controlPlane.Labels[capr.InitNodeMachineIDLabel] != "" {
+		return nil
+	}
+	for _, entry := range collect(plan, isInitNode) {
+		if isEtcd(entry) && isDeleting(entry) && entry.Metadata.Annotations[capr.JoinURLAnnotation] != "" {
+			return entry
+		}
+	}
+	return nil
+}
+
+// protectedInitReplacement returns the machine that takes over the init mark from the deleting target, or nil.
+// A candidate that already carries the init mark comes first: the move was interrupted and the saved mark is the decision.
+// Otherwise the first candidate joined to the target that has its own join URL and is an etcd voter.
+func (p *Planner) protectedInitReplacement(controlPlane *rkev1.RKEControlPlane, plan *plan.Plan, target *planEntry) *planEntry {
+	joinURL := target.Metadata.Annotations[capr.JoinURLAnnotation]
+	candidates := collect(plan, canBeInitNode)
+	for _, candidate := range candidates {
+		if isInitNode(candidate) && candidate.Metadata.Annotations[capr.JoinedToAnnotation] == joinURL {
+			return candidate
+		}
+	}
+	for _, candidate := range candidates {
+		if candidate.Metadata.Annotations[capr.JoinedToAnnotation] == joinURL &&
+			candidate.Metadata.Annotations[capr.JoinURLAnnotation] != "" &&
+			p.hasEtcdVoter(controlPlane, candidate) {
+			return candidate
+		}
+	}
+	return nil
+}
+
+// findInitNodeForOperation lets snapshot, certificate and encryption-key operations wait during a protected
+// hand-off. It reports no init node without an error so callers can skip the operation and allow ordinary
+// reconciliation to continue. The existing pause check still applies.
+func (p *Planner) findInitNodeForOperation(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (bool, string, *planEntry, error) {
+	if target := protectedInitTarget(rkeControlPlane, plan); target != nil {
+		logrus.Infof("[planner] rkecluster %s/%s: deferring operation while init node %s is handing off to its replacement", rkeControlPlane.Namespace, rkeControlPlane.Name, target.Machine.Name)
+		return false, "", nil, nil
+	}
+	return p.findInitNode(rkeControlPlane, plan)
+}
+
+// hasEtcdVoter checks for the candidate's cached EtcdIsVoter=True condition, published by K3s/RKE2 after observing it
+// as a voting etcd member. The planner combines this evidence with the plan's joined-to URL before promoting a
+// replacement to init node. This records a past join, not current health; missing data or cache errors provide no proof.
+func (p *Planner) hasEtcdVoter(controlPlane *rkev1.RKEControlPlane, candidate *planEntry) bool {
+	if p.managementNodes == nil || controlPlane.Spec.ManagementClusterName == "" || candidate.Machine.UID == "" {
+		return false
+	}
+	nodes, err := p.managementNodes.List(controlPlane.Spec.ManagementClusterName, labels.Everything())
+	if err != nil {
+		logrus.Warnf("[planner] rkecluster %s/%s: failed to list management nodes for etcd voter check on machine %s/%s: %v",
+			controlPlane.Namespace, controlPlane.Name, candidate.Machine.Namespace, candidate.Machine.Name, err)
+		return false
+	}
+	// Find the candidate's Node by the Machine UID label copied from downstream.
+	for _, node := range nodes {
+		if node.Status.NodeLabels[capr.MachineUIDLabel] != string(candidate.Machine.UID) {
+			continue
+		}
+		for _, condition := range node.Status.InternalNodeStatus.Conditions {
+			if condition.Type == corev1.NodeConditionType("EtcdIsVoter") && condition.Status == corev1.ConditionTrue {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// moveInitNodeMark marks newInit before clearing oldInit's mark.
+// newInit must have passed the promotion gate or already be the persisted choice.
+func (p *Planner) moveInitNodeMark(oldInit, newInit *planEntry) error {
+	setErr := p.setInitNodeMark(newInit)
+	if setErr != nil && !errors.Is(setErr, generic.ErrSkip) {
+		return setErr
+	}
+
+	if clearErr := p.clearInitNodeMark(oldInit); clearErr != nil {
+		return clearErr
+	}
+
+	return setErr
+}
+
+// clearInitNodeMark removes the init node label from the plan Secret, demoting it in the current plan.
 func (p *Planner) clearInitNodeMark(entry *planEntry) error {
 	if entry.Metadata.Labels[capr.InitNodeLabel] == "" {
 		return nil
@@ -25,19 +114,25 @@ func (p *Planner) clearInitNodeMark(entry *planEntry) error {
 	return generic.ErrSkip
 }
 
-// setInitNodeMark sets the init node label on the given machine and updates the machine directly against the api
-// server. It returns the modified/updated machine object
+// setInitNodeMark persists the init node label in the plan Secret.
 func (p *Planner) setInitNodeMark(entry *planEntry) error {
 	if entry.Metadata.Labels[capr.InitNodeLabel] == "true" {
 		return nil
 	}
 
-	entry.Metadata.Labels[capr.InitNodeLabel] = "true"
-	if err := p.store.updatePlanSecretLabelsAndAnnotations(entry); err != nil {
+	updated := *entry
+	metadata := *entry.Metadata
+	metadata.Labels = maps.Clone(metadata.Labels)
+	metadata.Labels[capr.InitNodeLabel] = "true"
+	updated.Metadata = &metadata
+
+	if err := p.store.updatePlanSecretLabelsAndAnnotations(&updated); err != nil {
 		return err
 	}
 
-	// We've changed state, so let the caches sync up again
+	entry.Metadata.Labels = updated.Metadata.Labels
+	entry.Plan = updated.Plan
+
 	return generic.ErrSkip
 }
 

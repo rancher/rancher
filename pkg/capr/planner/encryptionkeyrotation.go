@@ -141,7 +141,12 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return status, nil
 	}
 
-	found, joinServer, initNode, err := p.findInitNode(controlPlane, clusterPlan)
+	// An encryption-key rotation already in progress keeps the plain lookup, so a hand-off cannot skip it.
+	findInit := p.findInitNodeForOperation
+	if rotateEncryptionKeyInProgress(controlPlane) {
+		findInit = p.findInitNode
+	}
+	found, joinServer, initNode, err := findInit(controlPlane, clusterPlan)
 	if err != nil {
 		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during encryption key rotation: %v", controlPlane.Namespace, controlPlane.Name, err)
 		return status, err

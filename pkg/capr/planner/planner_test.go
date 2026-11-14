@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/moby/locker"
+	"github.com/rancher/channelserver/pkg/model"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -19,11 +21,78 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+func TestProcessProtectsLastDeletingEtcdWithoutForceRemoval(t *testing.T) {
+	mp := newMockPlanner(t, InfoFunctions{ReleaseData: func(context.Context, *rkev1.RKEControlPlane) *model.Release { return &model.Release{} }})
+	mp.planner.locker = *locker.New()
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "ns", UID: types.UID("cp-uid"), OwnerReferences: []metav1.OwnerReference{{APIVersion: capi.GroupVersion.String(), Kind: "Cluster", Name: "cluster"}}},
+		Spec:       rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.28.4+k3s1"},
+	}
+	cluster := &capi.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns"}, Status: capi.ClusterStatus{Initialization: capi.ClusterInitializationStatus{InfrastructureProvisioned: ptr.To(true)}}}
+	capr.SetCAPIResourceCondition(cluster, metav1.Condition{Type: capi.ClusterControlPlaneInitializedCondition, Status: metav1.ConditionFalse, Reason: capi.ClusterControlPlaneNotInitializedReason})
+	old := &capi.Machine{ObjectMeta: metav1.ObjectMeta{Name: "old", Namespace: "ns", Labels: map[string]string{capi.ClusterNameLabel: "cluster"}, UID: types.UID("old-uid"), DeletionTimestamp: &metav1.Time{Time: time.Now()}}, Spec: capi.MachineSpec{Bootstrap: capi.Bootstrap{ConfigRef: capi.ContractVersionedObjectReference{APIGroup: capr.RKEAPIGroup, Kind: capr.RKEBootstrapKind, Name: "old"}}}}
+	secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: capr.PlanSecretFromBootstrapName("old"), Namespace: "ns", Labels: map[string]string{capr.EtcdRoleLabel: "true", capr.InitNodeLabel: "true"}, Annotations: map[string]string{capr.JoinURLAnnotation: "https://old:9345"}}, Type: capr.SecretTypeMachinePlan, Data: map[string][]byte{"plan": []byte("{}")}}
+	mp.capiClusters.EXPECT().Get("ns", "cluster").Return(cluster, nil).AnyTimes()
+	mp.machinesCache.EXPECT().List("ns", gomock.Any()).Return([]*capi.Machine{old}, nil)
+	mp.secretClient.EXPECT().Get("ns", capr.PlanSecretFromBootstrapName("old"), gomock.Any()).Return(secret, nil)
+
+	status, err := mp.planner.Process(controlPlane, rkev1.RKEControlPlaneStatus{})
+	require.Error(t, err)
+	require.True(t, IsErrWaiting(err))
+	require.Contains(t, err.Error(), "last etcd member is protected")
+	require.False(t, ptr.Deref(status.Initialization.ControlPlaneInitialized, false))
+}
+
+func TestProcessWaitsForRestoreWhenOnlyDeletingEtcdHasPlan(t *testing.T) {
+	mp := newMockPlanner(t, InfoFunctions{ReleaseData: func(context.Context, *rkev1.RKEControlPlane) *model.Release { return &model.Release{} }})
+	mp.planner.locker = *locker.New()
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "ns", UID: types.UID("cp-uid"), OwnerReferences: []metav1.OwnerReference{{APIVersion: capi.GroupVersion.String(), Kind: "Cluster", Name: "cluster"}}},
+		Spec:       rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.28.4+k3s1", UnmanagedConfig: true},
+	}
+	cluster := &capi.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns"}, Status: capi.ClusterStatus{Initialization: capi.ClusterInitializationStatus{InfrastructureProvisioned: ptr.To(true)}}}
+	makeMachine := func(name string, roles map[string]string, deleting bool) *capi.Machine {
+		machine := &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns", Labels: map[string]string{capi.ClusterNameLabel: "cluster"}, UID: types.UID(name + "-uid")},
+			Spec:       capi.MachineSpec{Bootstrap: capi.Bootstrap{ConfigRef: capi.ContractVersionedObjectReference{APIGroup: capr.RKEAPIGroup, Kind: capr.RKEBootstrapKind, Name: name}}},
+		}
+		if deleting {
+			machine.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+		}
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: capr.PlanSecretFromBootstrapName(name), Namespace: "ns", Labels: roles},
+			Type:       capr.SecretTypeMachinePlan,
+			Data:       map[string][]byte{},
+		}
+		if deleting {
+			secret.Data["plan"] = []byte("{}")
+		}
+		mp.secretClient.EXPECT().Get("ns", capr.PlanSecretFromBootstrapName(name), gomock.Any()).Return(secret, nil)
+		return machine
+	}
+	oldEtcd := makeMachine("old", map[string]string{capr.EtcdRoleLabel: "true"}, true)
+	newEtcd := makeMachine("new-etcd", map[string]string{capr.EtcdRoleLabel: "true"}, false)
+	controlPlaneMachine := makeMachine("control-plane", map[string]string{capr.ControlPlaneRoleLabel: "true"}, false)
+	worker := makeMachine("worker", map[string]string{capr.WorkerRoleLabel: "true"}, false)
+	mp.capiClusters.EXPECT().Get("ns", "cluster").Return(cluster, nil)
+	mp.machinesCache.EXPECT().List("ns", gomock.Any()).Return([]*capi.Machine{oldEtcd, newEtcd, controlPlaneMachine, worker}, nil)
+
+	status := rkev1.RKEControlPlaneStatus{}
+	capr.Bootstrapped.True(&status)
+	_, err := mp.planner.Process(controlPlane, status)
+	require.Error(t, err)
+	require.True(t, IsErrWaiting(err))
+	require.Contains(t, err.Error(), "Restoration from etcd snapshot is required")
+}
 
 func TestMinorPlanChangeDetectedForPreBootstrapClusterAgentManifest(t *testing.T) {
 	manifestPath := "/var/lib/rancher/rke2/server/manifests/rancher/cluster-agent.yaml"
@@ -89,6 +158,7 @@ type mockPlanner struct {
 	capiClient                    *fake.MockClientInterface[*capi.Cluster, *capi.ClusterList]
 	capiClusters                  *fake.MockCacheInterface[*capi.Cluster]
 	managementClusters            *fake.MockNonNamespacedCacheInterface[*apisv3.Cluster]
+	managementNodes               *fake.MockCacheInterface[*apisv3.Node]
 	rancherClusterCache           *fake.MockCacheInterface[*apisv1.Cluster]
 }
 
@@ -109,6 +179,7 @@ func newMockPlanner(t *testing.T, functions InfoFunctions) *mockPlanner {
 		capiClient:                    fake.NewMockClientInterface[*capi.Cluster, *capi.ClusterList](ctrl),
 		capiClusters:                  fake.NewMockCacheInterface[*capi.Cluster](ctrl),
 		managementClusters:            fake.NewMockNonNamespacedCacheInterface[*apisv3.Cluster](ctrl),
+		managementNodes:               fake.NewMockCacheInterface[*apisv3.Node](ctrl),
 		rancherClusterCache:           fake.NewMockCacheInterface[*apisv1.Cluster](ctrl),
 	}
 	store := PlanStore{
@@ -128,6 +199,7 @@ func newMockPlanner(t *testing.T, functions InfoFunctions) *mockPlanner {
 		capiClient:                    mp.capiClient,
 		capiClusters:                  mp.capiClusters,
 		managementClusters:            mp.managementClusters,
+		managementNodes:               mp.managementNodes,
 		rancherClusterCache:           mp.rancherClusterCache,
 		rkeControlPlanes:              mp.rkeControlPlanes,
 		rkeBootstrap:                  mp.rkeBootstrap,

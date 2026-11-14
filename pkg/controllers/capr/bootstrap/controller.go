@@ -565,7 +565,7 @@ func (h *handler) OnRemove(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEB
 // object, which is used to prevent premature tear down of infrastructure before it is ready to be teared down, i.e.
 // allowing removal of an etcd member without causing quorum loss.
 // The pre-terminate hook will be set on the machine object if the machine and bootstrap are not deleting, the corresponding
-// CAPI cluster and RKEControlPlane are not deleting, and the force remove annotation is not set on the bootstrap.
+// CAPI cluster and RKEControlPlane are not deleting, and an explicit force-remove annotation is not set on the bootstrap.
 // The annotation will be removed from the machine to allow infrastructure cleanup in the following cases:
 // * The machine is deleting and the "safe remove" logic has fired and removed the etcd member from the etcd cluster
 // * The bootstrap is missing the CAPI cluster label || the CAPI cluster controlPlaneRef is nil || the machine noderef is nil
@@ -742,6 +742,17 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		bootstrap.Namespace, bootstrap.Name,
 		machine.Namespace, machine.Name,
 	)
+
+	// CAPI deletes the downstream Node right after this bootstrap is released. Its Node deletion
+	// timeout is measured from Machine deletion and has usually expired while the Machine was
+	// protected, so a disconnected CAPI client would skip Node deletion. Wait until CAPI can reach the cluster.
+	if !bootstrap.DeletionTimestamp.IsZero() && !conditions.IsTrue(capiCluster, capi.ClusterRemoteConnectionProbeCondition) {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cannot reach cluster %s/%s yet, delaying release of machine %s/%s so CAPI can delete node %s",
+			bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name,
+			machine.Namespace, machine.Name, machine.Status.NodeRef.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
+		return bootstrap, generic.ErrSkip
+	}
 
 	// Member removal is asynchronous; keep the hook until the downstream controller confirms completion.
 	removed, err := etcdmgmt.SafelyRemoved(restConfig, capr.GetRuntimeCommand(cp.Spec.KubernetesVersion), machine.Status.NodeRef.Name)

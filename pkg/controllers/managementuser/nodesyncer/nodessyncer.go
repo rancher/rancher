@@ -592,8 +592,12 @@ func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
 func cleanStatus(machine *apimgmtv3.Node) {
 	var conditions []corev1.NodeCondition
 	for _, condition := range machine.Status.InternalNodeStatus.Conditions {
-		if condition.Type == "Ready" {
+		if condition.Type == corev1.NodeReady || condition.Type == corev1.NodeConditionType("EtcdIsVoter") {
+			// Keep EtcdIsVoter in internal status for planner gating; only Ready is projected below.
 			conditions = append(conditions, condition)
+			if condition.Type != corev1.NodeReady {
+				continue
+			}
 			readyCondition := apimgmtv3.NodeCondition{
 				Type:               cond.Cond(condition.Type),
 				Status:             condition.Status,

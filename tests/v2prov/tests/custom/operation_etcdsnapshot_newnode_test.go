@@ -19,13 +19,16 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode creates a custom 2 node cluster with a controlplane+worker and
 // etcd node, creates a configmap, takes a snapshot of the cluster, deletes the configmap, then deletes the etcd machine/node
-// It then creates a new etcd node and restores from local snapshot file. This validates that it is possible to restore
+// It then creates a new etcd node and restores from local snapshot file. The old etcd Machine stays protected while the new
+// node waits to join through it; the restore is what removes it. This validates that it is possible to restore
 // a snapshot on a completely new etcd node from file (without a corresponding snapshot file)
 func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	clients, err := clients.New()
@@ -82,7 +85,7 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		etcdNodePodName = etcdNode.Name
 	}
 
-	_, err = cluster.WaitForCreate(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,17 +120,30 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	}
 
 	for _, machine := range oldEtcdMachines.Items {
-		err = clients.CAPI.Machine().Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
+		// Foreground deletion would garbage-collect the Machine-owned plan Secret while the pre-terminate hook
+		// still holds the Machine, which drops the protected join target. Users delete with background propagation.
+		err = clients.CAPI.Machine().Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating the last etcd member is protected", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "last etcd member is protected"), nil
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// The old etcd Machines must stay held (deleting, not removed) until the restore removes them.
+	for _, machine := range oldEtcdMachines.Items {
+		held, err := clients.CAPI.Machine().Get(machine.Namespace, machine.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held.DeletionTimestamp.IsZero() {
+			t.Fatalf("old etcd machine %s is not deleting", held.Name)
+		}
 	}
 
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
@@ -135,14 +151,39 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating the replacement is waiting to join", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for the replacement to join the existing etcd cluster through"), nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm, 2)
+
+	for _, machine := range oldEtcdMachines.Items {
+		if err := waitForMachineGone(clients, &machine, 5*time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
+}
+
+// waitForMachineGone polls until the Machine with the same UID is gone, or fails after timeout.
+func waitForMachineGone(clients *clients.Clients, m *capi.Machine, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		current, err := clients.CAPI.Machine().Get(m.Namespace, m.Name, metav1.GetOptions{})
+		if apierror.IsNotFound(err) || (err == nil && current.UID != m.UID) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("machine %s still exists after %s", m.Name, timeout)
+		}
+		time.Sleep(5 * time.Second)
+	}
 }
