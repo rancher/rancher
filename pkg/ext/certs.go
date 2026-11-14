@@ -206,7 +206,7 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 		return fmt.Errorf("failed to create label requirement: %w", err)
 	}
 
-	watcher, err := p.secrets.Watch(Namespace, metav1.ListOptions{
+	watcher, err := p.secrets.Watch(GetNamespace(), metav1.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*req).String(),
 	})
 	if err != nil {
@@ -225,7 +225,7 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 		case <-stopChan:
 			logrus.Info("stopping imperative api cert rotator")
 
-			if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+			if err := p.secrets.Delete(GetNamespace(), p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 				logrus.Error(err)
 			}
 
@@ -266,7 +266,7 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      p.secretName,
-				Namespace: Namespace,
+				Namespace: GetNamespace(),
 				Labels: map[string]string{
 					SecretLabelProvider: p.name,
 				},
@@ -327,7 +327,7 @@ func (p *rotatingSNIProvider) willCertExpireWithinDuration(secret *corev1.Secret
 }
 
 func (p *rotatingSNIProvider) handleCert() error {
-	secret, err := p.secrets.Get(Namespace, p.secretName, metav1.GetOptions{})
+	secret, err := p.secrets.Get(GetNamespace(), p.secretName, metav1.GetOptions{})
 
 	if apierrors.IsNotFound(err) {
 		if err := p.createOrUpdateCerts(nil); err != nil {
