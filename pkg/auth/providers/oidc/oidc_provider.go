@@ -394,7 +394,21 @@ func GetOIDCRedirectionURL(config map[string]any, pkceVerifier string, values ur
 
 	values.Add("redirect_uri", config["rancherUrl"].(string))
 
-	return fmt.Sprintf("%s?%s", authURL, values.Encode())
+	return appendQuery(authURL, values.Encode())
+}
+
+// appendQuery adds query to authURL, keeping any query parameters that are
+// already part of the configured endpoint (e.g. an IdP hint like
+// "?connection=..." or "?kc_idp_hint=...").
+func appendQuery(authURL, query string) string {
+	switch {
+	case !strings.Contains(authURL, "?"):
+		return authURL + "?" + query
+	case strings.HasSuffix(authURL, "?"), strings.HasSuffix(authURL, "&"):
+		return authURL + query
+	default:
+		return authURL + "&" + query
+	}
 }
 
 func (o *OpenIDCProvider) getRedirectURL(authConfig map[string]any) (string, error) {
@@ -404,12 +418,11 @@ func (o *OpenIDCProvider) getRedirectURL(authConfig map[string]any) (string, err
 	if !ok {
 		logrus.Debugf("OpenIDCProvider: No API Host - no PKCE Redirection")
 		authURL, _ := FetchAuthURL(authConfig)
-		return fmt.Sprintf(
-			"%s?client_id=%s&response_type=code&redirect_uri=%s",
-			authURL,
+		return appendQuery(authURL, fmt.Sprintf(
+			"client_id=%s&response_type=code&redirect_uri=%s",
 			authConfig["clientId"],
 			authConfig["rancherUrl"],
-		), nil
+		)), nil
 
 	}
 
