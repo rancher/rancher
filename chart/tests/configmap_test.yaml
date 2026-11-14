@@ -101,6 +101,68 @@ tests:
       - notExists:
           path: data.fleet
 
+  - it: should set turtles values from string
+    set:
+      turtles: |-
+        newKey: newValue
+        newlist:
+          - list1
+          - list2
+          - list3
+        newMap:
+          entry1: 1
+          entry2: 2
+          entry3:
+            sub3: "sub"
+    asserts:
+      - equal:
+          path: data.rancher-turtles
+          value: |-
+            newKey: newValue
+            newlist:
+              - list1
+              - list2
+              - list3
+            newMap:
+              entry1: 1
+              entry2: 2
+              entry3:
+                sub3: "sub"
+
+  - it: should set turtles values from map
+    set:
+      turtles.debug: true
+      turtles.newKey: 2
+      turtles.innerMap:
+        foo: bar
+    asserts:
+      - equal:
+          path: data.rancher-turtles
+          value: |-
+            debug: true
+            innerMap:
+              foo: bar
+            newKey: 2
+
+  - it: should not set turtles values
+    asserts:
+      - notExists:
+          path: data.rancher-turtles
+
+  - it: should set turtles caapf feature gate
+    set:
+      turtles: |-
+        features:
+          use-caapf:
+            enabled: true
+    asserts:
+      - equal:
+          path: data.rancher-turtles
+          value: |-
+            features:
+              use-caapf:
+                enabled: true
+
   - it: should set priorityClassName
     set:
       priorityClassName: "super"
