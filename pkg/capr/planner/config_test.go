@@ -10,12 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	channelmodel "github.com/rancher/channelserver/pkg/model"
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
+	"github.com/rancher/wrangler/v3/pkg/schemas"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1030,4 +1032,143 @@ func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func TestAgentAffectingServerConfig(t *testing.T) {
+	releaseData := setTestKDMReleaseData(t, map[string]schemas.Field{
+		"disable-kube-proxy": {Type: "boolean"},
+		"tls-san":            {},
+	})
+
+	tests := []struct {
+		name     string
+		config   map[string]any
+		expected map[string]interface{}
+	}{
+		{
+			name:     "empty config",
+			config:   map[string]any{},
+			expected: map[string]interface{}{},
+		},
+		{
+			name:     "disable-kube-proxy present",
+			config:   map[string]any{"disable-kube-proxy": true, "cni": "cilium"},
+			expected: map[string]interface{}{"disable-kube-proxy": true},
+		},
+		{
+			name:     "only unrelated keys",
+			config:   map[string]any{"cni": "cilium", "tls-san": "example.com"},
+			expected: map[string]interface{}{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cp := &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.31.8+rke2r1",
+					ClusterConfiguration: rkev1.ClusterConfiguration{
+						MachineGlobalConfig: rkev1.GenericMap{Data: tt.config},
+					},
+				},
+			}
+			result := agentAffectingServerConfigWithRelease(cp, releaseData)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestRestartStampWorkerChangesWithDisableKubeProxy(t *testing.T) {
+	a := assert.New(t)
+	releaseData := setTestKDMReleaseData(t, map[string]schemas.Field{
+		"disable-kube-proxy": {Type: "boolean"},
+	})
+
+	workerEntry := &planEntry{
+		Metadata: &plan.Metadata{
+			Labels: map[string]string{
+				capr.CattleOSLabel:         "linux",
+				capr.ControlPlaneRoleLabel: "false",
+				capr.EtcdRoleLabel:         "false",
+				capr.WorkerRoleLabel:       "true",
+			},
+		},
+		Machine: &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "false",
+					capr.EtcdRoleLabel:         "false",
+					capr.WorkerRoleLabel:       "true",
+				},
+			},
+		},
+	}
+
+	cpEntry := &planEntry{
+		Metadata: &plan.Metadata{
+			Labels: map[string]string{
+				capr.CattleOSLabel:         "linux",
+				capr.ControlPlaneRoleLabel: "true",
+				capr.EtcdRoleLabel:         "true",
+				capr.WorkerRoleLabel:       "false",
+			},
+		},
+		Machine: &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "true",
+					capr.EtcdRoleLabel:         "true",
+					capr.WorkerRoleLabel:       "false",
+				},
+			},
+		},
+	}
+
+	cpWithout := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			KubernetesVersion: "v1.31.8+rke2r1",
+			ClusterConfiguration: rkev1.ClusterConfiguration{
+				MachineGlobalConfig: rkev1.GenericMap{Data: map[string]any{"cni": "cilium"}},
+			},
+		},
+	}
+	cpWith := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			KubernetesVersion: "v1.31.8+rke2r1",
+			ClusterConfiguration: rkev1.ClusterConfiguration{
+				MachineGlobalConfig: rkev1.GenericMap{Data: map[string]any{"cni": "cilium", "disable-kube-proxy": true}},
+			},
+		},
+	}
+
+	nodePlan := plan.NodePlan{}
+	image := "test-image"
+
+	workerStampWithout := restartStampWithRelease(nodePlan, cpWithout, image, workerEntry, releaseData)
+	workerStampWith := restartStampWithRelease(nodePlan, cpWith, image, workerEntry, releaseData)
+	a.NotEqual(workerStampWithout, workerStampWith, "worker restart stamp should change when disable-kube-proxy is toggled")
+
+	cpStampWithout := restartStampWithRelease(nodePlan, cpWithout, image, cpEntry, releaseData)
+	cpStampWith := restartStampWithRelease(nodePlan, cpWith, image, cpEntry, releaseData)
+	a.Equal(cpStampWithout, cpStampWith, "control plane restart stamp should not be affected by agentAffectingServerFlags logic")
+}
+
+func setTestKDMReleaseData(t *testing.T, serverFields map[string]schemas.Field) *channelmodel.Release {
+	t.Helper()
+
+	serverArgs := map[string]channelmodel.Arg{}
+	for key, field := range serverFields {
+		arg := channelmodel.Arg{Field: field}
+		if key == "disable-kube-proxy" {
+			arg.RestartScope = []string{restartScopeDownstream}
+		}
+		serverArgs[key] = arg
+	}
+
+	release := &channelmodel.Release{
+		Version:    "v1.31.8+rke2r1",
+		ServerArgs: serverArgs,
+		AgentArgs:  map[string]channelmodel.Arg{"node-name": {Field: schemas.Field{Type: "string"}}},
+	}
+	return release
 }
