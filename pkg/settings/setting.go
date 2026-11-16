@@ -111,7 +111,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.16")
+	KDMBranch                           = NewSetting("kdm-branch", "release-v2.16")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", "").WithEnvDefault("CATTLE_NAMESPACE")
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
