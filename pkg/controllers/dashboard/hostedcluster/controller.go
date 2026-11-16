@@ -195,12 +195,13 @@ func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition
 		chartValues[priorityClassKey] = priorityClassName
 	}
 
+	// chartVersion is passed as the exact version. As a minimum version, a pin that only differs in the +up
 	if err := h.manager.Ensure(
 		toInstallCrdChart.ReleaseNamespace,
 		toInstallCrdChart.ChartName,
 		toInstallCrdChart.ReleaseName,
-		chartVersion,
 		"",
+		chartVersion,
 		nil,
 		true,
 		""); err != nil {
@@ -211,8 +212,8 @@ func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition
 		toInstallChart.ReleaseNamespace,
 		toInstallChart.ChartName,
 		toInstallChart.ReleaseName,
-		chartVersion,
 		"",
+		chartVersion,
 		chartValues,
 		true,
 		""); err != nil {
