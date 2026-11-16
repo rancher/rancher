@@ -116,7 +116,13 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch r.Form.Get("grant_type") {
+	grantType := r.Form.Get("grant_type")
+	if grantType == "" {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "missing grant_type", http.StatusBadRequest, w)
+		return
+	}
+
+	switch grantType {
 	case "authorization_code":
 		tokenResponse, oidcErr := h.createTokenFromCode(r)
 		if oidcErr != nil {

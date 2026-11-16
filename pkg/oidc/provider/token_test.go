@@ -1324,7 +1324,7 @@ func TestTokenEndpoint(t *testing.T) {
 			wantError:  `{"error":"unsupported_grant_type","error_description":"grant_type not supported"}`,
 			wantStatus: http.StatusBadRequest,
 		},
-		"missing grant_type returns unsupported_grant_type": {
+		"missing grant_type returns invalid_request": {
 			req: func() *http.Request {
 				data := url.Values{}
 				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
@@ -1332,7 +1332,7 @@ func TestTokenEndpoint(t *testing.T) {
 
 				return req
 			},
-			wantError:  `{"error":"unsupported_grant_type","error_description":"grant_type not supported"}`,
+			wantError:  `{"error":"invalid_request","error_description":"missing grant_type"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"token endpoint sets cache-control headers": {
