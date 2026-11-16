@@ -236,6 +236,7 @@ func (h *tokenHandler) isValidClientSecret(clientSecret string, oidcClient *v3.O
 func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidcerror.Error) {
 	refreshToken := r.Form.Get("refresh_token")
 	// verify refresh_token signature
+	var keyStoreErr error
 	token, err := jwt.ParseWithClaims(refreshToken, &RefreshTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// Ensure correct signing method
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
@@ -247,11 +248,19 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 		}
 		pubKey, err := h.jwks.GetPublicKey(kid)
 		if err != nil {
+			// An unknown kid is a problem with the token, anything else is a
+			// failure of the key store.
+			if !errors.Is(err, errPublicKeyNotFound) {
+				keyStoreErr = err
+			}
 			return nil, err
 		}
 
 		return pubKey, nil
 	})
+	if keyStoreErr != nil {
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to get public key: %v", keyStoreErr)
+	}
 	if err != nil {
 		return TokenResponse{}, oidcerror.Newf(oidcerror.InvalidGrant, "failed to parse refresh token: %v", err)
 	}

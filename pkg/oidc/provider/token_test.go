@@ -1191,6 +1191,40 @@ func TestTokenEndpoint(t *testing.T) {
 			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token signature is invalid: crypto/rsa: verification error"}`,
 			wantStatus: http.StatusBadRequest,
 		},
+		"refresh_token returns server_error when the public key can't be retrieved": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "refresh_token")
+				data.Set("refresh_token", fakeRefreshTokenString)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(nil, fmt.Errorf("getting public key: unexpected error"))
+			},
+			wantError:  `{"error":"server_error","error_description":"failed to get public key: getting public key: unexpected error"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		"refresh_token returns invalid_grant when the kid is unknown": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "refresh_token")
+				data.Set("refresh_token", fakeRefreshTokenString)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(nil, errPublicKeyNotFound)
+			},
+			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token is unverifiable: error while executing keyfunc: public key not found"}`,
+			wantStatus: http.StatusBadRequest,
+		},
 		"refresh_token fails when the associated Rancher token is no longer present": {
 			req: func() *http.Request {
 				data := url.Values{}
