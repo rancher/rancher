@@ -15,6 +15,10 @@ machineProvisionImage: rancher/machine:v0.15.0-rancher146-rc.10
 systemAgentVersion: v0.16.0-rc.8
 winsAgentVersion: v0.16.0-rc.10
 # Charts Versions
+aksOperatorVersion: 111.0.0+up1.16.0-rc.7
+eksOperatorVersion: 111.0.0+up1.16.0-rc.6
+gkeOperatorVersion: 111.0.0+up1.16.0-rc.5
+fleetVersion: 111.0.0+up0.17.0-rc.5
 fleetVersion: 111.0.0+up0.17.0-rc.1
 remoteDialerProxyVersion: 111.0.0+up0.9.1-rc.2
 turtlesVersion: 111.0.0+up0.28.0-rc.5
