@@ -16,6 +16,8 @@ const (
 	UnsupportedResponseType = "unsupported_response_type"
 	// InvalidScope the requested scope is invalid, unknown, or malformed
 	InvalidScope = "invalid_scope"
+	// InvalidGrant the provided authorization grant or refresh token is invalid, expired, revoked, or was issued to another client (RFC 6749 section 5.2).
+	InvalidGrant = "invalid_grant"
 	// ServerError the authorization server encountered an unexpected condition that prevented it from fulfilling the request.
 	ServerError = "server_error"
 )

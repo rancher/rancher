@@ -1188,7 +1188,7 @@ func TestTokenEndpoint(t *testing.T) {
 				anotherKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&anotherKey.PublicKey, nil)
 			},
-			wantError:  `{"error":"server_error","error_description":"failed to parse refresh token: token signature is invalid: crypto/rsa: verification error"}`,
+			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token signature is invalid: crypto/rsa: verification error"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"refresh_token fails when the associated Rancher token is no longer present": {
@@ -1281,7 +1281,7 @@ func TestTokenEndpoint(t *testing.T) {
 				})).Return(fakeTokenList, nil)
 				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{}, nil)
 			},
-			wantError:  `{"error":"server_error","error_description":"failed to get oidc client: no OIDC clients found"}`,
+			wantError:  `{"error":"invalid_grant","error_description":"the OIDC client that issued this refresh token no longer exists"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"refresh_token fails when it is expired": {
@@ -1309,7 +1309,7 @@ func TestTokenEndpoint(t *testing.T) {
 			mockSetup: func(m mockParams) {
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
-			wantError:  `{"error":"server_error","error_description":"failed to parse refresh token: token has invalid claims: token is expired"}`,
+			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token has invalid claims: token is expired"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"token endpoint sets cache-control headers": {
