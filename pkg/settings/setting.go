@@ -248,13 +248,13 @@ var (
 	FleetVersion = NewSetting("fleet-version", buildconfig.FleetVersion)
 
 	// AksOperatorVersion is the exact version of the aks-operator and aks-operator-crd charts that Rancher will install.
-	AksOperatorVersion = NewSetting("aks-operator-version", "")
+	AksOperatorVersion = NewSetting("aks-operator-version", buildconfig.AksOperatorVersion)
 
 	// EksOperatorVersion is the exact version of the eks-operator and eks-operator-crd chart that Rancher will install.
-	EksOperatorVersion = NewSetting("eks-operator-version", "")
+	EksOperatorVersion = NewSetting("eks-operator-version", buildconfig.EksOperatorVersion)
 
 	// GkeOperatorVersion is the exact version of the gke-operator and gke-operator-crd chart that Rancher will install.
-	GkeOperatorVersion = NewSetting("gke-operator-version", "")
+	GkeOperatorVersion = NewSetting("gke-operator-version", buildconfig.GkeOperatorVersion)
 
 	// AliOperatorVersion is the exact version of the ali-operator and ali-operator-crd chart that Rancher will install.
 	AliOperatorVersion = NewSetting("ali-operator-version", "")
