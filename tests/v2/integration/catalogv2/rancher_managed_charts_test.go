@@ -1,12 +1,8 @@
 package integration
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"testing"
 	"time"
@@ -24,8 +20,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v4/pkg/repo/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -36,6 +30,10 @@ import (
 
 const smallForkURL = "https://github.com/rancher/charts-small-fork"
 const smallForkClusterRepoName = "rancher-charts-small-fork"
+
+// aksOperatorVersionSetting is the setting holding the exact version of the AKS operator chart Rancher installs. It
+// defaults to the version pinned in build.yaml, which does not exist in the charts of the small fork.
+const aksOperatorVersionSetting = "aks-operator-version"
 
 var propagation = metav1.DeletePropagationForeground
 
@@ -93,6 +91,8 @@ func (w *RancherManagedChartsTest) SetupSuite() {
 }
 
 func (w *RancherManagedChartsTest) resetSettings() {
+	// An empty value brings back the default, which is the version pinned in build.yaml.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, ""))
 	w.resetManagementCluster()
 
 	w.uninstallApp("cattle-system", "rancher-aks-operator-crd")
@@ -126,6 +126,8 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	downloadTime := clusterRepo.Status.DownloadTime
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 
+	// Rancher installs the pinned version of the operator chart, so pin the latest version in the repo.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "104.0.2+up1.9.0"))
 	w.Require().NoError(w.updateManagementCluster())
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
@@ -151,56 +153,21 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	downloadTime := clusterRepo.Status.DownloadTime
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 
-	cfgMap, err := w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
-	w.Require().NoError(err)
-	origCfg := cfgMap.DeepCopy()
-
-	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
-	originalLatestVersion := w.updateConfigMap(cfgMap)
-
-	//UPDATING THE CONFIGMAP
-	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
-
-	//KWait for config map to be updated
-	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, originalLatestVersion))
-
-	//Updating the cluster
+	// Pin a version older than the latest in the repo.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "104.0.1+up1.9.0"))
 	w.Require().NoError(w.updateManagementCluster())
 
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 	w.Require().Equal("104.0.1+up1.9.0", app.Spec.Chart.Metadata.Version)
-
-	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version)
-
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 
-	//REVERT CONFIGMAP TO ORIGINAL VALUE
-	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
-	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
+	// Pin the latest version, as a Rancher upgrade would.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "104.0.2+up1.9.0"))
+	w.Require().NoError(w.retriggerManagementCluster())
 
-	clusterRepo, err = w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
-	w.Require().NoError(err)
-
-	prevDownloadTime := clusterRepo.Status.DownloadTime
-
-	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
-	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
-	w.Require().NoError(err)
-
-	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", prevDownloadTime))
-
-	err = kwait.Poll(2*time.Second, 3*time.Minute, func() (done bool, err error) {
-		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), "rancher-aks-operator", metav1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-		return app.Spec.Info.Status == rv1.StatusDeployed && app.Spec.Chart.Metadata.Version == originalLatestVersion, nil
-	})
-	w.Require().NoError(err)
+	app = w.waitForAksChartVersion("104.0.2+up1.9.0")
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 }
@@ -220,22 +187,12 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	w.Require().NoError(err)
 	downloadTime := clusterRepo.Status.DownloadTime
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
-	cfgMap, err := w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
-	w.Require().NoError(err)
-	origCfg := cfgMap.DeepCopy()
 
-	// GETTING INDEX FROM CONFIGMAP AND MODIFYING iT
-	latestVersion := w.updateConfigMap(cfgMap)
-	//UPDATING THE CONFIGMAP
-	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
-
-	//KWait for config map to be updated
-	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
+	// Pin a version that fails to install.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "102.0.0+up1.1.0"))
 	list, err := w.catalogClient.Operations("cattle-system").List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
 	numberOfOps := countNumberOfOperations(list, "rancher-aks-operator", time.Now())
-	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
 
 	app, at, err := w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", 0)
@@ -246,30 +203,11 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	w.Require().NoError(err)
 	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
 
-	//REVERT CONFIGMAP TO ORIGINAL VALUE
-	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
-	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
+	// Pin the working version.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "102.0.1+up1.1.0"))
+	w.Require().NoError(w.retriggerManagementCluster())
 
-	clusterRepo, err = w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
-	w.Require().NoError(err)
-
-	prevDownloadTime := clusterRepo.Status.DownloadTime
-
-	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
-	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
-	w.Require().NoError(err)
-
-	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", prevDownloadTime))
-
-	err = kwait.Poll(2*time.Second, 3*time.Minute, func() (done bool, err error) {
-		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), "rancher-aks-operator", metav1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-		return app.Spec.Info.Status == rv1.StatusDeployed && app.Spec.Chart.Metadata.Version == latestVersion, nil
-	})
-	w.Require().NoError(err)
+	app = w.waitForAksChartVersion("102.0.1+up1.1.0")
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 }
@@ -287,20 +225,9 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 
 	downloadTime := clusterRepo.Status.DownloadTime
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
-	cfgMap, err := w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
-	w.Require().NoError(err)
-	origCfg := cfgMap.DeepCopy()
 
-	// GETTING INDEX FROM CONFIGMAP AND MODIFYING iT
-	latestVersion := w.updateConfigMap(cfgMap)
-	//UPDATING THE CONFIGMAP
-	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
-
-	//KWait for config map to be updated
-	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
-
-	//Updating the cluster
+	// Pin a working version.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "102.0.0+up1.1.0"))
 	w.Require().NoError(w.updateManagementCluster())
 
 	app, at, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
@@ -314,16 +241,9 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 	w.Require().NoError(err)
 	numberOfOps := countNumberOfOperations(list, "rancher-aks-operator", at)
 
-	//REVERT CONFIGMAP TO ORIGINAL VALUE
-	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
-	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
-
-	clusterRepo, err = w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
-	w.Require().NoError(err)
-	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
-	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
-	w.Require().NoError(err)
+	// Pin a version that fails to install.
+	w.Require().NoError(w.updateSetting(aksOperatorVersionSetting, "102.0.1+up1.1.0"))
+	w.Require().NoError(w.retriggerManagementCluster())
 
 	app, at, err = w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", app.Spec.Version)
 	w.Require().NoError(err)
@@ -342,44 +262,6 @@ func countNumberOfOperations(ops *rv1.OperationList, name string, at time.Time) 
 		}
 	}
 	return count
-}
-
-func (w *RancherManagedChartsTest) WaitForConfigMap(namespace, name, latestVersion string) error {
-	return kwait.Poll(1*time.Second, 3*time.Minute, func() (done bool, err error) {
-		cfgMap, err := w.corev1.ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		w.Require().NoError(err)
-		gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
-		w.Require().NoError(err)
-		defer gz.Close()
-		data, err := io.ReadAll(gz)
-		w.Require().NoError(err)
-		index := &repo.IndexFile{}
-		w.Require().NoError(json.Unmarshal(data, index))
-		index.SortEntries()
-		return index.Entries["rancher-aks-operator"][0].Version < latestVersion, nil
-	})
-}
-
-func (w *RancherManagedChartsTest) updateConfigMap(cfgMap *v1.ConfigMap) string {
-	gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
-	w.Require().NoError(err)
-	defer gz.Close()
-	data, err := io.ReadAll(gz)
-	w.Require().NoError(err)
-	index := &repo.IndexFile{}
-	w.Require().NoError(json.Unmarshal(data, index))
-	index.SortEntries()
-	latestVersion := index.Entries["rancher-aks-operator"][0].Version
-	index.Entries["rancher-aks-operator"] = index.Entries["rancher-aks-operator"][1:]
-	marshal, err := json.Marshal(index)
-	w.Require().NoError(err)
-	var compressedData bytes.Buffer
-	writer := gzip.NewWriter(&compressedData)
-	_, err = writer.Write(marshal)
-	w.Require().NoError(err)
-	w.Require().NoError(writer.Close())
-	cfgMap.BinaryData["content"] = compressedData.Bytes()
-	return latestVersion
 }
 
 func (w *RancherManagedChartsTest) waitForAksChart(status rv1.Status, name string, previousVersion int) (*rv1.App, time.Time, error) {
@@ -403,6 +285,27 @@ func (w *RancherManagedChartsTest) waitForAksChart(status rv1.Status, name strin
 	})
 	w.Require().NoError(err)
 	return app, at, err
+}
+
+// waitForAksChartVersion waits until the AKS operator chart is deployed at the given version.
+func (w *RancherManagedChartsTest) waitForAksChartVersion(version string) *rv1.App {
+	var app *rv1.App
+	err := kwait.Poll(2*time.Second, 3*time.Minute, func() (done bool, err error) {
+		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), "rancher-aks-operator", metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return app.Spec.Info.Status == rv1.StatusDeployed && app.Spec.Chart.Metadata.Version == version, nil
+	})
+	w.Require().NoError(err)
+	return app
+}
+
+// retriggerManagementCluster turns the AKS config off and on again. Rancher only evaluates the operator chart to
+// install when the cluster changes, not when the operator version setting changes.
+func (w *RancherManagedChartsTest) retriggerManagementCluster() error {
+	w.resetManagementCluster()
+	return w.updateManagementCluster()
 }
 
 func (w *RancherManagedChartsTest) updateManagementCluster() error {
