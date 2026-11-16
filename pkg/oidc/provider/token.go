@@ -148,7 +148,7 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	default:
-		http.Error(w, "grant_type not supported", http.StatusInternalServerError)
+		oidcerror.WriteError(oidcerror.UnsupportedGrantType, "grant_type not supported", http.StatusBadRequest, w)
 		return
 	}
 }

@@ -1312,6 +1312,29 @@ func TestTokenEndpoint(t *testing.T) {
 			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token has invalid claims: token is expired"}`,
 			wantStatus: http.StatusBadRequest,
 		},
+		"unsupported grant_type returns unsupported_grant_type": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "password")
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+				return req
+			},
+			wantError:  `{"error":"unsupported_grant_type","error_description":"grant_type not supported"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		"missing grant_type returns unsupported_grant_type": {
+			req: func() *http.Request {
+				data := url.Values{}
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+				return req
+			},
+			wantError:  `{"error":"unsupported_grant_type","error_description":"grant_type not supported"}`,
+			wantStatus: http.StatusBadRequest,
+		},
 		"token endpoint sets cache-control headers": {
 			// https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.3.1.3.3
 			req: func() *http.Request {
