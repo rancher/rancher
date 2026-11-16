@@ -190,10 +190,11 @@ scopes:
           - 'wins-agent-install-script'
           - 'chart-default-branch'
           - 'machine-provision-image'
-      - path: "^package/Dockerfile"
+      - path: "^package/Dockerfile$"
         substrings:
           - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
           - 'CATTLE_K3S_VERSION'
+      - path: '^Dockerfile.runtime$' # Used to run the 'make quick' commands, and the provisioning tests. Changes to this file can impact provisioning.
       - path: '^trigger-basic-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
       - { V2PROV_TEST_DIST: k3s, V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', V2PROV_TEST_PARALLELISM: 3 }
