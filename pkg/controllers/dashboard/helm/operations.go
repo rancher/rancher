@@ -12,13 +12,10 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/kstatus"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -29,20 +26,17 @@ const (
 type operationHandler struct {
 	ctx             context.Context
 	pods            corecontrollers.PodCache
-	k8s             kubernetes.Interface
 	operationsCache catalogcontrollers.OperationCache
 	apps            catalogcontrollers.AppController
 }
 
 func RegisterOperations(ctx context.Context,
-	k8s kubernetes.Interface,
 	pods corecontrollers.PodController,
 	operations catalogcontrollers.OperationController,
 	apps catalogcontrollers.AppController) {
 
 	o := operationHandler{
 		ctx:             ctx,
-		k8s:             k8s,
 		pods:            pods.Cache(),
 		operationsCache: operations.Cache(),
 		apps:            apps,
@@ -123,9 +117,6 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 						container.State.Terminated.Message,
 						container.State.Terminated.ExitCode))
 			}
-			if err := o.cleanup(pod); err != nil {
-				return status, err
-			}
 		} else if container.State.Waiting != nil {
 			kstatus.SetTransitioning(&status, "waiting to run operation")
 		} else {
@@ -134,38 +125,4 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 	}
 
 	return status, nil
-}
-
-func (o *operationHandler) cleanup(pod *corev1.Pod) error {
-	running := false
-	success := false
-	for _, container := range pod.Status.ContainerStatuses {
-		if container.Name == "proxy" && container.State.Terminated == nil {
-			running = true
-		} else if container.Name == "helm" && container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 {
-			success = true
-		}
-	}
-
-	if !running || !success {
-		return nil
-	}
-
-	result := o.k8s.CoreV1().RESTClient().
-		Get().
-		Namespace(pod.Namespace).
-		Resource("pods").
-		Name(pod.Name).
-		SubResource("exec").
-		SetHeader("Upgrade", "websocket").
-		SetHeader("Sec-Websocket-Key", "websocket").
-		SetHeader("Sec-Websocket-Version", "13").
-		SetHeader("Connection", "Upgrade").
-		VersionedParams(&corev1.PodExecOptions{
-			Stdout:    true,
-			Stderr:    true,
-			Container: "proxy",
-			Command:   []string{"pkill", "-x", "kubectl"},
-		}, scheme.ParameterCodec).Do(o.ctx)
-	return result.Error()
 }
