@@ -13,7 +13,6 @@ import (
 
 const (
 	projectIDAnnotation        = "field.cattle.io/projectId"
-	sysNamespaceAnnotation     = "management.cattle.io/system-namespace"
 	NoDefaultSATokenAnnotation = "management.cattle.io/no-default-sa-token"
 )
 
