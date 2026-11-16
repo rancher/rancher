@@ -138,12 +138,12 @@ require (
 	github.com/urfave/cli v1.22.17
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.58.0
-	golang.org/x/mod v0.41.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/text v0.43.0
+	golang.org/x/sync v0.25.0
+	golang.org/x/text v0.44.0
 	google.golang.org/api v0.291.0
 	google.golang.org/grpc v1.83.2
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -410,10 +410,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/time v0.15.0
-	golang.org/x/tools v0.51.0 // indirect
+	golang.org/x/tools v0.52.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/inf.v0 v0.9.1 // indirect
