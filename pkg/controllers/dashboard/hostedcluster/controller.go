@@ -195,7 +195,8 @@ func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition
 		chartValues[priorityClassKey] = priorityClassName
 	}
 
-	// chartVersion is passed as the exact version. As a minimum version, a pin that only differs in the +up
+	// chartVersion is passed as the exact version, not the minimum version. A minimum version ignores the
+	// +up metadata, so a bump like rc.6 to rc.7 would not be installed over an existing release.
 	if err := h.manager.Ensure(
 		toInstallCrdChart.ReleaseNamespace,
 		toInstallCrdChart.ChartName,
