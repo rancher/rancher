@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Verifies that the chart versions pinned in build.yaml exist in the rancher/charts index of the commit baked into the
+# Rancher Assets image in use. Otherwise they cannot be installed in an air-gapped environment.
+set -e
+
+source "$(dirname "$0")/assets-charts-lib"
+
+# build.yaml key -> chart name in the charts index
+CHECKS=(
+    "fleetVersion fleet"
+    "remoteDialerProxyVersion remotedialer-proxy"
+    "turtlesVersion rancher-turtles"
+    "webhookVersion rancher-webhook"
+)
+
+echo "Checking build.yaml chart versions against the Rancher Assets image charts"
+checkout_assets_charts
+echo "Using rancher/charts commit ${CHARTS_COMMIT}"
+
+failed=0
+for check in "${CHECKS[@]}"; do
+    read -r key chart <<<"$check"
+    version=$(KEY=$key yq '.[strenv(KEY)]' "${ASSETS_CHARTS_ROOT}/build.yaml")
+    found=$(CHART=$chart VERSION=$version yq '.entries[strenv(CHART)][] | select(.version == strenv(VERSION)) | .version' "${CHARTS_REPO_PATH}/index.yaml")
+    if [ -z "$found" ]; then
+        echo "FAIL: ${key}=${version} not found for chart '${chart}' in charts index at ${CHARTS_COMMIT}" >&2
+        failed=1
+    else
+        echo "OK:   ${key}=${version}"
+    fi
+done
+
+exit $failed
