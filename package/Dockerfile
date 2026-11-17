@@ -100,6 +100,13 @@ RUN ./export-images -arch ${TARGETARCH} -k3s-version ${CATTLE_K3S_VERSION} -outp
 FROM scratch AS k3s-images
 COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
 
+# Download system charts for embedding
+FROM --platform=$BUILDPLATFORM go-builder AS systemcharts
+ARG TARGETARCH
+WORKDIR /src
+COPY hack/systemcharts/* build.yaml /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go run ./main.go --build-yaml build.yaml --output-dir /systemcharts
+
 # rancher-build is an intermediate target to build Rancher's go binaries.
 # go mod dependencies are early loaded, to optimize caching
 FROM --platform=$BUILDPLATFORM go-builder AS rancher-build
