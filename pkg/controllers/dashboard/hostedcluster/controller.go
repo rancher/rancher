@@ -195,12 +195,14 @@ func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition
 		chartValues[priorityClassKey] = priorityClassName
 	}
 
+	// chartVersion is passed as the exact version, not the minimum version. A minimum version ignores the
+	// +up metadata, so a bump like rc.6 to rc.7 would not be installed over an existing release.
 	if err := h.manager.Ensure(
 		toInstallCrdChart.ReleaseNamespace,
 		toInstallCrdChart.ChartName,
 		toInstallCrdChart.ReleaseName,
-		chartVersion,
 		"",
+		chartVersion,
 		nil,
 		true,
 		""); err != nil {
@@ -211,8 +213,8 @@ func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition
 		toInstallChart.ReleaseNamespace,
 		toInstallChart.ChartName,
 		toInstallChart.ReleaseName,
-		chartVersion,
 		"",
+		chartVersion,
 		chartValues,
 		true,
 		""); err != nil {

@@ -93,8 +93,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
-					settings.AksOperatorVersion.Get(),
 					"",
+					settings.AksOperatorVersion.Get(),
 					nil,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -103,8 +103,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksChart.ReleaseNamespace,
 					AksChart.ReleaseName,
 					AksChart.ChartName,
-					settings.AksOperatorVersion.Get(),
 					"",
+					settings.AksOperatorVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -147,8 +147,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
-					settings.AksOperatorVersion.Get(),
 					"",
+					settings.AksOperatorVersion.Get(),
 					nil,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -157,8 +157,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksChart.ReleaseNamespace,
 					AksChart.ReleaseName,
 					AksChart.ChartName,
-					settings.AksOperatorVersion.Get(),
 					"",
+					settings.AksOperatorVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -205,8 +205,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
-					exactVersion,
 					"",
+					exactVersion,
 					nil,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -215,8 +215,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksChart.ReleaseNamespace,
 					AksChart.ReleaseName,
 					AksChart.ChartName,
-					exactVersion,
 					"",
+					exactVersion,
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -263,8 +263,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
-					settings.AksOperatorVersion.Get(),
 					"",
+					settings.AksOperatorVersion.Get(),
 					nil,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -273,8 +273,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksChart.ReleaseNamespace,
 					AksChart.ReleaseName,
 					AksChart.ChartName,
-					settings.AksOperatorVersion.Get(),
 					"",
+					settings.AksOperatorVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -315,8 +315,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
-					gomock.Any(),
 					"",
+					gomock.Any(),
 					nil,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -355,8 +355,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 					AksChart.ReleaseNamespace,
 					AksChart.ReleaseName,
 					AksChart.ChartName,
-					gomock.Any(),
 					"",
+					gomock.Any(),
 					gomock.Any(),
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -474,12 +474,12 @@ func Test_handler_onSettingsChange(t *testing.T) {
 				// AKS CRD chart
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace, AksCrdChart.ReleaseName, AksCrdChart.ChartName,
-					gomock.Any(), "", nil, gomock.AssignableToTypeOf(b), "",
+					"", gomock.Any(), nil, gomock.AssignableToTypeOf(b), "",
 				).Return(nil)
 				// AKS operator chart
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace, AksChart.ReleaseName, AksChart.ChartName,
-					gomock.Any(), "", gomock.Any(), gomock.AssignableToTypeOf(b), "",
+					"", gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(b), "",
 				).Return(nil)
 				return manager
 			},
@@ -504,11 +504,11 @@ func Test_handler_onSettingsChange(t *testing.T) {
 				var b bool
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace, AksCrdChart.ReleaseName, AksCrdChart.ChartName,
-					gomock.Any(), "", nil, gomock.AssignableToTypeOf(b), "",
+					"", gomock.Any(), nil, gomock.AssignableToTypeOf(b), "",
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace, AksChart.ReleaseName, AksChart.ChartName,
-					gomock.Any(), "", gomock.Any(), gomock.AssignableToTypeOf(b), "",
+					"", gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(b), "",
 				).Return(nil)
 				return manager
 			},
@@ -557,11 +557,11 @@ func Test_handler_onSettingsChange(t *testing.T) {
 				var b bool
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace, AksCrdChart.ReleaseName, AksCrdChart.ChartName,
-					gomock.Any(), "", nil, gomock.AssignableToTypeOf(b), "",
+					"", gomock.Any(), nil, gomock.AssignableToTypeOf(b), "",
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace, AksChart.ReleaseName, AksChart.ChartName,
-					gomock.Any(), "", gomock.Any(), gomock.AssignableToTypeOf(b), "",
+					"", gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(b), "",
 				).Return(nil)
 				return manager
 			},
