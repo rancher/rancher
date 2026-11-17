@@ -137,7 +137,7 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod do
 
 ARG VERSION
 ARG COMMIT
-ARG TAGS="k8s,embedded_systemcharts"
+ARG TAGS="embedded_systemcharts"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG GCFLAGS
 ARG TARGETOS

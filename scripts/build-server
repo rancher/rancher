@@ -18,7 +18,7 @@ if [ "$(uname)" != "Darwin" ]; then
   fi
 fi
 
-CGO_ENABLED=0 go build -tags k8s \
+CGO_ENABLED=0 go build \
   -gcflags="all=${GCFLAGS}" \
   -ldflags \
   "-X github.com/rancher/rancher/pkg/version.Version=$VERSION
