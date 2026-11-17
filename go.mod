@@ -135,12 +135,12 @@ require (
 	github.com/rancher/machine v0.15.0-rancher146-rc.10
 	github.com/rancher/muchang v0.1.1
 	github.com/rancher/norman v0.10.2
-	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
+	github.com/rancher/rancher/pkg/apis v0.0.0-20261113080752-fd05373f461d
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260828234415-cde38be6980a
 	github.com/rancher/remotedialer v0.6.2
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
-	github.com/rancher/shepherd v0.0.0-20261021194219-25800d4c8ac6
+	github.com/rancher/shepherd v0.0.0-20261117195334-c630ad81f359
 	github.com/rancher/steve v0.10.11
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260923180507-96eced818739
 	github.com/rancher/wrangler/v3 v3.8.0
