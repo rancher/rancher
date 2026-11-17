@@ -53,7 +53,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3Aft
 	pool := cluster.ImportedNodePool{ControlPlane: true, ETCD: true, Worker: true, Quantity: 3}
 
 	endPhase := phase(t, "P0/objectstore")
-	osInfo, err := objectstore.GetObjectStore(cs, "default", "imported-store0", "s3snapshots")
+	osInfo, err := objectstore.GetSharedObjectStore(cs, "imported-store0", "s3snapshots")
 	require.NoError(t, err, "setting up object store")
 	endPhase()
 	// One folder per run, so the snapshot this run restores is the only one the nodes can list.

@@ -627,9 +627,9 @@ func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayN
 	}
 
 	// The nodes are pods in this cluster, so a ClusterIP endpoint is reachable — unlike the CAPRKE2
-	// case, which needs objectstore's external flavour. Living in `default` mirrors the shared
-	// registry cache.
-	osInfo, err := objectstore.GetObjectStore(cs, "default", "imported-store0", "s3snapshots")
+	// case, which needs objectstore's external flavour. The store is shared by every imported S3 test
+	// and never cleaned up, so parallel tests don't tear it down under each other.
+	osInfo, err := objectstore.GetSharedObjectStore(cs, "imported-store0", "s3snapshots")
 	if err != nil {
 		t.Fatalf("setting up object store: %v", err)
 	}

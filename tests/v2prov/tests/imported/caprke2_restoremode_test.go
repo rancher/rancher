@@ -215,12 +215,12 @@ func setUpCAPRKE2RestoreModeCluster(t *testing.T, namePrefix string) (*clients.C
 	}
 	t.Cleanup(cs.Close)
 
-	// The object store lives in `default` — like the shared registry cache — rather than in the
-	// cluster's namespace, which NewCAPRKE2Cluster creates itself (and labels for Turtles
-	// auto-import). It has to be reachable from inside the CAPD machine containers, which are on the
+	// The object store is shared with the other CAPRKE2 restore-mode tests and never cleaned up, so
+	// parallel tests don't tear it down under each other; the per-run folder below keeps their
+	// snapshots apart. It has to be reachable from inside the CAPD machine containers, which are on the
 	// same Docker bridge network as the local cluster's nodes but outside its pod network, so the
 	// external (NodePort) flavour is required — a ClusterIP endpoint is simply unroutable there.
-	osInfo, err := objectstore.GetExternalObjectStore(cs, "default", "extstore0", "s3snapshots")
+	osInfo, err := objectstore.GetSharedExternalObjectStore(cs, "extstore0", "s3snapshots")
 	if err != nil {
 		t.Fatalf("setting up object store: %v", err)
 	}
