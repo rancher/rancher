@@ -12,15 +12,18 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	v1apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/fake"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/util/secret"
 )
 
 func Test_getBootstrapSecret(t *testing.T) {
@@ -364,6 +367,204 @@ func TestReconcileMachinePreTerminateAnnotationReleasesMachineWithoutNodeRef(t *
 	result, err := h.reconcileMachinePreTerminateAnnotation(bootstrap)
 	assert.NoError(t, err)
 	assert.Same(t, bootstrap, result)
+}
+
+func TestReconcileMachinePreTerminateAnnotationWaitsForCAPIConnectivity(t *testing.T) {
+	const (
+		namespace       = "fleet-default"
+		bootstrapName   = "bootstrap-1"
+		machineName     = "machine-1"
+		clusterName     = "cluster"
+		controlPlaneRef = "cp"
+	)
+
+	// The kubeconfig points at a port nothing listens on, so SafelyRemoved fails fast with connection refused.
+	unreachableKubeconfig := []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: c
+  cluster:
+    server: https://127.0.0.1:1
+contexts:
+- name: c
+  context:
+    cluster: c
+    user: u
+current-context: c
+users:
+- name: u
+  user:
+    token: test
+`)
+
+	probe := func(status metav1.ConditionStatus) []metav1.Condition {
+		return []metav1.Condition{{Type: capi.ClusterRemoteConnectionProbeCondition, Status: status, Reason: "test"}}
+	}
+
+	tests := []struct {
+		name               string
+		bootstrapDeleting  bool
+		probeConditions    []metav1.Condition
+		expectGate         bool
+		expectSafeRemovErr bool
+	}{
+		{
+			name:              "probe false holds the deleting bootstrap",
+			bootstrapDeleting: true,
+			probeConditions:   probe(metav1.ConditionFalse),
+			expectGate:        true,
+		},
+		{
+			name:              "missing probe condition holds the deleting bootstrap",
+			bootstrapDeleting: true,
+			expectGate:        true,
+		},
+		{
+			name:              "unknown probe condition holds the deleting bootstrap",
+			bootstrapDeleting: true,
+			probeConditions:   probe(metav1.ConditionUnknown),
+			expectGate:        true,
+		},
+		{
+			name:               "probe true passes the gate",
+			bootstrapDeleting:  true,
+			probeConditions:    probe(metav1.ConditionTrue),
+			expectSafeRemovErr: true,
+		},
+		{
+			name:               "gate does not apply when the bootstrap is not deleting",
+			bootstrapDeleting:  false,
+			probeConditions:    probe(metav1.ConditionFalse),
+			expectSafeRemovErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+			machineClient := ctrlfake.NewMockClientInterface[*capi.Machine, *capi.MachineList](ctrl)
+			capiClusterCache := ctrlfake.NewMockCacheInterface[*capi.Cluster](ctrl)
+			rkeControlPlanes := ctrlfake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
+			secretCache := ctrlfake.NewMockCacheInterface[*v1.Secret](ctrl)
+			rkeBootstrap := ctrlfake.NewMockControllerInterface[*rkev1.RKEBootstrap, *rkev1.RKEBootstrapList](ctrl)
+
+			deletionTime := metav1.NewTime(time.Now())
+			machine := &capi.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              machineName,
+					Namespace:         namespace,
+					DeletionTimestamp: &deletionTime,
+					Labels: map[string]string{
+						capr.EtcdRoleLabel: "true",
+					},
+					Annotations: map[string]string{
+						capiMachinePreTerminateAnnotation: capiMachinePreTerminateAnnotationOwner,
+					},
+				},
+				Status: capi.MachineStatus{
+					NodeRef: capi.MachineNodeReference{Name: "node-1"},
+				},
+				Spec: capi.MachineSpec{ClusterName: clusterName},
+			}
+			capiCluster := &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Spec: capi.ClusterSpec{
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
+						APIGroup: rkev1.SchemeGroupVersion.Group,
+						Kind:     "RKEControlPlane",
+						Name:     controlPlaneRef,
+					},
+				},
+				Status: capi.ClusterStatus{Conditions: tt.probeConditions},
+			}
+			controlPlane := &rkev1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{Name: controlPlaneRef, Namespace: namespace},
+				Spec:       rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.30.0+rke2r1"},
+			}
+			kubeconfigSecret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: secret.Name(clusterName, secret.Kubeconfig), Namespace: namespace},
+				Data:       map[string][]byte{"value": unreachableKubeconfig},
+			}
+			replacementPlan := &v1.Secret{
+				Type: capr.SecretTypeMachinePlan,
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						capr.MachineNameLabel:      "machine-2",
+						capr.MachineNamespaceLabel: namespace,
+						capr.EtcdRoleLabel:         "true",
+						capr.InitNodeLabel:         "true",
+					},
+					Annotations: map[string]string{
+						planapi.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+						capr.JoinURLAnnotation:             "https://10.0.0.2:9345",
+					},
+				},
+			}
+			replacementMachine := &capi.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "machine-2",
+					Namespace: namespace,
+					Labels:    map[string]string{capr.EtcdRoleLabel: "true"},
+				},
+				Spec: capi.MachineSpec{ClusterName: clusterName},
+				Status: capi.MachineStatus{
+					NodeRef: capi.MachineNodeReference{Name: "node-2"},
+					Conditions: []metav1.Condition{{
+						Type:   capi.MachineNodeReadyCondition,
+						Status: metav1.ConditionTrue,
+						Reason: capi.MachineNodeReadyReason,
+					}},
+				},
+			}
+
+			machineCache.EXPECT().Get(namespace, machineName).Return(machine, nil)
+			capiClusterCache.EXPECT().Get(namespace, clusterName).Return(capiCluster, nil)
+			rkeControlPlanes.EXPECT().Get(namespace, controlPlaneRef).Return(controlPlane, nil)
+			secretCache.EXPECT().Get(namespace, capr.PlanSecretFromBootstrapName(bootstrapName)).Return(nil, apierrors.NewNotFound(v1.Resource("secrets"), bootstrapName))
+			secretCache.EXPECT().List(namespace, gomock.Any()).Return([]*v1.Secret{replacementPlan}, nil)
+			machineCache.EXPECT().Get(namespace, "machine-2").Return(replacementMachine, nil)
+			secretCache.EXPECT().Get(namespace, secret.Name(clusterName, secret.Kubeconfig)).Return(kubeconfigSecret, nil)
+			if tt.expectGate {
+				rkeBootstrap.EXPECT().EnqueueAfter(namespace, bootstrapName, 5*time.Second)
+			}
+
+			h := &handler{
+				machineCache:     machineCache,
+				machineClient:    machineClient,
+				capiClusterCache: capiClusterCache,
+				rkeControlPlanes: rkeControlPlanes,
+				secretCache:      secretCache,
+				rkeBootstrap:     rkeBootstrap,
+			}
+			bootstrap := &rkev1.RKEBootstrap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      bootstrapName,
+					Namespace: namespace,
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: capi.GroupVersion.String(),
+						Kind:       "Machine",
+						Name:       machineName,
+					}},
+				},
+				Spec: rkev1.RKEBootstrapSpec{ClusterName: clusterName},
+			}
+			if tt.bootstrapDeleting {
+				bootstrapDeletion := metav1.NewTime(time.Now())
+				bootstrap.DeletionTimestamp = &bootstrapDeletion
+			}
+
+			result, err := h.reconcileMachinePreTerminateAnnotation(bootstrap)
+			assert.Same(t, bootstrap, result)
+			if tt.expectGate {
+				assert.ErrorIs(t, err, generic.ErrSkip)
+				return
+			}
+			// Execution reached SafelyRemoved, which fails against the unreachable server.
+			assert.Error(t, err)
+			assert.NotErrorIs(t, err, generic.ErrSkip)
+		})
+	}
 }
 
 func TestReplacementEtcdMachineReady(t *testing.T) {

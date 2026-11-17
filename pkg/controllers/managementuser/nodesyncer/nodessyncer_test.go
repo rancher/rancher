@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,6 +85,22 @@ func TestReconcileAll_ClusterStatusEdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanStatusRetainsVoterInternallyAndProjectsOnlyReady(t *testing.T) {
+	ready := corev1.NodeCondition{Type: corev1.NodeReady, Status: corev1.ConditionTrue, Reason: "Ready", Message: "node is ready", LastHeartbeatTime: metav1.NewTime(time.Unix(10, 0)), LastTransitionTime: metav1.NewTime(time.Unix(9, 0))}
+	voter := corev1.NodeCondition{Type: corev1.NodeConditionType("EtcdIsVoter"), Status: corev1.ConditionTrue, Reason: "MemberNotLearner", Message: "member is voting", LastHeartbeatTime: metav1.NewTime(time.Unix(12, 0)), LastTransitionTime: metav1.NewTime(time.Unix(11, 0))}
+	other := corev1.NodeCondition{Type: corev1.NodeMemoryPressure, Status: corev1.ConditionFalse, Reason: "KubeletHasSufficientMemory"}
+	node := &v3.Node{Status: v3.NodeStatus{InternalNodeStatus: corev1.NodeStatus{Conditions: []corev1.NodeCondition{ready, voter, other}}}}
+
+	cleanStatus(node)
+
+	assert.Equal(t, []corev1.NodeCondition{ready, voter}, node.Status.InternalNodeStatus.Conditions)
+	require.Len(t, node.Status.Conditions, 1)
+	assert.Equal(t, string(corev1.NodeReady), string(node.Status.Conditions[0].Type))
+	assert.Equal(t, string(corev1.ConditionTrue), string(node.Status.Conditions[0].Status))
+	assert.Equal(t, ready.Reason, node.Status.Conditions[0].Reason)
+	assert.Equal(t, ready.Message, node.Status.Conditions[0].Message)
 }
 
 func TestDetermineNodeRole(t *testing.T) {

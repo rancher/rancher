@@ -1047,6 +1047,12 @@ func Test_Provisioning_SetB_Single_Node_Drain_Unhealthy_Replacement(t *testing.T
 		return err == nil && !m.DeletionTimestamp.IsZero() && m.Annotations[preTerminateHook] != ""
 	}, 15*time.Minute, 2*time.Second, "initial machine never entered protected deletion")
 
+	// Promotion to init node happens a few reconciles after deletion starts, so wait for it before checking the label.
+	require.Eventually(t, func() bool {
+		s, err := clients.Core.Secret().Get(secondMachine.Namespace, planSecretName, metav1.GetOptions{})
+		return err == nil && s.Labels[capr.InitNodeLabel] == "true"
+	}, 5*time.Minute, 2*time.Second, "replacement was never promoted to init node")
+
 	// Keep the fault active across multiple reconciliation cycles and verify the old Machine and Node remain protected.
 	protectionDeadline := time.Now().Add(45 * time.Second)
 	for time.Now().Before(protectionDeadline) {

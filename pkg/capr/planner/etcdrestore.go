@@ -442,6 +442,23 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 	}
 }
 
+// generateCreateEtcdTombstoneIfPresentInstruction is used on the restore target only. Its etcd data is always
+// removed by the Restore plan, so a target that never initialized etcd (a replacement that couldn't join a dead
+// node) has nothing to mark. A real touch failure on an existing directory still fails the plan.
+func generateCreateEtcdTombstoneIfPresentInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
+	return plan.OneTimeInstruction{
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "create-etcd-tombstone",
+			Command: "sh",
+			Args: []string{
+				"-c", `[ ! -d "$1" ] || touch "$1/tombstone"`,
+				"create-etcd-tombstone",
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd"),
+			},
+		},
+	}
+}
+
 func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) string {
 	return path.Join(capr.GetDistroDataDir(controlPlane), etcdRestoreBinPrefix, file)
 }
@@ -666,6 +683,13 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		return errWaitingf("waiting for %d etcd machines to delete", deletingEtcdNodes)
 	}
 
+	// The stop plans give the restore target the tolerant tombstone, and the Restore phase needs exactly one
+	// init node. Check it here, before any service is stopped. Deleting machines are already gone, so a stale
+	// mark on one of them was cleared by its force-removal.
+	if len(collect(clusterPlan, isInitNode)) != 1 {
+		return fmt.Errorf("more than one init node existed, cannot run etcd snapshot restore")
+	}
+
 	servers := collect(clusterPlan, anyRoleWithoutWindows)
 	updated := false
 	for _, server := range servers {
@@ -679,7 +703,11 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		// Clean up previous restoration tracking attempts before starting this restoration.
 		stopPlan.Instructions = append(stopPlan.Instructions, generateIdempotencyCleanupInstruction(controlPlane, "etcd-restore"))
 		if isEtcd(server) {
-			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
+			if isInitNode(server) {
+				stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneIfPresentInstruction(controlPlane))
+			} else {
+				stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
+			}
 		}
 		if roleOr(isEtcd, isControlPlane)(server) {
 			stopPlan.Instructions = append(stopPlan.Instructions, generateRemoveTLSDirInstruction(controlPlane))
