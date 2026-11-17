@@ -1,7 +1,6 @@
 package operations
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -71,17 +70,21 @@ func GatherDownstreamDebugData(clients *clients.Clients, c *v1.Cluster) (string,
 // PrintDebugData prints the local and downstream debug data bundles for the cluster. operation describes what failed and is
 // included in the printed header.
 func PrintDebugData(clients *clients.Clients, c *v1.Cluster, operation string) {
+	fmt.Printf("cluster %s %s failed\n", c.Name, operation)
+
 	data, newErr := cluster.GatherDebugData(clients, c)
 	if newErr != nil {
-		logrus.Error(newErr)
+		logrus.Errorf("failed to gather test data bundle for cluster %s/%s: %v", c.Namespace, c.Name, newErr)
+	} else {
+		fmt.Printf("cluster %s test data bundle: \n%s\n", c.Name, data)
 	}
-	fmt.Printf("cluster %s %s failed\ncluster %s test data bundle: \n%s\n", c.Name, operation, c.Name, data)
 
 	downstreamData, newErr := GatherDownstreamDebugData(clients, c)
 	if newErr != nil {
-		logrus.Error(newErr)
+		logrus.Errorf("failed to gather downstream test data bundle for cluster %s/%s: %v", c.Namespace, c.Name, newErr)
+	} else {
+		fmt.Printf("cluster %s downstream test data bundle: \n%s\n", c.Name, downstreamData)
 	}
-	fmt.Printf("cluster %s downstream test data bundle: \n%s\n", c.Name, downstreamData)
 }
 
 func listPods(clientset kubernetes.Interface, namespace, selector string) (*corev1.PodList, error) {
@@ -118,21 +121,10 @@ func populateDownstreamPodLogs(clientset kubernetes.Interface, pod corev1.Pod) m
 	return logMap
 }
 
-// getDownstreamPodLogs gathers the logs from the specified downstream pod in a manner similar to `kubectl logs`, encoded the same
-// way as cluster.GatherDebugData pod logs.
+// getDownstreamPodLogs gathers the logs from the specified downstream pod, encoded the same way as cluster.GatherDebugData pod
+// logs.
 func getDownstreamPodLogs(clientset kubernetes.Interface, podNamespace, podName string, previous bool) (string, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), downstreamDebugTimeout)
 	defer cancel()
-	stream, err := clientset.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{Previous: previous}).Stream(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error streaming downstream pod logs for pod %s/%s: %v", podNamespace, podName, err)
-	}
-	defer stream.Close()
-
-	reader := bufio.NewScanner(stream)
-	var logs string
-	for reader.Scan() {
-		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
-	}
-	return snapshotutil.CompressInterface(logs)
+	return cluster.PodLogs(ctx, clientset, podNamespace, podName, &corev1.PodLogOptions{Previous: previous})
 }

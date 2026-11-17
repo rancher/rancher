@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"net"
 	"os"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -791,21 +793,31 @@ func ExecOnPodContext(ctx context.Context, clients *clients.Clients, namespace, 
 	return stdout.String(), nil
 }
 
+// podLogsTimeout bounds a single pod log fetch on the failure path, so a wedged stream can't stall cleanup.
+const podLogsTimeout = time.Minute
+
 // getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`
 func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
-	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
-	stream, err := plr.Stream(context.TODO())
+	ctx, cancel := context.WithTimeout(clients.Ctx, podLogsTimeout)
+	defer cancel()
+	return PodLogs(ctx, clients.K8s, podNamespace, podName, &corev1.PodLogOptions{})
+}
+
+// PodLogs gathers the logs of a pod in a manner similar to `kubectl logs`, compressed the same way as GatherDebugData's pod
+// logs. If the stream breaks partway, the logs read so far are kept and the read error is appended to them.
+func PodLogs(ctx context.Context, kube kubernetes.Interface, podNamespace, podName string, opts *corev1.PodLogOptions) (string, error) {
+	stream, err := kube.CoreV1().Pods(podNamespace).GetLogs(podName, opts).Stream(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error streaming pod logs for pod %s/%s: %v", podNamespace, podName, err)
+		return "", fmt.Errorf("error streaming pod logs for pod %s/%s: %w", podNamespace, podName, err)
 	}
 	defer stream.Close()
 
-	reader := bufio.NewScanner(stream)
-	var logs string
-	for reader.Scan() {
-		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
+	logs, err := io.ReadAll(stream)
+	if err != nil {
+		logrus.Errorf("error reading pod logs for pod %s/%s, keeping the %d bytes read: %v", podNamespace, podName, len(logs), err)
+		logs = fmt.Appendf(logs, "\nerror reading logs: %v\n", err)
 	}
-	return snapshotutil.CompressInterface(logs)
+	return snapshotutil.CompressInterface(strings.ReplaceAll(string(logs), "\n", "SnewlineG"))
 }
 
 // countPodLogRegexOccurances gathers the logs from the specified pod in a manner similar to `kubectl logs` and counts the number of times the log matches the given regex.
@@ -821,10 +833,15 @@ func countPodLogRegexOccurances(clients *clients.Clients, podNamespace, podName,
 	re := regexp.MustCompile(regex)
 
 	reader := bufio.NewScanner(stream)
+	// Allow long lines, which the default 64KiB limit would stop the scan on and undercount.
+	reader.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for reader.Scan() {
 		if re.Match(reader.Bytes()) {
 			count++
 		}
+	}
+	if err := reader.Err(); err != nil {
+		return count, fmt.Errorf("error reading pod logs for pod %s/%s: %w", podNamespace, podName, err)
 	}
 	return count, nil
 }
@@ -846,18 +863,12 @@ func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
 		return "", nil
 	}
 
-	file, err := os.Open(destFile)
+	logs, err := os.ReadFile(destFile)
 	if err != nil {
 		logrus.Errorf("error retrieving destination file %s: %v", destFile, err)
 		return "", nil
 	}
-	defer file.Close()
-	reader := bufio.NewScanner(file)
-	var logs string
-	for reader.Scan() {
-		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
-	}
-	return snapshotutil.CompressInterface(logs)
+	return snapshotutil.CompressInterface(strings.ReplaceAll(string(logs), "\n", "SnewlineG"))
 }
 
 // GatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
@@ -1040,6 +1051,27 @@ echo "===== crictl ps -a"; cri ps -a 2>&1`,
 done`,
 }
 
+const (
+	// importedDebugGatherTimeout caps the whole of GatherImportedDownstreamData. It runs in the clients' OnClose hooks, so
+	// without a cap a cluster whose nodes don't answer could hold up cleanup for each node in turn.
+	importedDebugGatherTimeout = 5 * time.Minute
+
+	// importedDiskCommandTimeout and importedKubectlTimeout are passed to timeout(1) inside the node pod. The exec itself
+	// gets a little longer, so the in-pod timeout fires first and its partial output is kept.
+	importedDiskCommandTimeout = 120 * time.Second
+	importedKubectlTimeout     = 60 * time.Second
+	importedExecGrace          = 15 * time.Second
+)
+
+// execOnPodWithTimeout runs cmd on the pod under timeout(1), and bounds the exec stream as well in case it wedges.
+func execOnPodWithTimeout(ctx context.Context, clients *clients.Clients, pod corev1.Pod, timeout time.Duration, cmd ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout+importedExecGrace)
+	defer cancel()
+
+	seconds := strconv.Itoa(int(timeout.Seconds()))
+	return ExecOnPodContext(ctx, clients, pod.Namespace, pod.Name, append([]string{"timeout", seconds}, cmd...)...)
+}
+
 // GatherImportedDownstreamData collects the downstream cluster's view of an imported cluster whose nodes run as pods in
 // namespace, focused on which pods are running and what the cattle-cluster-agent logged. It is gathered two ways so that as
 // much as possible survives a broken cluster:
@@ -1053,6 +1085,9 @@ done`,
 func GatherImportedDownstreamData(clients *clients.Clients, namespace string) map[string]any {
 	data := map[string]any{}
 
+	ctx, cancel := context.WithTimeout(clients.Ctx, importedDebugGatherTimeout)
+	defer cancel()
+
 	nodePods, err := clients.Core.Pod().List(namespace, metav1.ListOptions{LabelSelector: ImportedNodeNameLabel})
 	if err != nil {
 		data["errors"] = []string{fmt.Sprintf("failed to list imported node pods in %s: %v", namespace, err)}
@@ -1061,15 +1096,15 @@ func GatherImportedDownstreamData(clients *clients.Clients, namespace string) ma
 
 	nodes := map[string]map[string]string{}
 	for _, nodePod := range nodePods.Items {
-		nodes[nodePod.Name] = gatherImportedNodeDiskData(clients, nodePod)
+		nodes[nodePod.Name] = gatherImportedNodeDiskData(ctx, clients, nodePod)
 	}
 	data["nodes"] = nodes
 
 	var errs []string
 	for _, nodePod := range nodePods.Items {
 		kubectl := func(args ...string) (string, error) {
-			cmd := append([]string{"timeout", "60", "sh", "-c", importedKubectlScript, "kubectl"}, args...)
-			return ExecOnPod(clients, nodePod.Namespace, nodePod.Name, cmd...)
+			cmd := append([]string{"sh", "-c", importedKubectlScript, "kubectl"}, args...)
+			return execOnPodWithTimeout(ctx, clients, nodePod, importedKubectlTimeout, cmd...)
 		}
 
 		out, err := kubectl("get", "pods", "-A", "-o", "json")
@@ -1118,19 +1153,21 @@ func GatherImportedDownstreamData(clients *clients.Clients, namespace string) ma
 
 // gatherImportedNodeDiskData runs importedNodeDiskCommands on a node pod. Failures are recorded in place of the output so one
 // broken command doesn't hide the rest.
-func gatherImportedNodeDiskData(clients *clients.Clients, nodePod corev1.Pod) map[string]string {
+func gatherImportedNodeDiskData(ctx context.Context, clients *clients.Clients, nodePod corev1.Pod) map[string]string {
 	logs := map[string]string{
 		"nodeName": nodePod.Labels[ImportedNodeNameLabel],
 	}
 	// The node pod's stdout carries rancher-system-agent's output.
-	if podLogs, err := getPodLogs(clients, nodePod.Namespace, nodePod.Name); err != nil {
+	logsCtx, cancel := context.WithTimeout(ctx, podLogsTimeout)
+	podLogs, err := PodLogs(logsCtx, clients.K8s, nodePod.Namespace, nodePod.Name, &corev1.PodLogOptions{})
+	cancel()
+	if err != nil {
 		logrus.Errorf("failed to collect logs for pod %s/%s: %v", nodePod.Namespace, nodePod.Name, err)
 	} else {
 		logs["logs"] = podLogs
 	}
 	for key, cmd := range importedNodeDiskCommands {
-		// Bound each exec so a wedged node can't stall the failure path indefinitely.
-		out, err := ExecOnPod(clients, nodePod.Namespace, nodePod.Name, "timeout", "120", "sh", "-c", importedNodeEnvScript+cmd)
+		out, err := execOnPodWithTimeout(ctx, clients, nodePod, importedDiskCommandTimeout, "sh", "-c", importedNodeEnvScript+cmd)
 		if err != nil {
 			out = fmt.Sprintf("%s\nerror collecting %s: %v", out, key, err)
 		}

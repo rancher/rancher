@@ -270,11 +270,12 @@ func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) s
 	return fmt.Sprintf("/var/lib/rancher/%s", distro)
 }
 
-func handleError(t *testing.T, clients *clients.Clients, name string, err error) {
+// handleError fails the test if err is set. The debug bundle is not included: setUpImportedCluster registers
+// printDebugDataOnFailure for every imported cluster, which prints a fuller one, with the downstream data, on close.
+func handleError(t *testing.T, _ *clients.Clients, name string, err error) {
+	t.Helper()
 	if err != nil {
-		//nolint:revive
-		err = fmt.Errorf("cluster %s operation wait failed on: %w\ncluster %s test data bundle: \n%s\n", name, err, name, gatherDebugData(clients, name, ""))
-		t.Fatal(err)
+		t.Fatalf("cluster %s operation wait failed on: %v", name, err)
 	}
 }
 
