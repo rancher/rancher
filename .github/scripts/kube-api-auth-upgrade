@@ -2,7 +2,7 @@
 set -e
 VERSION=$KUBE_API_AUTH_VERSION
 
-# 2.16 source of truth
+# source of truth
 FILE=build.yaml
 COUNT=$(grep -c "rancher/kube-api-auth:v.\+$" "$FILE" || true)
 if [ "$COUNT" != "1" ]; then
