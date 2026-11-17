@@ -20,7 +20,7 @@ Row keys are the environment variable names the workflow reads (`V2PROV_TEST_DIS
 | `basic` | general, custom and machine provisioning, fleet, agent | `general/`, `custom/`, `machineprovisioning/`, `fleet/`, `autoscaler/` |
 | `operations` | day-2 ops (cert rotation, encryption key rotation, etcd snapshot, drain) on custom and MP clusters | `custom/`, `machineprovisioning/` |
 | `imported` | imported cluster lifecycle and day-2 ops | `imported/` |
-| `prebootstrap` | prebootstrap secrets flow, on k3s (rke2 is covered by basic's `General` row) | `prebootstrap/` |
+| `prebootstrap` | prebootstrap secrets flow, on both dists | `prebootstrap/` |
 | `full` (paths only) | core code where any change can break all provisioning: planner, plan, rkecontrolplane, rkecluster, the v2prov framework, the runner | n/a |
 | `skip` (paths only) | provisioning-related code with no v2prov coverage, listed so nobody adds it to a scope by accident | n/a |
 | `nightly` (explicit) | everything that should run on merged code, once per day per listed branch | all |
@@ -34,12 +34,12 @@ The test name decides which row picks it up. Prefer giving a test the right name
 
 | Prefix | Where it runs |
 |---|---|
-| `Test_General_*` | basic (rke2 only), nightly (rke2 only). `Test_General_PreBootstrap_*` also runs on k3s via the `prebootstrap` scope and a k3s nightly row |
+| `Test_General_*` | basic (rke2 only, and only the names its row enumerates, so a new `General` test needs adding there), nightly (rke2 only). `Test_General_PreBootstrap_*` runs in the `prebootstrap` scope on both dists instead of basic, plus a k3s nightly row |
 | `Test_Fleet_*` | basic (rke2 only), nightly (rke2 only) |
 | `Test_Provisioning_SetA_*`, `Test_Provisioning_Custom_SetA_*` | basic (both dists), nightly, kdm |
 | `Test_Provisioning_SetB_*`, `Test_Provisioning_Custom_SetB_*` | nightly and kdm only |
 | `Test_Operation_SetA_*` | operations (both), nightly, kdm |
-| `Test_Operation_SetB_*` | operations (k3s all; rke2 split into a parallel `EtcdSnapshotOperationsOnNew` row and one named test), nightly, kdm |
+| `Test_Operation_SetB_*` | operations (k3s in one row; rke2 split across several rows, see the config), nightly, kdm |
 | `Test_Operation_SetC_*` | operations (k3s only), nightly (k3s only), kdm (both dists, since kdm rows set no dist) |
 | `Test_Imported_Operation_SetD_*` | imported, but only the tests named explicitly in its rows; nightly lists most of the rest by name |
 | `Test_Imported_Operation_SetE_*` | nightly only (heavy multi-node restore work) |
@@ -71,7 +71,7 @@ kdm is for behavior that changes with the Kubernetes version: etcd snapshot and 
 - `V2PROV_TEST_PARALLELISM` becomes `go test -parallel`. It only affects tests that call `t.Parallel()`. Setting it on a row where no test does is a no-op.
 - `V2PROV_TEST_CPUS` only picks the runner label (`runner=<cpus>cpu-linux-x64`). Default is 16. The imported rows that run 1-node tests one at a time use 8. Larger multi-node or parallel rows need 16.
 - `-failfast` is on: one failure stops the rest of that shard. Smaller shards fail more precisely.
-- Runner disk matters. Nightly sets `meta.V2PROV_RUNNER_FAMILY: c6id` (local NVMe); PR rows run on c7i-flex with EBS unless the row sets a family. The imported etcd tests are limited by disk writes and run about 25% faster on NVMe, so nightly timings understate a PR shard on EBS that runs them.
+- Runner disk matters. A row runs on c7i-flex with EBS unless it or its scope's `meta` sets `V2PROV_RUNNER_FAMILY` (c6id gives local NVMe). Check the config for which rows set one; nightly's meta currently doesn't (see the comment there). The imported etcd tests are limited by disk writes and run about 25% faster on NVMe. `fetch-timings.sh` reports each shard's `family`, so compare timings from the same family, and scale them when the target row runs on the other one.
 
 When nightly timing data isn't available for the target branch, estimate with node count and the closest existing test, and say so to the author.
 
@@ -101,7 +101,6 @@ When nightly timing data isn't available for the target branch, estimate with no
 
 - **Dead path.** `full` lists `^pkg/controllers/provisioningv2/rke2/`, which matches no tracked file (`DEAD-PATH`).
 - **Orphans.** `Test_Autoscaling_Provisioning`, the `ImportedServerJoinOutsideCertificateSANs` and `StaleAddressOutsideLeaderCertificate` SetD tests, `...LocalHAIPv6`, and the six `CAPRKE2Docker*` SetE tests match no row. The CAPRKE2 and IPv6 tests are deliberately local-only.
-- **No-op parallelism.** The rke2 imported row `imported[4]` sets `V2PROV_TEST_PARALLELISM: 3`, but none of its tests call `t.Parallel()`.
-- **Nightly is near the cap.** 24 of 25 rows. This isn't reported as a problem, but leaves room for one more row.
+- **Nightly is near the cap.** It isn't reported as a problem, but `check-coverage.sh` prints the current count under "Matrix capacity". Check it before adding a nightly row.
 
 Anything else the script reports that isn't caused by the author's change is new drift. Offer a fix, and apply it only if the author agrees.

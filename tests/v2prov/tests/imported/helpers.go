@@ -129,7 +129,7 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 	printDebugDataOnFailure(t, clients, mgmtCluster.Name, ns.Name)
 
 	importCmd, err := cluster.ImportCommand(clients, mgmtCluster)
-	handleError(t, clients, mgmtCluster.Name, err)
+	handleError(t, mgmtCluster.Name, err)
 	assert.NotEmpty(t, importCmd)
 
 	// Build the env prefix once — every kubectl invocation inside the imported cluster needs
@@ -194,7 +194,7 @@ func setUpImportedClusterWithHook(t *testing.T, clients *clients.Clients, displa
 		mgmtCluster = obj.(*v3.Cluster)
 		return v3.ClusterConditionReady.IsTrue(mgmtCluster), nil
 	})
-	handleError(t, clients, mgmtCluster.Name, err)
+	handleError(t, mgmtCluster.Name, err)
 	endPhase()
 
 	fx.mgmtCluster = mgmtCluster
@@ -272,7 +272,7 @@ func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) s
 
 // handleError fails the test if err is set. The debug bundle is not included: setUpImportedCluster registers
 // printDebugDataOnFailure for every imported cluster, which prints a fuller one, with the downstream data, on close.
-func handleError(t *testing.T, _ *clients.Clients, name string, err error) {
+func handleError(t *testing.T, name string, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("cluster %s operation wait failed on: %v", name, err)

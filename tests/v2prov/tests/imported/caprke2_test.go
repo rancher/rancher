@@ -197,10 +197,6 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, ekrOp.Status.Phase)
 }
 
-// pickCAPRKE2InitMachineName returns the name of the newest control-plane CAPI Machine in the
-// cluster. "Newest" matters after restore/EKR churn: earlier machines may have been rolled and
-// their snapshot CRs may no longer exist, so picking the freshest one gives the most reliable
-// snapshot lookup. Fails the test if no control-plane machine is found.
 // caprke2Kubectl returns an operations.Kubectl that runs on the newest control-plane machine, picked
 // on every call so it follows machine replacement.
 func caprke2Kubectl(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2Fixture) operations.Kubectl {
@@ -210,6 +206,10 @@ func caprke2Kubectl(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2Fixtur
 	}
 }
 
+// pickCAPRKE2InitMachineName returns the name of the newest control-plane CAPI Machine in the
+// cluster. "Newest" matters after restore/EKR churn: earlier machines may have been rolled and
+// their snapshot CRs may no longer exist, so picking the freshest one gives the most reliable
+// snapshot lookup. Fails the test if no control-plane machine is found.
 func pickCAPRKE2InitMachineName(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2Fixture) string {
 	t.Helper()
 	machines, err := cs.CAPI.Machine().List(fx.Namespace, metav1.ListOptions{

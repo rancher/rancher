@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -235,17 +234,13 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRolesS3(t 
 
 	poll := 5 * time.Second
 	deadline := 10 * time.Minute
-	t.Log("waiting for etcd config to apply to nodes, waiting for up to 10 minutes")
+	t.Logf("waiting for etcd config to apply to nodes, waiting for up to %s", deadline)
 
 	// poll for config application. Using a watch can be tricky as there isn't a clean label to filter on
 	// to limit the output to the current test fixture.
 	err = utilwait.PollUntilContextTimeout(cs.Ctx, poll, deadline, true, func(ctx context.Context) (bool, error) {
 		var nodes apimgmtv3.NodeList
 		err := cs.Client.List(ctx, &nodes, client.InNamespace(fx.mgmtCluster.Name))
-		if apierrors.IsNotFound(err) {
-			t.Log("nodes not found yet")
-			return false, nil
-		}
 		if err != nil {
 			return false, err
 		}

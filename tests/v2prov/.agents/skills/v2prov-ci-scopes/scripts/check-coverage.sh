@@ -38,9 +38,20 @@ TIMEOUT_FORMAT='^[0-9]+[mh]$'
 
 MODE=table
 TEST_NAME=""
+# require_value exits with a usage error when flag has no value after it. Without this,
+# 'shift 2' on the last argument fails without shifting and the parse loop never ends.
+require_value() {
+  local flag="$1"
+  local remaining="$2"
+  if [ "$remaining" -lt 2 ]; then
+    echo "error: $flag requires a value" >&2
+    exit 2
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    --test)     TEST_NAME="${2:-}"; MODE=test; shift 2 ;;
+    --test)     require_value "$1" "$#"; TEST_NAME="$2"; MODE=test; shift 2 ;;
     --problems) MODE=problems; shift ;;
     --json)     MODE=json; shift ;;
     -h|--help)  sed -n '4,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;

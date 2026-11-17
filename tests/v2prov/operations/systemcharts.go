@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -32,7 +34,14 @@ const (
 	// systemChartsSettleTimeout covers the initial clone of rancher-charts plus one 5 minute ClusterRepo retry backoff.
 	systemChartsSettleTimeout = 20 * time.Minute
 	systemChartsSettlePoll    = 30 * time.Second
+
+	// systemChartsRepoMissingTimeout is how long the rancher-charts ClusterRepo, or its CRD, may be missing before the wait
+	// gives up. The cluster agent creates both shortly after it connects, so an absence this long means it won't.
+	systemChartsRepoMissingTimeout = 5 * time.Minute
 )
+
+// errRancherChartsMissing is returned when the downstream cluster has no rancher-charts ClusterRepo, or no ClusterRepo CRD.
+var errRancherChartsMissing = errors.New("clusterrepo rancher-charts not found")
 
 // Kubectl runs kubectl against the downstream cluster with args and returns its stdout.
 type Kubectl func(ctx context.Context, args ...string) ([]byte, error)
@@ -72,9 +81,23 @@ func waitForSystemChartsSettled(t *testing.T, get getRaw) {
 
 	start := time.Now()
 	var reason string
+	var repoMissingSince time.Time
 	err := wait.PollUntilContextCancel(ctx, systemChartsSettlePoll, true, func(ctx context.Context) (bool, error) {
 		var err error
 		reason, err = systemChartsUnsettledReason(ctx, get)
+		if errors.Is(err, errRancherChartsMissing) {
+			if repoMissingSince.IsZero() {
+				repoMissingSince = time.Now()
+			}
+			reason = err.Error()
+			if missing := time.Since(repoMissingSince); missing >= systemChartsRepoMissingTimeout {
+				reason = fmt.Sprintf("%s for %s", reason, missing.Round(time.Second))
+				return false, err
+			}
+			t.Log("system charts not settled before etcd snapshot, reason: " + reason)
+			return false, nil
+		}
+		repoMissingSince = time.Time{}
 		if err != nil {
 			reason = err.Error()
 			return false, err
@@ -91,36 +114,48 @@ func waitForSystemChartsSettled(t *testing.T, get getRaw) {
 }
 
 // systemChartsUnsettledReason returns why the downstream cluster is not safe to snapshot, or "" if it is.
-// It returns an error only when the cluster can't settle on its own.
+// It returns an error only when the cluster can't settle on its own, or errRancherChartsMissing, which the caller
+// tolerates for systemChartsRepoMissingTimeout.
 func systemChartsUnsettledReason(ctx context.Context, get getRaw) (string, error) {
-	if reason := rancherChartsIndexMissingReason(ctx, get); reason != "" {
-		return reason, nil
+	reason, err := rancherChartsIndexMissingReason(ctx, get)
+	if err != nil || reason != "" {
+		return reason, err
 	}
 	return pendingSystemChartReleases(ctx, get)
 }
 
-// rancherChartsIndexMissingReason returns why rancher-charts has no usable index, or "" if it has one.
+// rancherChartsIndexMissingReason returns why rancher-charts has no usable index, or "" if it has one. It returns
+// errRancherChartsMissing when the ClusterRepo or its CRD doesn't exist.
 //
 // Only a missing index is unsafe to snapshot. Once an index exists, a failed refresh (Downloaded=False,
 // numberOfRetries > 0) or a pending follow-up reconcile (shouldNotSkip) leaves it in place, and a restored
 // copy of that status is reconciled right away, so system charts can still install from it. Waiting on
 // those instead can take longer than the timeout: retries back off 5m, ~10m, then ~20m, followed by the
 // 1h refresh interval.
-func rancherChartsIndexMissingReason(ctx context.Context, get getRaw) string {
+func rancherChartsIndexMissingReason(ctx context.Context, get getRaw) (string, error) {
 	repo := &catalogv1.ClusterRepo{}
 	if err := getJSON(ctx, get, "/apis/catalog.cattle.io/v1/clusterrepos/rancher-charts", repo); err != nil {
-		return err.Error()
+		if isNotFound(err) {
+			return "", fmt.Errorf("%w: %v", errRancherChartsMissing, err)
+		}
+		return err.Error(), nil
 	}
 
 	if repo.Status.IndexConfigMapName == "" {
-		return fmt.Sprintf("clusterrepo rancher-charts has no index configmap yet (downloaded: %s)", condition.Cond(catalogv1.RepoDownloaded).GetMessage(repo))
+		return fmt.Sprintf("clusterrepo rancher-charts has no index configmap yet (downloaded: %s)", condition.Cond(catalogv1.RepoDownloaded).GetMessage(repo)), nil
 	}
 
 	cm := fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", repo.Status.IndexConfigMapNamespace, repo.Status.IndexConfigMapName)
 	if _, err := get(ctx, cm); err != nil {
-		return fmt.Sprintf("getting clusterrepo rancher-charts index configmap: %v", err)
+		return fmt.Sprintf("getting clusterrepo rancher-charts index configmap: %v", err), nil
 	}
-	return ""
+	return "", nil
+}
+
+// isNotFound reports whether err is a NotFound from the API server, either as a client error or as kubectl's
+// "Error from server (NotFound)" output. A missing CRD is a NotFound too.
+func isNotFound(err error) bool {
+	return apierrors.IsNotFound(err) || strings.Contains(err.Error(), "(NotFound)")
 }
 
 // pendingSystemChartReleases returns which system chart releases are mid-operation, or "" if none are.

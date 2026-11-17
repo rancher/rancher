@@ -79,7 +79,7 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded, nil
 	})
 	if err != nil {
-		handleError(t, clients, clusterRef.Name, err)
+		handleError(t, clusterRef.Name, err)
 	}
 
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)

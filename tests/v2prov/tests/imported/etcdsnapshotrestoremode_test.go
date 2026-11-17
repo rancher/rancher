@@ -123,7 +123,7 @@ func waitForReportedVersion(t *testing.T, clients *clients.Clients, c *mgmtv3.Cl
 		upgrading := mgmtv3.ClusterConditionUpgraded.IsUnknown(current) || mgmtv3.ClusterConditionUpgraded.IsFalse(current)
 		return current.Status.Version.GitVersion == version && !upgrading, nil
 	})
-	handleError(t, clients, c.Name, err)
+	handleError(t, c.Name, err)
 }
 
 // waitForImportedNodesOnVersion waits until every node of the cluster runs version, is Ready, and is
@@ -234,7 +234,7 @@ func waitForDesiredVersion(t *testing.T, clients *clients.Clients, c *mgmtv3.Clu
 	err := wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		return desiredVersion(obj.(*mgmtv3.Cluster)) == version, nil
 	})
-	handleError(t, clients, c.Name, err)
+	handleError(t, c.Name, err)
 }
 
 // assertSnapshotOffersMode fails unless the snapshot advertises mode. snapshotbackpopulate computes
@@ -831,7 +831,7 @@ func assertImportedClusterHealthy(t *testing.T, clients *clients.Clients, fx *im
 	err := wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, fx.mgmtCluster, func(obj runtime.Object) (bool, error) {
 		return mgmtv3.ClusterConditionReady.IsTrue(obj.(*mgmtv3.Cluster)), nil
 	})
-	handleError(t, clients, fx.mgmtCluster.Name, err)
+	handleError(t, fx.mgmtCluster.Name, err)
 
 	waitForImportedNodesOnVersion(t, clients, fx, version)
 }
@@ -878,7 +878,7 @@ func waitForAgentToleration(t *testing.T, clients *clients.Clients, c *mgmtv3.Cl
 	err := wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		return agentToleration(obj.(*mgmtv3.Cluster)) == key, nil
 	})
-	handleError(t, clients, c.Name, err)
+	handleError(t, c.Name, err)
 }
 
 // importedNode is one of the fixture's node pods, read back from the API server, together with the

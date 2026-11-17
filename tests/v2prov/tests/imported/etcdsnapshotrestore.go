@@ -214,7 +214,7 @@ func RunETCDSnapshotRestoreOperationTest(t *testing.T, clients *clients.Clients,
 		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded, nil
 	})
 	if err != nil {
-		handleError(t, clients, clusterRef.Name, err)
+		handleError(t, clusterRef.Name, err)
 	}
 
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
@@ -359,7 +359,7 @@ func WaitForSnapshotRestoreFailed(t *testing.T, clients *clients.Clients, op *op
 		return false, nil
 	})
 	if err != nil {
-		handleError(t, clients, op.Spec.ClusterRef.Name, err)
+		handleError(t, op.Spec.ClusterRef.Name, err)
 	}
 	return latestOp
 }

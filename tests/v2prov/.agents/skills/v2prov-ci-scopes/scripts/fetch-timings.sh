@@ -20,12 +20,14 @@
 # Output (stdout, JSON):
 #   { branch, runs:   [{run_id, head_sha, created_at, conclusion, url}],
 #     tests:  [{name, dist, median_s, samples}],
-#     shards: [{dist, regex, median_wall_s, median_test_step_s, samples}] }
+#     shards: [{dist, regex, family, median_wall_s, median_test_step_s, samples}] }
 #
 # Only passing test cases with a non-zero time are counted (a timed out or
 # never-started test reports 0). Shard times only come from successful jobs.
 # Shard wall time includes runner boot, image load and Rancher startup;
-# test_step_s is just the 'Run tests' step.
+# test_step_s is just the 'Run tests' step. family is the runner's EC2 family, read
+# from the job's runs-on label, so c6id (NVMe) and c7i-flex (EBS) shards stay
+# separate. Per-test timings are not split by family.
 #
 # Exit status: 0 ok, 2 usage/prerequisite error, 3 no nightly data for branch.
 #
@@ -40,12 +42,23 @@ BRANCH=""
 RUNS=3
 SINCE_DAYS=14
 REPO=rancher/rancher
+# require_value exits with a usage error when flag has no value after it. Without this,
+# 'shift 2' on the last argument fails without shifting and the parse loop never ends.
+require_value() {
+  local flag="$1"
+  local remaining="$2"
+  if [ "$remaining" -lt 2 ]; then
+    echo "error: $flag requires a value" >&2
+    exit 2
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    --branch)     BRANCH="${2:-}"; shift 2 ;;
-    --runs)       RUNS="${2:-}"; shift 2 ;;
-    --since-days) SINCE_DAYS="${2:-}"; shift 2 ;;
-    --repo)       REPO="${2:-}"; shift 2 ;;
+    --branch)     require_value "$1" "$#"; BRANCH="$2"; shift 2 ;;
+    --runs)       require_value "$1" "$#"; RUNS="$2"; shift 2 ;;
+    --since-days) require_value "$1" "$#"; SINCE_DAYS="$2"; shift 2 ;;
+    --repo)       require_value "$1" "$#"; REPO="$2"; shift 2 ;;
     -h|--help)    sed -n '4,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            echo "error: unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -140,7 +153,8 @@ for run_id in $(printf '%s' "$RUNS_JSON" | jq -r '.[].run_id'); do
   fi
   jq -c --argjson run "$run_id" --argjson rows "$NIGHTLY_ROWS" '
       (.name | sub("^.*Provisioning tests \\("; "") | sub("\\)$"; "")) as $values
-      | ($values | sub("(\\.\\.\\.|…)$"; "") | split(", ")) as $f
+      # The cut can land right after a ", " separator, leaving a trailing comma or space.
+      | ($values | sub(",? *(\\.\\.\\.|…)$"; "") | split(", ")) as $f
       | ([$f[] | select(test("^(k3s|rke2)$"))] | .[0]) as $dist
       | ([$f[] | select(test("^\\^?Test"))] | .[0]) as $seen
       # A row without a dist runs on both.
@@ -152,6 +166,7 @@ for run_id in $(printf '%s' "$RUNS_JSON" | jq -r '.[].run_id'); do
       | {name, dist: $dist, matches: ($matches | length),
          regex: (if ($matches | length) == 1 then $matches[0].regex else null end),
          run: $run,
+         family: ([.labels[]? | capture("family=(?<f>[^,]+)").f] | .[0] // "unknown"),
          wall: ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601)),
          test_step: (if $step and $step.started_at and $step.completed_at
                      then (($step.completed_at | fromdateiso8601) - ($step.started_at | fromdateiso8601))
@@ -162,7 +177,7 @@ for run_id in $(printf '%s' "$RUNS_JSON" | jq -r '.[].run_id'); do
       | if .matches > 1 then "warning: run \(.run): job matches \(.matches) nightly rows, skipping it: \(.name)"
         else "warning: run \(.run): job matches no nightly row in this config, skipping it: \(.name)" end' \
     "$TMP/mapped-$run_id.jsonl" >&2
-  jq -c 'select(.regex != null) | {dist, regex, run, wall, test_step}' "$TMP/mapped-$run_id.jsonl" >> "$SHARD_SAMPLES"
+  jq -c 'select(.regex != null) | {dist, regex, family, run, wall, test_step}' "$TMP/mapped-$run_id.jsonl" >> "$SHARD_SAMPLES"
 
   USED_RUNS="$(printf '%s' "$USED_RUNS" | jq --argjson all "$RUNS_JSON" --argjson id "$run_id" '. + [$all[] | select(.run_id == $id)]')"
 done
@@ -188,8 +203,8 @@ RESULT="$(jq -n \
     tests: ($tests | group_by([.name, .dist])
       | map({name: .[0].name, dist: .[0].dist, median_s: (map(.time) | median), samples: length})
       | sort_by(-.median_s)),
-    shards: ($shards | group_by([.dist, .regex])
-      | map({dist: .[0].dist, regex: .[0].regex,
+    shards: ($shards | group_by([.dist, .regex, .family])
+      | map({dist: .[0].dist, regex: .[0].regex, family: .[0].family,
              median_wall_s: (map(.wall) | median),
              median_test_step_s: (map(.test_step | select(. != null)) | median),
              samples: length})
@@ -200,6 +215,6 @@ printf '%s' "$RESULT" | jq -r '
   "branch \(.branch), runs: \(.runs | map("\(.run_id) (\(.created_at[:10]), \(.conclusion), \(.head_sha[:9]))") | join(", "))",
   "\(.tests | length) test timings, \(.shards | length) shard timings",
   "slowest shards (wall / test step, minutes):",
-  (.shards[:8][] | "  \(.dist)\t\(.median_wall_s / 60 | floor) / \(if .median_test_step_s then (.median_test_step_s / 60 | floor) else "?" end)\t\(.regex)")' >&2
+  (.shards[:8][] | "  \(.dist)\t\(.family)\t\(.median_wall_s / 60 | floor) / \(if .median_test_step_s then (.median_test_step_s / 60 | floor) else "?" end)\t\(.regex)")' >&2
 
 printf '%s\n' "$RESULT"

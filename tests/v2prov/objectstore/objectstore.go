@@ -31,6 +31,10 @@ const (
 	secretKeyTLSPrivateKey = "private.key"
 )
 
+// bucketReadyFile is created by setupMinioBucket once the bucket exists, and backs the setupbucket container's readiness
+// probe. A Running pod only means minio started, not that the bucket is there yet.
+const bucketReadyFile = "/tmp/bucket-ready"
+
 const setupMinioBucket = `
 #!/bin/sh
 
@@ -47,7 +51,7 @@ while true; do
 	fi; 
 done; 
 
-mc mb --insecure myminio/%s
+mc mb --insecure --ignore-existing myminio/%s && touch %s
 
 sleep infinity
 `
@@ -168,7 +172,7 @@ func createHelperConfigmap(clients *clients.Clients, onClose func(func()), names
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			"setup.sh": fmt.Sprintf(setupMinioBucket, secretKeyCredAccessKey, secretKeyCredSecretKey, bucketName),
+			"setup.sh": fmt.Sprintf(setupMinioBucket, secretKeyCredAccessKey, secretKeyCredSecretKey, bucketName, bucketReadyFile),
 		},
 	})
 	if apierrors.IsAlreadyExists(err) {
@@ -341,6 +345,12 @@ func getPod(clients *clients.Clients, onClose func(func()), namespace, objectSto
 					Args: []string{
 						"/helper/setup.sh",
 					},
+					ReadinessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{Command: []string{"test", "-f", bucketReadyFile}},
+						},
+						PeriodSeconds: 2,
+					},
 					VolumeMounts: []corev1.VolumeMount{{
 						Name:      "helper",
 						ReadOnly:  true,
@@ -418,8 +428,37 @@ func nodeIPs(clients *clients.Clients) ([]net.IP, error) {
 }
 
 func getObjectStore(clients *clients.Clients, namespace, identifier, bucket string, external, shared bool) (Info, error) {
+	info, pod, err := createObjectStore(clients, namespace, identifier, bucket, external, shared)
+	if err != nil {
+		return Info{}, err
+	}
+
+	// Waiting happens outside objectStoreLock, so tests sharing a store that never gets ready each time out on their own
+	// instead of queueing behind one another.
+	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, pod, func(obj runtime.Object) (bool, error) {
+		return podReady(obj.(*corev1.Pod)), nil
+	})
+	if err != nil {
+		return Info{}, fmt.Errorf("waiting for object store pod %s/%s to be ready: %w", pod.Namespace, pod.Name, err)
+	}
+	return info, nil
+}
+
+func podReady(pod *corev1.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// createObjectStore creates the objects backing a store, or finds the ones that already exist, and returns the store's
+// connection details along with its pod.
+func createObjectStore(clients *clients.Clients, namespace, identifier, bucket string, external, shared bool) (Info, *corev1.Pod, error) {
 	objectStoreLock.Lock()
 	defer objectStoreLock.Unlock()
+
 	// A shared store outlives the test that created it, so nothing it creates is deleted.
 	onClose := clients.OnClose
 	if shared {
@@ -431,18 +470,18 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 
 	cs, err := createCredSecret(clients, onClose, namespace, objectStore)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	ccName := name.SafeConcatName("cc", objectStore)
 	cc, err := createCloudCredentialSecret(clients, onClose, namespace, ccName, cs)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	_, err = createHelperConfigmap(clients, onClose, namespace, objectStore, bucket)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	serviceType := corev1.ServiceTypeClusterIP
@@ -450,18 +489,18 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 	if external {
 		serviceType = corev1.ServiceTypeNodePort
 		if extraIPs, err = nodeIPs(clients); err != nil {
-			return Info{}, err
+			return Info{}, nil, err
 		}
 	}
 
 	svc, err := createService(clients, onClose, namespace, objectStore, serviceType)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	tls, err := createTLSSecret(clients, onClose, namespace, objectStore, fmt.Sprintf(objectStoreServiceNameTemplate, objectStore, namespace), svc.Spec.ClusterIP, extraIPs)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	endpoint := fmt.Sprintf("%s:9000", svc.Spec.ClusterIP)
@@ -471,15 +510,7 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 
 	pod, err := getPod(clients, onClose, namespace, objectStore)
 	if err != nil {
-		return Info{}, err
-	}
-
-	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, pod, func(obj runtime.Object) (bool, error) {
-		pod := obj.(*corev1.Pod)
-		return pod.Status.PodIP != "" && pod.Status.Phase == corev1.PodRunning, nil
-	})
-	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	return Info{
@@ -489,5 +520,5 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 		Endpoint:            endpoint,
 		Cert:                base64.StdEncoding.EncodeToString(tls.Data[secretKeyTLSPublicCrt]),
 		CloudCredentialName: cc.Name,
-	}, nil
+	}, pod, nil
 }
