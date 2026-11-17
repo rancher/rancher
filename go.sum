@@ -631,10 +631,10 @@ github.com/rancher/dynamiclistener v0.10.1 h1:qchQyxKO6mVVcaA0YLEiWBU74kBFLD4hgW
 github.com/rancher/dynamiclistener v0.10.1/go.mod h1:ILo9CaAlVjV4hUozsU6/prNylrIVMjW4mmOwPPAC7Js=
 github.com/rancher/eks-operator v1.16.0-rc.5 h1:GWViEKbWXcOo07slj3LvL7pGwTwGHfaOnOmR2SPHu8M=
 github.com/rancher/eks-operator v1.16.0-rc.5/go.mod h1:hSFmvnRI1YL3axTpX7cpgj3IpiKtFUVdD2ZIPpOMAD4=
-github.com/rancher/fleet/pkg/apis v0.17.0-rc.5 h1:hwGw6PPiFp8mylp9PNowVG3cP4Tl4BbO6EtOBlW4JMw=
-github.com/rancher/fleet/pkg/apis v0.17.0-rc.5/go.mod h1:Mt7+L4EAGtpUACf6Nzc+qLVxKmG39c0iyNnIRrRRFW4=
-github.com/rancher/fleet/pkg/helmvalues v0.17.0-rc.5 h1:laHYZPFq1jhU8wEkHfsYBsPbXlzF8idGsncAkDIsb+w=
-github.com/rancher/fleet/pkg/helmvalues v0.17.0-rc.5/go.mod h1:RzpSPIJ3BHRj/viNPBJH1RLpxopu/5Y/iWTBqQcPXzo=
+github.com/rancher/fleet/pkg/apis v0.17.0-rc.6 h1:+GshhTh3HAJthuJ8BEf+bvSJdrvvbAN4XLnDXJKlbFg=
+github.com/rancher/fleet/pkg/apis v0.17.0-rc.6/go.mod h1:Mt7+L4EAGtpUACf6Nzc+qLVxKmG39c0iyNnIRrRRFW4=
+github.com/rancher/fleet/pkg/helmvalues v0.17.0-rc.6 h1:yZ6hIyFazbGfeGiqtu9hA1EAPvX+S6OQg5YldUlYCng=
+github.com/rancher/fleet/pkg/helmvalues v0.17.0-rc.6/go.mod h1:RzpSPIJ3BHRj/viNPBJH1RLpxopu/5Y/iWTBqQcPXzo=
 github.com/rancher/gke-operator v1.16.0-rc.5 h1:ZNKbiwawKt2BO7z13mGqPF+0zCzDk8ItdnIMebTtLR8=
 github.com/rancher/gke-operator v1.16.0-rc.5/go.mod h1:pmiKveaS02VQmCHHiJXYE2dW8nAMI81tSAg/8mnMXV4=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXIAwGYNwSFoRYJadVnOrD8kx2qrZyN8=

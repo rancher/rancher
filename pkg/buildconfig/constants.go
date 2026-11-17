@@ -12,7 +12,7 @@ const (
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4-rc.2"
 	DefaultShellVersion       = "rancher/shell:v0.9.1-rc.2"
 	EksOperatorVersion        = "111.0.0+up1.16.0-rc.6"
-	FleetVersion              = "111.0.0+up0.17.0-rc.5"
+	FleetVersion              = "111.0.1+up0.17.0-rc.6"
 	GkeOperatorVersion        = "111.0.0+up1.16.0-rc.5"
 	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.10"
 	PartnerChartDefaultBranch = "main"
