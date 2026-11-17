@@ -23,3 +23,21 @@ func (e *NonTransientError) Error() string {
 func (e *NonTransientError) Unwrap() error {
 	return e.Err
 }
+
+// ExtrasUnavailableError wraps an error from a provider's GetPrincipal when the
+// provider can't read the user's own record, for example because the user
+// lacks permission to look themselves up. Groups can still be refreshed, but
+// the user's extra attributes can't be, so the refresh keeps the stored ones.
+type ExtrasUnavailableError struct {
+	Err error
+}
+
+// Error implements [error] interface.
+func (e *ExtrasUnavailableError) Error() string {
+	return e.Err.Error()
+}
+
+// Unwrap allows getting the original error using [errors.Unwrap] or [errors.As].
+func (e *ExtrasUnavailableError) Unwrap() error {
+	return e.Err
+}
