@@ -687,6 +687,48 @@ func shouldEmbedLifecycleLabels(controlPlane *rkev1.RKEControlPlane, entry *plan
 	if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 		return true
 	}
+	// Latch: if the labels are already baked into the node's applied node-label, keep rendering them.
+	// The embed decision must be monotonic over a node's lifetime - once the labels are in node-label
+	// (first boot of a new node, or a Kubernetes version upgrade), removing them on a later
+	// steady-state reconcile would itself change node-label and bump RESTART_STAMP, causing exactly
+	// the restart this change exists to avoid. Nodes that never had the labels (e.g. clusters upgraded
+	// from a pre-2.15 release that never injected them) do not match here and stay restart-free.
+	if appliedPlanHasLifecycleLabels(entry) {
+		return true
+	}
+	return false
+}
+
+// lifecycleNodeLabelPrefix is the key prefix shared by all six cluster/machine identity labels
+// (plan.cattle.io/cluster-* and plan.cattle.io/machine-*).
+const lifecycleNodeLabelPrefix = "plan.cattle.io/"
+
+// appliedPlanHasLifecycleLabels reports whether the node's last-applied 50-rancher.yaml already
+// carries any plan.cattle.io/* entry in its node-label list. It is the latch that keeps
+// shouldEmbedLifecycleLabels monotonic (see its comment). Any decode error is treated as "no labels"
+// - the worst case is a single reconcile that re-renders the labels, never a wrong-but-silent state.
+func appliedPlanHasLifecycleLabels(entry *planEntry) bool {
+	if entry.Plan == nil || entry.Plan.AppliedPlan == nil {
+		return false
+	}
+	for _, f := range entry.Plan.AppliedPlan.Files {
+		if !strings.HasSuffix(f.Path, "/50-rancher.yaml") {
+			continue
+		}
+		raw, err := base64.StdEncoding.DecodeString(f.Content)
+		if err != nil {
+			return false
+		}
+		cfg := map[string]any{}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			return false
+		}
+		for _, l := range convert.ToStringSlice(cfg["node-label"]) {
+			if strings.HasPrefix(l, lifecycleNodeLabelPrefix) {
+				return true
+			}
+		}
+	}
 	return false
 }
 

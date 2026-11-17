@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1082,6 +1083,24 @@ func TestAddLabelsLifecycleGating(t *testing.T) {
 		return false
 	}
 
+	// appliedPlanWithLabels builds an applied NodePlan whose 50-rancher.yaml already carries a
+	// plan.cattle.io/* entry in node-label, to exercise the monotonic latch.
+	appliedPlanWithLabels := func() *plan.NodePlan {
+		cfg, err := json.Marshal(map[string]any{
+			"node-label": []string{
+				"rke.cattle.io/machine=22cb3acf-f88b-4797-bcde-68155977f6a3",
+				"plan.cattle.io/cluster-name=z1-dev",
+			},
+		})
+		if err != nil {
+			t.Fatalf("marshal applied config: %v", err)
+		}
+		return &plan.NodePlan{Files: []plan.File{{
+			Path:    "/etc/rancher/rke2/config.yaml.d/50-rancher.yaml",
+			Content: base64.StdEncoding.EncodeToString(cfg),
+		}}}
+	}
+
 	for _, tt := range []struct {
 		name               string
 		entry              *planEntry
@@ -1100,6 +1119,13 @@ func TestAddLabelsLifecycleGating(t *testing.T) {
 		{
 			name:               "kubernetes version upgrade in flight - restart happening anyway",
 			entry:              newEntry(&plan.NodePlan{}, "v1.30.5+rke2r1"),
+			wantLifecycleBaked: true,
+		},
+		{
+			// Latch: a node already carrying the labels in its applied node-label must keep them even
+			// on a steady-state reconcile, otherwise removing them would itself cause a restart.
+			name:               "latch - applied plan already has labels, keep them (no flip)",
+			entry:              newEntry(appliedPlanWithLabels(), k8sVersion),
 			wantLifecycleBaked: true,
 		},
 	} {
