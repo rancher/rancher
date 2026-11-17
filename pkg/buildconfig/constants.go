@@ -3,7 +3,7 @@
 package buildconfig
 
 const (
-	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-15.11"
+	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-23.2"
 	ChartDefaultBranch        = "dev-v2.16"
 	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4"
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261116T1115Z-dev"
