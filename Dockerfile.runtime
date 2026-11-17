@@ -23,7 +23,7 @@
 #   - rancher-machine
 #   - Python 3.11 + tox (for validation/integration test suites)
 
-FROM registry.suse.com/rancher/appco-go:1.27.4
+FROM ghcr.io/rancher/ci-image/go1.27:1.27.4
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
@@ -32,7 +32,7 @@ ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.10
 ENV CATTLE_K3S_VERSION=v1.37.2+k3s1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.16
+ENV CATTLE_KDM_BRANCH=release-v2.16
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
