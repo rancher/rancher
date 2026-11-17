@@ -17,8 +17,9 @@
 # the test body and the same-package helpers it calls (up to 3 levels deep).
 # This is a heuristic: always read the test before trusting a skip flag.
 #
-# Exit status: 0 when no problems are found, 1 when problems are found,
-# 2 on usage or prerequisite errors.
+# Exit status: 0 when the analysis ran, whether or not it found problems (pre-existing
+# drift is normal, so compare --problems output against a baseline instead), 2 on usage
+# or prerequisite errors.
 #
 # =============================================================================
 set -uo pipefail
@@ -31,6 +32,9 @@ TESTS_DIR="$ROOT/tests/v2prov/tests"
 # .github/workflows/provisioning-tests.yml.
 REGEX_WHITELIST='^[][A-Za-z0-9_()|.^$*?]+$'
 MATRIX_CAP=25
+# Mirrors the V2PROV_TEST_TIMEOUT check in scripts/provisioning-tests.
+TIMEOUT_FORMAT='^[0-9]+[mh]$'
+
 
 MODE=table
 TEST_NAME=""
@@ -52,6 +56,10 @@ fi
 test -f "$CONFIG"        || { echo "error: config not found: $CONFIG" >&2; exit 2; }
 command -v yq >/dev/null || { echo "error: yq (v4) is required" >&2; exit 2; }
 command -v jq >/dev/null || { echo "error: jq is required" >&2; exit 2; }
+if [ "$MODE" = table ] && ! command -v column >/dev/null; then
+  echo "error: column is required for the table output (use --json or --problems without it)" >&2
+  exit 2
+fi
 
 # extract_funcs prints one JSON object per Go func under tests/v2prov/tests with
 # the signals needed to classify it. A dist/gate condition only counts if a
@@ -59,14 +67,23 @@ command -v jq >/dev/null || { echo "error: jq is required" >&2; exit 2; }
 extract_funcs() {
   find "$TESTS_DIR" -name '*.go' | sort | while IFS= read -r f; do
     awk -v rel="${f#"$ROOT"/}" '
+      # jstr quotes s as a JSON string. Skip messages are free text, so they can hold quotes,
+      # backslashes or tabs.
+      function jstr(s) {
+        gsub(/\\/, "\\\\", s)
+        gsub(/"/, "\\\"", s)
+        gsub(/\t/, "\\t", s)
+        gsub(/\r/, "\\r", s)
+        return "\"" s "\""
+      }
       function flush() {
         if (name == "") return
-        printf "{\"pkg\":\"%s\",\"name\":\"%s\",\"file\":\"%s\",\"line\":%d,\"parallel\":%s,\"skip_rke2\":%s,\"skip_k3s\":%s,\"gates\":[%s],\"calls\":[%s]}\n",
-          pkg, name, rel, line, par, sr, sk, gates, calls
+        printf "{\"pkg\":%s,\"name\":%s,\"file\":%s,\"line\":%d,\"parallel\":%s,\"skip_rke2\":%s,\"skip_k3s\":%s,\"gates\":[%s],\"calls\":[%s]}\n",
+          jstr(pkg), jstr(name), jstr(rel), line, par, sr, sk, gates, calls
         name = ""
       }
       function addgate(g) {
-        if (index(gates, "\"" g "\"") == 0) gates = gates (gates == "" ? "" : ",") "\"" g "\""
+        if (index(gates, jstr(g)) == 0) gates = gates (gates == "" ? "" : ",") jstr(g)
       }
       BEGIN { pkg = rel; sub(/\/[^\/]*$/, "", pkg) }
       /^func / {
@@ -111,7 +128,7 @@ extract_funcs() {
         s = $0
         while (match(s, /[A-Za-z_][A-Za-z0-9_]*\(/)) {
           id = substr(s, RSTART, RLENGTH - 1)
-          if (!(id in seen)) { seen[id] = 1; calls = calls (calls == "" ? "" : ",") "\"" id "\"" }
+          if (!(id in seen)) { seen[id] = 1; calls = calls (calls == "" ? "" : ",") jstr(id) }
           s = substr(s, RSTART + RLENGTH)
         }
       }
@@ -165,6 +182,7 @@ ANALYSIS="$(jq -n \
   --argjson cfg "$CONFIG_JSON" \
   --argjson deadpaths "$DEAD_PATHS" \
   --arg whitelist "$REGEX_WHITELIST" \
+  --arg timeoutformat "$TIMEOUT_FORMAT" \
   --argjson cap "$MATRIX_CAP" '
   def suite: sub("Test"; "") | gsub("[\\[\\]()|_^.*$?]"; "");
   def skips($t; $d): ($d == "rke2" and $t.skip_rke2) or ($d == "k3s" and $t.skip_k3s);
@@ -223,6 +241,16 @@ ANALYSIS="$(jq -n \
       # Rejected at runtime by scripts/provisioning-tests.
       ($rows | unique_by([.scope, .idx])[] | select(.regex | test($whitelist) | not)
         | "INVALID-REGEX \(.scope)[\(.idx)] \(.regex)"),
+
+      # Rejected at runtime by scripts/provisioning-tests, after the runner has already booted.
+      (($cfg.scopes // {} | to_entries[] | {scope: .key, def: .value}),
+       ($cfg.explicit // [] | .[] | {scope: .name, def: .})
+        | .scope as $s
+        | ((.def.meta.V2PROV_TEST_TIMEOUT // empty | {where: "\($s).meta", value: .}),
+           ((.def.tests // []) | to_entries[] | .key as $i
+             | .value.V2PROV_TEST_TIMEOUT // empty | {where: "\($s)[\($i)]", value: .}))
+        | select(.value | tostring | test($timeoutformat) | not)
+        | "INVALID-TIMEOUT \(.where) V2PROV_TEST_TIMEOUT=\(.value) must match \($timeoutformat)"),
 
       # parallelism > 1 does nothing unless a matched (non-skipped) test calls t.Parallel().
       ($rows[] | . as $r | select(.parallelism > 1)
@@ -302,5 +330,3 @@ case "$MODE" in
     print_problems
     ;;
 esac
-
-[ "$(printf '%s' "$ANALYSIS" | jq '.problems | length')" -eq 0 ]

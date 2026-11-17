@@ -15,10 +15,10 @@ This skill helps a test author get their test into the right CI shard. It does f
 
 Read [reference.md](reference.md) before deciding placement. It has the scope meanings, naming tiers, cost model, hard constraints and balancing rules.
 
-Scripts live in `scripts/` next to this file. Run them from anywhere inside the repo:
+Every path and command in this skill is relative to the repository root, so run commands from there. The scripts live in `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/`. They need `git`, `yq` (v4) and `jq`; the table output also needs `column`, and `fetch-timings.sh` needs an authenticated `gh`.
 
-- `scripts/check-coverage.sh` maps every top-level test to the rows that run it and lists problems. Use `--test <name>` for one test, `--problems` for a diffable problem list, and `--json` for raw data. `SCOPES_CONFIG=<file>` points it at a proposed copy.
-- `scripts/fetch-timings.sh --branch <branch>` gets median per-test and per-shard durations from recent nightly runs on that branch only. Exit 3 means there's no nightly data for that branch.
+- `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/check-coverage.sh` maps every top-level test to the rows that run it and lists problems. Use `--test <name>` for one test, `--problems` for a diffable problem list, and `--json` for raw data. `SCOPES_CONFIG=<file>` points it at a proposed copy. It exits 0 whenever the analysis ran, even if it found problems, and 2 on usage or prerequisite errors.
+- `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/fetch-timings.sh --branch <branch>` gets median per-test and per-shard durations from recent nightly runs on that branch only. Exit 3 means there's no nightly data for that branch. Warnings on stderr name any shard it couldn't map back to a nightly row; those shards are left out of the output.
 
 ## Workflow
 
@@ -26,18 +26,18 @@ Scripts live in `scripts/` next to this file. Run them from anywhere inside the 
 
 - Work out which tests are in play. Use the names the author gives, or find new and changed top-level `func Test_` declarations in `git diff <base>...HEAD -- tests/v2prov/tests`.
 - Determine the target branch: the branch the work will merge into (the upstream tracking branch, or the PR's base). Confirm it with the author, and don't guess silently. Every timing number below is only valid for that branch.
-- Save the baseline: `scripts/check-coverage.sh --problems > /tmp/v2prov-baseline.txt`. Problems already in this list are pre-existing drift, not caused by the author's change.
+- Save the baseline: `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/check-coverage.sh --problems > /tmp/v2prov-baseline.txt`. Problems already in this list are pre-existing drift, not caused by the author's change.
 
 For each test, read the code and note:
 
 - **Helper and node count:** `systemdnode` (custom), `MachinePools[].Quantity` (MP), or `setUpImportedCluster` pools (imported). Also note which roles each node has.
 - **What it does:** create, scale, drain, delete, rotate certs, snapshot or restore, and so on. Note which Rancher objects it creates or asserts on (plan secrets, etcd snapshot CRs, machine objects, fleet clusters).
-- **Dist skips, env or feature gates, and `t.Parallel()`.** Compare what you read with `scripts/check-coverage.sh --test <name>`. The script's detection is heuristic, so trust the code when they disagree.
+- **Dist skips, env or feature gates, and `t.Parallel()`.** Compare what you read with `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/check-coverage.sh --test <name>`. The script's detection is heuristic, so trust the code when they disagree.
 - **Where it lands today**, according to the same command.
 
 ### 2. Interview the author
 
-Use AskUserQuestion. Ask only what the code didn't settle, and pre-fill a recommended option from what you read. Batch related questions (up to 4 per call). Cover:
+Ask the author directly. If your environment has a structured question tool (multiple choice with a free-text fallback), use it; otherwise ask in plain text with numbered options. Ask only what the code didn't settle, mark a recommended option based on what you read, and batch related questions instead of asking one at a time. Cover:
 
 1. **Purpose**, when the name and directory don't make it obvious. Options: first-time provisioning flow, day-2 operation, imported cluster behavior, fleet or agent behavior, or a feature-flagged path.
 2. **Exercised code.** Ask which Rancher packages or controllers this test is meant to protect.
@@ -63,7 +63,7 @@ Work through these in order:
    - If it doesn't, propose a rename to the right prefix and Set letter before touching any regex.
    - Renaming is almost always better than widening a regex.
 4. **Row.**
-   - Run `scripts/fetch-timings.sh --branch <target>`.
+   - Run `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/fetch-timings.sh --branch <target>`.
    - On exit 3, tell the author there's no nightly data for that branch and use the cost model in reference.md. Never borrow numbers from another branch, and never use PR runs.
    - Pick the lightest compatible row. Only split if adding the test pushes the shard past the balancing target. Follow the split rules in reference.md, and keep rows disjoint.
 5. **Row options.** Set `V2PROV_TEST_CPUS` and `V2PROV_TEST_PARALLELISM` from node count and `t.Parallel()` usage, and `CATTLE_FEATURES` from any feature gate.
@@ -81,8 +81,8 @@ Work through these in order:
 
 - Copy the config to a temp file, apply the proposed edits there, then run:
   ```
-  SCOPES_CONFIG=/tmp/scopes.yaml scripts/check-coverage.sh --test <name>
-  SCOPES_CONFIG=/tmp/scopes.yaml scripts/check-coverage.sh --problems > /tmp/v2prov-proposed.txt
+  SCOPES_CONFIG=/tmp/scopes.yaml tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/check-coverage.sh --test <name>
+  SCOPES_CONFIG=/tmp/scopes.yaml tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/check-coverage.sh --problems > /tmp/v2prov-proposed.txt
   diff /tmp/v2prov-baseline.txt /tmp/v2prov-proposed.txt
   ```
   The diff must not add problems. The only exception is one the author accepts knowingly. `ORPHAN-GATED` for a deliberately local-only test is an example.
@@ -99,11 +99,14 @@ Work through these in order:
 
 ### 5. Apply
 
-Write the edits to the real config only after the author confirms. Then run `scripts/check-coverage.sh --test <name>` and the `--problems` diff against the baseline once more.
+Write the edits to the real config only after the author confirms. Then run `tests/v2prov/.agents/skills/v2prov-ci-scopes/scripts/check-coverage.sh --test <name>` and the `--problems` diff against the baseline once more.
 
 ### 6. Report pre-existing drift
 
-List the problems from the baseline that aren't related to this change; reference.md describes the known ones. Offer a fix for each, and apply only the fixes the author picks. Keep them as separate edits so they can go in their own commit.
+Split the baseline problems that aren't related to this change into two groups:
+
+- **Known drift**, listed in reference.md. Mention it once, and don't offer fixes.
+- **Everything else** is new drift. Offer a fix for each problem, and apply only the fixes the author picks. Keep them as separate edits so they can go in their own commit.
 
 ## Rules
 

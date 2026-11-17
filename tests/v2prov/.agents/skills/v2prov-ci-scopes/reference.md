@@ -9,7 +9,7 @@ Background for placing tests in `.github/scripts/provisioning-test-scopes.yaml`.
 3. Otherwise each scope whose `package-paths` (or `file-paths`, with optional substring rules) match a changed file is selected.
 4. The selected scopes' `tests` rows become the GHA matrix, one job per row per dist.
 
-Row keys are the environment variable names the workflow reads (`V2PROV_TEST_DIST`, `V2PROV_TEST_RUN_REGEX`, `CATTLE_FEATURES`, `V2PROV_TEST_CPUS`, `V2PROV_TEST_PARALLELISM`). The resolver passes every key on a row through to the matrix unchanged, then fills in defaults for dist (both), cpus (16) and parallelism (1). The scope's `meta.V2PROV_TEST_TIMEOUT` is added as well. Keys this repo doesn't read are still passed through. For example, kdm rows set `V2PROV_TEST_RUN_ON_RELEASE`, which is for downstream consumers. Keep such keys on any row you edit or split, and copy them onto new rows in the same scope. Every key also shows up in the GHA job name, so don't add keys just for documentation.
+Row keys are the environment variable names the workflow reads (`V2PROV_TEST_DIST`, `V2PROV_TEST_RUN_REGEX`, `CATTLE_FEATURES`, `V2PROV_TEST_CPUS`, `V2PROV_TEST_PARALLELISM`, `V2PROV_TEST_TIMEOUT`, `V2PROV_RUNNER_FAMILY`). The resolver passes every key on a row through to the matrix unchanged, then fills in defaults for dist (both), cpus (16) and parallelism (1). Any scope, PR or explicit, can set `meta.V2PROV_TEST_TIMEOUT` and `meta.V2PROV_RUNNER_FAMILY` as defaults for its rows; a row that sets the same key keeps its own value. Keys this repo doesn't read are still passed through. For example, kdm rows set `V2PROV_TEST_RUN_ON_RELEASE`, which is for downstream consumers. Keep such keys on any row you edit or split, and copy them onto new rows in the same scope. Every key also shows up in the GHA job name, so don't add keys just for documentation.
 
 `explicit` scopes (`nightly`, `kdm`) are never picked by a diff, not even with `ALL=1`. They only run when requested by name. So a test can sit in a PR scope and in nightly at the same time without running twice.
 
@@ -40,7 +40,7 @@ The test name decides which row picks it up. Prefer giving a test the right name
 | `Test_Provisioning_SetB_*`, `Test_Provisioning_Custom_SetB_*` | nightly and kdm only |
 | `Test_Operation_SetA_*` | operations (both), nightly, kdm |
 | `Test_Operation_SetB_*` | operations (k3s all; rke2 split into a parallel `EtcdSnapshotOperationsOnNew` row and one named test), nightly, kdm |
-| `Test_Operation_SetC_*` | operations (k3s only), nightly (k3s only), kdm |
+| `Test_Operation_SetC_*` | operations (k3s only), nightly (k3s only), kdm (both dists, since kdm rows set no dist) |
 | `Test_Imported_Operation_SetD_*` | imported, but only the tests named explicitly in its rows; nightly lists most of the rest by name |
 | `Test_Imported_Operation_SetE_*` | nightly only (heavy multi-node restore work) |
 
@@ -71,6 +71,7 @@ kdm is for behavior that changes with the Kubernetes version: etcd snapshot and 
 - `V2PROV_TEST_PARALLELISM` becomes `go test -parallel`. It only affects tests that call `t.Parallel()`. Setting it on a row where no test does is a no-op.
 - `V2PROV_TEST_CPUS` only picks the runner label (`runner=<cpus>cpu-linux-x64`). Default is 16. The imported rows that run 1-node tests one at a time use 8. Larger multi-node or parallel rows need 16.
 - `-failfast` is on: one failure stops the rest of that shard. Smaller shards fail more precisely.
+- Runner disk matters. Nightly sets `meta.V2PROV_RUNNER_FAMILY: c6id` (local NVMe); PR rows run on c7i-flex with EBS unless the row sets a family. The imported etcd tests are limited by disk writes and run about 25% faster on NVMe, so nightly timings understate a PR shard on EBS that runs them.
 
 When nightly timing data isn't available for the target branch, estimate with node count and the closest existing test, and say so to the author.
 
@@ -79,7 +80,7 @@ When nightly timing data isn't available for the target branch, estimate with no
 - **Regex characters.** `scripts/provisioning-tests` rejects any regex outside `^[][A-Za-z0-9_()|.^$*?]+$`. Character classes and `?` are allowed. No `+`, `{}`, `-`, spaces or `\`. Prefer alternation of full names when it reads more clearly.
 - **No lookahead.** Go uses RE2. To carve a test out of a `.*` row, enumerate the rest by name or rename tests so the prefixes separate.
 - **No overlap.** Rows in one scope must match disjoint tests for the same dist. Across PR scopes this also matters, since several scopes can fire on one PR and the resolver doesn't de-duplicate.
-- **Timeouts.** PR rows get the 60m `go test` default. Only explicit scopes can set `meta.V2PROV_TEST_TIMEOUT`. The GHA job is capped at 360m including setup.
+- **Timeouts.** Rows get the 60m `go test` default unless the row or its scope's `meta` sets `V2PROV_TEST_TIMEOUT` (`^[0-9]+[mh]$`, e.g. `200m` or `5h`; `check-coverage.sh` reports `INVALID-TIMEOUT` otherwise). PR scopes currently don't set one. The GHA job is capped at 360m including setup.
 - **Matrix cap.** `provisioning-tests.yml` fails if the matrix has more than 25 entries. Count expanded rows: a row with no `V2PROV_TEST_DIST` counts twice. A `full` trigger runs the union of all PR scopes, so their combined row count must also stay at or under 25.
 - **Artifact names.** Each job uploads `Test Results <dist> <suite>`, where `<suite>` is the regex with `Test` removed and `[]()|_^.*$?` stripped. Two rows in the same run with the same dist and suite overwrite each other.
 - **New scopes.** A new scope needs a `'^trigger-<scope>-ci$'` file-paths entry and must be added to the scope choices in `.github/workflows/ci-testing-create-pr.yml`.
@@ -98,8 +99,9 @@ When nightly timing data isn't available for the target branch, estimate with no
 
 `check-coverage.sh` reports these. They are known and accepted for now. Mention them to the author once per session, don't offer to fix them, and don't count them against a proposed change:
 
+- **Dead path.** `full` lists `^pkg/controllers/provisioningv2/rke2/`, which matches no tracked file (`DEAD-PATH`).
 - **Orphans.** `Test_Autoscaling_Provisioning`, the `ImportedServerJoinOutsideCertificateSANs` and `StaleAddressOutsideLeaderCertificate` SetD tests, `...LocalHAIPv6`, and the six `CAPRKE2Docker*` SetE tests match no row. The CAPRKE2 and IPv6 tests are deliberately local-only.
-- **No-op parallelism.** Some operations rows set `V2PROV_TEST_PARALLELISM`, but no Operation test calls `t.Parallel()`.
-- **Nightly is near the cap.** 23 of 25 rows.
+- **No-op parallelism.** The rke2 imported row `imported[4]` sets `V2PROV_TEST_PARALLELISM: 3`, but none of its tests call `t.Parallel()`.
+- **Nightly is near the cap.** 24 of 25 rows. This isn't reported as a problem, but leaves room for one more row.
 
 Anything else the script reports that isn't caused by the author's change is new drift. Offer a fix, and apply it only if the author agrees.
