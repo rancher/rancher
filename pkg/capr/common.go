@@ -403,7 +403,21 @@ func ShellQuote(s string) string {
 	if safe {
 		return s
 	}
+	return ShellSingleQuote(s)
+}
+
+// ShellSingleQuote returns s as one literal word for a POSIX shell. It always wraps s in single quotes
+// and escapes each single quote.
+func ShellSingleQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+var validEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// IsValidEnvVarName reports whether name is a valid POSIX shell identifier. It is also a valid name for
+// the "$env:NAME=" form in PowerShell. A leading "$env:" prefix is not part of the name.
+func IsValidEnvVarName(name string) bool {
+	return validEnvVarName.MatchString(name)
 }
 
 // PowerShellQuote returns s as one literal string for PowerShell. It uses single quotes and doubles
@@ -811,27 +825,27 @@ func AutoscalerEnabledByProvisioningCluster(cluster *provv1.Cluster) bool {
 // FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either
 // a Powershell script or the Rancher planner, indicated by the isPlanVariable parameter.
 // This function automatically configures the '$env:' prefix for a given environment variable,
-// automatically prefixes boolean values with '$', and surrounds string variables with double quotes as
-// needed. If the provided variable name incorrectly uses either '$env:' or '$' for the given isPlanVariable
-// value, it will be removed.
+// automatically prefixes boolean values with '$', and writes string variables for a PowerShell script as
+// single-quoted literals, so PowerShell never expands the value. Plan variables are not quoted, because the
+// system-agent sets them as literal environment entries, and their surrounding double quotes are removed.
+// If the provided variable name incorrectly uses either '$env:' or '$' for the given isPlanVariable
+// value, it will be removed. The caller must check the name with IsValidEnvVarName.
 func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
 	lowerValue := strings.ToLower(envVar.Value)
 	isBool := lowerValue == "$true" || lowerValue == "$false" ||
 		lowerValue == "true" || lowerValue == "false"
 
-	// remove any user provided prefixes and quotations
+	// remove any user provided prefixes
 	envVar.Name = strings.TrimPrefix(envVar.Name, "$env:")
-	envVar.Value = strings.Trim(envVar.Value, "\"")
 
 	if !isBool {
 		// Non-boolean variables are always treated as strings,
 		// even numbers
-		format := "$env:%s=\"%s\""
 		if isPlanVariable {
-			format = "%s=%s"
+			return fmt.Sprintf("%s=%s", envVar.Name, strings.Trim(envVar.Value, "\""))
 		}
 
-		return fmt.Sprintf(format, envVar.Name, envVar.Value)
+		return fmt.Sprintf("$env:%s=%s", envVar.Name, PowerShellQuote(envVar.Value))
 	}
 
 	if !isPlanVariable {

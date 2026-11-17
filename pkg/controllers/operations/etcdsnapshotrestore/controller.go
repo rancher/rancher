@@ -2192,7 +2192,7 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	if rejoining {
 		arg := fmt.Sprintf("server: %q\n", supervisorURL(serverURL, s.adapter.GetSupervisorPort(secret)))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
-			// strconv.Quote writes a YAML double-quoted string, and escapes the quote and the backslash.
+			// strconv.Quote output is also a valid YAML double-quoted string.
 			arg = fmt.Sprintf("%stoken-file: %s\n", arg, strconv.Quote(path.Join(dataDir, "server/token")))
 		}
 		nodePlan.Files = append(nodePlan.Files, plan.File{

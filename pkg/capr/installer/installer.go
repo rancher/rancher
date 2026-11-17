@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/capr"
@@ -55,20 +54,6 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	return io.ReadAll(resp.Body)
-}
-
-// validShellVarName validates that a variable name is a valid POSIX shell identifier.
-var validShellVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
-// isValidShellVarName returns true if name is a valid POSIX shell variable name.
-func isValidShellVarName(name string) bool {
-	return validShellVarName.MatchString(name)
-}
-
-// escapeShellValue safely escapes a value for use in a POSIX shell script.
-func escapeShellValue(value string) string {
-	escaped := strings.ReplaceAll(value, "'", "'\\''")
-	return "'" + escaped + "'"
 }
 
 func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, _ string) ([]byte, error) {
@@ -125,11 +110,11 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 		if envVar.Value == "" {
 			continue
 		}
-		if !isValidShellVarName(envVar.Name) {
+		if !capr.IsValidEnvVarName(envVar.Name) {
 			logrus.Warnf("skipping invalid shell variable name: %q", envVar.Name)
 			continue
 		}
-		envVarBuf.WriteString(fmt.Sprintf("export %s=%s\n", envVar.Name, escapeShellValue(envVar.Value)))
+		envVarBuf.WriteString(fmt.Sprintf("export %s=%s\n", envVar.Name, capr.ShellSingleQuote(envVar.Value)))
 	}
 	server := ""
 	if settings.ServerURL.Get() != "" {
@@ -198,10 +183,8 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 			Name:  "CATTLE_TOKEN",
 			Value: token,
 		}, false)
-		cattleRoleNone = capr.FormatWindowsEnvVar(corev1.EnvVar{
-			Name:  "CATTLE_ROLE_NONE",
-			Value: "\"true\"",
-		}, false)
+		// FormatWindowsEnvVar would turn "true" into the PowerShell boolean.
+		cattleRoleNone = fmt.Sprintf("$env:CATTLE_ROLE_NONE=%s", capr.PowerShellQuote("true"))
 	}
 
 	envVarBuf := &strings.Builder{}
@@ -209,9 +192,8 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		if envVar.Value == "" {
 			continue
 		}
-		if envVar.Name == capr.SystemAgentDataDirEnvVar {
-			// This value comes from spec.dataDirectories.systemAgent, so PowerShell must not parse it.
-			envVarBuf.WriteString(fmt.Sprintf("$env:%s=%s\n", envVar.Name, capr.PowerShellQuote(envVar.Value)))
+		if !capr.IsValidEnvVarName(strings.TrimPrefix(envVar.Name, "$env:")) {
+			logrus.Warnf("skipping invalid PowerShell variable name: %q", envVar.Name)
 			continue
 		}
 		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false) + "\n")
@@ -246,17 +228,5 @@ $env:STRICT_VERIFY = "%s"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`,
-		data,
-		envVarBuf.String(),
-		binaryURL,
-		server,
-		ca,
-		tokenEnvVar,
-		csiProxyURL,
-		csiProxyVersion,
-		capr.PowerShellQuote("C:"+dataDir+"/bin/kubelet.exe"),
-		strictVerify,
-		cattleRoleNone,
-	)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, capr.PowerShellQuote("C:"+dataDir+"/bin/kubelet.exe"), strictVerify, cattleRoleNone)), nil
 }

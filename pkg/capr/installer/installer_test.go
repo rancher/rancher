@@ -59,10 +59,10 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 	// assert
 	a.Nil(err)
 	a.NotNil(script)
-	a.Contains(string(script), "$env:CATTLE_TOKEN=\"test\"")
-	a.Contains(string(script), "$env:CATTLE_ROLE_NONE=\"true\"")
-	a.Contains(string(script), "$env:CATTLE_SERVER=\"localhost\"")
-	a.Contains(string(script), fmt.Sprintf("$env:CATTLE_CA_CHECKSUM=\"%s\"", CACertEncoded))
+	a.Contains(string(script), "$env:CATTLE_TOKEN='test'")
+	a.Contains(string(script), "$env:CATTLE_ROLE_NONE='true'")
+	a.Contains(string(script), "$env:CATTLE_SERVER='localhost'")
+	a.Contains(string(script), fmt.Sprintf("$env:CATTLE_CA_CHECKSUM='%s'", CACertEncoded))
 	a.Contains(string(script), "$env:CSI_PROXY_URL")
 	a.Contains(string(script), "$env:CSI_PROXY_VERSION")
 	a.Contains(string(script), "$env:CSI_PROXY_KUBELET_PATH")
@@ -310,4 +310,29 @@ func TestInstaller_WindowsInstallScriptQuotesDataDirectory(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInstaller_WindowsInstallScriptEnvVarNames(t *testing.T) {
+	envVars := []corev1.EnvVar{
+		{Name: "GOOD_NAME", Value: "v1"},
+		{Name: "$env:PREFIXED_NAME", Value: "v2"},
+		{Name: "BAD NAME", Value: "v3"},
+		{Name: "BAD=NAME;calc", Value: "v4"},
+		{Name: "1BAD", Value: "v5"},
+		{Name: "$(id)", Value: "v6"},
+	}
+
+	script, err := WindowsInstallScript(context.TODO(), "", envVars, "localhost", "")
+	assert.NoError(t, err)
+	assert.Contains(t, string(script), "$env:GOOD_NAME='v1'\n")
+	assert.Contains(t, string(script), "$env:PREFIXED_NAME='v2'\n")
+	for _, bad := range []string{"v3", "v4", "v5", "v6"} {
+		assert.NotContains(t, string(script), "'"+bad+"'")
+	}
+}
+
+func TestInstaller_WindowsInstallScriptKeepsQuotesInValue(t *testing.T) {
+	script, err := WindowsInstallScript(context.TODO(), "", []corev1.EnvVar{{Name: "X", Value: `"abc"`}}, "localhost", "")
+	assert.NoError(t, err)
+	assert.Contains(t, string(script), "$env:X='\"abc\"'\n")
 }
