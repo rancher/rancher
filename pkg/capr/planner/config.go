@@ -653,7 +653,44 @@ func updateConfigWithAdvertiseAddresses(config map[string]any, info *machineNetw
 	}
 }
 
-func addLabels(config map[string]any, cluster *capi.Cluster, entry *planEntry) error {
+// shouldEmbedLifecycleLabels reports whether the plan.cattle.io/* cluster- and machine-lifecycle
+// identity labels should be folded into the RKE2/K3s "node-label" setting (which becomes
+// kubelet --node-labels, a NON-DYNAMIC setting) for this node.
+//
+// node-label is consumed only at kubelet start, so Rancher folds any change to it into a new
+// RESTART_STAMP and system-agent-installer-rke2 restarts rke2-agent/rke2-server when the stamp
+// moves. Unconditionally appending these labels (the 2.15 behaviour) therefore restarts every node
+// of every downstream cluster on the first reconcile after a management-server upgrade, even though
+// nothing about the downstream cluster changed — see SURE-12151 / rancher/rancher#58320.
+//
+// We embed them only in the two cases where there is no additional cost:
+//
+//   - First boot: the node has never had a plan applied, so the kubelet is not yet running and
+//     baking the labels in guarantees they are present from the very first kubelet start (needed by
+//     the v2prov day-2 operations framework that correlates system-agents by these labels).
+//   - Kubernetes version upgrade in flight: rke2/k3s is going to be restarted for the version bump
+//     anyway, so folding the labels in now is free and keeps node-label authoritative going forward.
+//
+// On a steady-state reconcile (e.g. a management-server-only Rancher upgrade) we return false: the
+// labels are instead delivered to the downstream Node object via the machinerole ImportedLabelSync
+// controller (nodes.Update over the API — no kubelet, no restart).
+func shouldEmbedLifecycleLabels(controlPlane *rkev1.RKEControlPlane, entry *planEntry) bool {
+	if entry == nil || entry.Machine == nil {
+		return false
+	}
+	// First boot: no plan has ever been applied to this node.
+	if entry.Plan == nil || entry.Plan.AppliedPlan == nil {
+		return true
+	}
+	// Kubernetes version upgrade: the node's kubelet is not yet on the desired version, so a restart
+	// is already going to happen.
+	if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
+		return true
+	}
+	return false
+}
+
+func addLabels(config map[string]any, controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, entry *planEntry) error {
 	var labels []string
 	if data := entry.Metadata.Annotations[capr.LabelsAnnotation]; data != "" {
 		labelMap := map[string]string{}
@@ -667,20 +704,26 @@ func addLabels(config map[string]any, cluster *capi.Cluster, entry *planEntry) e
 
 	labels = append(labels, capr.MachineUIDLabel+"="+string(entry.Machine.UID))
 
-	lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
-	if err != nil {
-		return err
-	}
-	for k, v := range lifecycleLabels {
-		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
-	}
+	// Only fold the plan.cattle.io/* identity labels into node-label when it will not cost an extra
+	// rke2 restart (first boot or an in-flight Kubernetes version upgrade). On steady-state
+	// reconciles they are omitted here and synced onto the Node via the machinerole
+	// ImportedLabelSync controller instead. See SURE-12151 / rancher/rancher#58320.
+	if shouldEmbedLifecycleLabels(controlPlane, entry) {
+		lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
+		if err != nil {
+			return err
+		}
+		for k, v := range lifecycleLabels {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		}
 
-	lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
-	if err != nil {
-		return err
-	}
-	for k, v := range lifecycleLabels {
-		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
+		if err != nil {
+			return err
+		}
+		for k, v := range lifecycleLabels {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		}
 	}
 
 	sort.Strings(labels)
@@ -933,7 +976,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
-	if err := addLabels(config, cluster, entry); err != nil {
+	if err := addLabels(config, controlPlane, cluster, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
 	if err := addTaints(config, entry, controlPlane); err != nil {

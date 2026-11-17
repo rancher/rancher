@@ -1031,3 +1031,115 @@ func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }
+
+// TestAddLabelsLifecycleGating is the SURE-12151 / rancher/rancher#58320 regression guard. It asserts
+// that the plan.cattle.io/* cluster- and machine-lifecycle identity labels are folded into the
+// non-dynamic "node-label" setting ONLY on first boot or during a Kubernetes version upgrade — never
+// on a steady-state reconcile (e.g. a management-server-only Rancher upgrade), where doing so would
+// bump RESTART_STAMP and restart rke2 on every node of every downstream cluster. The rke.cattle.io/machine
+// (MachineUID) label must always be present, matching the pre-2.15 baseline.
+func TestAddLabelsLifecycleGating(t *testing.T) {
+	const k8sVersion = "v1.31.2+rke2r1"
+
+	newCluster := func() *capi.Cluster {
+		return &capi.Cluster{
+			TypeMeta:   metav1.TypeMeta{Kind: "Cluster", APIVersion: capi.GroupVersion.String()},
+			ObjectMeta: metav1.ObjectMeta{Name: "z1-dev", Namespace: "fleet-default"},
+		}
+	}
+	newEntry := func(appliedPlan *plan.NodePlan, kubeletVersion string) *planEntry {
+		return &planEntry{
+			Machine: &capi.Machine{
+				TypeMeta: metav1.TypeMeta{Kind: "Machine", APIVersion: capi.GroupVersion.String()},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "z1-dev-workers-az1-rp1-7fb8l-488tx",
+					UID:  "22cb3acf-f88b-4797-bcde-68155977f6a3",
+				},
+				Status: capi.MachineStatus{
+					NodeInfo: &corev1.NodeSystemInfo{KubeletVersion: kubeletVersion},
+				},
+			},
+			Plan:     &plan.Node{AppliedPlan: appliedPlan},
+			Metadata: &plan.Metadata{Annotations: map[string]string{}},
+		}
+	}
+	cp := &rkev1.RKEControlPlane{
+		Spec:   rkev1.RKEControlPlaneSpec{KubernetesVersion: k8sVersion},
+		Status: rkev1.RKEControlPlaneStatus{AgentConnected: true},
+	}
+
+	const (
+		machineUIDLabel = "rke.cattle.io/machine=22cb3acf-f88b-4797-bcde-68155977f6a3"
+		lifecyclePrefix = "plan.cattle.io/"
+	)
+
+	hasLifecycleLabel := func(nodeLabels []string) bool {
+		for _, l := range nodeLabels {
+			if strings.HasPrefix(l, lifecyclePrefix) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, tt := range []struct {
+		name               string
+		entry              *planEntry
+		wantLifecycleBaked bool
+	}{
+		{
+			name:               "steady state existing node - no plan.cattle.io/* (no restart)",
+			entry:              newEntry(&plan.NodePlan{}, k8sVersion),
+			wantLifecycleBaked: false,
+		},
+		{
+			name:               "first boot - labels baked in at kubelet start",
+			entry:              newEntry(nil, k8sVersion),
+			wantLifecycleBaked: true,
+		},
+		{
+			name:               "kubernetes version upgrade in flight - restart happening anyway",
+			entry:              newEntry(&plan.NodePlan{}, "v1.30.5+rke2r1"),
+			wantLifecycleBaked: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			config := map[string]interface{}{}
+			if err := addLabels(config, cp, newCluster(), tt.entry); err != nil {
+				t.Fatalf("addLabels returned error: %v", err)
+			}
+
+			nodeLabels := convert.ToStringSlice(config["node-label"])
+
+			// The MachineUID label is the pre-2.15 baseline and must always be present.
+			if !slicesContains(nodeLabels, machineUIDLabel) {
+				t.Errorf("expected %q in node-label, got %v", machineUIDLabel, nodeLabels)
+			}
+
+			if got := hasLifecycleLabel(nodeLabels); got != tt.wantLifecycleBaked {
+				t.Errorf("plan.cattle.io/* baked into node-label = %v, want %v (node-label=%v)",
+					got, tt.wantLifecycleBaked, nodeLabels)
+			}
+
+			if tt.wantLifecycleBaked {
+				for _, want := range []string{
+					"plan.cattle.io/cluster-name=z1-dev",
+					"plan.cattle.io/machine-name=z1-dev-workers-az1-rp1-7fb8l-488tx",
+				} {
+					if !slicesContains(nodeLabels, want) {
+						t.Errorf("expected %q in node-label, got %v", want, nodeLabels)
+					}
+				}
+			}
+		})
+	}
+}
+
+func slicesContains(s []string, v string) bool {
+	for _, x := range s {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
