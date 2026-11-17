@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -197,7 +198,15 @@ func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (apiv3.Pri
 		return lp.GetKnownPrincipal(principalID, myToken)
 	}
 
-	return GetPrincipalFromProvider(providerName, principalID, myToken)
+	principal, err := GetPrincipalFromProvider(providerName, principalID, myToken)
+	// Only the provider refresh cares that the extras are unavailable. Other
+	// callers get the original error, as API responses depend on its type.
+	var unavailable *common.ExtrasUnavailableError
+	if errors.As(err, &unavailable) {
+		err = unavailable.Err
+	}
+
+	return principal, err
 }
 
 // isOtherConfigPrincipal reports whether the principal was issued by an

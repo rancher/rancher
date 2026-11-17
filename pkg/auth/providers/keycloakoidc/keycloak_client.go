@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -142,6 +143,14 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 		search := URLEncoded(searchURL)
 		b, err := k.getFromKeyCloak(search)
 		if err != nil {
+			// Reading a user's record needs the view-users role, which an
+			// organization may deliberately not grant. Report it so the caller
+			// can carry on without the record, and don't log it as an error.
+			var apiErr *httperror.APIError
+			if errors.As(err, &apiErr) && apiErr.Code.Status == http.StatusForbidden {
+				logrus.Debugf("[keycloak oidc] getFromKeyCloakByID: not permitted to read user %s: %v", principalID, err)
+				return searchResult, &common.ExtrasUnavailableError{Err: err}
+			}
 			logrus.Errorf("[keycloak oidc] getFromKeyCloakByID: GET request failed. url: %s, err: %s", search, err)
 			return searchResult, err
 		}
