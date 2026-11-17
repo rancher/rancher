@@ -79,3 +79,63 @@ tests:
     - equal:
         path: spec.ports[0].targetPort
         value: 444
+- it: should preserve default public service ports and targets
+  documentIndex: 0
+  asserts:
+  - equal:
+      path: spec.ports
+      value:
+      - port: 80
+        targetPort: 80
+        protocol: TCP
+        name: http
+      - port: 443
+        targetPort: 443
+        protocol: TCP
+        name: https
+- it: should route public service ports to custom listeners
+  set:
+    hostNetwork: true
+    httpListenPort: 8080
+    httpsListenPort: 8443
+  documentIndex: 0
+  asserts:
+  - equal:
+      path: spec.ports
+      value:
+      - port: 80
+        targetPort: 8080
+        protocol: TCP
+        name: http
+      - port: 443
+        targetPort: 8443
+        protocol: TCP
+        name: https
+- it: should route the internal service to the custom HTTPS listener plus one
+  set:
+    hostNetwork: true
+    httpsListenPort: 8443
+  documentIndex: 1
+  asserts:
+  - equal:
+      path: spec.ports
+      value:
+      - port: 443
+        targetPort: 8444
+        protocol: TCP
+        name: https-internal
+- it: should route only HTTPS to the custom listener when HTTP is disabled
+  set:
+    httpListenPort: 8080
+    httpsListenPort: 8443
+    service.disableHTTP: true
+    ingress.servicePort: 443
+  documentIndex: 0
+  asserts:
+  - equal:
+      path: spec.ports
+      value:
+      - port: 443
+        targetPort: 8443
+        protocol: TCP
+        name: https

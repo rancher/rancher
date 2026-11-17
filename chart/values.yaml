@@ -334,6 +334,11 @@ readinessProbe:
   periodSeconds: 30
   failureThreshold: 5
 
+# Ports on which Rancher listens inside the pod. Override to avoid conflicts with host networking.
+httpListenPort: 80
+# The internal HTTPS listener uses httpsListenPort + 1.
+httpsListenPort: 443
+
 # Enable host networking for Rancher pods.
 # Required for EKS clusters using non-VPC CNIs (e.g. Calico).
 hostNetwork: false

@@ -814,3 +814,69 @@ tests:
         content:
           name: CATTLE_BASE_REGISTRY_PULL_SECRETS
           value: "secret-one,secret-two,secret-three"
+- it: should preserve default listen ports
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: --http-listen-port=80
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: --https-listen-port=443
+  - equal:
+      path: spec.template.spec.containers[0].ports
+      value:
+      - containerPort: 80
+        protocol: TCP
+      - containerPort: 443
+        protocol: TCP
+      - containerPort: 444
+        protocol: TCP
+      - containerPort: 6666
+        protocol: TCP
+  - equal:
+      path: spec.template.spec.containers[0].startupProbe.httpGet.port
+      value: 80
+  - equal:
+      path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+      value: 80
+  - equal:
+      path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+      value: 80
+- it: should configure custom listen ports with host networking
+  set:
+    hostNetwork: true
+    httpListenPort: 8080
+    httpsListenPort: 8443
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: --http-listen-port=8080
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: --https-listen-port=8443
+  - equal:
+      path: spec.template.spec.containers[0].ports
+      value:
+      - containerPort: 8080
+        protocol: TCP
+      - containerPort: 8443
+        protocol: TCP
+      - containerPort: 8444
+        protocol: TCP
+      - containerPort: 6666
+        protocol: TCP
+  - equal:
+      path: spec.template.spec.containers[0].startupProbe.httpGet.port
+      value: 8080
+  - equal:
+      path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+      value: 8080
+  - equal:
+      path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+      value: 8080
+  - equal:
+      path: spec.template.spec.hostNetwork
+      value: true
+  - equal:
+      path: spec.template.spec.dnsPolicy
+      value: ClusterFirstWithHostNet

@@ -18,12 +18,12 @@ spec:
   ports:
   {{- if not (default .Values.service.disableHTTP false) }}
   - port: 80
-    targetPort: 80
+    targetPort: {{ .Values.httpListenPort }}
     protocol: TCP
     name: http
   {{- end }}
   - port: 443
-    targetPort: 443
+    targetPort: {{ .Values.httpsListenPort }}
     protocol: TCP
     name: https
   selector:
@@ -41,7 +41,7 @@ spec:
   type: ClusterIP
   ports:
     - port: 443
-      targetPort: 444
+      targetPort: {{ add .Values.httpsListenPort 1 }}
       protocol: TCP
       name: https-internal
   selector:

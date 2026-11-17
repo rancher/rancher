@@ -86,11 +86,11 @@ spec:
         imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
         name: {{ template "rancher.name" . }}
         ports:
-        - containerPort: 80
+        - containerPort: {{ .Values.httpListenPort }}
           protocol: TCP
-        - containerPort: 443
+        - containerPort: {{ .Values.httpsListenPort }}
           protocol: TCP
-        - containerPort: 444
+        - containerPort: {{ add .Values.httpsListenPort 1 }}
           protocol: TCP
 {{- if (and .Values.hostPort (gt (int .Values.hostPort) 0)) }}
           hostPort: {{ int .Values.hostPort }}
@@ -109,8 +109,8 @@ spec:
         # Public trusted CA - clear ca certs
         - "--no-cacerts"
 {{- end }}
-        - "--http-listen-port=80"
-        - "--https-listen-port=443"
+        - "--http-listen-port={{ .Values.httpListenPort }}"
+        - "--https-listen-port={{ .Values.httpsListenPort }}"
         - "--add-local={{ .Values.addLocal }}"
         env:
         - name: CATTLE_NAMESPACE
@@ -192,14 +192,14 @@ spec:
         startupProbe:
           httpGet:
             path: /healthz
-            port: 80
+            port: {{ .Values.httpListenPort }}
           timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
           failureThreshold: {{ .Values.startupProbe.failureThreshold }}
           periodSeconds: {{ .Values.startupProbe.periodSeconds }}
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 80
+            port: {{ .Values.httpListenPort }}
           {{- with .Values.livenessProbe.initialDelaySeconds}}
           initialDelaySeconds: {{ . }}
           {{- end }}
@@ -209,7 +209,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 80
+            port: {{ .Values.httpListenPort }}
           {{- with .Values.readinessProbe.initialDelaySeconds}}
           initialDelaySeconds: {{ . }}
           {{- end }}
