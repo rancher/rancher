@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -12,9 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func TestLegacyClusterAutoscalerSettingValues(t *testing.T) {
@@ -152,6 +157,79 @@ func TestMigrateLegacyClusterAutoscalerSettings(t *testing.T) {
 		settings.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed")).AnyTimes()
 
 		require.Error(t, migrateLegacyClusterAutoscalerSettings(configMaps, settings))
+	})
+}
+
+func TestRemoveLegacyMachineConfigCleanupObjects(t *testing.T) {
+	originalVersion := rancherversion.Version
+	rancherversion.Version = "v1.0.0"
+	t.Cleanup(func() {
+		rancherversion.Version = originalVersion
+	})
+
+	legacyCronJob := func() *batchv1.CronJob {
+		return &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{
+			Name:        "rke2-machineconfig-cleanup-cronjob",
+			Namespace:   "fleet-default",
+			Annotations: map[string]string{"objectset.rio.cattle.io/id": "rke2-machine-config-cleanup"},
+		}}
+	}
+	newConfigMapController := func(ctrl *gomock.Controller) (*fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList], *fake.MockCacheInterface[*corev1.ConfigMap]) {
+		configMaps := fake.NewMockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		cache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+		configMaps.EXPECT().Cache().Return(cache)
+		return configMaps, cache
+	}
+	cronJobDeletes := func(client *k8sfake.Clientset) int {
+		var deletes int
+		for _, action := range client.Actions() {
+			if action.Matches("delete", "cronjobs") {
+				deletes++
+			}
+		}
+		return deletes
+	}
+
+	t.Run("skips a completed migration", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		cache.EXPECT().Get(cattleNamespace, legacyMachineConfigCleanupMigration).Return(&corev1.ConfigMap{
+			Data: map[string]string{legacyMachineConfigCleanupRemovedKey: "true"},
+		}, nil)
+		client := k8sfake.NewClientset(legacyCronJob())
+
+		removeLegacyMachineConfigCleanupObjects(configMaps, client)
+		assert.Zero(t, cronJobDeletes(client))
+	})
+
+	t.Run("removes legacy objects and records completion", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		cache.EXPECT().Get(cattleNamespace, legacyMachineConfigCleanupMigration).Return(nil, nil)
+		configMaps.EXPECT().Create(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      legacyMachineConfigCleanupMigration,
+				Namespace: cattleNamespace,
+			},
+			Data: map[string]string{legacyMachineConfigCleanupRemovedKey: "true"},
+		})
+		client := k8sfake.NewClientset(legacyCronJob())
+
+		removeLegacyMachineConfigCleanupObjects(configMaps, client)
+		assert.Equal(t, 1, cronJobDeletes(client))
+	})
+
+	t.Run("does not record completion when removal fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		configMaps, cache := newConfigMapController(ctrl)
+		cache.EXPECT().Get(cattleNamespace, legacyMachineConfigCleanupMigration).Return(nil, nil)
+		client := k8sfake.NewClientset(legacyCronJob())
+		client.PrependReactor("delete", "cronjobs", func(k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, errors.New("delete failed")
+		})
+
+		// No Create/Update expectation on configMaps: gomock fails the test if completion is recorded.
+		removeLegacyMachineConfigCleanupObjects(configMaps, client)
 	})
 }
 
