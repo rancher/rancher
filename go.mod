@@ -122,7 +122,7 @@ require (
 	github.com/rancher/norman v0.8.10
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.1
-	github.com/rancher/remotedialer-proxy v0.7.7
+	github.com/rancher/remotedialer-proxy v0.7.8-rc.2
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260804210509-d33eb553955c
 	github.com/rancher/steve v0.8.30
