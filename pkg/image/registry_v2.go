@@ -55,20 +55,33 @@ type ChartImage struct {
 
 // ImagesOfCharts returns the images of the list, in the "<image> <source>,<source>" lines that GetArtifacts gives, that
 // come from at least one chart, with only the sources that are charts. The source of a chart is its name and version,
-// with a colon, and the one of any other image is a word like rancher or rke2All.
+// with a colon, and the one of any other image is a word like rancher or rke2All. The lines of an image that is in
+// more than one are merged.
 func ImagesOfCharts(imagesAndSources []string) []ChartImage {
-	var images []ChartImage
+	var order []string
+	sources := map[string]map[string]struct{}{}
 	for _, line := range imagesAndSources {
-		image, sources, _ := strings.Cut(line, " ")
-		var charts []string
-		for _, source := range strings.Split(sources, ",") {
-			if strings.Contains(source, ":") {
-				charts = append(charts, source)
+		image, lineSources, _ := strings.Cut(line, " ")
+		for _, source := range strings.Split(lineSources, ",") {
+			if !strings.Contains(source, ":") {
+				continue
 			}
+			if sources[image] == nil {
+				sources[image] = map[string]struct{}{}
+				order = append(order, image)
+			}
+			sources[image][source] = struct{}{}
 		}
-		if len(charts) > 0 {
-			images = append(images, ChartImage{Image: image, Sources: charts})
+	}
+
+	images := make([]ChartImage, 0, len(order))
+	for _, image := range order {
+		charts := make([]string, 0, len(sources[image]))
+		for source := range sources[image] {
+			charts = append(charts, source)
 		}
+		sort.Strings(charts)
+		images = append(images, ChartImage{Image: image, Sources: charts})
 	}
 	return images
 }
