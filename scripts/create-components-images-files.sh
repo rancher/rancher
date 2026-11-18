@@ -27,6 +27,10 @@ if [ ! -d $SMALL_FORK_REPO_DIR ]; then
     git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
 fi
 
+# The export checks the chart pins against the images list, and the one of system-upgrade-controller is only in
+# package/Dockerfile.
+eval "$(grep '^ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION' ../package/Dockerfile | awk '{print "export " $2}')"
+
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.
     TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $CHARTS_DIRS $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE $CLUSTER_API_CONTROLLER_IMAGE
