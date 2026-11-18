@@ -87,7 +87,7 @@ func GetArtifacts(
 		chartExportConfig.ChartsPath = chartPath
 
 		charts := Charts{chartExportConfig}
-		if err := charts.FetchImages(imagesSet); err != nil {
+		if err := charts.FetchImagesV2(imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
 		}
 	}
