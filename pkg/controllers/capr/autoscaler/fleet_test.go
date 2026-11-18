@@ -293,10 +293,13 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.33.0+k3s1", true)
 
 	result := s.h.chartVersionsForCluster(cluster)
-	s.Equal("1.34.5-16.1", result.imageTag)
+	expected, ok := k8sVersionToAutoscalerChartVersions[33]
+	s.Require().True(ok)
+	s.Require().NotEqual(defaultChartVersionConfigs, expected)
+	s.Equal(expected, result)
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
