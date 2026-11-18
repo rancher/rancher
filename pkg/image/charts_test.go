@@ -193,3 +193,13 @@ func TestCompareRancherVersionToConstraint(t *testing.T) {
 		assert.Equalf(tc.expected, actual, "testcase: %v", tc)
 	}
 }
+
+func TestImageMatchesOS(t *testing.T) {
+	assert := assertlib.New(t)
+	assert.True(imageMatchesOS("", Linux))
+	assert.False(imageMatchesOS("", Windows))
+	assert.True(imageMatchesOS("Windows", Windows))
+	assert.False(imageMatchesOS("windows", Linux))
+	assert.True(imageMatchesOS("linux, windows", Windows))
+	assert.True(imageMatchesOS("windows,linux", Linux))
+}

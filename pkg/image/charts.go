@@ -11,12 +11,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v2"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"
+
+// HelmImagesAnnotationKey lists the images of a chart version in the charts index.yaml.
+const HelmImagesAnnotationKey = "helm.sh/images"
 
 // chartsToCheckConstraints and systemChartsToCheckConstraints define which charts and system charts should
 // be checked for images and added to imageSet based on whether the given Rancher version/tag satisfies the chart's
@@ -77,23 +79,41 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 			}
 		}
 	}
-	// Find values.yaml files in the tgz files of each chart, and check for images to add to imageSet
 	for _, version := range filteredVersions {
-		tgzPath := filepath.Join(c.Config.ChartsPath, version.URLs[0])
-		versionValues, err := decodeValuesFilesInTgz(tgzPath)
-		if err != nil {
-			logrus.Info(err)
-			continue
-		}
 		tag := chartsToIgnoreTags[version.Name]
 		chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
-		for _, values := range versionValues {
-			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType, tag); err != nil {
-				return err
+		var annotatedImages []struct {
+			Image string `yaml:"image"`
+			OS    string `yaml:"os"`
+		}
+		if err := yaml.Unmarshal([]byte(version.Annotations[HelmImagesAnnotationKey]), &annotatedImages); err != nil {
+			return errors.Wrapf(err, "failed to parse %s annotation of %s", HelmImagesAnnotationKey, chartNameAndVersion)
+		}
+		for _, img := range annotatedImages {
+			if tag != "" && strings.HasSuffix(img.Image, ":"+tag) {
+				continue
+			}
+			if imageMatchesOS(img.OS, c.Config.OsType) {
+				addSourceToImage(imagesSet, img.Image, chartNameAndVersion)
 			}
 		}
 	}
 	return nil
+}
+
+// imageMatchesOS reports whether an image with the given comma-delimited "os" value (e.g. "windows,linux")
+// belongs in the list for osType. An empty value means Linux only, as in chart values.yaml files.
+func imageMatchesOS(osList string, osType OSType) bool {
+	if strings.TrimSpace(osList) == "" {
+		return osType == Linux
+	}
+	for _, os := range strings.Split(osList, ",") {
+		os = strings.TrimSpace(os)
+		if (strings.EqualFold("windows", os) && osType == Windows) || (strings.EqualFold("linux", os) && osType == Linux) {
+			return true
+		}
+	}
+	return false
 }
 
 // FetchOCICharts finds all OCI chart artifacts for charts in a github repository
