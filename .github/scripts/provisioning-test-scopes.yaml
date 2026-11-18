@@ -178,6 +178,9 @@ scopes:
             - 'github.com/rancher/norman'
       - path: '^build.yaml'
         substrings:
+          - 'defaultAssetsImage:'
+          - 'chartDefaultBranch:'
+          - 'rke2ChartDefaultBranch'
           - 'fleetVersion:'
           - 'webhookVersion:'
       - path: "^pkg/settings/setting.go"
@@ -252,7 +255,10 @@ scopes:
 full:
   - path: '^build.yaml'
     substrings:
+      - 'machineProvisionImage:'
+      - 'systemAgentVersion:'
       - 'turtlesVersion:'
+      - 'clusterAPIControllerImage:'
   - path: '^go.mod$'
     substrings:
       - 'github.com/rancher/cluster-api-provider-rke2'
