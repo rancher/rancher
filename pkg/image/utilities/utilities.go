@@ -132,11 +132,16 @@ func GatherTargetArtifactsAndSources(
 		return ArtifactTargetsAndSources{}, err
 	}
 
-	// The images of the charts are pushed to the registry of the build before their charts, so they have to be there
-	// before anything of the list that has them is written: the one that is not would fail when it is saved.
+	// The images of the charts of rancher/charts are pushed to the registry of the build before their charts, so they
+	// have to be there before anything of the list that has them is written: the one that is not would fail when it is
+	// saved. The ones of the other repositories, prime-charts for one, are not asked for.
 	allLines := append(append([]string{}, targetArtifactsAndSources...), targetWindowsArtifactsAndSources...)
 	registry := img.RegistryOfAssetsImage(buildconfig.DefaultAssetsImage)
-	if err := img.CheckImagesExist(registry, img.ImagesOfCharts(allLines)); err != nil {
+	chartImages, err := img.ImagesOfCatalogCharts(allLines, chartPaths)
+	if err != nil {
+		return ArtifactTargetsAndSources{}, err
+	}
+	if err := img.CheckImagesExist(registry, chartImages); err != nil {
 		return ArtifactTargetsAndSources{}, err
 	}
 
