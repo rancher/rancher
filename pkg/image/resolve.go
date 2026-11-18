@@ -87,7 +87,13 @@ func GetArtifacts(
 		chartExportConfig.ChartsPath = chartPath
 
 		charts := Charts{chartExportConfig}
-		if err := charts.FetchImagesV2(imagesSet); err != nil {
+		// Only rancher/charts is the catalog of the new system. Any other directory, prime-charts for one, is in the
+		// old format and is read as it always was. To go back to the old system for all of them, call FetchImages here.
+		fetch := charts.FetchImages
+		if isCatalogPath(charts.Config.ChartsPath) {
+			fetch = charts.FetchImagesV2
+		}
+		if err := fetch(imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
 		}
 	}
