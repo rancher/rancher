@@ -20,6 +20,6 @@ const (
 	Rke2ChartDefaultBranch    = "main"
 	SystemAgentVersion        = "v0.16.0-rc.6"
 	TurtlesVersion            = "111.0.0+up0.28.0-rc.7"
-	WebhookVersion            = "111.0.0+up0.12.1-rc.17"
+	WebhookVersion            = "111.0.1+up0.12.1-rc.20"
 	WinsAgentVersion          = "v0.16.0-rc.10"
 )
