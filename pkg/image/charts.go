@@ -5,9 +5,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -81,13 +79,9 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 	}
 	// Find values.yaml files in the tgz files of each chart, and check for images to add to imageSet
 	for _, version := range filteredVersions {
-		archive, remote := chartArchivePath(version)
-		versionValues, err := decodeValuesFilesInTgz(filepath.Join(c.Config.ChartsPath, archive))
+		tgzPath := filepath.Join(c.Config.ChartsPath, version.URLs[0])
+		versionValues, err := decodeValuesFilesInTgz(tgzPath)
 		if err != nil {
-			// A chart that points at a registry has to be in assets/, so a list without its images would be wrong.
-			if remote {
-				return errors.Wrapf(err, "failed to read the chart %s:%s", version.Name, version.Version)
-			}
 			logrus.Info(err)
 			continue
 		}
@@ -100,17 +94,6 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 		}
 	}
 	return nil
-}
-
-// chartArchivePath returns the path, relative to the root of the charts repository, of the packaged chart of
-// version, and whether the index entry points outside of the repository. An entry with a URL that has a scheme
-// other than file (oci://, https://) has no archive at that path in the checkout: the archive is at
-// assets/<name>/<name>-<version>.tgz, which is where Rancher reads it from at runtime.
-func chartArchivePath(version *repo.ChartVersion) (string, bool) {
-	if u, err := url.Parse(version.URLs[0]); err == nil && u.Scheme != "" && u.Scheme != "file" {
-		return path.Join("assets", version.Name, fmt.Sprintf("%s-%s.tgz", version.Name, version.Version)), true
-	}
-	return version.URLs[0], false
 }
 
 // FetchOCICharts finds all OCI chart artifacts for charts in a github repository
