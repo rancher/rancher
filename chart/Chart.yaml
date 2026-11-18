@@ -20,7 +20,7 @@ annotations:
     - name: rancher
       image: rancher/rancher:%APP_VERSION%
     - name: rancher-assets
-      image: rancher/rancher-assets:v2.16-20261118T1113Z-dev
+      image: rancher/rancher-assets:v2.16-20261118T1639Z-dev
     - name: shell
       image: rancher/shell:v0.9.1-rc.2
     - name: mirrored-bci-micro
