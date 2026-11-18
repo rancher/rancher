@@ -6,7 +6,7 @@ const (
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-23.2"
 	ChartDefaultBranch        = "staging"
 	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4-turtles.1"
-	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261118T1639Z-dev"
+	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261118T2106Z-dev"
 	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.5"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4-rc.2"
 	DefaultShellVersion       = "rancher/shell:v0.9.1-rc.2"
