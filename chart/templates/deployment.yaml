@@ -216,6 +216,12 @@ spec:
           timeoutSeconds: {{.Values.readinessProbe.timeoutSeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
           failureThreshold: {{.Values.readinessProbe.failureThreshold }}
+        {{- if and (gt (int .Values.preStopSleepSeconds) 0) (semverCompare ">=1.30.0-0" .Capabilities.KubeVersion.Version) }}
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: {{ int .Values.preStopSleepSeconds }}
+        {{- end }}
         {{- if .Values.resources }}
         resources: {{- toYaml .Values.resources | nindent 10 }}
         {{- end }}
