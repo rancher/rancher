@@ -21,6 +21,23 @@ const HelmImagesAnnotationKey = "helm.sh/images"
 type annotatedImage struct {
 	Name  string `yaml:"name"`
 	Image string `yaml:"image"`
+	// Dependency marks an image that the chart installs and its values.yaml does not have. It is the name of what the
+	// chart depends on, or true, and it is not there, or false or empty, for any other image.
+	Dependency interface{} `yaml:"dependency"`
+}
+
+// isDependency reports whether the image is marked as a dependency.
+func (a annotatedImage) isDependency() bool {
+	switch dependency := a.Dependency.(type) {
+	case nil:
+		return false
+	case bool:
+		return dependency
+	case string:
+		return dependency != ""
+	default:
+		return true
+	}
 }
 
 // FetchImagesV2 is FetchImages for the catalog of the staging and production branches of rancher/charts, and it
@@ -38,6 +55,10 @@ type annotatedImage struct {
 //   - The images found in the values.yaml of each chart have to be exactly the ones that its helm.sh/images annotation
 //     declares, or it is an error that names the charts and the images of every difference. The list is made of what is
 //     found, so a chart that declares more or less than that is not installing what the list has.
+//   - The images that the annotation marks as a dependency are the exception: the chart installs them and its
+//     values.yaml does not have them, which is the reason for the mark, and an air-gapped installation needs them as
+//     much as the others, so they are in the list of images of Linux. The annotation does not say the system of an
+//     image, so they are not in the one of Windows.
 //
 // Entries with a path in the repository (partner-charts, rke2-charts) are read, and skipped when the archive is not
 // there, as FetchImages does. The selection of the version, and the reading of values.yaml, are the ones of
@@ -70,12 +91,17 @@ func (c Charts) FetchImagesV2(imagesSet map[string]map[string]struct{}) error {
 		}
 		tag := chartsToIgnoreTags[version.Name]
 		chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
-		problem, err := compareWithAnnotation(version, versionValues, tag)
+		problem, dependencies, err := compareWithAnnotation(version, versionValues, tag)
 		if err != nil {
 			return err
 		}
 		if problem != "" {
 			problems = append(problems, problem)
+		}
+		if c.Config.OsType == Linux {
+			for _, image := range dependencies {
+				addSourceToImage(imagesSet, image, chartNameAndVersion)
+			}
 		}
 		for _, values := range versionValues {
 			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType, tag); err != nil {
@@ -104,8 +130,9 @@ func sortedChartNames(index *repo.IndexFile) []string {
 // compareWithAnnotation compares the images found in the values.yaml of a chart version, for Linux and Windows, with
 // the ones that its helm.sh/images annotation declares. The annotation does not tell the system of an image, so the
 // images of both are compared with all of it. It returns a description of the differences, or an empty string when
-// there is none. A chart with no images and no annotation has none.
-func compareWithAnnotation(version *repo.ChartVersion, values []map[interface{}]interface{}, tagToIgnore string) (string, error) {
+// there is none, and the images that it marks as a dependency and the values.yaml does not have. A chart with no images
+// and no annotation has no difference.
+func compareWithAnnotation(version *repo.ChartVersion, values []map[interface{}]interface{}, tagToIgnore string) (string, []string, error) {
 	source := fmt.Sprintf("%s:%s", version.Name, version.Version)
 
 	found := map[string]struct{}{}
@@ -113,7 +140,7 @@ func compareWithAnnotation(version *repo.ChartVersion, values []map[interface{}]
 		images := map[string]map[string]struct{}{}
 		for _, v := range values {
 			if err := pickImagesFromValuesMap(images, v, source, osType, tagToIgnore); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 		for image := range images {
@@ -123,24 +150,33 @@ func compareWithAnnotation(version *repo.ChartVersion, values []map[interface{}]
 
 	var annotated []annotatedImage
 	if err := yaml.Unmarshal([]byte(version.Annotations[HelmImagesAnnotationKey]), &annotated); err != nil {
-		return fmt.Sprintf("  %s\n    cannot read its %s annotation: %v", source, HelmImagesAnnotationKey, err), nil
+		return fmt.Sprintf("  %s\n    cannot read its %s annotation: %v", source, HelmImagesAnnotationKey, err), nil, nil
 	}
 	declared := map[string]struct{}{}
+	declaredNotDependencies := map[string]struct{}{}
+	dependencies := map[string]struct{}{}
 	for _, a := range annotated {
 		declared[a.Image] = struct{}{}
+		if a.isDependency() {
+			dependencies[a.Image] = struct{}{}
+		} else {
+			declaredNotDependencies[a.Image] = struct{}{}
+		}
 	}
+	// A dependency that the chart also has is already in the list, and one that it does not is added to it.
+	notFound := difference(dependencies, found)
 
 	var lines []string
-	if missing := difference(declared, found); len(missing) > 0 {
+	if missing := difference(declaredNotDependencies, found); len(missing) > 0 {
 		lines = append(lines, fmt.Sprintf("    declared in %s, not found in values.yaml: %s", HelmImagesAnnotationKey, strings.Join(missing, ", ")))
 	}
 	if undeclared := difference(found, declared); len(undeclared) > 0 {
 		lines = append(lines, fmt.Sprintf("    found in values.yaml, not declared in %s: %s", HelmImagesAnnotationKey, strings.Join(undeclared, ", ")))
 	}
 	if len(lines) == 0 {
-		return "", nil
+		return "", notFound, nil
 	}
-	return "  " + source + "\n" + strings.Join(lines, "\n"), nil
+	return "  " + source + "\n" + strings.Join(lines, "\n"), notFound, nil
 }
 
 // difference returns the sorted members of a that are not in b.
