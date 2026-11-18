@@ -129,40 +129,44 @@ func (h *handler) lifecycleObjectsForNode(mgmtCluster *apimgmtv3.Cluster, node *
 		return nil, nil, err
 	}
 
+	// A provisioning Cluster exists for BOTH v2prov (CAPRKE2) and plain imported RKE2/K3s clusters, so
+	// capiRef being non-nil is not enough to prove this node is CAPI-backed. Only CAPRKE2 clusters
+	// actually have a cluster.x-k8s.io Cluster and Machines; imported clusters do not. We therefore
+	// only take the CAPI branch when the CAPI Cluster actually exists, and otherwise fall through to
+	// the mgmt v3 objects (the pre-existing behaviour for imported clusters). Getting this wrong leaves
+	// imported Nodes with no lifecycle labels, which breaks snapshot back-population (SURE-12151).
 	if capiRef != nil {
 		capiCluster, err := h.capiClusterCache.Get(capiRef.Namespace, capiRef.Name)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				// CAPI cluster not populated yet (transient).
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, nil, err
+		}
+
+		if capiCluster != nil {
+			machines, err := h.capiMachineCache.List(capiCluster.Namespace, labels.SelectorFromSet(labels.Set{
+				capi.ClusterNameLabel: capiCluster.Name,
+			}))
+			if err != nil {
+				return nil, nil, err
+			}
+
+			for _, m := range machines {
+				if m.DeletionTimestamp == nil && m.Status.NodeRef.IsDefined() && m.Status.NodeRef.Name == node.Name {
+					capiClusterTyped := capiCluster.DeepCopy()
+					capiClusterTyped.TypeMeta = metav1.TypeMeta{Kind: "Cluster", APIVersion: capi.GroupVersion.String()}
+					machineTyped := m.DeepCopy()
+					machineTyped.TypeMeta = metav1.TypeMeta{Kind: "Machine", APIVersion: capi.GroupVersion.String()}
+					return capiClusterTyped, machineTyped, nil
+				}
+			}
+
+			// A CAPI-backed (CAPRKE2) cluster whose Machine has not yet claimed this node: wait for the
+			// NodeRef to be populated rather than stamping the wrong (mgmt v3) labels.
+			if len(machines) > 0 {
 				return nil, nil, nil
 			}
-			return nil, nil, err
 		}
-
-		machines, err := h.capiMachineCache.List(capiCluster.Namespace, labels.SelectorFromSet(labels.Set{
-			capi.ClusterNameLabel: capiCluster.Name,
-		}))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		for _, m := range machines {
-			if m.DeletionTimestamp == nil && m.Status.NodeRef.IsDefined() && m.Status.NodeRef.Name == node.Name {
-				capiClusterTyped := capiCluster.DeepCopy()
-				capiClusterTyped.TypeMeta = metav1.TypeMeta{Kind: "Cluster", APIVersion: capi.GroupVersion.String()}
-				machineTyped := m.DeepCopy()
-				machineTyped.TypeMeta = metav1.TypeMeta{Kind: "Machine", APIVersion: capi.GroupVersion.String()}
-				return capiClusterTyped, machineTyped, nil
-			}
-		}
-
-		// The cluster is CAPI-backed but no Machine claims this node yet; wait for the NodeRef to be
-		// populated rather than falling back to mgmt v3 objects (which would stamp the wrong labels).
-		if len(machines) > 0 {
-			return nil, nil, nil
-		}
-		// No CAPI Machines at all: this is a truly-imported cluster that merely has a provisioning
-		// Cluster shell. Fall through to the mgmt v3 objects below.
+		// Either no CAPI Cluster (plain imported with only a provisioning-cluster shell) or a CAPI
+		// cluster with no Machines yet: fall through to the mgmt v3 objects below.
 	}
 
 	mgmtNodes, err := h.mgmtNodeCache.List(h.clusterName, labels.SelectorFromSet(labels.Set{
