@@ -253,3 +253,15 @@ func TestRegistryOfAssetsImageIsStagingForADevImage(t *testing.T) {
 func TestRegistryOfAssetsImageIsProductionForAnyOtherImage(t *testing.T) {
 	assert.Equal(t, "registry.suse.com", RegistryOfAssetsImage("rancher/rancher-assets:v2.16-20261118T1616Z"))
 }
+
+func TestImagesOfChartsMergesTheLinesOfTheSameImage(t *testing.T) {
+	lines := []string{
+		"rancher/fleet-agent:v0.17.0 fleet-agent:111.0.1",
+		"rancher/fleet-agent:v0.17.0 fleet:111.0.1,rancher",
+		"rancher/fleet-agent:v0.17.0 fleet-agent:111.0.1",
+	}
+
+	assert.Equal(t, []ChartImage{
+		{Image: "rancher/fleet-agent:v0.17.0", Sources: []string{"fleet-agent:111.0.1", "fleet:111.0.1"}},
+	}, ImagesOfCharts(lines), "the list of Linux and the list of Windows can have the same image")
+}
