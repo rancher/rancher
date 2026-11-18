@@ -88,3 +88,23 @@ func TestFetchImagesChartWithRelativeURLAndNoArchiveIsSkipped(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, imagesSet)
 }
+
+func TestFetchImagesChartWithRemoteURLReadsArchiveFromAssets(t *testing.T) {
+	for _, url := range []string{
+		"oci://registry.example.com/rancher/catalog/fleet:111.0.1_up0.17.0@sha256:0123456789abcdef",
+		"https://charts.example.com/fleet-111.0.1+up0.17.0.tgz",
+	} {
+		t.Run(url, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestIndex(t, root, url)
+			writeTestArchive(t, root, "assets/fleet/fleet-111.0.1+up0.17.0.tgz", testChartValues)
+
+			imagesSet, err := fetchTestImages(t, root)
+
+			require.NoError(t, err)
+			assert.Equal(t, map[string]map[string]struct{}{
+				"rancher/fleet:v0.17.0": {"fleet:111.0.1+up0.17.0": {}},
+			}, imagesSet)
+		})
+	}
+}
