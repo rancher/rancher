@@ -162,3 +162,81 @@ func TestFetchImagesV2ComparesTheAnnotationWithTheImagesOfBothSystems(t *testing
 		})
 	}
 }
+
+const dependencyAnnotation = fleetAnnotation + "- name: capi\n  dependency: cluster-api\n  image: rancher/cluster-api-controller:v1.14.4\n"
+
+func TestFetchImagesV2AddsTheDependenciesOfAChartToTheImagesOfLinux(t *testing.T) {
+	root := t.TempDir()
+	writeTestCharts(t, root, testChart{"fleet", "111.0.1", fleetValues, dependencyAnnotation})
+
+	imagesSet, err := fetchTestImagesOf(t, root, Linux)
+
+	require.NoError(t, err, "a dependency is not in the values.yaml of the chart, which is why it is one")
+	assert.Equal(t, map[string]map[string]struct{}{
+		"rancher/fleet:v0.17.0":                  {"fleet:111.0.1": {}},
+		"rancher/cluster-api-controller:v1.14.4": {"fleet:111.0.1": {}},
+	}, imagesSet)
+}
+
+func TestFetchImagesV2DoesNotAddTheDependenciesOfAChartToTheImagesOfWindows(t *testing.T) {
+	root := t.TempDir()
+	writeTestCharts(t, root, testChart{"fleet", "111.0.1", fleetValues, dependencyAnnotation})
+
+	imagesSet, err := fetchTestImagesOf(t, root, Windows)
+
+	require.NoError(t, err)
+	assert.Empty(t, imagesSet, "the annotation does not say that a dependency is for Windows")
+}
+
+func TestFetchImagesV2TakesAnyValueOfDependencyAsOne(t *testing.T) {
+	for _, dependency := range []string{"true", "cluster-api", "'yes'"} {
+		t.Run(dependency, func(t *testing.T) {
+			root := t.TempDir()
+			annotation := fleetAnnotation + "- name: capi\n  dependency: " + dependency + "\n  image: rancher/cluster-api-controller:v1.14.4\n"
+			writeTestCharts(t, root, testChart{"fleet", "111.0.1", fleetValues, annotation})
+
+			imagesSet, err := fetchTestImagesOf(t, root, Linux)
+
+			require.NoError(t, err)
+			assert.Contains(t, imagesSet, "rancher/cluster-api-controller:v1.14.4")
+		})
+	}
+}
+
+func TestFetchImagesV2DoesNotTakeFalseOrEmptyDependencyAsOne(t *testing.T) {
+	for _, dependency := range []string{"false", "''"} {
+		t.Run(dependency, func(t *testing.T) {
+			root := t.TempDir()
+			annotation := fleetAnnotation + "- name: capi\n  dependency: " + dependency + "\n  image: rancher/cluster-api-controller:v1.14.4\n"
+			writeTestCharts(t, root, testChart{"fleet", "111.0.1", fleetValues, annotation})
+
+			_, err := fetchTestImagesOf(t, root, Linux)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "declared in helm.sh/images, not found in values.yaml: rancher/cluster-api-controller:v1.14.4")
+		})
+	}
+}
+
+func TestFetchImagesV2ListsADependencyThatTheChartAlsoHasOnce(t *testing.T) {
+	root := t.TempDir()
+	annotation := "- name: fleet\n  dependency: itself\n  image: rancher/fleet:v0.17.0\n"
+	writeTestCharts(t, root, testChart{"fleet", "111.0.1", fleetValues, annotation})
+
+	imagesSet, err := fetchTestImagesOf(t, root, Linux)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]map[string]struct{}{"rancher/fleet:v0.17.0": {"fleet:111.0.1": {}}}, imagesSet)
+}
+
+func TestFetchImagesV2StillFailsForAnImageThatIsNotADependencyWhenThereAreDependencies(t *testing.T) {
+	root := t.TempDir()
+	writeTestCharts(t, root, testChart{"fleet", "111.0.1", fleetValues,
+		dependencyAnnotation + "- name: gone\n  image: rancher/gone:v1\n"})
+
+	_, err := fetchTestImagesOf(t, root, Linux)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "rancher/gone:v1")
+	assert.NotContains(t, err.Error(), "cluster-api-controller", "a dependency is not a difference")
+}
