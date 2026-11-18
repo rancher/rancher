@@ -2,6 +2,7 @@ package image
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -26,7 +27,12 @@ func PinnedCharts() []PinnedChart {
 		{Name: "remotedialer-proxy", Version: settings.RemoteDialerProxyVersion.Get()},
 		{Name: "rancher-turtles", Version: settings.RancherTurtlesVersion.Get()},
 	}
-	if version := settings.SystemUpgradeControllerChartVersion.Get(); version != "" {
+	// The setting only reads its variable when Rancher runs with the settings provider, which the export does not.
+	version := os.Getenv(settings.GetEnvKey(settings.SystemUpgradeControllerChartVersion.Name))
+	if version == "" {
+		version = settings.SystemUpgradeControllerChartVersion.Get()
+	}
+	if version != "" {
 		pins = append(pins, PinnedChart{Name: "system-upgrade-controller", Version: version})
 	}
 	return pins
