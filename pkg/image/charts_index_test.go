@@ -57,49 +57,31 @@ func writeTestArchive(t *testing.T, root, path, values string) {
 	require.NoError(t, gzw.Close())
 }
 
-func fetchTestImages(t *testing.T, root string) (map[string]map[string]struct{}, error) {
+type fetchImages func(Charts, map[string]map[string]struct{}) error
+
+// fetchers are the two ways of reading a charts repository: the one of the old system and the one of the catalog.
+var fetchers = map[string]fetchImages{
+	"FetchImages":   Charts.FetchImages,
+	"FetchImagesV2": Charts.FetchImagesV2,
+}
+
+func fetchTestImages(t *testing.T, fetch fetchImages, root string) (map[string]map[string]struct{}, error) {
 	t.Helper()
 	imagesSet := map[string]map[string]struct{}{}
 	charts := Charts{ExportConfig{ChartsPath: root, RancherVersion: "2.16.99", OsType: Linux}}
-	err := charts.FetchImages(imagesSet)
+	err := fetch(charts, imagesSet)
 	return imagesSet, err
 }
 
 func TestFetchImagesChartWithRelativeURL(t *testing.T) {
-	root := t.TempDir()
-	archive := "assets/fleet/fleet-111.0.1+up0.17.0.tgz"
-	writeTestIndex(t, root, archive)
-	writeTestArchive(t, root, archive, testChartValues)
-
-	imagesSet, err := fetchTestImages(t, root)
-
-	require.NoError(t, err)
-	assert.Equal(t, map[string]map[string]struct{}{
-		"rancher/fleet:v0.17.0": {"fleet:111.0.1+up0.17.0": {}},
-	}, imagesSet)
-}
-
-func TestFetchImagesChartWithRelativeURLAndNoArchiveIsSkipped(t *testing.T) {
-	root := t.TempDir()
-	writeTestIndex(t, root, "assets/fleet/fleet-111.0.1+up0.17.0.tgz")
-
-	imagesSet, err := fetchTestImages(t, root)
-
-	require.NoError(t, err)
-	assert.Empty(t, imagesSet)
-}
-
-func TestFetchImagesChartWithRemoteURLReadsArchiveFromAssets(t *testing.T) {
-	for _, url := range []string{
-		"oci://registry.example.com/rancher/catalog/fleet:111.0.1_up0.17.0@sha256:0123456789abcdef",
-		"https://charts.example.com/fleet-111.0.1+up0.17.0.tgz",
-	} {
-		t.Run(url, func(t *testing.T) {
+	for name, fetch := range fetchers {
+		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
-			writeTestIndex(t, root, url)
-			writeTestArchive(t, root, "assets/fleet/fleet-111.0.1+up0.17.0.tgz", testChartValues)
+			archive := "assets/fleet/fleet-111.0.1+up0.17.0.tgz"
+			writeTestIndex(t, root, archive)
+			writeTestArchive(t, root, archive, testChartValues)
 
-			imagesSet, err := fetchTestImages(t, root)
+			imagesSet, err := fetchTestImages(t, fetch, root)
 
 			require.NoError(t, err)
 			assert.Equal(t, map[string]map[string]struct{}{
@@ -109,11 +91,45 @@ func TestFetchImagesChartWithRemoteURLReadsArchiveFromAssets(t *testing.T) {
 	}
 }
 
-func TestFetchImagesChartWithRemoteURLAndNoArchiveFails(t *testing.T) {
+func TestFetchImagesChartWithRelativeURLAndNoArchiveIsSkipped(t *testing.T) {
+	for name, fetch := range fetchers {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestIndex(t, root, "assets/fleet/fleet-111.0.1+up0.17.0.tgz")
+
+			imagesSet, err := fetchTestImages(t, fetch, root)
+
+			require.NoError(t, err)
+			assert.Empty(t, imagesSet)
+		})
+	}
+}
+
+func TestFetchImagesV2ChartWithRemoteURLReadsArchiveFromAssets(t *testing.T) {
+	for _, url := range []string{
+		"oci://registry.example.com/rancher/catalog/fleet:111.0.1_up0.17.0@sha256:0123456789abcdef",
+		"https://charts.example.com/fleet-111.0.1+up0.17.0.tgz",
+	} {
+		t.Run(url, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestIndex(t, root, url)
+			writeTestArchive(t, root, "assets/fleet/fleet-111.0.1+up0.17.0.tgz", testChartValues)
+
+			imagesSet, err := fetchTestImages(t, Charts.FetchImagesV2, root)
+
+			require.NoError(t, err)
+			assert.Equal(t, map[string]map[string]struct{}{
+				"rancher/fleet:v0.17.0": {"fleet:111.0.1+up0.17.0": {}},
+			}, imagesSet)
+		})
+	}
+}
+
+func TestFetchImagesV2ChartWithRemoteURLAndNoArchiveFails(t *testing.T) {
 	root := t.TempDir()
 	writeTestIndex(t, root, "oci://registry.example.com/rancher/catalog/fleet:111.0.1_up0.17.0@sha256:0123456789abcdef")
 
-	imagesSet, err := fetchTestImages(t, root)
+	imagesSet, err := fetchTestImages(t, Charts.FetchImagesV2, root)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "assets/fleet/fleet-111.0.1+up0.17.0.tgz")
