@@ -92,6 +92,8 @@ func GetArtifacts(
 		fetch := charts.FetchImages
 		if isCatalogPath(charts.Config.ChartsPath) {
 			fetch = charts.FetchImagesV2
+		} else if err := checkNotACatalog(charts.Config.ChartsPath); err != nil {
+			return nil, nil, err
 		}
 		if err := fetch(imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")

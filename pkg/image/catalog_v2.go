@@ -1,6 +1,8 @@
 package image
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -49,4 +51,14 @@ func ImagesOfCatalogCharts(imagesAndSources []string, chartsPath string) ([]Char
 		}
 	}
 	return images, nil
+}
+
+// checkNotACatalog returns an error for a directory that is read as one in the old format and has the entries/ of the
+// catalog of the new system: it is rancher/charts under another name, so its charts would be read the old way, from
+// URLs that are not paths, and left out of the list.
+func checkNotACatalog(path string) error {
+	if info, err := os.Stat(filepath.Join(path, "entries")); err == nil && info.IsDir() {
+		return fmt.Errorf("%s has an entries/ directory, as the catalog of the new system does, and it is not in a directory named %q", path, catalogDirectory)
+	}
+	return nil
 }
