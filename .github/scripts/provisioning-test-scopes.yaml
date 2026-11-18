@@ -181,6 +181,7 @@ scopes:
           - 'defaultAssetsImage:'
           - 'chartDefaultBranch:'
           - 'rke2ChartDefaultBranch'
+          - 'machineProvisionImage:'
           - 'fleetVersion:'
           - 'webhookVersion:'
       - path: "^pkg/settings/setting.go"
@@ -255,7 +256,6 @@ scopes:
 full:
   - path: '^build.yaml'
     substrings:
-      - 'machineProvisionImage:'
       - 'systemAgentVersion:'
       - 'turtlesVersion:'
       - 'clusterAPIControllerImage:'
