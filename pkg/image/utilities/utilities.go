@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/rancher/rancher/pkg/buildconfig"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
 	"github.com/rancher/rancher/pkg/settings"
@@ -128,6 +129,14 @@ func GatherTargetArtifactsAndSources(
 
 	targetWindowsArtifacts, targetWindowsArtifactsAndSources, err := img.GetArtifacts(chartPaths, ociChartsPath, img.Windows, rancherVersion, img.ExtensionEndpoints, nil, []string{winsAgentUpdateImage}, ociRepository)
 	if err != nil {
+		return ArtifactTargetsAndSources{}, err
+	}
+
+	// The images of the charts are pushed to the registry of the build before their charts, so they have to be there
+	// before anything of the list that has them is written: the one that is not would fail when it is saved.
+	allLines := append(append([]string{}, targetArtifactsAndSources...), targetWindowsArtifactsAndSources...)
+	registry := img.RegistryOfAssetsImage(buildconfig.DefaultAssetsImage)
+	if err := img.CheckImagesExist(registry, img.ImagesOfCharts(allLines)); err != nil {
 		return ArtifactTargetsAndSources{}, err
 	}
 
