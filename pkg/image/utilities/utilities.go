@@ -62,10 +62,16 @@ func GatherTargetArtifactsAndSources(
 	ociRepository string,
 	rancherVersion string,
 ) (ArtifactTargetsAndSources, error) {
-	if !img.IsValidSemver(rancherVersion) || !settings.IsReleaseServerVersion(rancherVersion) {
+	// The charts of a release have to be the ones that Rancher installs, which is only a warning for any other build.
+	isRelease := img.IsValidSemver(rancherVersion) && settings.IsReleaseServerVersion(rancherVersion)
+	if !isRelease {
 		rancherVersion = settings.RancherVersionDev
 	}
 	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
+
+	if err := img.CheckPinnedCharts(chartPaths, rancherVersion, img.PinnedCharts(), isRelease); err != nil {
+		return ArtifactTargetsAndSources{}, err
+	}
 
 	// expected to already exist in the current runtime or working tree
 	b, err := os.ReadFile(filepath.Join("data.json"))

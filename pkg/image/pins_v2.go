@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
@@ -13,6 +14,22 @@ import (
 type PinnedChart struct {
 	Name    string
 	Version string
+}
+
+// PinnedCharts returns the charts that Rancher installs at an exact version, with the version that it installs.
+// The version of system-upgrade-controller is only pinned when its setting has a value: with none, Rancher installs the
+// latest one.
+func PinnedCharts() []PinnedChart {
+	pins := []PinnedChart{
+		{Name: "fleet", Version: settings.FleetVersion.Get()},
+		{Name: "rancher-webhook", Version: settings.RancherWebhookVersion.Get()},
+		{Name: "remotedialer-proxy", Version: settings.RemoteDialerProxyVersion.Get()},
+		{Name: "rancher-turtles", Version: settings.RancherTurtlesVersion.Get()},
+	}
+	if version := settings.SystemUpgradeControllerChartVersion.Get(); version != "" {
+		pins = append(pins, PinnedChart{Name: "system-upgrade-controller", Version: version})
+	}
+	return pins
 }
 
 // CheckPinnedCharts checks that the version of each pinned chart is the one FetchImagesV2 reads for the Rancher
