@@ -536,3 +536,57 @@ func TestSystemTemplate_quotedValues(t *testing.T) {
 	}
 	assert.True(t, found, "cattle-cluster-agent deployment not rendered")
 }
+
+// An empty appendTolerations list (as persisted by raw-JSON clients such as the dashboard EKS form) must not
+// render a literal `[]` after the default tolerations, which makes the agent manifest invalid YAML.
+func TestSystemTemplate_emptyAppendTolerations(t *testing.T) {
+	secretLister := &corefakes.SecretListerMock{
+		GetFunc: func(namespace string, name string) (*corev1.Secret, error) {
+			return nil, apierror.NewNotFound(schema.GroupResource{}, name)
+		},
+	}
+
+	renderTolerations := func(t *testing.T, appendTolerations []corev1.Toleration) []corev1.Toleration {
+		t.Helper()
+		cluster := &apimgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-abcde"},
+			Spec: apimgmtv3.ClusterSpec{
+				DisplayName: "test",
+				ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+					ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{AppendTolerations: appendTolerations},
+				},
+			},
+		}
+
+		var b bytes.Buffer
+		err := SystemTemplate(&b, &TemplateOps{
+			AgentImage:   "rancher/rancher-agent:test",
+			AuthImage:    "rancher/kube-api-auth:test",
+			AssetsImage:  "rancher/rancher-assets:test",
+			Token:        "token",
+			URL:          "https://rancher.example",
+			Cluster:      cluster,
+			SecretLister: secretLister,
+			Mutator:      namespace.GetMutator(),
+		})
+		assert.NoError(t, err)
+
+		for r := range strings.SplitSeq(b.String(), "\n---\n") {
+			if !strings.Contains(r, "kind: Deployment") || !strings.Contains(r, "name: cattle-cluster-agent") {
+				continue
+			}
+			obj, _, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(r), nil, nil)
+			if !assert.NoError(t, err, "cattle-cluster-agent deployment must be valid YAML") {
+				return nil
+			}
+			return obj.(*appsv1.Deployment).Spec.Template.Spec.Tolerations
+		}
+		t.Fatal("cattle-cluster-agent deployment not rendered")
+		return nil
+	}
+
+	want := renderTolerations(t, nil)
+	got := renderTolerations(t, []corev1.Toleration{})
+	assert.NotEmpty(t, got)
+	assert.Equal(t, want, got)
+}

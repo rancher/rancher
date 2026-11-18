@@ -1676,3 +1676,92 @@ func TestWebhookCustomization_Changed(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentCustomization_getClusterAgentTolerations(t *testing.T) {
+	toleration := []corev1.Toleration{{Key: "example.com/foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}}
+
+	tests := []struct {
+		name          string
+		customization *v3.AgentDeploymentCustomization
+		expected      []corev1.Toleration
+	}{
+		{name: "nil customization", customization: nil, expected: nil},
+		{name: "nil tolerations", customization: &v3.AgentDeploymentCustomization{}, expected: nil},
+		{name: "empty tolerations are treated as unset", customization: &v3.AgentDeploymentCustomization{AppendTolerations: []corev1.Toleration{}}, expected: nil},
+		{name: "tolerations set", customization: &v3.AgentDeploymentCustomization{AppendTolerations: toleration}, expected: toleration},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &v3.Cluster{Spec: v3.ClusterSpec{ClusterSpecBase: v3.ClusterSpecBase{ClusterAgentDeploymentCustomization: tt.customization}}}
+			assert.Equal(t, tt.expected, GetClusterAgentTolerations(cluster))
+		})
+	}
+}
+
+// Clients writing raw JSON (e.g. the dashboard EKS form) can persist `appendTolerations: []`, while the
+// applied status written back through the typed client drops it (omitempty). Those must not be seen as a change.
+func TestAgentCustomization_agentDeploymentCustomizationChanged_emptyTolerations(t *testing.T) {
+	toleration := []corev1.Toleration{{Key: "example.com/foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}}
+
+	tests := []struct {
+		name     string
+		spec     *v3.AgentDeploymentCustomization
+		status   *v3.AgentDeploymentCustomization
+		expected bool
+	}{
+		{
+			name: "empty spec tolerations vs nil status tolerations (EKS UI save)",
+			spec: &v3.AgentDeploymentCustomization{
+				AppendTolerations:            []corev1.Toleration{},
+				OverrideAffinity:             &corev1.Affinity{},
+				OverrideResourceRequirements: &corev1.ResourceRequirements{},
+			},
+			status: &v3.AgentDeploymentCustomization{
+				OverrideAffinity:             &corev1.Affinity{},
+				OverrideResourceRequirements: &corev1.ResourceRequirements{},
+			},
+			expected: false,
+		},
+		{
+			name:     "nil spec tolerations vs empty status tolerations",
+			spec:     &v3.AgentDeploymentCustomization{OverrideAffinity: &corev1.Affinity{}},
+			status:   &v3.AgentDeploymentCustomization{AppendTolerations: []corev1.Toleration{}, OverrideAffinity: &corev1.Affinity{}},
+			expected: false,
+		},
+		{
+			name:     "empty spec tolerations with no applied status",
+			spec:     &v3.AgentDeploymentCustomization{AppendTolerations: []corev1.Toleration{}},
+			status:   nil,
+			expected: false,
+		},
+		{
+			name:     "tolerations added with no applied status",
+			spec:     &v3.AgentDeploymentCustomization{AppendTolerations: toleration},
+			status:   nil,
+			expected: true,
+		},
+		{
+			name:     "tolerations added",
+			spec:     &v3.AgentDeploymentCustomization{AppendTolerations: toleration},
+			status:   &v3.AgentDeploymentCustomization{AppendTolerations: []corev1.Toleration{}},
+			expected: true,
+		},
+		{
+			name:     "tolerations removed",
+			spec:     &v3.AgentDeploymentCustomization{AppendTolerations: []corev1.Toleration{}},
+			status:   &v3.AgentDeploymentCustomization{AppendTolerations: toleration},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &v3.Cluster{
+				Spec:   v3.ClusterSpec{ClusterSpecBase: v3.ClusterSpecBase{ClusterAgentDeploymentCustomization: tt.spec}},
+				Status: v3.ClusterStatus{AppliedClusterAgentDeploymentCustomization: tt.status},
+			}
+			assert.Equal(t, tt.expected, AgentDeploymentCustomizationChanged(cluster))
+		})
+	}
+}

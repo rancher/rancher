@@ -253,7 +253,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	agentEnvVars = toYAML(envVars)
 
-	if appendTolerations := pkgcluster.GetClusterAgentTolerations(ops.Cluster); appendTolerations != nil {
+	if appendTolerations := pkgcluster.GetClusterAgentTolerations(ops.Cluster); len(appendTolerations) > 0 {
 		agentAppendTolerations = toYAML(appendTolerations)
 		if agentAppendTolerations == "" {
 			return fmt.Errorf("error converting agent append tolerations to YAML")
