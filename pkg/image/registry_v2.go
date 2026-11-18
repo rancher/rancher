@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"oras.land/oras-go/v2/errdef"
@@ -20,6 +21,9 @@ const (
 	stagingImagesRegistry    = "stgregistry.suse.com"
 	productionImagesRegistry = "registry.suse.com"
 )
+
+// registryConcurrency is how many images are asked for at once.
+const registryConcurrency = 8
 
 // registryAttempts is how many times a registry is asked for an image before giving up.
 const registryAttempts = 5
@@ -107,9 +111,25 @@ func CheckImagesExist(registry string, images []ChartImage) error {
 	sorted := append([]ChartImage(nil), images...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Image < sorted[j].Image })
 
+	// Each image is asked for apart, up to registryConcurrency at once, and what is wrong with each is kept in the place
+	// of its image, so that the report is in the same order whatever the order of the answers.
+	results := make([]string, len(sorted))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, registryConcurrency)
+	for i, image := range sorted {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
+			results[i] = checkImageExists(client, registry, image)
+		}()
+	}
+	wg.Wait()
+
 	var problems []string
-	for _, image := range sorted {
-		if problem := checkImageExists(client, registry, image); problem != "" {
+	for _, problem := range results {
+		if problem != "" {
 			problems = append(problems, problem)
 		}
 	}

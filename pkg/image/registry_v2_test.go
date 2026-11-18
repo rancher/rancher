@@ -22,10 +22,15 @@ type fakeRegistry struct {
 	server       *httptest.Server
 	requireToken bool
 
-	mu       sync.Mutex
-	statuses map[string][]int // the statuses to answer for "repository:tag", in order, and the last one for the rest
-	requests map[string]int
-	tokens   int
+	// delay is how long the registry takes to answer the HEAD of a manifest.
+	delay time.Duration
+
+	mu          sync.Mutex
+	statuses    map[string][]int // the statuses to answer for "repository:tag", in order, and the last one for the rest
+	requests    map[string]int
+	tokens      int
+	inFlight    int
+	maxInFlight int
 }
 
 func newFakeRegistry(t *testing.T, requireToken bool) *fakeRegistry {
@@ -85,6 +90,12 @@ func (f *fakeRegistry) serve(w http.ResponseWriter, r *http.Request) {
 		parts := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/v2/"), "/manifests/", 2)
 		image := parts[0] + ":" + parts[1]
 		f.mu.Lock()
+		f.inFlight++
+		f.maxInFlight = max(f.maxInFlight, f.inFlight)
+		f.mu.Unlock()
+		time.Sleep(f.delay)
+		f.mu.Lock()
+		f.inFlight--
 		statuses, known := f.statuses[image]
 		status := http.StatusNotFound
 		if known {
@@ -264,4 +275,42 @@ func TestImagesOfChartsMergesTheLinesOfTheSameImage(t *testing.T) {
 	assert.Equal(t, []ChartImage{
 		{Image: "rancher/fleet-agent:v0.17.0", Sources: []string{"fleet-agent:111.0.1", "fleet:111.0.1"}},
 	}, ImagesOfCharts(lines), "the list of Linux and the list of Windows can have the same image")
+}
+
+func TestCheckImagesExistAsksForSeveralImagesAtOnceButNotForAllOfThem(t *testing.T) {
+	useFakeRegistries(t)
+	registry := newFakeRegistry(t, true)
+	registry.delay = 20 * time.Millisecond
+	var images []ChartImage
+	for i := 0; i < 4*registryConcurrency; i++ {
+		image := fmt.Sprintf("rancher/image-%d:v1", i)
+		registry.has(image)
+		images = append(images, ChartImage{Image: image, Sources: []string{"chart:1"}})
+	}
+
+	require.NoError(t, CheckImagesExist(registry.host(), images))
+
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	assert.Greater(t, registry.maxInFlight, 1, "the images are asked for at once")
+	assert.LessOrEqual(t, registry.maxInFlight, registryConcurrency, "but not more than the limit")
+}
+
+func TestCheckImagesExistReportsInTheOrderOfTheImagesWhenItAsksAtOnce(t *testing.T) {
+	useFakeRegistries(t)
+	registry := newFakeRegistry(t, false)
+	registry.delay = 5 * time.Millisecond
+	var images []ChartImage
+	for _, name := range []string{"d", "b", "e", "a", "c"} {
+		images = append(images, ChartImage{Image: "rancher/" + name + ":v1", Sources: []string{"chart:1"}})
+	}
+
+	err := CheckImagesExist(registry.host(), images)
+
+	require.Error(t, err)
+	lines := strings.Split(err.Error(), "\n")[1:]
+	require.Len(t, lines, 5)
+	for i, name := range []string{"a", "b", "c", "d", "e"} {
+		assert.Contains(t, lines[i], "rancher/"+name+":v1")
+	}
 }
