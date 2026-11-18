@@ -20,7 +20,9 @@ import (
 //     runtime.
 //   - An archive that cannot be read for such an entry is an error. A list without the images of a chart is wrong,
 //     and nothing in it tells it apart from a correct one.
-//   - Only the latest version of each chart is considered, with no exception per chart.
+//   - The version of each chart is the newest one whose catalog.cattle.io/rancher-version matches the Rancher version,
+//     with no exception per chart. The index has the versions of every Rancher minor of a chart, so the newest one
+//     is often for the next minor and the one that this Rancher needs is below it.
 //
 // Entries with a path in the repository (partner-charts, rke2-charts) are read, and skipped when the archive is not
 // there, as FetchImages does. The selection of the version, and the reading of values.yaml, are the ones of
@@ -34,14 +36,11 @@ func (c Charts) FetchImagesV2(imagesSet map[string]map[string]struct{}) error {
 		return err
 	}
 	for _, versions := range index.Entries {
-		if len(versions) == 0 {
-			continue
+		version, err := c.newestVersionOfTheMinor(versions)
+		if err != nil {
+			return err
 		}
-		// Selecting the correct latest version relies on the index being sorted in descending order.
-		version := versions[0]
-		if isConstraintSatisfied, err := c.checkChartVersionConstraint(*version); err != nil {
-			return errors.Wrapf(err, "failed to check constraint of chart")
-		} else if !isConstraintSatisfied {
+		if version == nil {
 			continue
 		}
 		archive, remote := chartArchivePathV2(version)
@@ -62,6 +61,22 @@ func (c Charts) FetchImagesV2(imagesSet map[string]map[string]struct{}) error {
 		}
 	}
 	return nil
+}
+
+// newestVersionOfTheMinor returns the newest of versions that supports the Rancher version of the export, or nil when
+// none does. The versions are in the descending order that repo.LoadIndexFile gives them. A version with no
+// catalog.cattle.io/rancher-version annotation supports none.
+func (c Charts) newestVersionOfTheMinor(versions repo.ChartVersions) (*repo.ChartVersion, error) {
+	for _, version := range versions {
+		supported, err := c.checkChartVersionConstraint(*version)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to check constraint of chart %s:%s", version.Name, version.Version)
+		}
+		if supported {
+			return version, nil
+		}
+	}
+	return nil, nil
 }
 
 // chartArchivePathV2 returns the path, relative to the root of the charts repository, of the packaged chart of
