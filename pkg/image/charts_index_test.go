@@ -18,7 +18,8 @@ const (
 	testChartValues  = "image:\n  repository: rancher/fleet\n  tag: v0.17.0\n"
 )
 
-// writeTestIndex writes an index.yaml with a single chart version whose only URL is url.
+// writeTestIndex writes an index.yaml with a single chart version whose only URL is url, and whose
+// helm.sh/images annotation lists the image of testChartValues.
 func writeTestIndex(t *testing.T, root, url string) {
 	t.Helper()
 	index := fmt.Sprintf(`apiVersion: v1
@@ -26,6 +27,9 @@ entries:
   %[1]s:
   - annotations:
       catalog.cattle.io/rancher-version: '>= 2.16.0-0 < 2.17.0-0'
+      helm.sh/images: |
+        - name: %[1]s
+          image: rancher/fleet:v0.17.0
     apiVersion: v2
     name: %[1]s
     version: %[2]s
@@ -149,19 +153,22 @@ func (v testVersion) archive() string {
 }
 
 // writeTestIndexOfVersions writes an index.yaml with the given versions of the test chart, listed in the given
-// order, each with its archive in assets/ and an oci:// URL.
+// order, each with its archive in assets/, an oci:// URL, and a helm.sh/images annotation with its image.
 func writeTestIndexOfVersions(t *testing.T, root string, versions []testVersion) {
 	t.Helper()
 	index := "apiVersion: v1\nentries:\n  " + testChartName + ":\n"
 	for _, v := range versions {
 		index += fmt.Sprintf(`  - annotations:
       catalog.cattle.io/rancher-version: '%[3]s'
+      helm.sh/images: |
+        - name: %[1]s
+          image: rancher/fleet:%[4]s
     apiVersion: v2
     name: %[1]s
     version: %[2]s
     urls:
     - oci://registry.example.com/rancher/catalog/%[1]s:%[2]s@sha256:0123456789abcdef
-`, testChartName, v.version, v.rancherVersion)
+`, testChartName, v.version, v.rancherVersion, v.imageTag)
 		writeTestArchive(t, root, v.archive(),
 			fmt.Sprintf("image:\n  repository: rancher/fleet\n  tag: %s\n", v.imageTag))
 	}
