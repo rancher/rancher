@@ -1,5 +1,14 @@
 package image
 
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	"github.com/sirupsen/logrus"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
+)
+
 // PinnedChart is a chart that Rancher installs at an exact version, whatever versions the charts repository has.
 type PinnedChart struct {
 	Name    string
@@ -14,5 +23,56 @@ type PinnedChart struct {
 // repository. A mismatch is an error when strict is true, which is for the build of a release, and a warning
 // otherwise.
 func CheckPinnedCharts(chartsPath, rancherVersion string, pins []PinnedChart, strict bool) error {
+	type repository struct {
+		charts Charts
+		index  *repo.IndexFile
+	}
+	var repositories []repository
+	for _, path := range strings.Split(chartsPath, ",") {
+		index, err := repo.LoadIndexFile(filepath.Join(path, "index.yaml"))
+		if err != nil {
+			return err
+		}
+		charts := Charts{ExportConfig{ChartsPath: path, RancherVersion: rancherVersion}}
+		repositories = append(repositories, repository{charts, index})
+	}
+
+	var mismatches []string
+	for _, pin := range pins {
+		found, satisfied := false, false
+		listed := "no version that supports Rancher " + rancherVersion
+		for _, r := range repositories {
+			versions, ok := r.index.Entries[pin.Name]
+			if !ok {
+				continue
+			}
+			found = true
+			newest, err := r.charts.newestVersionOfTheMinor(versions)
+			if err != nil {
+				return err
+			}
+			if newest == nil {
+				continue
+			}
+			if newest.Version == pin.Version {
+				satisfied = true
+				break
+			}
+			listed = newest.Version
+		}
+		if found && !satisfied {
+			mismatches = append(mismatches, fmt.Sprintf("%s is pinned at %s and the list has the images of %s", pin.Name, pin.Version, listed))
+		}
+	}
+	if len(mismatches) == 0 {
+		return nil
+	}
+
+	message := "Rancher installs these charts at the pinned version, so the images of the list have to be of that version, " +
+		"or an air-gapped installation cannot pull them:\n  " + strings.Join(mismatches, "\n  ")
+	if strict {
+		return fmt.Errorf("%s", message)
+	}
+	logrus.Warn(message)
 	return nil
 }
