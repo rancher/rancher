@@ -1,6 +1,11 @@
 package image
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"strings"
+
+	repo "helm.sh/helm/v4/pkg/repo/v1"
+)
 
 // catalogDirectory is the name of the directory where rancher/charts is checked out for the export.
 const catalogDirectory = "charts"
@@ -12,7 +17,36 @@ func isCatalogPath(path string) bool {
 }
 
 // ImagesOfCatalogCharts is ImagesOfCharts for the charts of the catalog that are in chartsPath, a comma separated
-// list of directories: the images of charts that are in any other directory are left out.
+// list of directories: a source that is a chart of any other directory is left out, and so is an image that has no
+// other. A chart is the catalog's when its name and version are in the index.yaml of the catalog.
 func ImagesOfCatalogCharts(imagesAndSources []string, chartsPath string) ([]ChartImage, error) {
-	return ImagesOfCharts(imagesAndSources), nil
+	catalog := map[string]struct{}{}
+	for _, path := range strings.Split(chartsPath, ",") {
+		if !isCatalogPath(path) {
+			continue
+		}
+		index, err := repo.LoadIndexFile(filepath.Join(path, "index.yaml"))
+		if err != nil {
+			return nil, err
+		}
+		for name, versions := range index.Entries {
+			for _, version := range versions {
+				catalog[name+":"+version.Version] = struct{}{}
+			}
+		}
+	}
+
+	var images []ChartImage
+	for _, image := range ImagesOfCharts(imagesAndSources) {
+		var sources []string
+		for _, source := range image.Sources {
+			if _, ok := catalog[source]; ok {
+				sources = append(sources, source)
+			}
+		}
+		if len(sources) > 0 {
+			images = append(images, ChartImage{Image: image.Image, Sources: sources})
+		}
+	}
+	return images, nil
 }
