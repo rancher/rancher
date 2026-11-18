@@ -88,3 +88,20 @@ func TestCheckPinnedChartsLooksInEveryRepository(t *testing.T) {
 
 	assert.NoError(t, CheckPinnedCharts(first+","+second, "2.16.99", []PinnedChart{pinnedFleet}, true))
 }
+
+func TestPinnedChartsHasSystemUpgradeControllerOnlyWhenItIsPinned(t *testing.T) {
+	names := func() []string {
+		var names []string
+		for _, pin := range PinnedCharts() {
+			names = append(names, pin.Name)
+		}
+		return names
+	}
+
+	t.Setenv("CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION", "")
+	assert.NotContains(t, names(), "system-upgrade-controller", "with no version Rancher installs the latest one")
+
+	t.Setenv("CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION", "111.0.1")
+	assert.Contains(t, PinnedCharts(), PinnedChart{Name: "system-upgrade-controller", Version: "111.0.1"})
+	assert.Subset(t, names(), []string{"fleet", "rancher-webhook", "remotedialer-proxy", "rancher-turtles"})
+}
