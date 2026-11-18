@@ -135,3 +135,97 @@ func TestFetchImagesV2ChartWithRemoteURLAndNoArchiveFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "assets/fleet/fleet-111.0.1+up0.17.0.tgz")
 	assert.Empty(t, imagesSet)
 }
+
+// testVersion is a version of the test chart in an index that has several of them: the Rancher versions it
+// supports, and the image its values.yaml has.
+type testVersion struct {
+	version        string
+	rancherVersion string
+	imageTag       string
+}
+
+func (v testVersion) archive() string {
+	return fmt.Sprintf("assets/%[1]s/%[1]s-%[2]s.tgz", testChartName, v.version)
+}
+
+// writeTestIndexOfVersions writes an index.yaml with the given versions of the test chart, listed in the given
+// order, each with its archive in assets/ and an oci:// URL.
+func writeTestIndexOfVersions(t *testing.T, root string, versions []testVersion) {
+	t.Helper()
+	index := "apiVersion: v1\nentries:\n  " + testChartName + ":\n"
+	for _, v := range versions {
+		index += fmt.Sprintf(`  - annotations:
+      catalog.cattle.io/rancher-version: '%[3]s'
+    apiVersion: v2
+    name: %[1]s
+    version: %[2]s
+    urls:
+    - oci://registry.example.com/rancher/catalog/%[1]s:%[2]s@sha256:0123456789abcdef
+`, testChartName, v.version, v.rancherVersion)
+		writeTestArchive(t, root, v.archive(),
+			fmt.Sprintf("image:\n  repository: rancher/fleet\n  tag: %s\n", v.imageTag))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(root, "index.yaml"), []byte(index), 0o644))
+}
+
+// versionsOfSeveralMinors is what the staging branch of rancher/charts has for a chart that is released for more
+// than one Rancher minor: the newest version is for the next minor.
+var versionsOfSeveralMinors = []testVersion{
+	{"112.0.0+up0.13.0", ">= 2.17.0-0 < 2.18.0-0", "v0.13.0"},
+	{"111.0.1+up0.12.1", ">= 2.16.0-0 < 2.17.0-0", "v0.12.1"},
+	{"111.0.0+up0.12.0", ">= 2.16.0-0 < 2.17.0-0", "v0.12.0"},
+	{"110.0.0+up0.11.0", ">= 2.15.0-0 < 2.16.0-0", "v0.11.0"},
+}
+
+func TestFetchImagesV2TakesTheNewestVersionOfTheMinor(t *testing.T) {
+	for _, tc := range []struct {
+		rancherVersion string
+		wantImage      string
+		wantSource     string
+	}{
+		{"2.16.99", "rancher/fleet:v0.12.1", "fleet:111.0.1+up0.12.1"},
+		{"2.16.0", "rancher/fleet:v0.12.1", "fleet:111.0.1+up0.12.1"},
+		{"2.16.0-rc1", "rancher/fleet:v0.12.1", "fleet:111.0.1+up0.12.1"},
+		{"2.17.0", "rancher/fleet:v0.13.0", "fleet:112.0.0+up0.13.0"},
+		{"2.15.4", "rancher/fleet:v0.11.0", "fleet:110.0.0+up0.11.0"},
+	} {
+		t.Run(tc.rancherVersion, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
+			imagesSet := map[string]map[string]struct{}{}
+			charts := Charts{ExportConfig{ChartsPath: root, RancherVersion: tc.rancherVersion, OsType: Linux}}
+
+			require.NoError(t, charts.FetchImagesV2(imagesSet))
+
+			assert.Equal(t, map[string]map[string]struct{}{tc.wantImage: {tc.wantSource: {}}}, imagesSet)
+		})
+	}
+}
+
+func TestFetchImagesV2TakesTheNewestVersionOfTheMinorWhateverTheOrderOfTheIndex(t *testing.T) {
+	root := t.TempDir()
+	reversed := make([]testVersion, 0, len(versionsOfSeveralMinors))
+	for i := len(versionsOfSeveralMinors) - 1; i >= 0; i-- {
+		reversed = append(reversed, versionsOfSeveralMinors[i])
+	}
+	writeTestIndexOfVersions(t, root, reversed)
+	imagesSet := map[string]map[string]struct{}{}
+	charts := Charts{ExportConfig{ChartsPath: root, RancherVersion: "2.16.99", OsType: Linux}}
+
+	require.NoError(t, charts.FetchImagesV2(imagesSet))
+
+	assert.Equal(t, map[string]map[string]struct{}{
+		"rancher/fleet:v0.12.1": {"fleet:111.0.1+up0.12.1": {}},
+	}, imagesSet)
+}
+
+func TestFetchImagesV2LeavesOutAChartWithNoVersionOfTheMinor(t *testing.T) {
+	root := t.TempDir()
+	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
+	imagesSet := map[string]map[string]struct{}{}
+	charts := Charts{ExportConfig{ChartsPath: root, RancherVersion: "2.18.0", OsType: Linux}}
+
+	require.NoError(t, charts.FetchImagesV2(imagesSet))
+
+	assert.Empty(t, imagesSet)
+}
