@@ -1,23 +1,33 @@
 package image
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// newCatalogDir makes the directory where rancher/charts is checked out for the export, which is named charts.
+func newCatalogDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "build", catalogDirectory)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	return dir
+}
+
 var pinnedFleet = PinnedChart{Name: testChartName, Version: "111.0.1+up0.12.1"}
 
 func TestCheckPinnedChartsAcceptsThePinThatIsTheNewestOfTheMinor(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 
 	assert.NoError(t, CheckPinnedCharts(root, "2.16.99", []PinnedChart{pinnedFleet}, true))
 }
 
 func TestCheckPinnedChartsFindsAPinThatIsNotTheNewestOfTheMinor(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 	older := PinnedChart{Name: testChartName, Version: "111.0.0+up0.12.0"}
 
@@ -30,7 +40,7 @@ func TestCheckPinnedChartsFindsAPinThatIsNotTheNewestOfTheMinor(t *testing.T) {
 }
 
 func TestCheckPinnedChartsFindsAPinThatIsNotInTheIndex(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 	missing := PinnedChart{Name: testChartName, Version: "111.0.9+up0.12.9"}
 
@@ -41,7 +51,7 @@ func TestCheckPinnedChartsFindsAPinThatIsNotInTheIndex(t *testing.T) {
 }
 
 func TestCheckPinnedChartsFindsAPinOfAChartWithNoVersionOfTheMinor(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 
 	err := CheckPinnedCharts(root, "2.18.0", []PinnedChart{pinnedFleet}, true)
@@ -51,7 +61,7 @@ func TestCheckPinnedChartsFindsAPinOfAChartWithNoVersionOfTheMinor(t *testing.T)
 }
 
 func TestCheckPinnedChartsIgnoresAChartThatIsNotInTheRepositories(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 	other := PinnedChart{Name: "rancher-webhook", Version: "111.0.1+up0.12.1"}
 
@@ -59,7 +69,7 @@ func TestCheckPinnedChartsIgnoresAChartThatIsNotInTheRepositories(t *testing.T) 
 }
 
 func TestCheckPinnedChartsOnlyWarnsWhenItIsNotStrict(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 	older := PinnedChart{Name: testChartName, Version: "111.0.0+up0.12.0"}
 
@@ -67,7 +77,7 @@ func TestCheckPinnedChartsOnlyWarnsWhenItIsNotStrict(t *testing.T) {
 }
 
 func TestCheckPinnedChartsReportsEveryMismatch(t *testing.T) {
-	root := t.TempDir()
+	root := newCatalogDir(t)
 	writeTestIndexOfVersions(t, root, versionsOfSeveralMinors)
 	pins := []PinnedChart{
 		{Name: testChartName, Version: "111.0.0+up0.12.0"},
@@ -82,7 +92,7 @@ func TestCheckPinnedChartsReportsEveryMismatch(t *testing.T) {
 }
 
 func TestCheckPinnedChartsLooksInEveryRepository(t *testing.T) {
-	first, second := t.TempDir(), t.TempDir()
+	first, second := newCatalogDir(t), newCatalogDir(t)
 	writeTestIndexOfVersions(t, first, versionsOfSeveralMinors[:1])
 	writeTestIndexOfVersions(t, second, versionsOfSeveralMinors)
 

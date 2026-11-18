@@ -42,8 +42,8 @@ func PinnedCharts() []PinnedChart {
 // version, which is the newest one that supports it. Rancher installs the pinned version, so when the two differ the
 // images of the chart that is installed are not in the list and an air-gapped installation cannot pull them.
 //
-// A pinned chart that the repositories of chartsPath (comma separated) do not have is not checked: it is in another
-// repository. A mismatch is an error when strict is true, which is for the build of a release, and a warning
+// Only the catalog, rancher/charts, is looked at: the other directories of chartsPath (comma separated), prime-charts
+// for one, are not where Rancher gets its pinned charts. A pinned chart that the catalog does not have is not checked. A mismatch is an error when strict is true, which is for the build of a release, and a warning
 // otherwise.
 func CheckPinnedCharts(chartsPath, rancherVersion string, pins []PinnedChart, strict bool) error {
 	type repository struct {
@@ -52,6 +52,9 @@ func CheckPinnedCharts(chartsPath, rancherVersion string, pins []PinnedChart, st
 	}
 	var repositories []repository
 	for _, path := range strings.Split(chartsPath, ",") {
+		if !isCatalogPath(path) {
+			continue
+		}
 		index, err := repo.LoadIndexFile(filepath.Join(path, "index.yaml"))
 		if err != nil {
 			return err
