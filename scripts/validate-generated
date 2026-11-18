@@ -17,3 +17,5 @@ if [ -n "$drift" ]; then
   git --no-pager diff
   exit 1
 fi
+
+scripts/check-assets-chart-versions
