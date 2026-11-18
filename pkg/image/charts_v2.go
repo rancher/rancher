@@ -5,11 +5,23 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.yaml.in/yaml/v2"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
+
+// HelmImagesAnnotationKey is the annotation of an index entry that declares the images of the chart (HIP-15).
+const HelmImagesAnnotationKey = "helm.sh/images"
+
+// annotatedImage is an entry of the helm.sh/images annotation of an index entry.
+type annotatedImage struct {
+	Name  string `yaml:"name"`
+	Image string `yaml:"image"`
+}
 
 // FetchImagesV2 is FetchImages for the catalog of the staging and production branches of rancher/charts, and it
 // replaces it in GetArtifacts. FetchImages is not changed, so going back to the old system is a change of that call.
@@ -23,6 +35,9 @@ import (
 //   - The version of each chart is the newest one whose catalog.cattle.io/rancher-version matches the Rancher version,
 //     with no exception per chart. The index has the versions of every Rancher minor of a chart, so the newest one
 //     is often for the next minor and the one that this Rancher needs is below it.
+//   - The images found in the values.yaml of each chart have to be exactly the ones that its helm.sh/images annotation
+//     declares, or it is an error that names the charts and the images of every difference. The list is made of what is
+//     found, so a chart that declares more or less than that is not installing what the list has.
 //
 // Entries with a path in the repository (partner-charts, rke2-charts) are read, and skipped when the archive is not
 // there, as FetchImages does. The selection of the version, and the reading of values.yaml, are the ones of
@@ -35,8 +50,9 @@ func (c Charts) FetchImagesV2(imagesSet map[string]map[string]struct{}) error {
 	if err != nil {
 		return err
 	}
-	for _, versions := range index.Entries {
-		version, err := c.newestVersionOfTheMinor(versions)
+	var problems []string
+	for _, name := range sortedChartNames(index) {
+		version, err := c.newestVersionOfTheMinor(index.Entries[name])
 		if err != nil {
 			return err
 		}
@@ -54,13 +70,89 @@ func (c Charts) FetchImagesV2(imagesSet map[string]map[string]struct{}) error {
 		}
 		tag := chartsToIgnoreTags[version.Name]
 		chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
+		problem, err := compareWithAnnotation(version, versionValues, tag)
+		if err != nil {
+			return err
+		}
+		if problem != "" {
+			problems = append(problems, problem)
+		}
 		for _, values := range versionValues {
 			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType, tag); err != nil {
 				return err
 			}
 		}
 	}
+	if len(problems) > 0 {
+		return fmt.Errorf("the images found in the values.yaml of these charts are not the ones that their %s annotation declares:\n%s",
+			HelmImagesAnnotationKey, strings.Join(problems, "\n"))
+	}
 	return nil
+}
+
+// sortedChartNames returns the names of the charts of the index in alphabetical order, so that what is reported is
+// always in the same order.
+func sortedChartNames(index *repo.IndexFile) []string {
+	names := make([]string, 0, len(index.Entries))
+	for name := range index.Entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// compareWithAnnotation compares the images found in the values.yaml of a chart version, for Linux and Windows, with
+// the ones that its helm.sh/images annotation declares. The annotation does not tell the system of an image, so the
+// images of both are compared with all of it. It returns a description of the differences, or an empty string when
+// there is none. A chart with no images and no annotation has none.
+func compareWithAnnotation(version *repo.ChartVersion, values []map[interface{}]interface{}, tagToIgnore string) (string, error) {
+	source := fmt.Sprintf("%s:%s", version.Name, version.Version)
+
+	found := map[string]struct{}{}
+	for _, osType := range []OSType{Linux, Windows} {
+		images := map[string]map[string]struct{}{}
+		for _, v := range values {
+			if err := pickImagesFromValuesMap(images, v, source, osType, tagToIgnore); err != nil {
+				return "", err
+			}
+		}
+		for image := range images {
+			found[image] = struct{}{}
+		}
+	}
+
+	var annotated []annotatedImage
+	if err := yaml.Unmarshal([]byte(version.Annotations[HelmImagesAnnotationKey]), &annotated); err != nil {
+		return fmt.Sprintf("  %s\n    cannot read its %s annotation: %v", source, HelmImagesAnnotationKey, err), nil
+	}
+	declared := map[string]struct{}{}
+	for _, a := range annotated {
+		declared[a.Image] = struct{}{}
+	}
+
+	var lines []string
+	if missing := difference(declared, found); len(missing) > 0 {
+		lines = append(lines, fmt.Sprintf("    declared in %s, not found in values.yaml: %s", HelmImagesAnnotationKey, strings.Join(missing, ", ")))
+	}
+	if undeclared := difference(found, declared); len(undeclared) > 0 {
+		lines = append(lines, fmt.Sprintf("    found in values.yaml, not declared in %s: %s", HelmImagesAnnotationKey, strings.Join(undeclared, ", ")))
+	}
+	if len(lines) == 0 {
+		return "", nil
+	}
+	return "  " + source + "\n" + strings.Join(lines, "\n"), nil
+}
+
+// difference returns the sorted members of a that are not in b.
+func difference(a, b map[string]struct{}) []string {
+	var only []string
+	for image := range a {
+		if _, ok := b[image]; !ok {
+			only = append(only, image)
+		}
+	}
+	sort.Strings(only)
+	return only
 }
 
 // newestVersionOfTheMinor returns the newest of versions that supports the Rancher version of the export, or nil when
