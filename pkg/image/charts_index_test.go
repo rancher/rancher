@@ -108,3 +108,14 @@ func TestFetchImagesChartWithRemoteURLReadsArchiveFromAssets(t *testing.T) {
 		})
 	}
 }
+
+func TestFetchImagesChartWithRemoteURLAndNoArchiveFails(t *testing.T) {
+	root := t.TempDir()
+	writeTestIndex(t, root, "oci://registry.example.com/rancher/catalog/fleet:111.0.1_up0.17.0@sha256:0123456789abcdef")
+
+	imagesSet, err := fetchTestImages(t, root)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "assets/fleet/fleet-111.0.1+up0.17.0.tgz")
+	assert.Empty(t, imagesSet)
+}
