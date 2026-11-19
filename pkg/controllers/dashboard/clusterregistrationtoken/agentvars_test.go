@@ -58,7 +58,7 @@ func TestAgentEnvVars(t *testing.T) {
 			name:     "Envvars should be formatted correctly for Docker",
 			cluster:  c,
 			envType:  Docker,
-			expected: "-e \"HTTPS_PROXY=https://0.0.0.0\" -e \"HTTP_PROXY=http://0.0.0.0\"",
+			expected: "-e HTTPS_PROXY='https://0.0.0.0' -e HTTP_PROXY='http://0.0.0.0'",
 		},
 		{
 			name:     "Envvars should be formatted correctly for PowerShell",
@@ -102,36 +102,42 @@ func TestAgentEnvVarsSystemAgentDataDir(t *testing.T) {
 		dir        string
 		wantLinux  string
 		wantPShell string
+		wantDocker string
 	}{
 		{
 			name:       "valid directory",
 			dir:        "/var/lib/rancher/agent",
 			wantLinux:  `HTTPS_PROXY='https://0.0.0.0' CATTLE_AGENT_VAR_DIR='/var/lib/rancher/agent'`,
 			wantPShell: `$env:HTTPS_PROXY='https://0.0.0.0'; $env:CATTLE_AGENT_VAR_DIR='/var/lib/rancher/agent';`,
+			wantDocker: `-e HTTPS_PROXY='https://0.0.0.0' -e CATTLE_AGENT_VAR_DIR='/var/lib/rancher/agent'`,
 		},
 		{
 			name:       "space",
 			dir:        "/data/my dir",
 			wantLinux:  `HTTPS_PROXY='https://0.0.0.0' CATTLE_AGENT_VAR_DIR='/data/my dir'`,
 			wantPShell: `$env:HTTPS_PROXY='https://0.0.0.0'; $env:CATTLE_AGENT_VAR_DIR='/data/my dir';`,
+			wantDocker: `-e HTTPS_PROXY='https://0.0.0.0' -e CATTLE_AGENT_VAR_DIR='/data/my dir'`,
 		},
 		{
 			name:       "command substitution",
 			dir:        "/data/$(id)",
 			wantLinux:  `HTTPS_PROXY='https://0.0.0.0' CATTLE_AGENT_VAR_DIR='/data/$(id)'`,
 			wantPShell: `$env:HTTPS_PROXY='https://0.0.0.0'; $env:CATTLE_AGENT_VAR_DIR='/data/$(id)';`,
+			wantDocker: `-e HTTPS_PROXY='https://0.0.0.0' -e CATTLE_AGENT_VAR_DIR='/data/$(id)'`,
 		},
 		{
 			name:       "double quote",
 			dir:        `/data/a"b`,
 			wantLinux:  `HTTPS_PROXY='https://0.0.0.0' CATTLE_AGENT_VAR_DIR='/data/a"b'`,
 			wantPShell: `$env:HTTPS_PROXY='https://0.0.0.0'; $env:CATTLE_AGENT_VAR_DIR='/data/a"b';`,
+			wantDocker: `-e HTTPS_PROXY='https://0.0.0.0' -e CATTLE_AGENT_VAR_DIR='/data/a"b'`,
 		},
 		{
 			name:       "single quote",
 			dir:        "/data/it's",
 			wantLinux:  `HTTPS_PROXY='https://0.0.0.0' CATTLE_AGENT_VAR_DIR='/data/it'\''s'`,
 			wantPShell: `$env:HTTPS_PROXY='https://0.0.0.0'; $env:CATTLE_AGENT_VAR_DIR='/data/it''s';`,
+			wantDocker: `-e HTTPS_PROXY='https://0.0.0.0' -e CATTLE_AGENT_VAR_DIR='/data/it'\''s'`,
 		},
 	}
 	for _, tt := range tests {
@@ -140,6 +146,7 @@ func TestAgentEnvVarsSystemAgentDataDir(t *testing.T) {
 			c := clusterWithSystemAgentDir(tt.dir)
 			assert.Equal(t, tt.wantLinux, AgentEnvVars(c, Linux))
 			assert.Equal(t, tt.wantPShell, AgentEnvVars(c, PowerShell))
+			assert.Equal(t, tt.wantDocker, AgentEnvVars(c, Docker))
 		})
 	}
 }
@@ -183,30 +190,35 @@ func TestAgentEnvVarsValues(t *testing.T) {
 		value      string
 		wantLinux  string
 		wantPShell string
+		wantDocker string
 	}{
 		{
 			name:       "shell variable and command substitution stay literal",
 			value:      "$HOME/$(id)",
 			wantLinux:  `X='$HOME/$(id)'`,
 			wantPShell: `$env:X='$HOME/$(id)';`,
+			wantDocker: `-e X='$HOME/$(id)'`,
 		},
 		{
 			name:       "double dollar and exclamation mark stay literal",
 			value:      "https://u:pa$$w!d@proxy",
 			wantLinux:  `X='https://u:pa$$w!d@proxy'`,
 			wantPShell: `$env:X='https://u:pa$$w!d@proxy';`,
+			wantDocker: `-e X='https://u:pa$$w!d@proxy'`,
 		},
 		{
 			name:       "quotes in the value stay part of the value",
 			value:      `"abc"`,
 			wantLinux:  `X='"abc"'`,
 			wantPShell: `$env:X='"abc"';`,
+			wantDocker: `-e X='"abc"'`,
 		},
 		{
 			name:       "single quote",
 			value:      "it's",
 			wantLinux:  `X='it'\''s'`,
 			wantPShell: `$env:X='it''s';`,
+			wantDocker: `-e X='it'\''s'`,
 		},
 	}
 	for _, tt := range tests {
@@ -217,6 +229,7 @@ func TestAgentEnvVarsValues(t *testing.T) {
 			}}}
 			assert.Equal(t, tt.wantLinux, AgentEnvVars(c, Linux))
 			assert.Equal(t, tt.wantPShell, AgentEnvVars(c, PowerShell))
+			assert.Equal(t, tt.wantDocker, AgentEnvVars(c, Docker))
 		})
 	}
 }
@@ -236,6 +249,6 @@ func TestAgentEnvVarsSkipsInvalidNames(t *testing.T) {
 	}}}
 
 	assert.Equal(t, `GOOD='v'`, AgentEnvVars(c, Linux))
-	assert.Equal(t, `-e "GOOD=v"`, AgentEnvVars(c, Docker))
+	assert.Equal(t, `-e GOOD='v'`, AgentEnvVars(c, Docker))
 	assert.Equal(t, `$env:GOOD='v'; $env:ALSO_GOOD='v';`, AgentEnvVars(c, PowerShell))
 }

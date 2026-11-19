@@ -37,7 +37,7 @@ func AgentEnvVars(cluster *v3.Cluster, envType EnvType) string {
 		}
 		switch envType {
 		case Docker:
-			agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e \"%s=%s\"", envVar.Name, envVar.Value))
+			agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e %s=%s", envVar.Name, capr.ShellSingleQuote(envVar.Value)))
 		case PowerShell:
 			agentEnvVars = append(agentEnvVars, capr.FormatWindowsEnvVar(envVar, false)+";")
 		default:
