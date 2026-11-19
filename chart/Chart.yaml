@@ -22,7 +22,7 @@ annotations:
     - name: rancher-assets
       image: rancher/rancher-assets:v2.16-20261119T1853Z-dev
     - name: shell
-      image: rancher/shell:v0.9.1-rc.5
+      image: rancher/shell:v0.9.1-rc.6
     - name: mirrored-bci-micro
       image: rancher/mirrored-bci-micro:16.0-23.2
     - name: kube-api-auth
