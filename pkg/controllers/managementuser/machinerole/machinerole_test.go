@@ -34,13 +34,11 @@ func TestImportedLabelSyncSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T
 	assert.Same(t, node, out)
 }
 
-// TestImportedLabelSyncV2provStampsCAPILabels is the companion half of the SURE-12151 /
-// rancher/rancher#58320 regression guard (the planner half lives in config_test.go). It proves that
-// for a v2prov cluster - which does NOT carry the CAPIClusterOwner labels - the controller resolves
-// the backing CAPI Cluster/Machine via the provisioning-cluster index and stamps the CAPI-flavored
-// plan.cattle.io/* labels onto the Node through the API. This is what lets the planner stop baking
-// those labels into node-label on steady-state reconciles without losing them (snapshot restore and
-// v2prov day-2 ops read them off the Node).
+// TestImportedLabelSyncV2provStampsCAPILabels is the controller half of the rancher/rancher#58320
+// guard (the planner half is in config_test.go). For a v2prov cluster, which has no CAPIClusterOwner
+// labels, the controller resolves the backing CAPI Cluster/Machine via the provisioning-cluster
+// index and stamps the CAPI plan.cattle.io/* labels onto the Node over the API. That's what lets the
+// planner stop putting those labels in node-label without losing them.
 func TestImportedLabelSyncV2provStampsCAPILabels(t *testing.T) {
 	const (
 		mgmtName    = "c-m-test"
@@ -59,7 +57,7 @@ func TestImportedLabelSyncV2provStampsCAPILabels(t *testing.T) {
 		Status:     apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
 	}, nil)
 
-	// The mgmt cluster name is never the CAPI cluster name; it resolves through the provisioning cluster.
+	// The mgmt cluster name isn't the CAPI cluster name; it resolves through the provisioning cluster.
 	provClusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
 	provClusterCache.EXPECT().GetByIndex(provcluster.ByCluster, mgmtName).Return([]*provv1.Cluster{
 		{ObjectMeta: metav1.ObjectMeta{Name: capiName, Namespace: capiNS}},
@@ -104,22 +102,22 @@ func TestImportedLabelSyncV2provStampsCAPILabels(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, updated, "expected the node to be updated with lifecycle labels")
 
-	// Labels must be CAPI-flavored and match what the planner bakes into node-label at boot.
+	// Labels must be the CAPI ones, matching what the planner puts in node-label at boot.
 	assert.Equal(t, "cluster.x-k8s.io", updated.Labels["plan.cattle.io/cluster-group"])
 	assert.Equal(t, "Cluster", updated.Labels["plan.cattle.io/cluster-kind"])
 	assert.Equal(t, capiName, updated.Labels["plan.cattle.io/cluster-name"])
 	assert.Equal(t, "cluster.x-k8s.io", updated.Labels["plan.cattle.io/machine-group"])
 	assert.Equal(t, "Machine", updated.Labels["plan.cattle.io/machine-kind"])
-	// The machine-* labels are what snapshot restore relies on.
+	// The machine-* labels are what snapshot restore uses.
 	assert.Equal(t, machineName, updated.Labels["plan.cattle.io/machine-name"])
 }
 
-// TestImportedLabelSyncImportedFallsBackToMgmtV3 is the regression guard for the imported-cluster
-// path. A plain imported RKE2/K3s cluster (driver rke2/k3s, no CAPIClusterOwner labels) still has a
-// provisioning.cattle.io Cluster shell, so capiClusterRef resolves a reference - but there is NO
-// cluster.x-k8s.io CAPI Cluster. The handler must fall through to the mgmt v3 Cluster + mgmt v3 Node
-// and still stamp lifecycle labels. Returning early on the NotFound CAPI cluster (the earlier bug)
-// left imported Nodes unlabelled, which broke ETCD snapshot back-population (SURE-12151).
+// TestImportedLabelSyncImportedFallsBackToMgmtV3 guards the imported-cluster path. A plain imported
+// RKE2/K3s cluster has no CAPIClusterOwner labels but still has a provisioning.cattle.io Cluster
+// shell, so capiClusterRef resolves a reference even though there's no cluster.x-k8s.io CAPI Cluster.
+// The handler must fall through to the mgmt v3 Cluster + mgmt v3 Node and still stamp the labels.
+// Returning early on the NotFound CAPI cluster (the earlier bug) left imported Nodes unlabelled,
+// which broke etcd snapshot back-population.
 func TestImportedLabelSyncImportedFallsBackToMgmtV3(t *testing.T) {
 	const (
 		mgmtName     = "c-m-test"
@@ -138,13 +136,13 @@ func TestImportedLabelSyncImportedFallsBackToMgmtV3(t *testing.T) {
 		Status:     apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
 	}, nil)
 
-	// Imported clusters still have a provisioning cluster shell, so the ref resolves...
+	// Imported clusters still have a provisioning cluster shell, so the ref resolves,
 	provClusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
 	provClusterCache.EXPECT().GetByIndex(provcluster.ByCluster, mgmtName).Return([]*provv1.Cluster{
 		{ObjectMeta: metav1.ObjectMeta{Name: provName, Namespace: provNS}},
 	}, nil)
 
-	// ...but there is no CAPI Cluster: the Get must not abort the sync.
+	// but there is no CAPI Cluster: the Get must not abort the sync.
 	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](ctrl)
 	capiClusterCache.EXPECT().Get(provNS, provName).Return(nil,
 		apierrors.NewNotFound(schema.GroupResource{Group: capi.GroupVersion.Group, Resource: "clusters"}, provName))
@@ -183,7 +181,7 @@ func TestImportedLabelSyncImportedFallsBackToMgmtV3(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, updated, "imported node must still be labelled via the mgmt v3 fallback, not skipped")
 
-	// mgmt-v3-flavored identity (what snapshotbackpopulate expects for imported clusters).
+	// mgmt v3 identity (what snapshotbackpopulate expects for imported clusters).
 	assert.Equal(t, "management.cattle.io", updated.Labels["plan.cattle.io/machine-group"])
 	assert.Equal(t, "Node", updated.Labels["plan.cattle.io/machine-kind"])
 	assert.Equal(t, mgmtNodeName, updated.Labels["plan.cattle.io/machine-name"])

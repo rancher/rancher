@@ -106,35 +106,33 @@ func (h *handler) ImportedLabelSync(_ string, node *corev1.Node) (*corev1.Node, 
 }
 
 // lifecycleObjectsForNode returns the cluster and machine objects whose lifecycle labels should be
-// stamped on the downstream node. Three cluster shapes reach this handler (driver rke2/k3s):
+// stamped on the downstream node. Three kinds of cluster reach this handler (driver rke2/k3s):
 //
-//   - turtles-imported CAPI clusters — mgmt cluster carries the CAPIClusterOwner labels,
-//   - v2prov (Rancher-provisioned) RKE2/K3s — backed by a provisioning.cattle.io Cluster and a CAPI
-//     Cluster whose Machines carry a Status.NodeRef,
-//   - truly-imported RKE2/K3s — no CAPI Machines back the nodes.
+//   - turtles-imported CAPI clusters: the mgmt cluster carries the CAPIClusterOwner labels.
+//   - v2prov (Rancher-provisioned) RKE2/K3s: backed by a provisioning.cattle.io Cluster and a CAPI
+//     Cluster whose Machines carry a Status.NodeRef.
+//   - plain imported RKE2/K3s: no CAPI Machines back the nodes.
 //
-// For the first two (CAPI-backed) shapes the stamped objects are the CAPI Cluster + CAPI Machine, so
-// the resulting plan.cattle.io/* labels match exactly what the provisioning planner bakes into
-// node-label at boot (see pkg/capr/planner/config.go addLabels). This is what lets the planner stop
-// folding those labels into node-label on steady-state reconciles — the labels still land on the
-// Node here, via the API, without restarting rke2 (SURE-12151 / rancher/rancher#58320). For the
-// truly-imported shape there is no CAPI Machine, so we fall back to the mgmt v3 Cluster + mgmt v3
-// Node (the pre-existing behaviour).
+// For the two CAPI-backed kinds we stamp the CAPI Cluster + CAPI Machine, so the plan.cattle.io/*
+// labels match what the planner bakes into node-label at boot (see pkg/capr/planner/config.go
+// addLabels). That match is what lets the planner stop putting those labels in node-label on
+// steady-state reconciles: they still land on the Node here, over the API, without restarting rke2
+// (rancher/rancher#58320). Plain imported clusters have no CAPI Machine, so we fall back to the mgmt
+// v3 Cluster + mgmt v3 Node, as before.
 //
-// Returns (nil, nil, nil) if the backing objects have not yet been created (transient state —
-// caller will retry on the next informer event).
+// Returns (nil, nil, nil) when the backing objects don't exist yet; the caller retries on the next
+// informer event.
 func (h *handler) lifecycleObjectsForNode(mgmtCluster *apimgmtv3.Cluster, node *corev1.Node) (runtime.Object, runtime.Object, error) {
 	capiRef, err := h.capiClusterRef(mgmtCluster)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// A provisioning Cluster exists for BOTH v2prov (CAPRKE2) and plain imported RKE2/K3s clusters, so
-	// capiRef being non-nil is not enough to prove this node is CAPI-backed. Only CAPRKE2 clusters
-	// actually have a cluster.x-k8s.io Cluster and Machines; imported clusters do not. We therefore
-	// only take the CAPI branch when the CAPI Cluster actually exists, and otherwise fall through to
-	// the mgmt v3 objects (the pre-existing behaviour for imported clusters). Getting this wrong leaves
-	// imported Nodes with no lifecycle labels, which breaks snapshot back-population (SURE-12151).
+	// Both v2prov and plain imported clusters have a provisioning Cluster, so a non-nil capiRef alone
+	// doesn't prove this node is CAPI-backed. Only v2prov clusters have an actual cluster.x-k8s.io
+	// Cluster and Machines. So we take the CAPI branch only when that Cluster exists, and otherwise
+	// fall through to the mgmt v3 objects. Getting this wrong leaves imported Nodes unlabelled, which
+	// breaks snapshot back-population.
 	if capiRef != nil {
 		capiCluster, err := h.capiClusterCache.Get(capiRef.Namespace, capiRef.Name)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -159,14 +157,13 @@ func (h *handler) lifecycleObjectsForNode(mgmtCluster *apimgmtv3.Cluster, node *
 				}
 			}
 
-			// A CAPI-backed (CAPRKE2) cluster whose Machine has not yet claimed this node: wait for the
-			// NodeRef to be populated rather than stamping the wrong (mgmt v3) labels.
+			// CAPI cluster whose Machine hasn't claimed this node yet: wait for the NodeRef rather than
+			// stamping the wrong (mgmt v3) labels.
 			if len(machines) > 0 {
 				return nil, nil, nil
 			}
 		}
-		// Either no CAPI Cluster (plain imported with only a provisioning-cluster shell) or a CAPI
-		// cluster with no Machines yet: fall through to the mgmt v3 objects below.
+		// No CAPI Cluster (plain imported), or one with no Machines yet: fall through to mgmt v3.
 	}
 
 	mgmtNodes, err := h.mgmtNodeCache.List(h.clusterName, labels.SelectorFromSet(labels.Set{
@@ -181,10 +178,9 @@ func (h *handler) lifecycleObjectsForNode(mgmtCluster *apimgmtv3.Cluster, node *
 	return mgmtCluster, mgmtNodes[0], nil
 }
 
-// capiClusterRef resolves the CAPI Cluster backing the given management cluster. The management
-// cluster name (c-m-xxxxx) is never the CAPI cluster name, so for v2prov clusters it is resolved via
-// the provisioning.cattle.io Cluster that owns it. Returns nil when the cluster is not backed by a
-// CAPI/provisioning cluster (e.g. a truly-imported RKE2/K3s cluster).
+// capiClusterRef resolves the CAPI Cluster backing the given management cluster. The mgmt cluster
+// name (c-m-xxxxx) is never the CAPI cluster name, so for v2prov clusters we resolve it through the
+// provisioning.cattle.io Cluster that owns it. Returns nil when there's no provisioning cluster.
 func (h *handler) capiClusterRef(mgmtCluster *apimgmtv3.Cluster) (*types.NamespacedName, error) {
 	ownerName := mgmtCluster.Labels[capr.CAPIClusterOwnerLabel]
 	ownerNS := mgmtCluster.Labels[capr.CAPIClusterOwnerNSLabel]

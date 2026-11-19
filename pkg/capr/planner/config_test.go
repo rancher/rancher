@@ -1033,12 +1033,10 @@ func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }
 
-// TestAddLabelsLifecycleGating is the SURE-12151 / rancher/rancher#58320 regression guard. It asserts
-// that the plan.cattle.io/* cluster- and machine-lifecycle identity labels are folded into the
-// non-dynamic "node-label" setting ONLY on first boot or during a Kubernetes version upgrade — never
-// on a steady-state reconcile (e.g. a management-server-only Rancher upgrade), where doing so would
-// bump RESTART_STAMP and restart rke2 on every node of every downstream cluster. The rke.cattle.io/machine
-// (MachineUID) label must always be present, matching the pre-2.15 baseline.
+// TestAddLabelsLifecycleGating guards rancher/rancher#58320: the plan.cattle.io/* lifecycle labels
+// go into node-label only on first boot or during a version upgrade, never on a steady-state
+// reconcile (where it would bump RESTART_STAMP and restart rke2). The rke.cattle.io/machine label is
+// always present.
 func TestAddLabelsLifecycleGating(t *testing.T) {
 	const k8sVersion = "v1.31.2+rke2r1"
 
@@ -1083,8 +1081,8 @@ func TestAddLabelsLifecycleGating(t *testing.T) {
 		return false
 	}
 
-	// appliedPlanWithLabels builds an applied NodePlan whose 50-rancher.yaml already carries a
-	// plan.cattle.io/* entry in node-label, to exercise the monotonic latch.
+	// appliedPlanWithLabels builds an applied NodePlan whose 50-rancher.yaml already has a
+	// plan.cattle.io/* entry in node-label, to exercise the latch.
 	appliedPlanWithLabels := func() *plan.NodePlan {
 		cfg, err := json.Marshal(map[string]any{
 			"node-label": []string{
@@ -1122,8 +1120,8 @@ func TestAddLabelsLifecycleGating(t *testing.T) {
 			wantLifecycleBaked: true,
 		},
 		{
-			// Latch: a node already carrying the labels in its applied node-label must keep them even
-			// on a steady-state reconcile, otherwise removing them would itself cause a restart.
+			// Latch: a node that already has the labels keeps them even on a steady-state reconcile,
+			// since removing them would itself cause a restart.
 			name:               "latch - applied plan already has labels, keep them (no flip)",
 			entry:              newEntry(appliedPlanWithLabels(), k8sVersion),
 			wantLifecycleBaked: true,
@@ -1137,7 +1135,7 @@ func TestAddLabelsLifecycleGating(t *testing.T) {
 
 			nodeLabels := convert.ToStringSlice(config["node-label"])
 
-			// The MachineUID label is the pre-2.15 baseline and must always be present.
+			// The MachineUID label must always be present.
 			if !slicesContains(nodeLabels, machineUIDLabel) {
 				t.Errorf("expected %q in node-label, got %v", machineUIDLabel, nodeLabels)
 			}

@@ -653,60 +653,41 @@ func updateConfigWithAdvertiseAddresses(config map[string]any, info *machineNetw
 	}
 }
 
-// shouldEmbedLifecycleLabels reports whether the plan.cattle.io/* cluster- and machine-lifecycle
-// identity labels should be folded into the RKE2/K3s "node-label" setting (which becomes
-// kubelet --node-labels, a NON-DYNAMIC setting) for this node.
+// shouldEmbedLifecycleLabels reports whether the plan.cattle.io/* lifecycle labels should go into
+// the RKE2/K3s node-label setting for this node.
 //
-// node-label is consumed only at kubelet start, so Rancher folds any change to it into a new
-// RESTART_STAMP and system-agent-installer-rke2 restarts rke2-agent/rke2-server when the stamp
-// moves. Unconditionally appending these labels (the 2.15 behaviour) therefore restarts every node
-// of every downstream cluster on the first reconcile after a management-server upgrade, even though
-// nothing about the downstream cluster changed — see SURE-12151 / rancher/rancher#58320.
+// node-label becomes kubelet --node-labels, which is non-dynamic: any change to it bumps
+// RESTART_STAMP and restarts rke2. Appending these labels unconditionally (the 2.15 behaviour) is
+// what restarts every downstream node after a management-server upgrade (rancher/rancher#58320).
 //
-// We embed them only in the two cases where there is no additional cost:
-//
-//   - First boot: the node has never had a plan applied, so the kubelet is not yet running and
-//     baking the labels in guarantees they are present from the very first kubelet start (needed by
-//     the v2prov day-2 operations framework that correlates system-agents by these labels).
-//   - Kubernetes version upgrade in flight: rke2/k3s is going to be restarted for the version bump
-//     anyway, so folding the labels in now is free and keeps node-label authoritative going forward.
-//
-// On a steady-state reconcile (e.g. a management-server-only Rancher upgrade) we return false: the
-// labels are instead delivered to the downstream Node object via the machinerole ImportedLabelSync
-// controller (nodes.Update over the API — no kubelet, no restart).
+// So we only embed them when a restart is happening regardless: first boot (no plan applied yet, so
+// the kubelet isn't running) or an in-flight Kubernetes version upgrade. On a steady-state reconcile
+// we return false and let the machinerole ImportedLabelSync controller stamp the labels on the Node
+// over the API instead, which doesn't restart anything.
 func shouldEmbedLifecycleLabels(controlPlane *rkev1.RKEControlPlane, entry *planEntry) bool {
 	if entry == nil || entry.Machine == nil {
 		return false
 	}
-	// First boot: no plan has ever been applied to this node.
+	// First boot: no plan has ever been applied.
 	if entry.Plan == nil || entry.Plan.AppliedPlan == nil {
 		return true
 	}
-	// Kubernetes version upgrade: the node's kubelet is not yet on the desired version, so a restart
-	// is already going to happen.
+	// Version upgrade: kubelet isn't on the desired version yet, so rke2 is going to restart anyway.
 	if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 		return true
 	}
-	// Latch: if the labels are already baked into the node's applied node-label, keep rendering them.
-	// The embed decision must be monotonic over a node's lifetime - once the labels are in node-label
-	// (first boot of a new node, or a Kubernetes version upgrade), removing them on a later
-	// steady-state reconcile would itself change node-label and bump RESTART_STAMP, causing exactly
-	// the restart this change exists to avoid. Nodes that never had the labels (e.g. clusters upgraded
-	// from a pre-2.15 release that never injected them) do not match here and stay restart-free.
-	if appliedPlanHasLifecycleLabels(entry) {
-		return true
-	}
-	return false
+	// Latch: if the labels are already in the applied node-label, keep rendering them. The decision
+	// has to be one-way (off to on, never on to off): dropping labels that are already there would
+	// change node-label and cause the very restart we're avoiding. Nodes that never had the labels
+	// don't match and stay restart-free.
+	return appliedPlanHasLifecycleLabels(entry)
 }
 
-// lifecycleNodeLabelPrefix is the key prefix shared by all six cluster/machine identity labels
-// (plan.cattle.io/cluster-* and plan.cattle.io/machine-*).
 const lifecycleNodeLabelPrefix = "plan.cattle.io/"
 
-// appliedPlanHasLifecycleLabels reports whether the node's last-applied 50-rancher.yaml already
-// carries any plan.cattle.io/* entry in its node-label list. It is the latch that keeps
-// shouldEmbedLifecycleLabels monotonic (see its comment). Any decode error is treated as "no labels"
-// - the worst case is a single reconcile that re-renders the labels, never a wrong-but-silent state.
+// appliedPlanHasLifecycleLabels reports whether the node's last-applied 50-rancher.yaml already has
+// a plan.cattle.io/* entry in its node-label. This is the latch for shouldEmbedLifecycleLabels. A
+// decode error is treated as "no labels", so the worst case is one reconcile re-rendering them.
 func appliedPlanHasLifecycleLabels(entry *planEntry) bool {
 	if entry.Plan == nil || entry.Plan.AppliedPlan == nil {
 		return false
@@ -746,10 +727,8 @@ func addLabels(config map[string]any, controlPlane *rkev1.RKEControlPlane, clust
 
 	labels = append(labels, capr.MachineUIDLabel+"="+string(entry.Machine.UID))
 
-	// Only fold the plan.cattle.io/* identity labels into node-label when it will not cost an extra
-	// rke2 restart (first boot or an in-flight Kubernetes version upgrade). On steady-state
-	// reconciles they are omitted here and synced onto the Node via the machinerole
-	// ImportedLabelSync controller instead. See SURE-12151 / rancher/rancher#58320.
+	// Only put the plan.cattle.io/* labels in node-label when it won't cost an extra rke2 restart.
+	// Otherwise they're synced onto the Node by the machinerole controller. See rancher/rancher#58320.
 	if shouldEmbedLifecycleLabels(controlPlane, entry) {
 		lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
 		if err != nil {
