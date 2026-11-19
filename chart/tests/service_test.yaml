@@ -49,6 +49,25 @@ tests:
   asserts:
   - isNull:
       path: metadata.annotations
+- it: should set a provided nodePort on the https port
+  set:
+    service.type: NodePort
+    service.nodePort: 30443
+  documentIndex: 0
+  asserts:
+  - equal:
+      path: spec.ports[1].name
+      value: https
+  - equal:
+      path: spec.ports[1].nodePort
+      value: 30443
+- it: should not set nodePort when none is provided
+  set:
+    service.type: NodePort
+  documentIndex: 0
+  asserts:
+  - isNull:
+      path: spec.ports[1].nodePort
 - it: should define both http and https ports
   documentIndex: 0
   asserts:
