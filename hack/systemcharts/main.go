@@ -79,15 +79,7 @@ func run(ctx context.Context) error {
 	}
 
 	for _, chart := range toDownload {
-		chartURL := chart.URLs[0]
-
-		// OCI charts can be pulled efficiently at runtime
-		if strings.HasPrefix(chartURL, "oci://") {
-			fmt.Printf("skipping chart %s-%s, OCI URL %q...\n", chart.Name, chart.Version, chartURL)
-			continue
-		}
-
-		if err := downloadChart(chartDownloader, chartsBranch, chartURL, *outputDir); err != nil {
+		if err := downloadChart(chartDownloader, chartsBranch, chart.URLs[0], *outputDir); err != nil {
 			return fmt.Errorf("downloading chart %s-%s: %w", chart.Name, chart.Version, err)
 		}
 	}
