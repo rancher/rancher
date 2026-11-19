@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/rancher/channelserver/pkg/model"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -379,6 +380,51 @@ func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
 	return "/var/lib/rancher/agent"
 }
 
+// ShellQuote returns s as one literal word for a POSIX shell. It returns s unchanged when every
+// character is a letter, a digit, or one of "_@+:,./-", so existing plans for normal paths keep
+// the same bytes. Otherwise, it wraps s in single quotes and escapes each single quote.
+func ShellQuote(s string) string {
+	safe := s != "" && !strings.ContainsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r) && !strings.ContainsRune("_@+:,./-", r)
+	})
+	if safe {
+		return s
+	}
+	return ShellSingleQuote(s)
+}
+
+// ShellSingleQuote returns s as one literal word for a POSIX shell. It always wraps s in single quotes
+// and escapes each single quote.
+func ShellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+var validEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// IsValidEnvVarName reports whether name is a valid POSIX shell identifier. It is also a valid name for
+// the "$env:NAME=" form in PowerShell. A leading "$env:" prefix is not part of the name.
+func IsValidEnvVarName(name string) bool {
+	return validEnvVarName.MatchString(name)
+}
+
+// PowerShellQuote returns s as one literal string for PowerShell. It uses single quotes and doubles
+// every character that PowerShell treats as a single quote, including the Unicode curly quotes.
+func PowerShellQuote(s string) string {
+	var b strings.Builder
+	b.WriteByte('\'')
+	for _, r := range s {
+		b.WriteRune(r)
+		switch r {
+		case '\'', '\u2018', '\u2019', '\u201A', '\u201B':
+			// PowerShell escapes a quote inside a single-quoted string by doubling it.
+			// For example, it's becomes it''s.
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('\'')
+	return b.String()
+}
+
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
 		// CAPI-native path (turtles-imported clusters): the plan SA is owned directly by the
@@ -728,27 +774,27 @@ func AutoscalerEnabledByProvisioningCluster(cluster *provv1.Cluster) bool {
 // FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either
 // a Powershell script or the Rancher planner, indicated by the isPlanVariable parameter.
 // This function automatically configures the '$env:' prefix for a given environment variable,
-// automatically prefixes boolean values with '$', and surrounds string variables with double quotes as
-// needed. If the provided variable name incorrectly uses either '$env:' or '$' for the given isPlanVariable
-// value, it will be removed.
+// automatically prefixes boolean values with '$', and writes string variables for a PowerShell script as
+// single-quoted literals, so PowerShell never expands the value. Plan variables are not quoted, because the
+// system-agent sets them as literal environment entries, and their surrounding double quotes are removed.
+// If the provided variable name incorrectly uses either '$env:' or '$' for the given isPlanVariable
+// value, it will be removed. The caller must check the name with IsValidEnvVarName.
 func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
 	lowerValue := strings.ToLower(envVar.Value)
 	isBool := lowerValue == "$true" || lowerValue == "$false" ||
 		lowerValue == "true" || lowerValue == "false"
 
-	// remove any user provided prefixes and quotations
+	// remove any user provided prefixes
 	envVar.Name = strings.TrimPrefix(envVar.Name, "$env:")
-	envVar.Value = strings.Trim(envVar.Value, "\"")
 
 	if !isBool {
 		// Non-boolean variables are always treated as strings,
 		// even numbers
-		format := "$env:%s=\"%s\""
 		if isPlanVariable {
-			format = "%s=%s"
+			return fmt.Sprintf("%s=%s", envVar.Name, strings.Trim(envVar.Value, "\""))
 		}
 
-		return fmt.Sprintf(format, envVar.Name, envVar.Value)
+		return fmt.Sprintf("$env:%s=%s", envVar.Name, PowerShellQuote(envVar.Value))
 	}
 
 	if !isPlanVariable {
