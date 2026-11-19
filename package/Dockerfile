@@ -18,6 +18,9 @@ ARG GODEP_WRANGLER=scratch
 ARG GODEP_WRANGLER_PATH
 
 ARG CHART_DEFAULT_BRANCH=staging
+# Branch of rancher/prime-charts, which is not in the new catalog system. It is read from here by the Prime
+# builds and by the image scanning, which cannot use CHART_DEFAULT_BRANCH: that one names the branch of rancher/charts.
+ARG PRIME_CHART_DEFAULT_BRANCH=dev-v2.16
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
