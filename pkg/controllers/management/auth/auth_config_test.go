@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	azuread "github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -121,6 +122,52 @@ func TestCleanupRuns(t *testing.T) {
 	}
 }
 
+func TestSyncSetsLogoutAllSupportedFromType(t *testing.T) {
+	tests := []struct {
+		name      string
+		authType  string
+		stored    bool
+		want      bool
+		wantWrite bool
+	}{
+		{name: "new keycloak OIDC config gets support", authType: client.KeyCloakOIDCConfigType, want: true, wantWrite: true},
+		{name: "new generic SAML config gets support", authType: client.GenericSAMLConfigType, want: true, wantWrite: true},
+		{name: "new azure config gets support", authType: client.AzureADConfigType, want: true, wantWrite: true},
+		{name: "already set is left alone", authType: client.OKTAConfigType, stored: true, want: true},
+		{name: "non SLO type stays false", authType: client.GithubConfigType, want: false},
+		{name: "client supplied true is cleared for non SLO type", authType: client.GithubConfigType, stored: true, want: false, wantWrite: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockUsers := newMockUserLister()
+			config := &v3.AuthConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-config"},
+				Type:       test.authType,
+				// A set cleanup annotation keeps the sync from also updating the config for its own reasons.
+				// This is the state of a config the controller has already seen.
+			}
+			config.Annotations = map[string]string{CleanupAnnotation: CleanupRancherLocked}
+			config.LogoutAllSupported = test.stored
+
+			mockClient := newMockAuthConfigClient(config).(*mockAuthConfigClient)
+			controller := authConfigController{
+				cleanup:                 &fakeCleanupService{},
+				authConfigsUnstructured: mockClient,
+				users:                   &mockUsers,
+			}
+
+			result, err := controller.sync("test", config)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, result.(*v3.AuthConfig).LogoutAllSupported)
+			assert.Equal(t, test.want, mockClient.config.config.LogoutAllSupported)
+			if !test.wantWrite {
+				assert.Same(t, config, result, "the config should not have been updated")
+			}
+		})
+	}
+}
+
 func TestAuthConfigReset(t *testing.T) {
 	t.Parallel()
 
@@ -149,7 +196,7 @@ func TestAuthConfigReset(t *testing.T) {
 					Name:        github.ProviderName,
 					Annotations: map[string]string{CleanupAnnotation: test.annotationValue},
 				},
-				Type:                "githubConfig",
+				Type:                client.OIDCConfigType,
 				Enabled:             false,
 				AccessMode:          "unrestricted",
 				AllowedPrincipalIDs: []string{"user1", "user2"},
