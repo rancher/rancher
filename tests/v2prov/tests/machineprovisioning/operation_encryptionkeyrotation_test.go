@@ -1,10 +1,11 @@
 package machineprovisioning
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -53,4 +54,15 @@ func Test_Operation_SetA_MP_EncryptionKeyRotation(t *testing.T) {
 	operations.RunRotateEncryptionKeysTest(t, clients, c)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
