@@ -34,7 +34,7 @@ jobs:
       # Upload the failure bundle as an artifact, so the agentic workflow can download it
       - name: Upload failure bundle
         if: steps.collect.outputs.any-failures == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nightly-provisioning-failure-bundle
           path: bundle.json
@@ -69,7 +69,7 @@ jobs:
         with:
           persist-credentials: 'false'
       - name: Fetch failure bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nightly-provisioning-failure-bundle
           path: .
@@ -77,7 +77,7 @@ jobs:
       # Absent when the analysis workflow failed or wrote nothing usable.
       - name: Fetch analysis
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nightly-provisioning-analysis
           path: analysis
