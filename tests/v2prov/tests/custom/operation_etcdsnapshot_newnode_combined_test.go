@@ -33,6 +33,7 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testi
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{

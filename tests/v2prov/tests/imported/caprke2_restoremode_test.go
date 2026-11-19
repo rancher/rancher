@@ -83,6 +83,7 @@ import (
 // then restore selecting kubernetesVersion, after which the control plane is configured for and
 // running the snapshot's version again — on the same machines, with the cluster healthy.
 func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *testing.T) {
+	t.Parallel()
 	requireCAPRKE2(t)
 	requireTwoVersions(t)
 
@@ -136,6 +137,7 @@ func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeKubernetesVersion(t *t
 // does not. That second assertion is the point of the test: it pins the upstream guard that stops a
 // downstream payload from rewriting arbitrary fields of its own control plane.
 func Test_Imported_Operation_SetE_CAPRKE2DockerRestoreModeAll(t *testing.T) {
+	t.Parallel()
 	requireCAPRKE2(t)
 	requireTwoVersions(t)
 
@@ -213,12 +215,12 @@ func setUpCAPRKE2RestoreModeCluster(t *testing.T, namePrefix string) (*clients.C
 	}
 	t.Cleanup(cs.Close)
 
-	// The object store lives in `default` — like the shared registry cache — rather than in the
-	// cluster's namespace, which NewCAPRKE2Cluster creates itself (and labels for Turtles
-	// auto-import). It has to be reachable from inside the CAPD machine containers, which are on the
+	// The object store is shared with the other CAPRKE2 restore-mode tests and never cleaned up, so
+	// parallel tests don't tear it down under each other; the per-run folder below keeps their
+	// snapshots apart. It has to be reachable from inside the CAPD machine containers, which are on the
 	// same Docker bridge network as the local cluster's nodes but outside its pod network, so the
 	// external (NodePort) flavour is required — a ClusterIP endpoint is simply unroutable there.
-	osInfo, err := objectstore.GetExternalObjectStore(cs, "default", "extstore0", "s3snapshots")
+	osInfo, err := objectstore.GetSharedExternalObjectStore(cs, "extstore0", "s3snapshots")
 	if err != nil {
 		t.Fatalf("setting up object store: %v", err)
 	}
@@ -318,7 +320,7 @@ func saveCAPRKE2Snapshot(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2F
 	t.Helper()
 
 	validAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.MgmtClusterName, fx.MgmtClusterRef())
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.MgmtClusterName, fx.MgmtClusterRef(), caprke2Kubectl(t, cs, fx))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	snapshot := waitForCAPRKE2S3Snapshot(t, cs, fx, validAfter)
