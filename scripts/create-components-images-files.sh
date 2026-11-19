@@ -16,9 +16,10 @@ mkdir -p ../dist
 
 cd ../bin
 
-if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
-fi
+# The image lists must match the charts baked into the Rancher Assets image in use, so check out the charts commit
+# referenced by that image's assets tag instead of using the branch head.
+source ../scripts/assets-charts-lib
+checkout_assets_charts
 
 CHARTS_DIRS="${CHARTS_DIRS:+${CHARTS_DIRS},}${CHART_REPO_DIR}"
 
@@ -26,6 +27,10 @@ if [ ! -d $SMALL_FORK_REPO_DIR ]; then
     mkdir -p $SMALL_FORK_REPO_DIR
     git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
 fi
+
+# The export checks the chart pins against the images list, and the one of system-upgrade-controller is only in
+# package/Dockerfile.
+eval "$(grep '^ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION' ../package/Dockerfile | awk '{print "export " $2}')"
 
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.

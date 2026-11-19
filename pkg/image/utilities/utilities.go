@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/rancher/rancher/pkg/buildconfig"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
 	"github.com/rancher/rancher/pkg/settings"
@@ -62,10 +63,16 @@ func GatherTargetArtifactsAndSources(
 	ociRepository string,
 	rancherVersion string,
 ) (ArtifactTargetsAndSources, error) {
-	if !img.IsValidSemver(rancherVersion) || !settings.IsReleaseServerVersion(rancherVersion) {
+	// The charts of a release have to be the ones that Rancher installs, which is only a warning for any other build.
+	isRelease := img.IsValidSemver(rancherVersion) && settings.IsReleaseServerVersion(rancherVersion)
+	if !isRelease {
 		rancherVersion = settings.RancherVersionDev
 	}
 	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
+
+	if err := img.CheckPinnedCharts(chartPaths, rancherVersion, img.PinnedCharts(), isRelease); err != nil {
+		return ArtifactTargetsAndSources{}, err
+	}
 
 	// expected to already exist in the current runtime or working tree
 	b, err := os.ReadFile(filepath.Join("data.json"))
@@ -122,6 +129,19 @@ func GatherTargetArtifactsAndSources(
 
 	targetWindowsArtifacts, targetWindowsArtifactsAndSources, err := img.GetArtifacts(chartPaths, ociChartsPath, img.Windows, rancherVersion, img.ExtensionEndpoints, nil, []string{winsAgentUpdateImage}, ociRepository)
 	if err != nil {
+		return ArtifactTargetsAndSources{}, err
+	}
+
+	// The images of the charts of rancher/charts are pushed to the registry of the build before their charts, so they
+	// have to be there before anything of the list that has them is written: the one that is not would fail when it is
+	// saved. The ones of the other repositories, prime-charts for one, are not asked for.
+	allLines := append(append([]string{}, targetArtifactsAndSources...), targetWindowsArtifactsAndSources...)
+	registry := img.RegistryOfAssetsImage(buildconfig.DefaultAssetsImage)
+	chartImages, err := img.ImagesOfCatalogCharts(allLines, chartPaths)
+	if err != nil {
+		return ArtifactTargetsAndSources{}, err
+	}
+	if err := img.CheckImagesExist(registry, chartImages); err != nil {
 		return ArtifactTargetsAndSources{}, err
 	}
 
