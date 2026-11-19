@@ -6,7 +6,7 @@ const (
 	AksOperatorVersion        = "111.0.0+up1.16.0-rc.7"
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-23.2"
 	ChartDefaultBranch        = "staging"
-	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4-turtles.1"
+	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4_turtles.3"
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261119T1853Z-dev"
 	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.7"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4-rc.2"
@@ -19,7 +19,7 @@ const (
 	RemoteDialerProxyVersion  = "111.0.1+up0.9.1-rc.5"
 	Rke2ChartDefaultBranch    = "main"
 	SystemAgentVersion        = "v0.16.0-rc.6"
-	TurtlesVersion            = "111.0.0+up0.28.0-rc.7"
+	TurtlesVersion            = "111.0.0+up0.28.0-rc.8"
 	WebhookVersion            = "111.0.1+up0.12.1-rc.21"
 	WinsAgentVersion          = "v0.16.0-rc.10"
 )
