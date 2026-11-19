@@ -57,6 +57,7 @@ func TestSaveOIDCConfigUpdatesConfigWithSecretReferences(t *testing.T) {
 			assert.Equal(t, common.SecretsNamespace+":"+tt.wantPrefix+"-privatekey", stored["privateKey"])
 			assert.Equal(t, common.SecretsNamespace+":"+tt.wantPrefix+"-clientsecret", stored["clientSecret"])
 			assert.Equal(t, tt.configName, stored["metadata"].(map[string]any)["name"])
+			assert.Equal(t, true, stored["logoutAllSupported"], "SLO support is a provider capability and must be set on save")
 		})
 	}
 }

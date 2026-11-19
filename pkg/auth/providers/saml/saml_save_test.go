@@ -41,6 +41,7 @@ func TestSaveSamlConfigRetriesOnConflict(t *testing.T) {
 	secretName := common.SecretNamePrefix(GenericSAMLName, client.GenericSAMLConfigType) + "-spkey"
 	assert.Equal(t, map[string]map[string]string{secretName: {"spkey": "test-key"}}, created)
 	assert.Equal(t, common.SecretsNamespace+":"+secretName, srv.Stored()["spKey"])
+	assert.Equal(t, true, srv.Stored()["logoutAllSupported"], "SLO support is a provider capability and must be set on save")
 }
 
 func TestSaveSamlConfigWithLDAPRetriesOnConflict(t *testing.T) {
