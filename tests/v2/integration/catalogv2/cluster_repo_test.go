@@ -32,6 +32,7 @@ import (
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
 	rancherWait "github.com/rancher/shepherd/pkg/wait"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -964,11 +965,10 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	status := c.getStatusFromClusterRepo(clusterRepo)
 	assert.Equal(c.T(), params.URL1, status.URL)
 
-	// Save download timestamp and generation count before changing the URL
-	downloadTime := status.DownloadTime
+	// Save the generation count before changing the URL
 	observedGeneration := status.ObservedGeneration
 
-	// Validate updating the ClusterRepo by changing the repo URL and verifying DownloadTime was updated (meaning new resources were pulled)
+	// Validate updating the ClusterRepo by changing the repo URL
 	spec := c.getSpecFromClusterRepo(clusterRepo)
 	setClusterRepoURL(spec, params.Type, params.URL2)
 	clusterRepoUpdated := *clusterRepo
@@ -977,7 +977,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(&clusterRepoUpdated)
 	require.NoError(c.T(), err)
 
-	clusterRepo, err = c.pollUntilDownloaded(params.Name, downloadTime)
+	clusterRepo, err = c.pollUntilRepoUpdated(params, observedGeneration)
 	require.NoError(c.T(), err)
 
 	status = c.getStatusFromClusterRepo(clusterRepo)
@@ -1226,6 +1226,62 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 		c.T().Logf("Error while downloading ClusterRepo %s from catalog: %v. \n CR status: \n %v", ClusterRepoName, err, clusterRepo.Status)
 	}
 	return clusterRepo, err
+}
+
+func (c *ClusterRepoTestSuite) pollUntilRepoUpdated(params ClusterRepoParams, previousGeneration int64) (*stevev1.SteveAPIObject, error) {
+	var clusterRepo *stevev1.SteveAPIObject
+	err := wait.Poll(PollInterval, PollTimeout, func() (bool, error) {
+		var err error
+		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(params.Name)
+		if err != nil {
+			return false, err
+		}
+		return repoUpdateDownloaded(c.getStatusFromClusterRepo(clusterRepo), params, previousGeneration), nil
+	})
+	if err != nil && clusterRepo != nil {
+		c.T().Logf("Error while updating ClusterRepo %s: %v. \n CR status: \n %v", params.Name, err, clusterRepo.Status)
+	}
+	return clusterRepo, err
+}
+
+func repoUpdateDownloaded(status *v1.RepoStatus, params ClusterRepoParams, previousGeneration int64) bool {
+	if status.ObservedGeneration <= previousGeneration || status.URL != params.URL2 {
+		return false
+	}
+	conditionType := v1.RepoDownloaded
+	if params.Type == OCI {
+		conditionType = v1.OCIDownloaded
+	}
+	for _, condition := range status.Conditions {
+		if condition.Type == string(conditionType) && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func TestClusterRepoTestSuiteUpdateDownloaded(t *testing.T) {
+	downloadTime := metav1.NewTime(time.Date(2026, 11, 20, 12, 24, 18, 0, time.UTC))
+	tests := []struct {
+		name       string
+		repoType   RepoType
+		status     v1.RepoStatus
+		downloaded bool
+	}{
+		{"same-second git download", Git, v1.RepoStatus{ObservedGeneration: 2, URL: "new", DownloadTime: downloadTime, Conditions: []genericcondition.GenericCondition{{Type: string(v1.RepoDownloaded), Status: corev1.ConditionTrue}}}, true},
+		{"same-second http download", HTTP, v1.RepoStatus{ObservedGeneration: 2, URL: "new", DownloadTime: downloadTime, Conditions: []genericcondition.GenericCondition{{Type: string(v1.RepoDownloaded), Status: corev1.ConditionTrue}}}, true},
+		{"same-second oci download", OCI, v1.RepoStatus{ObservedGeneration: 2, URL: "new", DownloadTime: downloadTime, Conditions: []genericcondition.GenericCondition{{Type: string(v1.OCIDownloaded), Status: corev1.ConditionTrue}}}, true},
+		{"stale generation", Git, v1.RepoStatus{ObservedGeneration: 1, URL: "new", Conditions: []genericcondition.GenericCondition{{Type: string(v1.RepoDownloaded), Status: corev1.ConditionTrue}}}, false},
+		{"stale url", Git, v1.RepoStatus{ObservedGeneration: 2, URL: "old", Conditions: []genericcondition.GenericCondition{{Type: string(v1.RepoDownloaded), Status: corev1.ConditionTrue}}}, false},
+		{"failed download", Git, v1.RepoStatus{ObservedGeneration: 2, URL: "new", Conditions: []genericcondition.GenericCondition{{Type: string(v1.RepoDownloaded), Status: corev1.ConditionFalse}}}, false},
+		{"missing condition", Git, v1.RepoStatus{ObservedGeneration: 2, URL: "new"}, false},
+		{"wrong condition", OCI, v1.RepoStatus{ObservedGeneration: 2, URL: "new", Conditions: []genericcondition.GenericCondition{{Type: string(v1.RepoDownloaded), Status: corev1.ConditionTrue}}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.downloaded, repoUpdateDownloaded(&tt.status, ClusterRepoParams{Type: tt.repoType, URL2: "new"}, 1))
+		})
+	}
 }
 
 func (c *ClusterRepoTestSuite) getSpecFromClusterRepo(obj *stevev1.SteveAPIObject) *v1.RepoSpec {
