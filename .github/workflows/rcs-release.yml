@@ -40,6 +40,9 @@ jobs:
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
+    permissions:
+      contents: read
+      id-token: write
     env:
       ARCH: amd64
     outputs:
@@ -50,6 +53,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: setup and build
         id: build
         uses: $/.github/actions/rancher-chart/build
@@ -96,13 +104,7 @@ jobs:
       group: 'build-chart-tag'
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
-    env:
-      ARCH: amd64
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
@@ -110,7 +112,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID_CHARTS;
             secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CHARTS;
             secret/data/github/repo/${{ github.repository }}/aws/credentials chartsBucketName | CHARTS_BUCKET_NAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: publish
         env:
           CHARTS_BUCKET_NAME: ${{ env.CHARTS_BUCKET_NAME }}

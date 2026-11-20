@@ -98,9 +98,6 @@ jobs:
       group: 'build-chart-tag'
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
-    env:
-      ARCH: amd64
-      REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
     steps:
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
