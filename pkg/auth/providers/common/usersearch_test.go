@@ -292,3 +292,63 @@ func TestUserSearcherSearchPrincipalsListError(t *testing.T) {
 	require.ErrorContains(t, err, `listing users for search "testu": cache is not synced`)
 	assert.Nil(t, got)
 }
+
+func TestUserSearcherDisplayNameForPrincipal(t *testing.T) {
+	t.Parallel()
+
+	searcher := common.NewUserSearcher(&fakes.UserListerMock{
+		ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+			return []*apiv3.User{
+				{
+					ObjectMeta:   metav1.ObjectMeta{Name: "u-local"},
+					DisplayName:  "Local Admin",
+					PrincipalIDs: []string{"local://u-local"},
+				},
+				{
+					ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+					DisplayName:  "Test UserOne",
+					PrincipalIDs: []string{"genericoidc_user://sub-0001", "local://u-oidc1"},
+				},
+				{
+					ObjectMeta:   metav1.ObjectMeta{Name: "u-eu"},
+					DisplayName:  "Test UserTwo",
+					PrincipalIDs: []string{"genericoidc-eu_user://sub-0002"},
+				},
+			}, nil
+		},
+	})
+
+	tests := []struct {
+		name        string
+		principalID string
+		want        string
+	}{
+		{name: "known user", principalID: "genericoidc_user://sub-0001", want: "Test UserOne"},
+		{name: "known user of a named config", principalID: "genericoidc-eu_user://sub-0002", want: "Test UserTwo"},
+		{name: "same subject under another config", principalID: "genericoidc_user://sub-0002", want: ""},
+		{name: "unknown subject", principalID: "genericoidc_user://sub-9999", want: ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := searcher.DisplayNameForPrincipal(test.principalID)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestUserSearcherDisplayNameForPrincipalListError(t *testing.T) {
+	t.Parallel()
+
+	searcher := common.NewUserSearcher(&fakes.UserListerMock{
+		ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+			return nil, errors.New("cache is not synced")
+		},
+	})
+
+	got, err := searcher.DisplayNameForPrincipal("genericoidc_user://sub-0001")
+	require.ErrorContains(t, err, `listing users to look up principal "genericoidc_user://sub-0001": cache is not synced`)
+	assert.Empty(t, got)
+}
