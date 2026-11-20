@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	stderrors "errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -50,6 +51,11 @@ type oidcKeyClient struct {
 	secretCache corecontrollers.SecretCache
 }
 
+// errPublicKeyNotFound is returned when no public key matches the requested kid.
+// Unlike other lookup errors it is caused by the token presented by the client,
+// not by a failure of the key store.
+var errPublicKeyNotFound = stderrors.New("public key not found")
+
 // GetPublicKey returns the public key specified by the kid
 func (h *oidcKeyClient) GetPublicKey(kid string) (*rsa.PublicKey, error) {
 	s, err := h.secretCache.Get(keySecretNamespace, keySecretName)
@@ -61,7 +67,7 @@ func (h *oidcKeyClient) GetPublicKey(kid string) (*rsa.PublicKey, error) {
 			return getPublicKeyFromSecretData(value)
 		}
 	}
-	return nil, fmt.Errorf("public key not found")
+	return nil, errPublicKeyNotFound
 }
 
 type jwksHandler struct {
