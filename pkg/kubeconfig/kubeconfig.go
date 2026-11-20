@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 
@@ -163,7 +164,7 @@ func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clu
 				nodeName := clusterName + "-" + strings.TrimPrefix(n.Spec.RequestedHostname, clusterName+"-")
 				clusterNode := kubeNode{
 					ClusterName: nodeName,
-					Server:      "https://" + node.GetEndpointNodeIP(n) + ":6443",
+					Server:      "https://" + net.JoinHostPort(node.GetEndpointNodeIP(n), "6443"),
 					Cert:        FormatCertString(cluster.CACert),
 					User:        clusterName,
 				}

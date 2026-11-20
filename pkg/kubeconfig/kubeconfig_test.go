@@ -175,6 +175,39 @@ func TestForClusterTokenBased(t *testing.T) {
 	}
 }
 
+func TestForClusterTokenBasedNodeAddress(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		ip     string
+		server string
+	}{
+		{name: "IPv4", ip: "10.0.0.1", server: "https://10.0.0.1:6443"},
+		{name: "IPv6", ip: "2600:1f16:1df8:8a98:e461:bc:1bfb:dda8", server: "https://[2600:1f16:1df8:8a98:e461:bc:1bfb:dda8]:6443"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			nodes := []*normanv3.Node{{
+				Spec: apiv3.NodeSpec{ControlPlane: true, RequestedHostname: "ace-cp1"},
+				Status: apiv3.NodeStatus{InternalNodeStatus: corev1.NodeStatus{
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: tt.ip}},
+				}},
+			}}
+			cluster := &clientv3.Cluster{
+				Name: "ace", CACert: "Y2E=",
+				LocalClusterAuthEndpoint: &clientv3.LocalClusterAuthEndpoint{Enabled: true},
+			}
+
+			content, err := ForClusterTokenBased(cluster, nodes, "c-m-ace", testHost, "token", nil)
+			require.NoError(t, err)
+			config := loadConfig(t, content)
+			require.Contains(t, config.Clusters, "ace-cp1")
+			assert.Equal(t, tt.server, config.Clusters["ace-cp1"].Server)
+		})
+	}
+}
+
 func TestGenerate(t *testing.T) {
 	t.Parallel()
 

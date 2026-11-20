@@ -455,7 +455,7 @@ func TestStoreCreate(t *testing.T) {
 					Status: v3.NodeStatus{
 						InternalNodeStatus: corev1.NodeStatus{
 							Addresses: []corev1.NodeAddress{
-								{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
+								{Type: corev1.NodeExternalIP, Address: "2600:1f16:1df8:8a98:e461:bc:1bfb:dda8"},
 							},
 							Conditions: []corev1.NodeCondition{
 								{
@@ -635,7 +635,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, rancherCACert, string(config.Clusters[defaultClusterName].CertificateAuthorityData))
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
-		assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
+		assert.Equal(t, "https://[2600:1f16:1df8:8a98:e461:bc:1bfb:dda8]:6443", config.Clusters["downstream2-cp"].Server)
 		assert.Equal(t, downstream2CACert, string(config.Clusters["downstream2-cp"].CertificateAuthorityData))
 
 		require.Len(t, config.Contexts, 4)
@@ -828,7 +828,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, serverURL, config.Clusters["rancher"].Server)
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
-		assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
+		assert.Equal(t, "https://[2600:1f16:1df8:8a98:e461:bc:1bfb:dda8]:6443", config.Clusters["downstream2-cp"].Server)
 
 		require.Len(t, config.Contexts, 4)
 		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].Cluster)

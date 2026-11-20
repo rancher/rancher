@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net"
 	"net/url"
 	"reflect"
 	"slices"
@@ -707,7 +708,7 @@ func (s *Store) Create(
 					nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
 					data.Clusters = append(data.Clusters, kconfig.Cluster{
 						Name:   nodeName,
-						Server: "https://" + v3node.GetEndpointNodeIP(node) + ":6443",
+						Server: "https://" + net.JoinHostPort(v3node.GetEndpointNodeIP(node), "6443"),
 						Cert:   clusterCerts,
 					})
 					data.Contexts = append(data.Contexts, kconfig.Context{
