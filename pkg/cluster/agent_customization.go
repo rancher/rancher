@@ -37,10 +37,10 @@ const (
 )
 
 // GetClusterAgentTolerations returns additional tolerations for the cluster agent if they have been user defined. If
-// not, nil is returned.
+// not, nil is returned. An empty list is treated the same as an unset one.
 func GetClusterAgentTolerations(cluster *v3.Cluster) []corev1.Toleration {
 	if cluster.Spec.ClusterAgentDeploymentCustomization != nil &&
-		cluster.Spec.ClusterAgentDeploymentCustomization.AppendTolerations != nil {
+		len(cluster.Spec.ClusterAgentDeploymentCustomization.AppendTolerations) > 0 {
 		return cluster.Spec.ClusterAgentDeploymentCustomization.AppendTolerations
 	}
 
@@ -174,17 +174,25 @@ func AgentDeploymentCustomizationChanged(cluster *v3.Cluster) bool {
 
 	if statusCustomization == nil {
 		affinitiesDiffer = specCustomization.OverrideAffinity != nil
-		tolerationsDiffer = specCustomization.AppendTolerations != nil
+		tolerationsDiffer = len(specCustomization.AppendTolerations) > 0
 		resourcesDiffer = specCustomization.OverrideResourceRequirements != nil
 
 		return affinitiesDiffer || tolerationsDiffer || resourcesDiffer
 	}
 
-	tolerationsDiffer = !reflect.DeepEqual(specCustomization.AppendTolerations, statusCustomization.AppendTolerations)
+	tolerationsDiffer = !tolerationsEqual(specCustomization.AppendTolerations, statusCustomization.AppendTolerations)
 	affinitiesDiffer = !reflect.DeepEqual(specCustomization.OverrideAffinity, statusCustomization.OverrideAffinity)
 	resourcesDiffer = !reflect.DeepEqual(specCustomization.OverrideResourceRequirements, statusCustomization.OverrideResourceRequirements)
 
 	return affinitiesDiffer || tolerationsDiffer || resourcesDiffer
+}
+
+// tolerationsEqual reports whether two toleration lists are equal, treating nil and empty lists as equal.
+func tolerationsEqual(a, b []corev1.Toleration) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // AgentSchedulingPodDisruptionBudgetChanged compares the cluster spec and status to determine if the
