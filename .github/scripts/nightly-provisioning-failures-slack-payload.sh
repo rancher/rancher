@@ -9,9 +9,19 @@
 # Optionally accepts an array of branch-keyed summary objects as the second argument or
 # through FAILURE_SUMMARIES, for example: [{"main":{"summary":"Failure details"}}].
 #
+# Optionally merges in runs that are still executing long after they should have finished, through a
+# file path in RUNNING_BUNDLE. It has the same format as the failure bundle, plus "running": true and a
+# "created_at" on each entry, and the jobs that have not finished listed under "failures". Those runs are
+# shown in the same message, as their own cards.
+#
+# If the payload can't be built, a short fallback payload is written instead, so that
+# a failure is never silently dropped.
+#
+# The payload is written to PAYLOAD_FILE (default slack-payload.json).
+#
 # Writes to GITHUB_OUTPUT:
-#   any-failures=true|false
-#   slack-payload=<JSON>   (only written when any-failures is true)
+#   has-payload=true|false   (false only when there is nothing to report)
+#   payload-file=<path>      (only written when has-payload is true)
 
 set -uo pipefail
 
@@ -19,10 +29,42 @@ GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/stdout}"
 NIGHTLY_TEST_FAILURE_LIMIT="${NIGHTLY_TEST_FAILURE_LIMIT:-3}"
 BUNDLE_INPUT="${1:-${FAILURE_BUNDLE:-}}"
 SUMMARY_INPUT="${2:-${FAILURE_SUMMARIES:-}}"
+PAYLOAD_FILE="${PAYLOAD_FILE:-slack-payload.json}"
+
+# Writes a payload that needs nothing from the bundle, then stops the script.
+fallback_payload() {
+  local reason="$1"
+  echo "::error::$reason" >&2
+  local report_run_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-rancher/rancher}/actions/runs/${GITHUB_RUN_ID:-0}"
+  jq -cn \
+    --arg reason "$reason" \
+    --arg report_run_url "$report_run_url" \
+    '{
+      text: ("Nightly provisioning tests need attention, but the report could not be generated. " + $report_run_url),
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", emoji: true, text: ":moon: Nightly Provisioning Tests" }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: (
+              ":warning: *Tests need attention, but the detailed report could not be generated.*\n_" + $reason + "_\n"
+              + "The failure bundle is attached to <" + $report_run_url + "|the report run>."
+            )
+          }
+        }
+      ]
+    }' > "$PAYLOAD_FILE"
+  echo "has-payload=true" >> "$GITHUB_OUTPUT"
+  echo "payload-file=${PAYLOAD_FILE}" >> "$GITHUB_OUTPUT"
+  exit 0
+}
 
 if [ -z "$BUNDLE_INPUT" ]; then
-  echo "error: provide a failure bundle file or JSON through the first argument or FAILURE_BUNDLE" >&2
-  exit 1
+  fallback_payload "No failure bundle was provided."
 fi
 
 bundle_filter='
@@ -37,14 +79,22 @@ bundle_filter='
   then
     error("failure bundle must be an object whose values contain branch, head_sha, run_url, and failures")
   else
-    .
+    # Failure logs can be 100KB each and are not used below. Dropping them keeps the bundle
+    # small enough to pass to jq with --argjson (a single argument is limited to about 128KB).
+    map_values(.failures |= map(del(.failure, .error)))
   end
 '
 
 if [ -f "$BUNDLE_INPUT" ]; then
-  complete_bundle=$(jq -ce "$bundle_filter" "$BUNDLE_INPUT") || exit 1
+  complete_bundle=$(jq -ce "$bundle_filter" "$BUNDLE_INPUT") || fallback_payload "The failure bundle is invalid."
 else
-  complete_bundle=$(jq -ce "$bundle_filter" <<< "$BUNDLE_INPUT") || exit 1
+  complete_bundle=$(jq -ce "$bundle_filter" <<< "$BUNDLE_INPUT") || fallback_payload "The failure bundle is invalid."
+fi
+
+if [ -n "${RUNNING_BUNDLE:-}" ]; then
+  running_bundle=$(jq -ce "$bundle_filter" "$RUNNING_BUNDLE") || fallback_payload "The running bundle is invalid."
+  complete_bundle=$(jq -cn --argjson failed "$complete_bundle" --argjson running "$running_bundle" '$failed + $running') \
+    || fallback_payload "Could not merge the running bundle."
 fi
 
 summary_filter='
@@ -80,7 +130,7 @@ if [ -n "$SUMMARY_INPUT" ]; then
 fi
 
 if [ "$(jq 'length' <<< "$complete_bundle")" -eq 0 ]; then
-  echo "any-failures=false" >> "$GITHUB_OUTPUT"
+  echo "has-payload=false" >> "$GITHUB_OUTPUT"
   exit 0
 fi
 
@@ -114,11 +164,11 @@ containers=$(jq -cn \
         title: {
           type: "plain_text",
           emoji: true,
-          text: (($jobs | length | tostring) + " job(s) failed on " + $branch)
+          text: (($jobs | length | tostring) + (if $entry.running then " job(s) still executing on " else " job(s) failed on " end) + $branch)
         },
         subtitle: {
           type: "plain_text",
-          text: ("View Analysis of Final Attempt")
+          text: (if $entry.running then "Created " + $entry.created_at else "View Analysis of Final Attempt" end)
         },
         is_collapsible: true,
         default_collapsed: true,
@@ -209,7 +259,10 @@ containers=$(jq -cn \
                   text: {
                     type: "mrkdwn",
                     text: (
-                      ":warning: *The following jobs failed without producing per-test results*\n_This may mean they do not produce an XML bundle entry, or did not run at all._\n"
+                      (if $entry.running
+                        then ":hourglass_flowing_sand: *This run is still executing unexpectedly*\n_It was created at " + $entry.created_at + " and has not finished._\nJobs that have not finished:\n"
+                        else ":warning: *The following jobs failed without producing per-test results*\n_This may mean they do not produce an XML bundle entry, or did not run at all._\n"
+                      end)
                       + ($bare | map(":bug: `" + .[0].job + "`") | join("\n"))
                     )
                   }
@@ -232,7 +285,7 @@ containers=$(jq -cn \
     | $entries[$i] as {key: $key, value: $entry}
     | branch_container((($i + 1) | tostring); $key; $entry)
   ]
-  ')
+  ') || fallback_payload "Could not build the failure details."
 
 slack_payload=$(jq -cn \
   --argjson containers "$containers" \
@@ -242,6 +295,7 @@ slack_payload=$(jq -cn \
   '
    ($bundle
      | to_entries
+     | map(select(.value.running | not))
      | map(
          .value.branch as $branch
          | (.value.failures | group_by(.job) | length | tostring) as $n
@@ -249,6 +303,11 @@ slack_payload=$(jq -cn \
              + $n + " job(s)"
        )
      | join("\n")) as $branch_lines
+   | ($bundle
+     | to_entries
+     | map(select(.value.running))
+     | map("• <" + .value.run_url + "|" + .value.branch + ">: created " + .value.created_at)
+     | join("\n")) as $running_lines
    | {
        blocks: ([
          {
@@ -266,8 +325,10 @@ slack_payload=$(jq -cn \
            text: {
              type: "mrkdwn",
              text: (
-               ":fire: *Branches failing after " + $failure_limit + " attempts*\n"
-               + $branch_lines
+               [
+                 (if $branch_lines == "" then empty else ":fire: *Branches failing after " + $failure_limit + " attempts*\n" + $branch_lines end),
+                 (if $running_lines == "" then empty else ":hourglass_flowing_sand: *Runs still executing unexpectedly*\n" + $running_lines end)
+               ] | join("\n\n")
              )
            }
          },
@@ -277,7 +338,8 @@ slack_payload=$(jq -cn \
          }
        ] + $containers)
      }
-  ')
+  ') || fallback_payload "Could not build the Slack payload."
 
-echo "any-failures=true" >> "$GITHUB_OUTPUT"
-echo "slack-payload=${slack_payload}" >> "$GITHUB_OUTPUT"
+echo "$slack_payload" > "$PAYLOAD_FILE"
+echo "has-payload=true" >> "$GITHUB_OUTPUT"
+echo "payload-file=${PAYLOAD_FILE}" >> "$GITHUB_OUTPUT"
