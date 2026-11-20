@@ -93,3 +93,56 @@ func TestClusterRepoOnChangeDownloadCondition(t *testing.T) {
 		})
 	}
 }
+
+func TestClusterRepoOnChangeDoesNotSkipOnRestart(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	clusterRepos := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+
+	clusterRepo := &catalog.ClusterRepo{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-repo",
+			ResourceVersion: "1",
+			Generation:      2,
+		},
+	}
+
+	var statuses []catalog.RepoStatus
+
+	clusterRepos.EXPECT().
+		Get(clusterRepo.Name, metav1.GetOptions{}).
+		Return(clusterRepo, nil).
+		AnyTimes()
+	clusterRepos.EXPECT().
+		UpdateStatus(gomock.Any()).
+		DoAndReturn(func(updated *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
+			statuses = append(statuses, *updated.Status.DeepCopy())
+			return updated, nil
+		}).
+		AnyTimes()
+	clusterRepos.EXPECT().EnqueueAfter(clusterRepo.Name, gomock.Any()).AnyTimes()
+
+	handler := &repoHandler{clusterRepos: clusterRepos}
+	_, err := handler.ClusterRepoOnChange(clusterRepo.Name, clusterRepo)
+	assert.NoError(t, err)
+
+	if !assert.NotEmpty(t, statuses, "expected the handler to persist the statuses") {
+		return
+	}
+
+	initialStatus := statuses[0]
+	assert.True(t, initialStatus.Conditions[0].Status != corev1.ConditionTrue)
+	assert.True(t, initialStatus.Conditions[0].Type == string(repoCondition))
+	assert.Less(t, initialStatus.ObservedGeneration, clusterRepo.Generation,
+		"the downloaded = false status must not update the observed generation")
+
+	restarted := clusterRepo.DeepCopy()
+	restarted.Status = initialStatus
+	assert.False(t, shouldSkip(restarted, defaultHandlerErrRetryPolicy, repoCondition, defaultInterval, clusterRepos, initialStatus.DeepCopy()),
+		"a reconcile right after restart must not be skipped if downloaded = false")
+
+	lastStatus := statuses[1]
+	assert.True(t, lastStatus.Conditions[0].Status == corev1.ConditionTrue)
+	assert.True(t, lastStatus.Conditions[0].Type == string(repoCondition))
+	assert.Equal(t, lastStatus.ObservedGeneration, clusterRepo.Generation,
+		"the downloaded = true  status must update the observed generation")
+}
