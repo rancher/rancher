@@ -104,7 +104,6 @@ func Test_getBootstrapSecret(t *testing.T) {
 
 			a.Equal("rke.cattle.io/bootstrap", string(secret.Type))
 			data := string(secret.Data["value"])
-			a.Contains(data, fmt.Sprintf("CATTLE_TOKEN=\"%s\"", expectEncodedHash))
 
 			switch tt.args.os {
 
@@ -115,6 +114,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.True(machine.GetLabels()[capr.ControlPlaneRoleLabel] == "true")
 				a.True(machine.GetLabels()[capr.EtcdRoleLabel] == "true")
 				a.True(machine.GetLabels()[capr.WorkerRoleLabel] == "true")
+				a.Contains(data, fmt.Sprintf("CATTLE_TOKEN=\"%s\"", expectEncodedHash))
 				a.Contains(data, "CATTLE_SERVER=localhost")
 				a.Contains(data, "CATTLE_ROLE_NONE=true")
 
@@ -125,8 +125,9 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.True(machine.GetLabels()[capr.ControlPlaneRoleLabel] == "false")
 				a.True(machine.GetLabels()[capr.EtcdRoleLabel] == "false")
 				a.True(machine.GetLabels()[capr.WorkerRoleLabel] == "true")
-				a.Contains(data, "$env:CATTLE_SERVER=\"localhost\"")
-				a.Contains(data, "CATTLE_ROLE_NONE=\"true\"")
+				a.Contains(data, "$env:CATTLE_SERVER='localhost'")
+				a.Contains(data, fmt.Sprintf("$env:CATTLE_TOKEN='%s'", expectEncodedHash))
+				a.Contains(data, "$env:CATTLE_ROLE_NONE='true'")
 				a.Contains(data, "$env:CSI_PROXY_URL")
 				a.Contains(data, "$env:CSI_PROXY_VERSION")
 				a.Contains(data, "$env:CSI_PROXY_KUBELET_PATH")
