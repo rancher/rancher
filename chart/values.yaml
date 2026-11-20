@@ -225,7 +225,7 @@ useBundledSystemChart: false
 # Important: update build.yaml when this default image needs to be changed, then run `go generate`.
 assetsImage:
   repository: rancher/rancher-assets
-  tag: v2.16-20261120T1507Z-dev
+  tag: v2.16-20261120T1632Z-dev
 
 # Certmanager version compatibility
 certmanager:
