@@ -756,6 +756,7 @@ spec:
                           pods.
                         type: boolean
                       gracePeriod:
+                        default: -1
                         description: |-
                           GracePeriod is the period of time in seconds given to each pod to
                           terminate gracefully.
@@ -861,6 +862,7 @@ spec:
                           pods.
                         type: boolean
                       gracePeriod:
+                        default: -1
                         description: |-
                           GracePeriod is the period of time in seconds given to each pod to
                           terminate gracefully.
@@ -1638,6 +1640,7 @@ spec:
                               pods.
                             type: boolean
                           gracePeriod:
+                            default: -1
                             description: |-
                               GracePeriod is the period of time in seconds given to each pod to
                               terminate gracefully.
@@ -1743,6 +1746,7 @@ spec:
                               pods.
                             type: boolean
                           gracePeriod:
+                            default: -1
                             description: |-
                               GracePeriod is the period of time in seconds given to each pod to
                               terminate gracefully.
