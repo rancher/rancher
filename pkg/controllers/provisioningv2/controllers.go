@@ -18,13 +18,17 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) error {
 	if features.Fleet.Enabled() {
-		managedchart.Register(ctx, clients)
+		if err := managedchart.Register(ctx, clients); err != nil {
+			return err
+		}
 		fleetcluster.Register(ctx, clients)
 		fleetworkspace.Register(ctx, clients)
 	}
 	cluster.EarlyRegister(ctx, clients, kubeconfigManager)
+
+	return nil
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) error {
