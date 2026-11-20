@@ -39,8 +39,25 @@ jobs:
           persist-credentials: false
       - name: setup and build
         uses: $/.github/actions/build-images
+  build-chart:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
+    env:
+      ARCH: amd64
+      REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
+    outputs:
+      chart_repo: ${{ steps.build.outputs.chart_repo }}
+      chart_filename: ${{ steps.build.outputs.chart_filename }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: setup and build
+        id: build
+        uses: $/.github/actions/rancher-chart/build
   integration-tests:
-    needs: [build-images]
+    needs: [build-images, build-chart]
     uses: $/.github/workflows/integration-tests.yml
     permissions:
       contents: read
@@ -70,8 +87,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
       - name: push
         uses: $/.github/actions/push-images
-  build-publish-chart:
-    needs: [push-images]
+  publish-chart:
+    needs: [build-chart, push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     permissions:
@@ -81,22 +98,16 @@ jobs:
       group: 'build-chart-tag'
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
-    env:
-      ARCH: amd64
-      REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: $/.github/actions/rancher-chart/build
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: publish
+        with:
+          chart_repo: ${{ needs.build-chart.output.chart_repo }}
+          chart_filename: ${{ needs.build-chart.output.chart_filename }}
         uses: $/.github/actions/rancher-chart/publish-gcp
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
