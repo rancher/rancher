@@ -535,6 +535,8 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = o.Type
+	// All OIDC based providers support SSO logout.
+	config.LogoutAllSupported = true
 	config.ObjectMeta = storedMeta
 
 	if err := o.saveOIDCSecrets(config); err != nil {

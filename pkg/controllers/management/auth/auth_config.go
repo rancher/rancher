@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -97,6 +98,15 @@ func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Ob
 	unstructuredObj, err := ac.getUnstructured(obj)
 	if err != nil {
 		return nil, err
+	}
+
+	// LogoutAllSupported is a capability of the provider type, whoever created the auth config.
+	// Clients such as the Dashboard create auth configs without it, so set it here. The update
+	// triggers another sync, which carries on with the cleanup handling below.
+	if supported := common.SupportsLogoutAll(obj.Type); obj.LogoutAllSupported != supported {
+		logrus.Debugf("Setting logoutAllSupported=%t on auth config %s of type %s", supported, obj.Name, obj.Type)
+		unstructuredObj.Object["logoutAllSupported"] = supported
+		return ac.updateAuthConfig(unstructuredObj, obj)
 	}
 
 	value := obj.Annotations[CleanupAnnotation]
