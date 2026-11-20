@@ -92,6 +92,25 @@ func (s *UserSearcher) SearchPrincipals(providerName, configName, searchKey stri
 	return principals, nil
 }
 
+// DisplayNameForPrincipal returns the display name of the user that carries
+// principalID, or "" if no user carries it. Providers whose identity provider
+// offers no user lookup use it to name a principal other than the caller's own,
+// which they otherwise know only by its external ID.
+func (s *UserSearcher) DisplayNameForPrincipal(principalID string) (string, error) {
+	users, err := s.users.List("", labels.NewSelector())
+	if err != nil {
+		return "", fmt.Errorf("listing users to look up principal %q: %w", principalID, err)
+	}
+
+	for _, user := range users {
+		if slices.Contains(user.PrincipalIDs, principalID) {
+			return user.DisplayName, nil
+		}
+	}
+
+	return "", nil
+}
+
 // PrincipalsWithFallback returns the principals of the configName AuthConfig's
 // users matching searchKey, followed by fallback unless one of them already has its ID.
 // Providers whose identity provider offers no user lookup call this with a

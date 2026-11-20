@@ -611,3 +611,95 @@ func TestGenOIDCProviderPrincipalsUseConfigName(t *testing.T) {
 		assert.Equal(t, result[0].Name, got.Name)
 	})
 }
+
+func TestGenOIDCProviderGetPrincipalNamesKnownUsers(t *testing.T) {
+	t.Parallel()
+
+	g := &GenOIDCProvider{
+		oidc.OpenIDCProvider{
+			Name: ProviderName,
+			Type: client.GenericOIDCConfigType,
+			UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+				ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+					return []*apiv3.User{
+						{
+							ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+							DisplayName:  "Test UserOne",
+							PrincipalIDs: []string{"genericoidc_user://sub-0001", "local://u-oidc1"},
+						},
+					}, nil
+				},
+			}),
+		},
+	}
+	// The caller is someone else, so the token cannot name the principal.
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta:  metav1.ObjectMeta{Name: "genericoidc_user://sub-admin"},
+			DisplayName: "Admin",
+		},
+	}
+
+	tests := []struct {
+		name        string
+		principalID string
+		want        apiv3.Principal
+	}{
+		{
+			name:        "user who has logged in is named after their Rancher user",
+			principalID: "genericoidc_user://sub-0001",
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-0001"},
+				DisplayName:   "Test UserOne",
+				LoginName:     "sub-0001",
+				PrincipalType: UserType,
+				Provider:      ProviderName,
+			},
+		},
+		{
+			name:        "unknown user keeps the subject as its name",
+			principalID: "genericoidc_user://sub-9999",
+			want: apiv3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-9999"},
+				DisplayName:   "sub-9999",
+				LoginName:     "sub-9999",
+				PrincipalType: UserType,
+				Provider:      ProviderName,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := g.GetPrincipal(test.principalID, token)
+			assert.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestGenOIDCProviderGetPrincipalUserLookupError(t *testing.T) {
+	t.Parallel()
+
+	g := &GenOIDCProvider{
+		oidc.OpenIDCProvider{
+			Name: ProviderName,
+			Type: client.GenericOIDCConfigType,
+			UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+				ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+					return nil, errors.New("cache is not synced")
+				},
+			}),
+		},
+	}
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "genericoidc_user://sub-admin"},
+		},
+	}
+	got, err := g.GetPrincipal("genericoidc_user://sub-0001", token)
+	assert.ErrorContains(t, err, "cache is not synced")
+	assert.Equal(t, apiv3.Principal{}, got)
+}

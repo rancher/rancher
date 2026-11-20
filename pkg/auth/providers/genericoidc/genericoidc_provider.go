@@ -109,6 +109,17 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 			PrincipalType: UserType,
 			Provider:      g.Name,
 		}
+		// The identity provider cannot be asked who a subject is, but a user who
+		// has logged in already has a Rancher user named after their claims.
+		if g.UserSearcher != nil {
+			displayName, err := g.UserSearcher.DisplayNameForPrincipal(p.Name)
+			if err != nil {
+				return apiv3.Principal{}, err
+			}
+			if displayName != "" {
+				p.DisplayName = displayName
+			}
+		}
 	} else {
 		p = g.groupToPrincipal(principalConfigName, externalID)
 	}
