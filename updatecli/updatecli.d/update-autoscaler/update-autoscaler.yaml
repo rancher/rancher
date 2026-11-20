@@ -1,0 +1,57 @@
+name: '{{ .autoscaler.manifest }}'
+pipelineid: '{{ .autoscaler.pipelineid }}'
+
+scms:
+  default:
+    kind: github
+    spec:
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repo }}'
+      branch: '{{ .scm.branch }}'
+      user: '{{ .scm.user }}'
+      email: '{{ .scm.email }}'
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      commitusingapi: {{ .scm.commitusingapi }}
+      commitmessage:
+        squash: {{ .scm.commitmessage.squash }}
+        type: '{{ .autoscaler.commitmessage.type }}'
+        scope: '{{ .autoscaler.commitmessage.scope }}'
+        title: 'Update cluster-autoscaler artifact versions'
+        body: 'Update the generated cluster-autoscaler artifact version mapping from the Rancher Apps API.'
+
+actions:
+  rancher-pr:
+    kind: github/pullrequest
+    scmid: 'default'
+    spec:
+      labels:
+        - 'dependencies'
+      reviewers:
+        - 'rancher/rancher-team-2-hostbusters-dev'
+      mergemethod: '{{ .scm.mergemethod }}'
+      title: '[{{ .scm.branch }}] Update cluster-autoscaler artifact versions'
+      description: 'Update the generated cluster-autoscaler artifact version mapping from the Rancher Apps API.'
+
+conditions:
+  generated-artifact-versions:
+    name: 'Check for cluster-autoscaler artifact version changes'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      command: 'go run ./pkg/controllers/capr/autoscaler/generator && git diff --exit-code -- pkg/controllers/capr/autoscaler/artifact_versions_zz_generated.go'
+      changedif:
+        kind: 'exitcode'
+        spec:
+          warning: 0
+          success: 1
+
+targets:
+  generate-artifact-versions:
+    name: 'Generate cluster-autoscaler artifact versions'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      command: 'go run ./pkg/controllers/capr/autoscaler/generator'
