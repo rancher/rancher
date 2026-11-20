@@ -260,16 +260,6 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
 		values.PutValue(data, false, "enableNetworkPolicy")
-	} else if value := convert.ToBool(enableNetworkPolicy); value {
-		rke2Config := values.GetValueN(data, "rke2Config")
-		k3sConfig := values.GetValueN(data, "k3sConfig")
-		if rke2Config != nil || k3sConfig != nil {
-			if create {
-				values.PutValue(data, false, "enableNetworkPolicy")
-				return nil
-			}
-			return fmt.Errorf("enableNetworkPolicy should be false for k3s or rke2 clusters")
-		}
 	}
 	return nil
 }
