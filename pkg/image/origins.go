@@ -53,7 +53,7 @@ var OriginMap = map[string]string{
 	"fleet":                                                   "https://github.com/rancher/fleet",
 	"fleet-agent":                                             "https://github.com/rancher/fleet",
 	"fluentd":                                                 "https://github.com/rancher/kube-logging-fluentd",
-	"fluent-bit":                                              "https://github.com/fluent/fluent-bit",
+	"fluent-bit":                                              "https://github.com/rancher/kube-logging-fluent-bit",
 	"gbp-server":                                              "https://github.com/noironetworks/aci-containers/tree/master/pkg/gbpserver",
 	"gitjob":                                                  "https://github.com/rancher/gitjob",
 	"gke-operator":                                            "https://github.com/rancher/gke-operator",
