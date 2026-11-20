@@ -892,6 +892,28 @@ func TestRTHandlerEnsureOnlyDesiredClusterRolesExist(t *testing.T) {
 			},
 		},
 		{
+			name:       "update keeps the install-uuid label stamped by the legacy controllers",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: labelSelector}).Return(&rbacv1.ClusterRoleList{}, nil)
+
+				legacyCR := &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-rt",
+						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+						Labels:      map[string]string{rbac.ClusterRoleOwnerInstallUUIDLabel: "install-uuid"},
+					},
+					Rules: []rbacv1.PolicyRule{sampleRule},
+				}
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(legacyCR, nil)
+
+				want := desiredCR1.DeepCopy()
+				want.Labels[rbac.ClusterRoleOwnerInstallUUIDLabel] = "install-uuid"
+				m.EXPECT().Update(want).Return(want, nil)
+			},
+		},
+		{
 			name:       "delete unwanted cluster roles",
 			rt:         testRT.DeepCopy(),
 			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},

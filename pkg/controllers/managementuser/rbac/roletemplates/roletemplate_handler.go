@@ -99,7 +99,7 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 	for _, cr := range desiredCRs {
 		logrus.Tracef("[cluster-roletemplate-change-handler] installUUID=%s cluster=%s: ensuring clusterRole %q exists for roleTemplate %q",
 			settings.InstallUUID.Get(), rth.clusterName, cr.Name, rt.Name)
-		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
+		if err := rbac.CreateOrUpdateClusterRole(cr, rth.crController); err != nil {
 			return fmt.Errorf("failed to create or update cluster role %s: %w", cr.Name, err)
 		}
 	}

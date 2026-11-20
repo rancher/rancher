@@ -42,7 +42,7 @@ const (
 	// Rancher install while also being the local cluster of another. Without this, the local install's
 	// orphan ClusterRole sweep (cluster-clusterrole-sync) can delete ClusterRoles it did not create, because
 	// the owning RoleTemplate legitimately only exists in the other install's management plane.
-	clusterRoleOwnerInstallUUIDLabel = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
+	clusterRoleOwnerInstallUUIDLabel = pkgrbac.ClusterRoleOwnerInstallUUIDLabel
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
