@@ -555,6 +555,17 @@ func TestOnDownstreamChange(t *testing.T) {
 	assert.NoError(t, err, "It should not return an error when updating the snapshot")
 }
 
+func TestPopulateUpstreamSnapshotFromDownstreamWithoutCreationTime(t *testing.T) {
+	h := &handler{}
+	downstream := &k3s.ETCDSnapshotFile{
+		ObjectMeta: metav1.ObjectMeta{Name: "incomplete-snapshot"},
+	}
+	cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+
+	_, err := h.populateUpstreamSnapshotFromDownstream(nil, downstream, cluster)
+	assert.ErrorContains(t, err, "creation time")
+}
+
 func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 	t.Parallel()
 
