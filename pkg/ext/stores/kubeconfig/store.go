@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/url"
 	"reflect"
 	"slices"
@@ -313,10 +314,16 @@ func (s *Store) Create(
 	defaultTTL := exttokens.ClampToMaxTTL(exttokens.DefaultTTL(*defaultTTLPtr, maxTTL), maxTTL)
 	defaultTTLSeconds := defaultTTL / 1000
 
+	// Checked before converting to milliseconds, which could overflow otherwise.
+	switch {
+	case kubeconfig.Spec.TTL < 0:
+		return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite)")
+	case kubeconfig.Spec.TTL > exttokens.MaxTTL/1000:
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds the maximum of %d (10 years)", kubeconfig.Spec.TTL, exttokens.MaxTTL/1000))
+	}
+
 	ttlMilliseconds := kubeconfig.Spec.TTL * 1000
 	switch {
-	case ttlMilliseconds < 0:
-		return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite)")
 	case ttlMilliseconds == 0:
 		if defaultTTL < 0 {
 			return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite), please fix the default")
@@ -1514,7 +1521,7 @@ func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOption
 		Object: runtime.RawExtension{Object: kubeconfig},
 		Cells: []any{
 			kubeconfig.Name,
-			duration.HumanDuration(time.Duration(kubeconfig.Spec.TTL) * time.Second),
+			duration.HumanDuration(ttlSecondsToDuration(kubeconfig.Spec.TTL)),
 			tokens,
 			status,
 			translateTimestampSince(kubeconfig.CreationTimestamp),
@@ -1963,3 +1970,12 @@ var (
 		pathKConfigPreferRancherProxyField.String():  pathCMPreferRancherProxyField,
 	}
 )
+
+// ttlSecondsToDuration converts a time-to-live in seconds into a time.Duration, saturating
+// instead of overflowing for values above the range of time.Duration (about 292 years).
+func ttlSecondsToDuration(ttl int64) time.Duration {
+	if ttl > math.MaxInt64/int64(time.Second) {
+		return math.MaxInt64
+	}
+	return time.Duration(ttl) * time.Second
+}
