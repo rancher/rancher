@@ -31,6 +31,10 @@ const (
 	secretKeyTLSPrivateKey = "private.key"
 )
 
+// bucketReadyFile is created by setupMinioBucket once the bucket exists, and backs the setupbucket container's readiness
+// probe. A Running pod only means minio started, not that the bucket is there yet.
+const bucketReadyFile = "/tmp/bucket-ready"
+
 const setupMinioBucket = `
 #!/bin/sh
 
@@ -47,7 +51,7 @@ while true; do
 	fi; 
 done; 
 
-mc mb --insecure myminio/%s
+mc mb --insecure --ignore-existing myminio/%s && touch %s
 
 sleep infinity
 `
@@ -55,7 +59,7 @@ sleep infinity
 // createTLSSecret creates a TLS Secret with a self signed cert + key for the given service FQDN + IP,
 // plus any extra IPs callers need in the SANs (see getObjectStore's external mode, where clients reach
 // the store by node IP rather than through the Service).
-func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQDN, serviceIP string, extraIPs []net.IP) (*corev1.Secret, error) {
+func createTLSSecret(clients *clients.Clients, onClose func(func()), namespace, objectStore, serviceFQDN, serviceIP string, extraIPs []net.IP) (*corev1.Secret, error) {
 	objectStoreTLSSecretName := objectStore + "-tls"
 	secret, err := clients.Core.Secret().Get(namespace, objectStoreTLSSecretName, metav1.GetOptions{})
 	if err == nil {
@@ -80,7 +84,7 @@ func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQ
 		},
 	})
 	if err == nil {
-		clients.OnClose(func() {
+		onClose(func() {
 			_ = clients.Core.Secret().Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
 		})
 		return secret, nil
@@ -91,7 +95,7 @@ func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQ
 }
 
 // createCredSecret creates a credential secret for the
-func createCredSecret(clients *clients.Clients, namespace, objectStore string) (*corev1.Secret, error) {
+func createCredSecret(clients *clients.Clients, onClose func(func()), namespace, objectStore string) (*corev1.Secret, error) {
 	objectStoreCredSecretName := objectStore + "-cred"
 	secret, err := clients.Core.Secret().Get(namespace, objectStoreCredSecretName, metav1.GetOptions{})
 	if err == nil {
@@ -122,7 +126,7 @@ func createCredSecret(clients *clients.Clients, namespace, objectStore string) (
 		},
 	})
 	if err == nil {
-		clients.OnClose(func() {
+		onClose(func() {
 			_ = clients.Core.Secret().Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
 		})
 		return secret, nil
@@ -132,7 +136,7 @@ func createCredSecret(clients *clients.Clients, namespace, objectStore string) (
 	return nil, err
 }
 
-func createCloudCredentialSecret(clients *clients.Clients, namespace, name string, credentials *corev1.Secret) (*corev1.Secret, error) {
+func createCloudCredentialSecret(clients *clients.Clients, onClose func(func()), namespace, name string, credentials *corev1.Secret) (*corev1.Secret, error) {
 	cc, err := clients.Core.Secret().Create(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -146,14 +150,14 @@ func createCloudCredentialSecret(clients *clients.Clients, namespace, name strin
 	if apierrors.IsAlreadyExists(err) {
 		return clients.Core.Secret().Get(namespace, name, metav1.GetOptions{})
 	} else if err == nil {
-		clients.OnClose(func() {
+		onClose(func() {
 			_ = clients.Core.Secret().Delete(namespace, name, &metav1.DeleteOptions{})
 		})
 	}
 	return cc, err
 }
 
-func createHelperConfigmap(clients *clients.Clients, namespace, objectStore, bucketName string) (*corev1.ConfigMap, error) {
+func createHelperConfigmap(clients *clients.Clients, onClose func(func()), namespace, objectStore, bucketName string) (*corev1.ConfigMap, error) {
 	objectStoreHelperCMName := objectStore + "-helper"
 	cm, err := clients.Core.ConfigMap().Get(namespace, objectStoreHelperCMName, metav1.GetOptions{})
 	if err == nil {
@@ -168,13 +172,13 @@ func createHelperConfigmap(clients *clients.Clients, namespace, objectStore, buc
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			"setup.sh": fmt.Sprintf(setupMinioBucket, secretKeyCredAccessKey, secretKeyCredSecretKey, bucketName),
+			"setup.sh": fmt.Sprintf(setupMinioBucket, secretKeyCredAccessKey, secretKeyCredSecretKey, bucketName, bucketReadyFile),
 		},
 	})
 	if apierrors.IsAlreadyExists(err) {
 		return clients.Core.ConfigMap().Get(namespace, objectStoreHelperCMName, metav1.GetOptions{})
 	} else if err == nil {
-		clients.OnClose(func() {
+		onClose(func() {
 			_ = clients.Core.ConfigMap().Delete(cm.Namespace, cm.Name, &metav1.DeleteOptions{})
 		})
 	}
@@ -183,7 +187,7 @@ func createHelperConfigmap(clients *clients.Clients, namespace, objectStore, buc
 
 // createService exposes the object store. serviceType is NodePort when the store has to be reachable
 // from outside the local cluster's network, and ClusterIP otherwise.
-func createService(clients *clients.Clients, namespace, objectStore string, serviceType corev1.ServiceType) (*corev1.Service, error) {
+func createService(clients *clients.Clients, onClose func(func()), namespace, objectStore string, serviceType corev1.ServiceType) (*corev1.Service, error) {
 	svc, err := clients.Core.Service().Create(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      objectStore,
@@ -208,11 +212,14 @@ func createService(clients *clients.Clients, namespace, objectStore string, serv
 		if err != nil {
 			return nil, err
 		}
+	} else if err != nil {
+		return nil, err
+	} else {
+		// Like the other resources, only the caller that created the service deletes it.
+		onClose(func() {
+			_ = clients.Core.Service().Delete(svc.Namespace, svc.Name, &metav1.DeleteOptions{})
+		})
 	}
-
-	clients.OnClose(func() {
-		_ = clients.Core.Service().Delete(svc.Namespace, svc.Name, &metav1.DeleteOptions{})
-	})
 
 	err = wait.Object(clients.Ctx, clients.Core.Service().Watch, svc, func(obj runtime.Object) (bool, error) {
 		latestSvc := obj.(*corev1.Service)
@@ -233,7 +240,7 @@ func createService(clients *clients.Clients, namespace, objectStore string, serv
 	return svc, err
 }
 
-func getPod(clients *clients.Clients, namespace, objectStore string) (*corev1.Pod, error) {
+func getPod(clients *clients.Clients, onClose func(func()), namespace, objectStore string) (*corev1.Pod, error) {
 	objectStoreCredSecretName := objectStore + "-cred"
 	objectStoreTLSSecretName := objectStore + "-tls"
 	objectStoreHelperCMName := objectStore + "-helper"
@@ -338,6 +345,12 @@ func getPod(clients *clients.Clients, namespace, objectStore string) (*corev1.Po
 					Args: []string{
 						"/helper/setup.sh",
 					},
+					ReadinessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{Command: []string{"test", "-f", bucketReadyFile}},
+						},
+						PeriodSeconds: 2,
+					},
 					VolumeMounts: []corev1.VolumeMount{{
 						Name:      "helper",
 						ReadOnly:  true,
@@ -350,7 +363,7 @@ func getPod(clients *clients.Clients, namespace, objectStore string) (*corev1.Po
 	if apierrors.IsAlreadyExists(err) {
 		return clients.Core.Pod().Get(namespace, objectStore, metav1.GetOptions{})
 	} else if err == nil {
-		clients.OnClose(func() {
+		onClose(func() {
 			_ = clients.Core.Pod().Delete(pod.Namespace, pod.Name, &metav1.DeleteOptions{})
 		})
 	}
@@ -361,20 +374,32 @@ type Info struct {
 	AccessKey, SecretKey, Bucket, Endpoint, Cert, CloudCredentialName string
 }
 
+// GetObjectStore stands up an object store in namespace, which is deleted when clients is closed. Use it for a store in a
+// namespace the test owns; use GetSharedObjectStore when tests share one.
 func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket string) (Info, error) {
-	return getObjectStore(clients, namespace, identifier, bucket, false)
+	return getObjectStore(clients, namespace, identifier, bucket, false, false)
 }
 
-// GetExternalObjectStore is GetObjectStore for machines that are not pods in the local cluster and so
-// cannot reach a ClusterIP — CAPD machines, for instance, are Docker containers on the same bridge
-// network as the local cluster's nodes but outside its pod network. The store is exposed on a
-// NodePort and the returned Endpoint addresses a node directly; every node IP is added to the
-// certificate's SANs so the returned Cert still verifies.
+// SharedObjectStoreNamespace holds the shared object stores, like the shared registry cache.
+const SharedObjectStoreNamespace = "default"
+
+// GetSharedObjectStore returns the object store named identifier in SharedObjectStoreNamespace, standing it up if no
+// test has yet. It is never cleaned up, so every test in the run (and in every package, since the objects are created
+// idempotently) reuses one minio pod. Tests sharing a store must keep their data apart, e.g. with a folder per test.
+// The bucket is only created by the first caller, so every caller of an identifier must pass the same bucket.
+func GetSharedObjectStore(clients *clients.Clients, identifier, bucket string) (Info, error) {
+	return getObjectStore(clients, SharedObjectStoreNamespace, identifier, bucket, false, true)
+}
+
+// GetSharedExternalObjectStore is GetSharedObjectStore for machines that are not pods in the local cluster and so
+// cannot reach a ClusterIP. CAPD machines, for instance, are Docker containers on the same bridge network as the local
+// cluster's nodes but outside its pod network. The store is exposed on a NodePort and the returned Endpoint addresses a
+// node directly; every node IP is added to the certificate's SANs so the returned Cert still verifies.
 //
-// Callers must not share an identifier with GetObjectStore: the two modes differ in Service type and
-// certificate, and the per-identifier objects are created once and then reused.
-func GetExternalObjectStore(clients *clients.Clients, namespace, identifier, bucket string) (Info, error) {
-	return getObjectStore(clients, namespace, identifier, bucket, true)
+// Callers must not share an identifier with GetSharedObjectStore: the two modes differ in Service type and certificate,
+// and the per-identifier objects are created once and then reused.
+func GetSharedExternalObjectStore(clients *clients.Clients, identifier, bucket string) (Info, error) {
+	return getObjectStore(clients, SharedObjectStoreNamespace, identifier, bucket, true, true)
 }
 
 // nodeIPs returns the InternalIP of every node in the local cluster, which is what an external client
@@ -402,26 +427,61 @@ func nodeIPs(clients *clients.Clients) ([]net.IP, error) {
 	return ips, nil
 }
 
-func getObjectStore(clients *clients.Clients, namespace, identifier, bucket string, external bool) (Info, error) {
+func getObjectStore(clients *clients.Clients, namespace, identifier, bucket string, external, shared bool) (Info, error) {
+	info, pod, err := createObjectStore(clients, namespace, identifier, bucket, external, shared)
+	if err != nil {
+		return Info{}, err
+	}
+
+	// Waiting happens outside objectStoreLock, so tests sharing a store that never gets ready each time out on their own
+	// instead of queueing behind one another.
+	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, pod, func(obj runtime.Object) (bool, error) {
+		return podReady(obj.(*corev1.Pod)), nil
+	})
+	if err != nil {
+		return Info{}, fmt.Errorf("waiting for object store pod %s/%s to be ready: %w", pod.Namespace, pod.Name, err)
+	}
+	return info, nil
+}
+
+func podReady(pod *corev1.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// createObjectStore creates the objects backing a store, or finds the ones that already exist, and returns the store's
+// connection details along with its pod.
+func createObjectStore(clients *clients.Clients, namespace, identifier, bucket string, external, shared bool) (Info, *corev1.Pod, error) {
 	objectStoreLock.Lock()
 	defer objectStoreLock.Unlock()
+
+	// A shared store outlives the test that created it, so nothing it creates is deleted.
+	onClose := clients.OnClose
+	if shared {
+		onClose = func(func()) {}
+	}
+
 	hid := name.Hex(identifier, 5)
 	objectStore := name.SafeConcatName("objectstore", hid)
 
-	cs, err := createCredSecret(clients, namespace, objectStore)
+	cs, err := createCredSecret(clients, onClose, namespace, objectStore)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	ccName := name.SafeConcatName("cc", objectStore)
-	cc, err := createCloudCredentialSecret(clients, namespace, ccName, cs)
+	cc, err := createCloudCredentialSecret(clients, onClose, namespace, ccName, cs)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
-	_, err = createHelperConfigmap(clients, namespace, objectStore, bucket)
+	_, err = createHelperConfigmap(clients, onClose, namespace, objectStore, bucket)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	serviceType := corev1.ServiceTypeClusterIP
@@ -429,18 +489,18 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 	if external {
 		serviceType = corev1.ServiceTypeNodePort
 		if extraIPs, err = nodeIPs(clients); err != nil {
-			return Info{}, err
+			return Info{}, nil, err
 		}
 	}
 
-	svc, err := createService(clients, namespace, objectStore, serviceType)
+	svc, err := createService(clients, onClose, namespace, objectStore, serviceType)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
-	tls, err := createTLSSecret(clients, namespace, objectStore, fmt.Sprintf(objectStoreServiceNameTemplate, objectStore, namespace), svc.Spec.ClusterIP, extraIPs)
+	tls, err := createTLSSecret(clients, onClose, namespace, objectStore, fmt.Sprintf(objectStoreServiceNameTemplate, objectStore, namespace), svc.Spec.ClusterIP, extraIPs)
 	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	endpoint := fmt.Sprintf("%s:9000", svc.Spec.ClusterIP)
@@ -448,17 +508,9 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 		endpoint = fmt.Sprintf("%s:%d", extraIPs[0], svc.Spec.Ports[0].NodePort)
 	}
 
-	pod, err := getPod(clients, namespace, objectStore)
+	pod, err := getPod(clients, onClose, namespace, objectStore)
 	if err != nil {
-		return Info{}, err
-	}
-
-	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, pod, func(obj runtime.Object) (bool, error) {
-		pod := obj.(*corev1.Pod)
-		return pod.Status.PodIP != "" && pod.Status.Phase == corev1.PodRunning, nil
-	})
-	if err != nil {
-		return Info{}, err
+		return Info{}, nil, err
 	}
 
 	return Info{
@@ -468,5 +520,5 @@ func getObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 		Endpoint:            endpoint,
 		Cert:                base64.StdEncoding.EncodeToString(tls.Data[secretKeyTLSPublicCrt]),
 		CloudCredentialName: cc.Name,
-	}, nil
+	}, pod, nil
 }

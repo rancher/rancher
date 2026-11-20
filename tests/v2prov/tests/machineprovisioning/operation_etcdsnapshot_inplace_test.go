@@ -25,6 +25,7 @@ func Test_Operation_SetA_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	clients, err := clients.New()
 	require.NoError(t, err)
 	defer clients.Close()
+	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
