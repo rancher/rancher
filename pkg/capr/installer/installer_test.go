@@ -59,10 +59,10 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 	// assert
 	a.Nil(err)
 	a.NotNil(script)
-	a.Contains(string(script), "$env:CATTLE_TOKEN=\"test\"")
-	a.Contains(string(script), "$env:CATTLE_ROLE_NONE=\"true\"")
-	a.Contains(string(script), "$env:CATTLE_SERVER=\"localhost\"")
-	a.Contains(string(script), fmt.Sprintf("$env:CATTLE_CA_CHECKSUM=\"%s\"", CACertEncoded))
+	a.Contains(string(script), "$env:CATTLE_TOKEN='test'")
+	a.Contains(string(script), "$env:CATTLE_ROLE_NONE='true'")
+	a.Contains(string(script), "$env:CATTLE_SERVER='localhost'")
+	a.Contains(string(script), fmt.Sprintf("$env:CATTLE_CA_CHECKSUM='%s'", CACertEncoded))
 	a.Contains(string(script), "$env:CSI_PROXY_URL")
 	a.Contains(string(script), "$env:CSI_PROXY_VERSION")
 	a.Contains(string(script), "$env:CSI_PROXY_KUBELET_PATH")
@@ -252,4 +252,87 @@ func TestInstaller_LinuxInstallScript_ShellInjectionPrevention(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInstaller_WindowsInstallScriptQuotesDataDirectory(t *testing.T) {
+	tests := []struct {
+		name                string
+		dataDir             string
+		wantKubeletPath     string
+		envVars             []corev1.EnvVar
+		wantAgentVarDirLine string
+	}{
+		{
+			name:            "normal path",
+			dataDir:         "/var/lib/rancher/rke2",
+			wantKubeletPath: "$env:CSI_PROXY_KUBELET_PATH = 'C:/var/lib/rancher/rke2/bin/kubelet.exe'\n",
+		},
+		{
+			name:            "space",
+			dataDir:         "/data/my dir",
+			wantKubeletPath: "$env:CSI_PROXY_KUBELET_PATH = 'C:/data/my dir/bin/kubelet.exe'\n",
+		},
+		{
+			name:            "newline",
+			dataDir:         "/data/a\nb",
+			wantKubeletPath: "$env:CSI_PROXY_KUBELET_PATH = 'C:/data/a\nb/bin/kubelet.exe'\n",
+		},
+		{
+			name:            "single quote",
+			dataDir:         "/data/it's",
+			wantKubeletPath: "$env:CSI_PROXY_KUBELET_PATH = 'C:/data/it''s/bin/kubelet.exe'\n",
+		},
+		{
+			name:            "backslash",
+			dataDir:         `/data/a\b`,
+			wantKubeletPath: "$env:CSI_PROXY_KUBELET_PATH = 'C:/data/a\\b/bin/kubelet.exe'\n",
+		},
+		{
+			name:            "subexpression",
+			dataDir:         "/data/$(Remove-Item x)",
+			wantKubeletPath: "$env:CSI_PROXY_KUBELET_PATH = 'C:/data/$(Remove-Item x)/bin/kubelet.exe'\n",
+		},
+		{
+			name:                "system agent directory",
+			dataDir:             "/var/lib/rancher/rke2",
+			wantKubeletPath:     "$env:CSI_PROXY_KUBELET_PATH = 'C:/var/lib/rancher/rke2/bin/kubelet.exe'\n",
+			envVars:             []corev1.EnvVar{{Name: capr.SystemAgentDataDirEnvVar, Value: "/data/it's \"a\"$(x)"}},
+			wantAgentVarDirLine: "$env:CATTLE_AGENT_VAR_DIR='/data/it''s \"a\"$(x)'\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script, err := WindowsInstallScript(context.TODO(), "", tt.envVars, "localhost", tt.dataDir)
+			assert.NoError(t, err)
+			assert.Contains(t, string(script), tt.wantKubeletPath)
+			if tt.wantAgentVarDirLine != "" {
+				assert.Contains(t, string(script), tt.wantAgentVarDirLine)
+			}
+		})
+	}
+}
+
+func TestInstaller_WindowsInstallScriptEnvVarNames(t *testing.T) {
+	envVars := []corev1.EnvVar{
+		{Name: "GOOD_NAME", Value: "v1"},
+		{Name: "$env:PREFIXED_NAME", Value: "v2"},
+		{Name: "BAD NAME", Value: "v3"},
+		{Name: "BAD=NAME;calc", Value: "v4"},
+		{Name: "1BAD", Value: "v5"},
+		{Name: "$(id)", Value: "v6"},
+	}
+
+	script, err := WindowsInstallScript(context.TODO(), "", envVars, "localhost", "")
+	assert.NoError(t, err)
+	assert.Contains(t, string(script), "$env:GOOD_NAME='v1'\n")
+	assert.Contains(t, string(script), "$env:PREFIXED_NAME='v2'\n")
+	for _, bad := range []string{"v3", "v4", "v5", "v6"} {
+		assert.NotContains(t, string(script), "'"+bad+"'")
+	}
+}
+
+func TestInstaller_WindowsInstallScriptKeepsQuotesInValue(t *testing.T) {
+	script, err := WindowsInstallScript(context.TODO(), "", []corev1.EnvVar{{Name: "X", Value: `"abc"`}}, "localhost", "")
+	assert.NoError(t, err)
+	assert.Contains(t, string(script), "$env:X='\"abc\"'\n")
 }
