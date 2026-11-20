@@ -2662,3 +2662,111 @@ func TestRefreshAttributesUnparseablePrincipalDeletedWithLocal(t *testing.T) {
 		})
 	}
 }
+
+// When a provider can't read the user's own record (ExtrasUnavailableError),
+// the refresh must still update the groups, keep the stored extras as they are
+// and not return an error, which would requeue the user forever.
+func TestRefreshAttributesExtrasUnavailable(t *testing.T) {
+	const providerName = "keycloakoidc"
+
+	group := func(name string) apiv3.Principal {
+		return apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+	// What login stored, plus a key that only SCIM sets.
+	storedExtras := map[string][]string{
+		common.UserAttributePrincipalID: {providerName + "_user://alice"},
+		common.UserAttributeUserName:    {"alice@example.com"},
+		"externalid":                    {"00u123"},
+	}
+
+	for _, scimEnabled := range []bool{false, true} {
+		t.Run("SCIM enabled "+strconv.FormatBool(scimEnabled), func(t *testing.T) {
+			// Not parallel: the feature flag, the environment and the providers are global.
+			t.Setenv("RANCHER_VERSION_TYPE", "prime")
+			features.SCIM.Set(true)
+			t.Cleanup(features.SCIM.Unset)
+
+			providers.SetProviders(map[string]common.AuthProvider{
+				providerName: &mockGitHubAppProvider{
+					mockLocalProvider: mockLocalProvider{
+						canAccess: true,
+						getPrincipalFn: func(string, accessor.TokenAccessor) (apiv3.Principal, error) {
+							return apiv3.Principal{}, &common.ExtrasUnavailableError{
+								Err: fmt.Errorf("PermissionDenied 403: access denied"),
+							}
+						},
+					},
+					groupPrincipals: []apiv3.Principal{group("keycloakoidc_group://g2")},
+				},
+			})
+
+			user := &apiv3.User{
+				ObjectMeta:   metav1.ObjectMeta{Name: "user-alice"},
+				PrincipalIDs: []string{providerName + "_user://alice"},
+			}
+			attribs := &apiv3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: "user-alice"},
+				GroupPrincipals: map[string]apiv3.Principals{
+					providerName: {Items: []apiv3.Principal{group("keycloakoidc_group://g1")}},
+				},
+				ExtraByProvider: map[string]map[string][]string{
+					providerName: storedExtras,
+				},
+			}
+			loginToken := &apiv3.Token{
+				UserID: "user-alice",
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://alice"},
+					Provider:   providerName,
+					LoginName:  "alice@example.com",
+				},
+			}
+
+			ctrl := gomock.NewController(t)
+			configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+			configMapCache.EXPECT().Get(scimconfig.Namespace, "scim-config-"+providerName).Return(&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "scim-config-" + providerName},
+				Data:       map[string]string{"enabled": strconv.FormatBool(scimEnabled)},
+			}, nil).AnyTimes()
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+			tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+			r := &refresher{
+				tokenLister: &fakes.TokenListerMock{
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+						return []*apiv3.Token{loginToken}, nil
+					},
+				},
+				userLister: &fakes.UserListerMock{
+					GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+				},
+				tokens:   &fakes.TokenInterfaceMock{},
+				tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
+				configMapCache:   configMapCache,
+				authConfigLister: newFakeAuthConfigs(providerName),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+					providerName: false,
+				}),
+			}
+
+			got, err := r.refreshAttributes(attribs)
+
+			require.NoError(t, err, "an unreadable user record must not fail the refresh")
+			assert.Equal(t, []apiv3.Principal{group("keycloakoidc_group://g2")}, got.GroupPrincipals[providerName].Items,
+				"groups should still be refreshed")
+			assert.Equal(t, storedExtras, got.ExtraByProvider[providerName],
+				"stored extras, including username, should be kept")
+		})
+	}
+}

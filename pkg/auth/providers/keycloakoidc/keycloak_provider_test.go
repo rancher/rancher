@@ -18,6 +18,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/authconfigtest"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -446,4 +447,64 @@ func TestKeyCloakOIDCProviderGetPrincipalRejectsOtherConfig(t *testing.T) {
 
 	_, err := provider.GetPrincipal("keycloak-eu_user://bob", token)
 	assert.True(t, httperror.IsNotFound(err), "expected NotFound, got %v", err)
+}
+
+// A user without the view-users role gets a 403 when Rancher reads their own
+// record from Keycloak. GetPrincipal must report that as an
+// ExtrasUnavailableError so the provider refresh can keep the stored extras
+// and carry on. A plain error is requeued by the userattributes controller
+// forever.
+func TestKeyCloakOIDCProviderGetPrincipalPermissionDenied(t *testing.T) {
+	const (
+		configName = "keycloakoidc"
+		userID     = "07c91111-c136-4fcd-b84c-9428959fa20d"
+	)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	var userRequests int
+	testSrv := newFakeKeycloakServerWithRoutes(t, privateKey, func(*testing.T, *http.Request) bool { return true },
+		func(mux *http.ServeMux) {
+			mux.HandleFunc("/admin/realms/testing/users/"+userID, func(w http.ResponseWriter, r *http.Request) {
+				userRequests++
+				http.Error(w, `{"error":"HTTP 403 Forbidden"}`, http.StatusForbidden)
+			})
+		})
+
+	authConfigs := authconfigtest.NewClient(t, map[string]any{
+		"metadata": map[string]any{"name": configName},
+		"type":     client.KeyCloakOIDCConfigType,
+		"enabled":  true,
+		"issuer":   testSrv.URL + "/realms/testing",
+		"clientId": "test",
+	})
+	provider := &keyCloakOIDCProvider{
+		oidc.OpenIDCProvider{
+			Name:        ProviderName,
+			Type:        client.KeyCloakOIDCConfigType,
+			AuthConfigs: authConfigs,
+			TokenMgr: &fakeTokenManager{
+				getSecretFunc: func(string, string, []accessor.TokenAccessor) (string, error) {
+					return `{"access_token":"user-access-token"}`, nil
+				},
+			},
+		},
+	}
+	token := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: configName + "_user://" + userID},
+			LoginName:     "developer",
+			PrincipalType: UserType,
+			Provider:      ProviderName,
+		},
+	}
+
+	_, err = provider.GetPrincipal(configName+"_user://"+userID, token)
+
+	require.Equal(t, 1, userRequests, "expected Keycloak to be asked for the user")
+	var unavailable *common.ExtrasUnavailableError
+	require.ErrorAs(t, err, &unavailable, "a 403 on the user's own record should be an ExtrasUnavailableError")
+	var apiErr *httperror.APIError
+	require.ErrorAs(t, err, &apiErr, "the original error should stay available")
+	assert.Equal(t, http.StatusForbidden, apiErr.Code.Status)
 }
