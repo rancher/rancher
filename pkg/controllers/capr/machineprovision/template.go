@@ -1,8 +1,10 @@
 package machineprovision
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/capr"
 	name2 "github.com/rancher/wrangler/v3/pkg/name"
@@ -23,6 +25,13 @@ const (
 
 	pathToMachineFiles = "/path/to/machine/files"
 	sslCertDir         = "/etc/rancher/ssl"
+
+	driverDownloadURLFlag  = "--driver-download-url="
+	driverDownloadHashFlag = "--driver-hash="
+	driverDownloadURLEnv   = "CATTLE_DRIVER_DOWNLOAD_URL"
+	driverDownloadHashEnv  = "CATTLE_DRIVER_DOWNLOAD_HASH"
+	driverBinaryPrefix     = "docker-machine-driver-"
+	machineEntrypoint      = "/usr/local/bin/entrypoint.sh"
 )
 
 var (
@@ -31,6 +40,86 @@ var (
 
 func GetJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
+}
+
+// driverDownload describes how the driver binary should be fetched inside the
+// machine provision pod. Drivers served from Rancher's own assets are already
+// extracted binaries, so they can be downloaded directly instead of going
+// through the machine image's download_driver.sh script. That script relies on
+// sed and grep, which are not present in all rancher/machine images.
+type driverDownload struct {
+	args       []string
+	url        string
+	hash       string
+	binaryName string
+	direct     bool
+}
+
+func getDriverDownload(args driverArgs) driverDownload {
+	var url, hash string
+	remaining := make([]string, 0, len(args.Args))
+	for _, arg := range args.Args {
+		switch {
+		case strings.HasPrefix(arg, driverDownloadURLFlag):
+			url = strings.TrimPrefix(arg, driverDownloadURLFlag)
+		case strings.HasPrefix(arg, driverDownloadHashFlag):
+			hash = strings.TrimPrefix(arg, driverDownloadHashFlag)
+		default:
+			remaining = append(remaining, arg)
+		}
+	}
+
+	if url == "" || !strings.Contains(url, "/assets/"+driverBinaryPrefix) {
+		return driverDownload{args: args.Args}
+	}
+
+	binaryName := args.DriverName
+	if !strings.HasPrefix(binaryName, driverBinaryPrefix) {
+		binaryName = driverBinaryPrefix + binaryName
+	}
+
+	return driverDownload{
+		args:       remaining,
+		url:        url,
+		hash:       hash,
+		binaryName: binaryName,
+		direct:     true,
+	}
+}
+
+func (d driverDownload) command() []string {
+	if !d.direct {
+		return nil
+	}
+
+	dest := "/usr/local/bin/" + d.binaryName
+	script := fmt.Sprintf(`set -e
+if [ -n "${SSL_CERT_DIR}" ]; then
+  ln -s /etc/ssl/certs/* "${SSL_CERT_DIR}" 2>/dev/null || true
+fi
+if command -v c_rehash >/dev/null 2>&1; then
+  c_rehash >/dev/null 2>&1 || true
+fi
+curl -fsSL -o %q "$%s"
+if [ -n "$%s" ]; then
+  printf '%%s  %%s\n' "$%s" %q | sha256sum -c -
+fi
+chmod 0755 %q
+exec %s "$@"
+`, dest, driverDownloadURLEnv, driverDownloadHashEnv, driverDownloadHashEnv, dest, dest, machineEntrypoint)
+
+	return []string{"/bin/sh", "-c", script}
+}
+
+func (d driverDownload) env() []corev1.EnvVar {
+	if !d.direct {
+		return nil
+	}
+
+	return []corev1.EnvVar{
+		{Name: driverDownloadURLEnv, Value: d.url},
+		{Name: driverDownloadHashEnv, Value: d.hash},
+	}
 }
 
 func objects(ready bool, args driverArgs) []runtime.Object {
@@ -198,6 +287,12 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		CapiMachineName:     args.CapiMachineName,
 	}
 
+	download := getDriverDownload(args)
+	machineArgs := args.Args
+	if download.direct {
+		machineArgs = append([]string{"machine-provision"}, download.args...)
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
@@ -222,7 +317,9 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 							},
 							Image:           args.ImageName,
 							ImagePullPolicy: args.ImagePullPolicy,
-							Args:            args.Args,
+							Command:         download.command(),
+							Args:            machineArgs,
+							Env:             download.env(),
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{
