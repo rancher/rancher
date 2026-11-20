@@ -330,7 +330,7 @@ func TestFormatWindowsEnvVar(t *testing.T) {
 				Value: "ABC123",
 			},
 			IsPlanVar:      false,
-			ExpectedString: "$env:BASIC_STRING=\"ABC123\"",
+			ExpectedString: "$env:BASIC_STRING='ABC123'",
 		},
 		{
 			Name: "Basic Bool",
@@ -384,7 +384,49 @@ func TestFormatWindowsEnvVar(t *testing.T) {
 				Value: "\"$true\"",
 			},
 			IsPlanVar:      false,
-			ExpectedString: "$env:PLAN_BOOL=\"$true\"",
+			ExpectedString: "$env:PLAN_BOOL='\"$true\"'",
+		},
+		{
+			Name:           "Non-Plan String Value Is Not Expanded",
+			EnvVar:         corev1.EnvVar{Name: "S", Value: "/data/$(id)"},
+			IsPlanVar:      false,
+			ExpectedString: "$env:S='/data/$(id)'",
+		},
+		{
+			Name:           "Non-Plan String Value With Single Quote",
+			EnvVar:         corev1.EnvVar{Name: "S", Value: "it's"},
+			IsPlanVar:      false,
+			ExpectedString: "$env:S='it''s'",
+		},
+		{
+			Name:           "Non-Plan String Value With Curly Quote",
+			EnvVar:         corev1.EnvVar{Name: "S", Value: "a\u2019b"},
+			IsPlanVar:      false,
+			ExpectedString: "$env:S='a\u2019\u2019b'",
+		},
+		{
+			Name:           "Non-Plan String Value With Newline And Backslash",
+			EnvVar:         corev1.EnvVar{Name: "S", Value: "a\nb\\c"},
+			IsPlanVar:      false,
+			ExpectedString: "$env:S='a\nb\\c'",
+		},
+		{
+			Name:           "Non-Plan String Value Keeps Surrounding Double Quotes",
+			EnvVar:         corev1.EnvVar{Name: "S", Value: "\"abc\""},
+			IsPlanVar:      false,
+			ExpectedString: "$env:S='\"abc\"'",
+		},
+		{
+			Name:           "Non-Plan Name Mistakenly Includes $env:",
+			EnvVar:         corev1.EnvVar{Name: "$env:S", Value: "abc"},
+			IsPlanVar:      false,
+			ExpectedString: "$env:S='abc'",
+		},
+		{
+			Name:           "Plan String Value Is Not Quoted",
+			EnvVar:         corev1.EnvVar{Name: "S", Value: "/data/my dir"},
+			IsPlanVar:      true,
+			ExpectedString: "S=/data/my dir",
 		},
 		{
 			Name: "Plan String Value Includes $",
@@ -596,6 +638,57 @@ func TestGetProvisioningClusterFromCAPICluster(t *testing.T) {
 				assert.Fail(t, "expected err to be nil, was actually %s", err)
 			}
 			assert.Equal(t, tt.cluster, cluster)
+		})
+	}
+}
+
+func TestIsValidEnvVarName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{name: "upper case", in: "HTTPS_PROXY", want: true},
+		{name: "lower case", in: "new_key", want: true},
+		{name: "leading underscore", in: "_A1", want: true},
+		{name: "empty", in: "", want: false},
+		{name: "leading digit", in: "1A", want: false},
+		{name: "space", in: "A B", want: false},
+		{name: "equals sign", in: "A=1", want: false},
+		{name: "semicolon", in: "A;calc", want: false},
+		{name: "newline", in: "A\nB", want: false},
+		{name: "dash", in: "A-B", want: false},
+		{name: "env prefix", in: "$env:A", want: false},
+		{name: "command substitution", in: "$(id)", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, IsValidEnvVarName(tt.in))
+		})
+	}
+}
+
+func TestShellSingleQuote(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "plain value is quoted", in: "https://0.0.0.0", want: "'https://0.0.0.0'"},
+		{name: "empty", in: "", want: "''"},
+		{name: "single quote", in: "it's", want: `'it'\''s'`},
+		{name: "dollar and backtick", in: "$$`id`", want: "'$$`id`'"},
+		{name: "double quote and backslash", in: `a"b\c`, want: `'a"b\c'`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, ShellSingleQuote(tt.in))
 		})
 	}
 }
