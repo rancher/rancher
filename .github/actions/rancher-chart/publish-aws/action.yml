@@ -1,8 +1,40 @@
 name: "Publish chart to aws"
 description: "Build index and upload chart to aws s3"
+inputs:
+  chart_repo:
+    description: "Value of CHART_REPO variable at build time"
+    required: false # required only if not using local, explicit validation below
+  chart_filename:
+    description: "Original rancher chart filename, including version"
+    required: false # required only if not using local, explicit validation below
+  use_local:
+    description: "Disable artifact retrieval; requires local checkout and build step within the same job"
+    required: false
+    default: 'false'
 runs:
   using: "composite"
   steps:
+    - name: Validate inputs
+      if: ${{ inputs.use_local != 'true' && (inputs.chart_repo == '' || inputs.chart_filename == '') }}
+      shell: bash
+      run: |
+        echo "::error::'chart_repo' and 'chart_filename' are required."
+        exit 1
+    - name: Download rancher chart
+      if: ${{ inputs.use_local != 'true' }}
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: "rancher-chart"
+        path: /tmp
+    - name: Prepare for upload
+      if: ${{ inputs.use_local != 'true' }}
+      shell: bash
+      env:
+        CHART_REPO: ${{ inputs.chart_repo }}
+        CHART_FILENAME: ${{ inputs.chart_filename }}
+      run: |
+        mkdir -p "bin/chart/${CHART_REPO}"
+        cp /tmp/rancher-chart.tgz "bin/chart/${CHART_REPO}/${CHART_FILENAME}"
     - name: Upload chart to bucket
       shell: bash
       env:
