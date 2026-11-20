@@ -16,7 +16,7 @@ const (
 	GkeOperatorVersion        = "111.0.0+up1.16.0-rc.5"
 	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.11"
 	PartnerChartDefaultBranch = "main"
-	RemoteDialerProxyVersion  = "111.0.1+up0.9.1-rc.5"
+	RemoteDialerProxyVersion  = "111.0.1+up0.9.1"
 	Rke2ChartDefaultBranch    = "main"
 	SystemAgentVersion        = "v0.16.0-rc.10"
 	TurtlesVersion            = "111.0.0+up0.28.0-rc.8"
