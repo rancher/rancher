@@ -35,6 +35,9 @@ runs:
       run: |
         mkdir -p "bin/chart/${CHART_REPO}"
         cp /tmp/rancher-chart.tgz "bin/chart/${CHART_REPO}/${CHART_FILENAME}"
+    - name: install dependencies
+      shell: bash
+      run: zypper install -y aws-cli
     - name: Upload chart to bucket
       shell: bash
       env:

@@ -13,9 +13,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: install dependencies
-      shell: bash
-      run: zypper install -y aws-cli
     - name: Setup Tag Env Variables
       uses: $/.github/actions/setup-tag-env
     - id: env
