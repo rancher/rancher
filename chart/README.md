@@ -6,7 +6,7 @@ By installing this application, you accept the [End User License Agreement & Ter
 
 ### Introduction
 
-This chart bootstraps a [Rancher Server](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster) on a Kubernetes cluster using the [Helm](https://helm.sh/) package manager. For a Rancher Supported Deployment please follow our [HA install instructions](https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/kubernetes-cluster-setup/high-availability-installs).
+This chart bootstraps a [Rancher Server](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/) on a Kubernetes cluster using the [Helm](https://helm.sh/) package manager. For a Rancher Supported Deployment please follow our [HA install instructions](https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/kubernetes-cluster-setup/high-availability-installs).
 
 
 ### Prerequisites Details
@@ -15,29 +15,29 @@ This chart bootstraps a [Rancher Server](https://ranchermanager.docs.rancher.com
 
 Make sure the node(s) for the Rancher server fulfill the following requirements:
 
-[Operating Systems and Container Runtime Requirements](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#operating-systems-and-container-runtime-requirements)
-[Hardware Requirements](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#hardware-requirements)
+[Operating Systems and Container Runtime Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_operating_systems_and_container_runtime_requirements)
+[Hardware Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_hardware_requirements)
 
-- [CPU and Memory](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#cpu-and-memory)
-- [Ingress](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#ingress)
-- [Disks](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#disks)
+- [CPU and Memory](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_hardware_requirements)
+- [Ingress](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_ingress)
+- [Disks](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_disks)
 
-[Networking Requirements](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#networking-requirements)
-- [Node IP Addresses](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#node-ip-addresses)
-- [Port Requirements](https://ranchermanager.docs.rancher.com/pages-for-subheaders/installation-requirements#port-requirements)
+[Networking Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_networking_requirements)
+- [Node IP Addresses](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_node_ip_addresses)
+- [Port Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements/#_port_requirements)
 
-[Install the Required CLI Tools](https://ranchermanager.docs.rancher.com/pages-for-subheaders/cli-with-rancher)
+[Install the Required CLI Tools](https://ranchermanager.docs.rancher.com/reference-guides/cli-with-rancher/)
 
 - [kubectl](https://ranchermanager.docs.rancher.com/reference-guides/cli-with-rancher/kubectl-utility) - Kubernetes command-line tool.
 - [helm](https://docs.helm.sh/using_helm/#installing-helm) - Package management for Kubernetes. Refer to the [Helm version requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/resources/helm-version-requirements) to choose a version of Helm to install Rancher.
 
-For a list of best practices that we recommend for running the Rancher server in production, refer to the [best practices section](https://ranchermanager.docs.rancher.com/pages-for-subheaders/best-practices).
+For a list of best practices that we recommend for running the Rancher server in production, refer to the [best practices section](https://ranchermanager.docs.rancher.com/reference-guides/best-practices/).
 
 ## Installing Rancher
 
 For production environments, we recommend installing Rancher in a [high-availability Kubernetes installation](https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/kubernetes-cluster-setup/high-availability-installs) so that your user base can always access Rancher Server. When installed in a Kubernetes cluster, Rancher will integrate with the cluster’s etcd database and take advantage of Kubernetes scheduling for high-availability.
 
-Optional: Installing Rancher on a [Single-node](https://ranchermanager.docs.rancher.com/pages-for-subheaders/rancher-on-a-single-node-with-docker) Kubernetes Cluster
+Optional: Installing Rancher on a [Single-node](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/other-installation-methods/rancher-on-a-single-node-with-docker/) Kubernetes Cluster
 
 #### Add the Helm Chart Repository
 
@@ -61,26 +61,26 @@ The Rancher management server is designed to be secure by default and requires S
 
 There are three recommended options for the source of the certificate used for TLS termination at the Rancher server:
 
-- [Rancher-generated TLS certificate](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#3-choose-your-ssl-configuration)
-- [Let’s Encrypt](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#3-choose-your-ssl-configuration)
-- [Bring your own certificate](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#3-choose-your-ssl-configuration)
+- [Rancher-generated TLS certificate](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_3_choose_your_ssl_configuration)
+- [Let’s Encrypt](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_3_choose_your_ssl_configuration)
+- [Bring your own certificate](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_3_choose_your_ssl_configuration)
 
 #### Install cert-manager
 
 This step is only required to use certificates issued by Rancher’s generated CA **`(ingress.tls.source=rancher)`** or to request Let’s Encrypt issued certificates **`(ingress.tls.source=letsEncrypt)`**.
 
-[These instructions are adapted from the official cert-manager documentation.](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#4-install-cert-manager)
+[These instructions are adapted from the official cert-manager documentation.](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_4_install_cert_manager)
 
 #### Install Rancher with Helm and Your Chosen Certificate Option
 
-- [Rancher to generated certificates](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#5-install-rancher-with-helm-and-your-chosen-certificate-option)
+- [Rancher to generated certificates](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_5_install_rancher_with_helm_and_your_chosen_certificate_option)
 ```bash
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
   --set hostname=rancher.my.org
 ```
 
-- [Let’s Encrypt](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#5-install-rancher-with-helm-and-your-chosen-certificate-option)
+- [Let’s Encrypt](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_5_install_rancher_with_helm_and_your_chosen_certificate_option)
 
 ```bash
 helm install rancher rancher-latest/rancher \
@@ -90,7 +90,7 @@ helm install rancher rancher-latest/rancher \
   --set letsEncrypt.email=me@example.org
 ```
 
-- [Certificates from Files](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#5-install-rancher-with-helm-and-your-chosen-certificate-option)
+- [Certificates from Files](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_5_install_rancher_with_helm_and_your_chosen_certificate_option)
 
 ```bash
 helm install rancher rancher-latest/rancher \
@@ -141,7 +141,7 @@ In a web browser, go to the DNS name that forwards traffic to your load balancer
 
 Doesn’t work? Take a look at the [Troubleshooting Page](https://ranchermanager.docs.rancher.com/troubleshooting/general-troubleshooting)
 
-***All of these instructions are defined in detailed in the [Rancher Documentation](https://ranchermanager.docs.rancher.com/pages-for-subheaders/install-upgrade-on-a-kubernetes-cluster#install-the-rancher-helm-chart).***
+***All of these instructions are defined in detailed in the [Rancher Documentation](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/#_install_the_rancher_helm_chart).***
 
 ### Helm Chart Options for Kubernetes Installations
 
