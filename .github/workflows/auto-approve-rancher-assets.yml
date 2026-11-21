@@ -1,14 +1,15 @@
 name: Rancher Assets Auto-Approve
 
-# Approves the rancher/rancher-assets/.github/workflows/push-to-rancher.yml
-# generated bump PRs in rancher/rancher once their checks are green,
-# and re-runs failed checks (rancher/rancher's CI is known-flaky).
+# Approves and enables auto-merge on the
+# rancher/rancher-assets/.github/workflows/push-to-rancher.yml generated bump
+# PRs in rancher/rancher (main and release/vX.Y), and re-runs failed checks
+# (rancher/rancher's CI is known-flaky). Only PRs limited to the
+# rancher-assets image files, with the matching assets tag, are touched.
 # Scheduled, not event-triggered - rancher/rancher's required checks run
-# too long for a single polling job. push-to-rancher.yml creates the PR
-# and requests auto-merge; native GitHub auto-merge (already enabled on
-# rancher/rancher) does the actual merging once approval and checks are
-# both satisfied. This job only supplies the approval and nudges flaky
-# failures, snapshot-style, every run - never waits in-job.
+# too long for a single polling job. Native GitHub auto-merge does the actual
+# merging once approval and checks are both satisfied. This job supplies the
+# approval and auto-merge request and nudges flaky failures, snapshot-style,
+# every run - never waits in-job.
 
 on:
   schedule:
@@ -23,12 +24,86 @@ concurrency:
 permissions: {}
 
 jobs:
+  find-prs:
+    name: Find Valid Rancher Assets Release PRs
+    permissions:
+      pull-requests: read # List open bump PRs and read their diffs.
+    runs-on: ubuntu-latest
+    outputs:
+      valid_prs: ${{ steps.validate.outputs.valid_prs }}
+    steps:
+      - name: Validate PR diffs
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # A bump PR only touches these files; chart/values.yaml must be exactly
+          # the assets tag line, set to the tag in its title.
+          allowed_files="build.yaml chart/Chart.yaml chart/values.yaml pkg/buildconfig/constants.go"
+          tag_re='v2\.[0-9]+-[0-9]{8}T[0-9]{4}Z(-dev)?'
+
+          # Bump PRs target main or a release/vX.Y branch, titled "[main] ..." or "[vX.Y] ...".
+          # shellcheck disable=SC2016 # $base is a jq variable.
+          pr_numbers=$(gh pr list --repo "$REPO" --state open \
+            --author "rancher-pr-actions-write[bot]" \
+            --limit 50 \
+            --json number,title,baseRefName,isCrossRepository \
+            --jq '.[] | select(.isCrossRepository | not)
+              | select(.baseRefName == "main" or (.baseRefName | test("^release/v[0-9]+\\.[0-9]+$")))
+              | select(.baseRefName as $base | .title | startswith("[" + ($base | sub("^release/"; "")) + "] Update rancher-assets to "))
+              | .number')
+
+          valid_prs=()
+          for pr_number in $pr_numbers; do
+            # Pin the validated head; approve and merge only act on this commit.
+            read -r head_sha base title < <(gh pr view "$pr_number" --repo "$REPO" \
+              --json headRefOid,baseRefName,title --jq '"\(.headRefOid) \(.baseRefName) \(.title)"')
+            title_tag=$(grep -oE "$tag_re\$" <<<"$title" || true)
+
+            # A release/vX.Y branch only takes vX.Y assets.
+            if [[ "$base" == release/v* && "$title_tag" != "${base#release/}-"* ]]; then
+              echo "::warning::PR #$pr_number tag '$title_tag' does not match base branch $base, skipping."
+              continue
+            fi
+
+            files_json=$(gh api "repos/$REPO/pulls/$pr_number/files")
+
+            unexpected=$(jq -r --arg allowed "$allowed_files" \
+              '($allowed | split(" ")) as $a | .[].filename | select(. as $f | $a | index($f) | not)' <<<"$files_json")
+            if [[ -n "$unexpected" ]]; then
+              echo "::warning::PR #$pr_number changes unexpected files (${unexpected//$'\n'/ }), skipping."
+              continue
+            fi
+
+            values=$(jq -r '.[] | select(.filename == "chart/values.yaml") | "\(.additions) \(.deletions)\n\(.patch)"' <<<"$files_json")
+            values_added=$(grep '^+' <<<"$values" || true)
+            if [[ "$(head -1 <<<"$values")" != "1 1" || "$values_added" != "+  tag: $title_tag" ]]; then
+              echo "::warning::PR #$pr_number chart/values.yaml is not the assets tag '$title_tag', skipping."
+              continue
+            fi
+
+            if [[ "$(gh pr view "$pr_number" --repo "$REPO" --json headRefOid --jq '.headRefOid')" != "$head_sha" ]]; then
+              echo "::warning::PR #$pr_number head changed during validation, skipping."
+              continue
+            fi
+
+            valid_prs+=("$pr_number:$head_sha")
+          done
+
+          echo "Valid PRs: ${valid_prs[*]:-none}"
+          printf 'valid_prs=%s\n' "${valid_prs[*]:-}" >> "$GITHUB_OUTPUT"
+
   ci-check-trigger:
     name: Check/Re-trigger Rancher Assets Release GHAs PRs
+    needs: find-prs
+    if: needs.find-prs.outputs.valid_prs != ''
     permissions:
       actions: write # Re-run failed checks.
       checks: read # Find which checks failed.
-      pull-requests: read # List open bump PRs and read their checks.
+      pull-requests: read # Read bump PR checks.
     runs-on: ubuntu-latest
     steps:
       - name: Find failed check runs
@@ -36,24 +111,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          PR_NUMBERS: ${{ needs.find-prs.outputs.valid_prs }}
         run: |
           set -euo pipefail
 
-          pr_numbers=$(gh pr list --repo "$REPO" --state open \
-            --author "rancher-pr-actions-write[bot]" \
-            --base main \
-            --limit 50 \
-            --json number,title \
-            --jq '.[] | select(.title | contains("Update rancher-assets to")) | .number')
-
-          if [[ -z "$pr_numbers" ]]; then
-            echo "No open rancher-assets bump PRs."
-            printf 'failed_runs=\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           failed_runs=()
-          for pr_number in $pr_numbers; do
+          for entry in $PR_NUMBERS; do
+            pr_number="${entry%%:*}"
             checks_json=$(gh pr checks "$pr_number" --repo "$REPO" --json name,bucket,link) || continue
 
             links=$(jq -r '.[] | select(.bucket != "pass") | .link' <<<"$checks_json")
@@ -93,62 +157,48 @@ jobs:
           done
 
   approve:
-    name: Approve Rancher Assets Release PRs
+    name: Approve and Auto-Merge Rancher Assets Release PRs
+    needs: find-prs
+    if: needs.find-prs.outputs.valid_prs != ''
     permissions:
       id-token: write # Allow Vault action to authenticate with GitHub OIDC.
-      pull-requests: read # Read PR restrictions and review state.
     runs-on: ubuntu-latest
     steps:
-      - name: Validate PR eligibility
-        id: eligibility
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          eligible_prs=$(gh pr list --repo "$REPO" --state open \
-            --author "rancher-pr-actions-write[bot]" \
-            --base main \
-            --limit 50 \
-            --json number,title,reviewDecision \
-            --jq '.[] | select(.title | contains("Update rancher-assets to")) | select(.reviewDecision != "APPROVED") | .number')
-
-          if [[ -z "$eligible_prs" ]]; then
-            echo "No eligible rancher-assets bump PRs to approve."
-            printf 'eligible_prs=\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          printf 'eligible_prs=%s\n' "$(echo "$eligible_prs" | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
-
       - name: Read Vault Token
-        if: steps.eligibility.outputs.eligible_prs != ''
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
-            github/token/rancher--rancher--auto-approve--pull_requests--write token | APPROVE_TOKEN
+            github/token/rancher--rancher--auto-approve--contents--pull_requests--write token | APPROVE_TOKEN
 
-      - name: Approve PR
-        if: steps.eligibility.outputs.eligible_prs != ''
+      - name: Approve and enable auto-merge
         env:
           GH_TOKEN: ${{ env.APPROVE_TOKEN }}
-          PR_NUMBERS: ${{ steps.eligibility.outputs.eligible_prs }}
+          PR_NUMBERS: ${{ needs.find-prs.outputs.valid_prs }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          for pr_number in $PR_NUMBERS; do
+          failed=0
+          for entry in $PR_NUMBERS; do
+            pr_number="${entry%%:*}"
+            head_sha="${entry#*:}"
+
             review_decision=$(gh pr view "$pr_number" --repo "$REPO" \
               --json reviewDecision --jq '.reviewDecision')
 
-            if [[ "$review_decision" == "APPROVED" ]]; then
-              echo "PR #$pr_number is currently approved."
-              continue
+            if [[ "$review_decision" != "APPROVED" ]]; then
+              gh api --method POST "repos/$REPO/pulls/$pr_number/reviews" \
+                -f commit_id="$head_sha" \
+                -f event=APPROVE \
+                -f body="Auto-approving Rancher Assets PR: diff validated as an assets image bump." \
+                > /dev/null
             fi
 
-            gh pr review "$pr_number" \
-              --repo "$REPO" \
-              --approve \
-              --body "Auto-approving Rancher Assets PR with auto-merge enabled."
+            # Re-requested every run: idempotent, and covers PRs approved before auto-merge worked.
+            gh pr merge "$pr_number" --repo "$REPO" --auto --squash --match-head-commit "$head_sha" || {
+              echo "::error::Failed to enable auto-merge on PR #$pr_number."
+              failed=1
+            }
           done
+
+          exit "$failed"

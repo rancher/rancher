@@ -156,7 +156,7 @@ func createS3Secrets(cs *clients.Clients, ns, clusterName string, s3 *CAPRKE2S3)
 // keeps snapshots on machine-local disk only.
 //
 // enforceSslVerify is deliberately true: the object store's certificate covers every node IP (see
-// objectstore.GetExternalObjectStore), so there is no reason to weaken this, and CAPRKE2 inverts the
+// objectstore.GetSharedExternalObjectStore), so there is no reason to weaken this, and CAPRKE2 inverts the
 // field into etcd-s3-skip-ssl-verify.
 func etcdBackupConfig(ns, clusterName string, s3 *CAPRKE2S3) map[string]any {
 	if s3 == nil {

@@ -5,4 +5,9 @@ set -e
 # directive in generate.go). Safe to call from any directory.
 cd "$(dirname "$0")/.."
 
+echo "Generating Rancher's build.yaml values controlled files/content..."
+
+echo "Chart Dir: $CHART_DIR"
+echo "Flavor: ${RANCHER_VERSION_TYPE:-default}"
+
 go run ./pkg/codegen/buildconfig

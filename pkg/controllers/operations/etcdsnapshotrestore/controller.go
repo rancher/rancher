@@ -10,6 +10,7 @@ import (
 	"path"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,7 +100,7 @@ const (
 
 	// TokenHashCommandFormat is the shell command the Preflight step runs on every etcd node to hash the server token
 	// persisted on disk, so it can be compared against the hash the distro stamped on the snapshot.
-	// The single format argument is the distro data directory, where the token file is persisted.
+	// The single format argument is the shell-quoted distro data directory, where the token file is persisted.
 	//
 	// It has to reproduce in a shell what the distro's do which respects colons as part of the password, treating
 	// everything after "server:" as the password.
@@ -135,7 +136,7 @@ const (
 i=0
 
 while [ $i -lt 30 ]; do
-	if $@ >/dev/null 2>&1; then
+	if "$@" >/dev/null 2>&1; then
 		exit 0
 	fi
 	sleep 10
@@ -170,7 +171,7 @@ fi
 
 TMPALLNODES=$(mktemp)
 
-if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
+if ! "$KUBECTL" get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
         echo "Error listing all nodes"
         rm "$TMPALLNODES"
         exit 1
@@ -192,7 +193,7 @@ while IFS='' read -r NODE; do
         done < "$NODENAMESFILE"
         if [ "${FOUND}" != "true" ]; then
                 echo "Deleting node ${NODE}"
-                ${KUBECTL} delete node "${NODE}" --wait=false
+                "$KUBECTL" delete node "${NODE}" --wait=false
         fi
 done < "$TMPALLNODES"
 
@@ -1835,7 +1836,7 @@ const (
 // it runs out of attempts. The request goes to the node's own supervisor on its loopback address, so it
 // reports the node's view, whatever server or load balancer the node is configured to join through.
 //
-// Arguments: data directory, supervisor base URL, attempts, interval in seconds.
+// Arguments: shell-quoted data directory, supervisor base URL, attempts, interval in seconds.
 const postflightCommandFormat = `f=%[1]s/server/token
 ca=%[1]s/server/tls/server-ca.crt
 if ! command -v curl >/dev/null 2>&1; then echo "UNAVAILABLE: curl not found"; exit 0; fi
@@ -1879,7 +1880,7 @@ func buildPostflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 				Command:    "/bin/sh",
 				Args: []string{
 					"-c",
-					fmt.Sprintf(postflightCommandFormat, dataDir, base, postflightAttempts, postflightIntervalSeconds),
+					fmt.Sprintf(postflightCommandFormat, capr.ShellQuote(dataDir), base, postflightAttempts, postflightIntervalSeconds),
 				},
 			},
 		},
@@ -2038,7 +2039,7 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 				Command:    "/bin/sh",
 				Args: []string{
 					"-c",
-					fmt.Sprintf(TokenHashCommandFormat, dataDir),
+					fmt.Sprintf(TokenHashCommandFormat, capr.ShellQuote(dataDir)),
 				},
 			},
 		},
@@ -2191,7 +2192,8 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 	if rejoining {
 		arg := fmt.Sprintf("server: %q\n", supervisorURL(serverURL, s.adapter.GetSupervisorPort(secret)))
 		if ops.IsEtcd(secret) || ops.IsControlPlane(secret) {
-			arg = fmt.Sprintf("%stoken-file: \"%s\"\n", arg, path.Join(dataDir, "server/token"))
+			// strconv.Quote output is also a valid YAML double-quoted string.
+			arg = fmt.Sprintf("%stoken-file: %s\n", arg, strconv.Quote(path.Join(dataDir, "server/token")))
 		}
 		nodePlan.Files = append(nodePlan.Files, plan.File{
 			Content: base64.StdEncoding.EncodeToString(
@@ -2210,7 +2212,7 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 				ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/rejoin-clean-etcd-dir", value, plan.OneTimeInstruction{
 					Name:    "remove-etcd-db-dir",
 					Command: "/bin/sh",
-					Args:    []string{"-c", fmt.Sprintf("systemctl stop %s; rm -rf %s", unit, path.Join(dataDir, "server/db/etcd"))},
+					Args:    []string{"-c", fmt.Sprintf("systemctl stop %s; rm -rf %s", unit, capr.ShellQuote(path.Join(dataDir, "server/db/etcd")))},
 				}))
 		}
 	}

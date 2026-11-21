@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"net"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -41,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -421,7 +425,7 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 		}
 
 		if cluster.Spec.RKEConfig.Registries == nil {
-			registryConfig, err := registry.CreateOrGetRegistry(clients, cluster.Namespace, "registry-cache", false)
+			registryConfig, err := registry.CreateOrGetRegistry(clients, cluster.Namespace, "registry-cache")
 			if err != nil {
 				return nil, err
 			}
@@ -758,6 +762,11 @@ func ImportCommand(clients *clients.Clients, mgmtCluster *v3.Cluster) (string, e
 }
 
 func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
+	return ExecOnPodContext(clients.Ctx, clients, namespace, podName, cmd...)
+}
+
+// ExecOnPodContext is ExecOnPod, stopping the exec when ctx is done.
+func ExecOnPodContext(ctx context.Context, clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
 	req := clients.K8s.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(namespace).
@@ -774,8 +783,10 @@ func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...strin
 		return "", fmt.Errorf("failed to create executor: %w", err)
 	}
 
-	var stdout, stderr strings.Builder
-	err = executor.StreamWithContext(clients.Ctx, remotecommand.StreamOptions{
+	// When ctx is done, StreamWithContext returns while its stream goroutine may still be writing, so the buffers
+	// have to be safe to read concurrently.
+	var stdout, stderr lockedBuilder
+	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
@@ -785,21 +796,49 @@ func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...strin
 	return stdout.String(), nil
 }
 
+// lockedBuilder is a strings.Builder that is safe for one writer and concurrent readers.
+type lockedBuilder struct {
+	lock    sync.Mutex
+	builder strings.Builder
+}
+
+func (b *lockedBuilder) Write(p []byte) (int, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.builder.Write(p)
+}
+
+func (b *lockedBuilder) String() string {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.builder.String()
+}
+
+// podLogsTimeout bounds a single pod log fetch on the failure path, so a wedged stream can't stall cleanup.
+const podLogsTimeout = time.Minute
+
 // getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`
 func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
-	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
-	stream, err := plr.Stream(context.TODO())
+	ctx, cancel := context.WithTimeout(clients.Ctx, podLogsTimeout)
+	defer cancel()
+	return PodLogs(ctx, clients.K8s, podNamespace, podName, &corev1.PodLogOptions{})
+}
+
+// PodLogs gathers the logs of a pod in a manner similar to `kubectl logs`, compressed the same way as GatherDebugData's pod
+// logs. If the stream breaks partway, the logs read so far are kept and the read error is appended to them.
+func PodLogs(ctx context.Context, kube kubernetes.Interface, podNamespace, podName string, opts *corev1.PodLogOptions) (string, error) {
+	stream, err := kube.CoreV1().Pods(podNamespace).GetLogs(podName, opts).Stream(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error streaming pod logs for pod %s/%s: %v", podNamespace, podName, err)
+		return "", fmt.Errorf("error streaming pod logs for pod %s/%s: %w", podNamespace, podName, err)
 	}
 	defer stream.Close()
 
-	reader := bufio.NewScanner(stream)
-	var logs string
-	for reader.Scan() {
-		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
+	logs, err := io.ReadAll(stream)
+	if err != nil {
+		logrus.Errorf("error reading pod logs for pod %s/%s, keeping the %d bytes read: %v", podNamespace, podName, len(logs), err)
+		logs = fmt.Appendf(logs, "\nerror reading logs: %v\n", err)
 	}
-	return snapshotutil.CompressInterface(logs)
+	return snapshotutil.CompressInterface(strings.ReplaceAll(string(logs), "\n", "SnewlineG"))
 }
 
 // countPodLogRegexOccurances gathers the logs from the specified pod in a manner similar to `kubectl logs` and counts the number of times the log matches the given regex.
@@ -815,10 +854,15 @@ func countPodLogRegexOccurances(clients *clients.Clients, podNamespace, podName,
 	re := regexp.MustCompile(regex)
 
 	reader := bufio.NewScanner(stream)
+	// Allow long lines, which the default 64KiB limit would stop the scan on and undercount.
+	reader.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for reader.Scan() {
 		if re.Match(reader.Bytes()) {
 			count++
 		}
+	}
+	if err := reader.Err(); err != nil {
+		return count, fmt.Errorf("error reading pod logs for pod %s/%s: %w", podNamespace, podName, err)
 	}
 	return count, nil
 }
@@ -834,24 +878,20 @@ func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
 		destFile,
 	}
 
-	cmd := exec.Command("kubectl", kcp...)
+	ctx, cancel := context.WithTimeout(context.Background(), podLogsTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "kubectl", kcp...)
 	if err := cmd.Run(); err != nil {
 		logrus.Errorf("error running kubectl -n %s cp %s:%s %s", podNamespace, podName, podPath, destFile)
 		return "", nil
 	}
 
-	file, err := os.Open(destFile)
+	logs, err := os.ReadFile(destFile)
 	if err != nil {
 		logrus.Errorf("error retrieving destination file %s: %v", destFile, err)
 		return "", nil
 	}
-	defer file.Close()
-	reader := bufio.NewScanner(file)
-	var logs string
-	for reader.Scan() {
-		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
-	}
-	return snapshotutil.CompressInterface(logs)
+	return snapshotutil.CompressInterface(strings.ReplaceAll(string(logs), "\n", "SnewlineG"))
 }
 
 // GatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
@@ -1001,6 +1041,264 @@ func populatePodLogs(clients *clients.Clients, controlPlane *rkev1.RKEControlPla
 	return logMap
 }
 
+// importedNodeEnvScript detects the distro inside an imported node pod and defines kc (kubectl against the downstream
+// cluster) and cri (crictl against the node's containerd). A node's data-dir may be overridden in its config, so it is
+// resolved on the node rather than assumed.
+const importedNodeEnvScript = `if [ -d /etc/rancher/rke2 ]; then
+  dd=$(cat /etc/rancher/rke2/config.yaml /etc/rancher/rke2/config.yaml.d/*.yaml 2>/dev/null | sed -n 's/^data-dir:[[:space:]]*//p' | tail -n1 | tr -d "\"'")
+  dd=${dd:-/var/lib/rancher/rke2}
+  kubeconfig=/etc/rancher/rke2/rke2.yaml
+  kc() { KUBECONFIG=$kubeconfig "$dd/bin/kubectl" --request-timeout=20s "$@"; }
+  cri() { "$dd/bin/crictl" --runtime-endpoint unix:///run/k3s/containerd/containerd.sock "$@"; }
+else
+  kubeconfig=/etc/rancher/k3s/k3s.yaml
+  kc() { KUBECONFIG=$kubeconfig k3s kubectl --request-timeout=20s "$@"; }
+  cri() { k3s crictl "$@"; }
+fi
+`
+
+// importedKubectlScript runs kubectl against the downstream cluster from inside an imported node pod, passing its arguments
+// through. It fails on nodes without a kubeconfig, i.e. agent-only nodes.
+const importedKubectlScript = importedNodeEnvScript + `if [ ! -f "$kubeconfig" ]; then echo "` + notServerNodeMessage + `" >&2; exit 3; fi
+kc "$@"`
+
+// importedNodeDiskCommands read the same information as the kubectl queries, but from the node itself, so they still work when
+// the downstream apiserver is down.
+// notServerNodeMessage is what importedKubectlScript prints on an agent-only node.
+const notServerNodeMessage = "not a server node"
+
+// importedNodeDiskCommand is one command run by gatherImportedNodeDiskData, stored under key.
+type importedNodeDiskCommand struct {
+	key, script string
+}
+
+// importedNodeDiskCommands are run in order, most useful first, so a node that runs out of time loses the least.
+var importedNodeDiskCommands = []importedNodeDiskCommand{
+	// Includes rotated, and possibly compressed, files, which hold the previous container instances' logs.
+	{key: "agentLogs", script: `for f in $(find /var/log/pods -path '/var/log/pods/cattle-system_cattle-cluster-agent-*' -name '*.log*' -type f 2>/dev/null | sort); do
+  echo "===== $f"
+  case "$f" in *.gz) zcat "$f" ;; *) cat "$f" ;; esac
+done`},
+	{key: "runtimePods", script: `echo "===== crictl pods"; cri pods 2>&1
+echo "===== crictl ps -a"; cri ps -a 2>&1`},
+}
+
+const (
+	// importedKubectlPhaseTimeout caps the kubectl phase of GatherImportedDownstreamData. It runs in the clients' OnClose
+	// hooks, so without a cap a cluster whose nodes don't answer could hold up cleanup for each node in turn. The disk
+	// phase has its own budget (see gatherImportedDiskData) so a wedged node in one can't starve the other.
+	importedKubectlPhaseTimeout = 3 * time.Minute
+
+	// importedDiskCommandTimeout and importedKubectlTimeout are passed to timeout(1) inside the node pod. The exec itself
+	// gets a little longer, so the in-pod timeout fires first and its partial output is kept.
+	importedDiskCommandTimeout = 120 * time.Second
+	importedKubectlTimeout     = 60 * time.Second
+	importedExecGrace          = 15 * time.Second
+)
+
+// execOnPodWithTimeout runs cmd on the pod under timeout(1), and bounds the exec stream as well in case it wedges.
+func execOnPodWithTimeout(ctx context.Context, clients *clients.Clients, pod corev1.Pod, timeout time.Duration, cmd ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout+importedExecGrace)
+	defer cancel()
+
+	seconds := strconv.Itoa(int(timeout.Seconds()))
+	return ExecOnPodContext(ctx, clients, pod.Namespace, pod.Name, append([]string{"timeout", seconds}, cmd...)...)
+}
+
+// GatherImportedDownstreamData collects the downstream cluster's view of an imported cluster whose nodes run as pods in
+// namespace, focused on which pods are running and what the cattle-cluster-agent logged. It is gathered two ways so that as
+// much as possible survives a broken cluster:
+//
+//   - from every node's disk (nodes): the containerd pods and containers, and the cattle-cluster-agent pod logs under
+//     /var/log/pods. This doesn't need the apiserver.
+//   - through kubectl on the first server node that answers (pods, podLogs): every downstream pod and the cattle-cluster-agent
+//     logs. This goes around Rancher, since the agent tunnel it would use is often what's broken.
+//
+// Logs are compressed the same way as GatherDebugData's pod logs, so DEBUG.md applies.
+func GatherImportedDownstreamData(clients *clients.Clients, namespace string) map[string]any {
+	data := map[string]any{}
+
+	nodePods, err := clients.Core.Pod().List(namespace, metav1.ListOptions{LabelSelector: ImportedNodeNameLabel})
+	if err != nil {
+		data["errors"] = []string{fmt.Sprintf("failed to list imported node pods in %s: %v", namespace, err)}
+		return data
+	}
+
+	// The kubectl view goes first: it holds the cattle-cluster-agent logs, which are usually what explains a failure.
+	errs := gatherImportedKubectlData(clients, nodePods.Items, data)
+	data["nodes"] = gatherImportedDiskData(clients, nodePods.Items)
+	if len(errs) > 0 {
+		data["errors"] = errs
+	}
+
+	return data
+}
+
+// gatherImportedKubectlData fills data with the downstream pods, cattle-cluster-agent logs, ClusterRepos and cattle-system
+// ReplicaSets, queried through kubectl on the server nodes. Each query moves on to the next server node if one fails, so
+// an apiserver that flaps partway through still yields as much as possible. It returns the errors it hit along the way.
+func gatherImportedKubectlData(clients *clients.Clients, nodePods []corev1.Pod, data map[string]any) []string {
+	ctx, cancel := context.WithTimeout(clients.Ctx, importedKubectlPhaseTimeout)
+	defer cancel()
+
+	var errs []string
+	agentOnly := map[string]bool{}
+	queriedFrom := map[string]string{}
+	data["queriedFrom"] = queriedFrom
+
+	// onAnyServer runs query with kubectl on each server node in turn, until one succeeds.
+	onAnyServer := func(what string, query func(kubectl func(args ...string) (string, error)) error) {
+		for _, nodePod := range nodePods {
+			if agentOnly[nodePod.Name] {
+				continue
+			}
+			kubectl := func(args ...string) (string, error) {
+				cmd := append([]string{"sh", "-c", importedKubectlScript, "kubectl"}, args...)
+				return execOnPodWithTimeout(ctx, clients, nodePod, importedKubectlTimeout, cmd...)
+			}
+			err := query(kubectl)
+			if err == nil {
+				queriedFrom[what] = nodePod.Name
+				return
+			}
+			if strings.Contains(err.Error(), notServerNodeMessage) {
+				agentOnly[nodePod.Name] = true
+				continue
+			}
+			errs = append(errs, fmt.Sprintf("%s: failed to get downstream %s: %v", nodePod.Name, what, err))
+		}
+	}
+
+	onAnyServer("pods", func(kubectl func(args ...string) (string, error)) error {
+		out, err := kubectl("get", "pods", "-A", "-o", "json")
+		if err != nil {
+			return err
+		}
+		pods := &corev1.PodList{}
+		if err := json.Unmarshal([]byte(out), pods); err != nil {
+			return fmt.Errorf("decoding pods: %w", err)
+		}
+
+		podLogs := map[string]map[string]string{}
+		for _, pod := range pods.Items {
+			if pod.Namespace == "cattle-system" && pod.Labels["app"] == "cattle-cluster-agent" {
+				podLogs[pod.Name] = importedDownstreamPodLogs(kubectl, pod)
+			}
+		}
+		data["pods"] = pods
+		data["podLogs"] = podLogs
+		return nil
+	})
+
+	// ClusterRepo status shows whether rancher-charts finished downloading, and the cattle-system ReplicaSets show whether
+	// the cluster agent was redeployed while it was. Raw JSON keeps the objects as they were served.
+	rawQueries := []struct {
+		key  string
+		args []string
+	}{
+		{key: "clusterRepos", args: []string{"get", "clusterrepos.catalog.cattle.io", "-o", "json"}},
+		{key: "replicaSets", args: []string{"-n", "cattle-system", "get", "replicasets", "-o", "json"}},
+	}
+	for _, q := range rawQueries {
+		onAnyServer(q.key, func(kubectl func(args ...string) (string, error)) error {
+			out, err := kubectl(q.args...)
+			if err != nil {
+				return err
+			}
+			if !json.Valid([]byte(out)) {
+				return fmt.Errorf("output is not JSON: %s", out)
+			}
+			data[q.key] = json.RawMessage(out)
+			return nil
+		})
+	}
+	return errs
+}
+
+// gatherImportedDiskData runs gatherImportedNodeDiskData on every node at once, so a wedged node only costs its own data.
+func gatherImportedDiskData(clients *clients.Clients, nodePods []corev1.Pod) map[string]map[string]string {
+	// Nodes are gathered in parallel, so the budget only has to fit one node's worst case.
+	budget := podLogsTimeout + time.Duration(len(importedNodeDiskCommands))*(importedDiskCommandTimeout+importedExecGrace) + 30*time.Second
+	ctx, cancel := context.WithTimeout(clients.Ctx, budget)
+	defer cancel()
+
+	var lock sync.Mutex
+	var wg sync.WaitGroup
+	nodes := map[string]map[string]string{}
+	for _, nodePod := range nodePods {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			nodeData := gatherImportedNodeDiskData(ctx, clients, nodePod)
+			lock.Lock()
+			defer lock.Unlock()
+			nodes[nodePod.Name] = nodeData
+		}()
+	}
+	wg.Wait()
+	return nodes
+}
+
+// gatherImportedNodeDiskData runs importedNodeDiskCommands on a node pod. Failures are recorded in place of the output so one
+// broken command doesn't hide the rest.
+func gatherImportedNodeDiskData(ctx context.Context, clients *clients.Clients, nodePod corev1.Pod) map[string]string {
+	logs := map[string]string{
+		"nodeName": nodePod.Labels[ImportedNodeNameLabel],
+	}
+	// The node pod's stdout carries rancher-system-agent's output.
+	logsCtx, cancel := context.WithTimeout(ctx, podLogsTimeout)
+	podLogs, err := PodLogs(logsCtx, clients.K8s, nodePod.Namespace, nodePod.Name, &corev1.PodLogOptions{})
+	cancel()
+	if err != nil {
+		logrus.Errorf("failed to collect logs for pod %s/%s: %v", nodePod.Namespace, nodePod.Name, err)
+	} else {
+		logs["logs"] = podLogs
+	}
+	for _, cmd := range importedNodeDiskCommands {
+		key := cmd.key
+		out, err := execOnPodWithTimeout(ctx, clients, nodePod, importedDiskCommandTimeout, "sh", "-c", importedNodeEnvScript+cmd.script)
+		if err != nil {
+			out = fmt.Sprintf("%s\nerror collecting %s: %v", out, key, err)
+		}
+		compressed, err := snapshotutil.CompressInterface(strings.ReplaceAll(out, "\n", "SnewlineG"))
+		if err != nil {
+			logrus.Errorf("failed to compress %s for pod %s/%s: %v", key, nodePod.Namespace, nodePod.Name, err)
+			continue
+		}
+		logs[key] = compressed
+	}
+	return logs
+}
+
+// importedDownstreamPodLogs collects the logs of a downstream pod, and those of the previous container instance if the pod has
+// restarted, since an agent that crashloops after a restore usually logs the cause before exiting.
+func importedDownstreamPodLogs(kubectl func(args ...string) (string, error), pod corev1.Pod) map[string]string {
+	logMap := map[string]string{}
+
+	collect := func(key string, extraArgs ...string) {
+		out, err := kubectl(append([]string{"-n", pod.Namespace, "logs", pod.Name, "--all-containers"}, extraArgs...)...)
+		if err != nil {
+			out = fmt.Sprintf("%s\nerror collecting %s: %v", out, key, err)
+		}
+		compressed, err := snapshotutil.CompressInterface(strings.ReplaceAll(out, "\n", "SnewlineG"))
+		if err != nil {
+			logrus.Errorf("failed to compress %s for downstream pod %s/%s: %v", key, pod.Namespace, pod.Name, err)
+			return
+		}
+		logMap[key] = compressed
+	}
+
+	collect("logs")
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.RestartCount > 0 {
+			collect("previousLogs", "--previous")
+			break
+		}
+	}
+
+	return logMap
+}
+
 // EnsureMinimalConflictsWithThreshold walks through pod logs and ensures a minimal number of conflict messages have occurred.
 func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioningv1api.Cluster, threshold int) error {
 	customPods, newErr := clients.Core.Pod().List(c.Namespace, metav1.ListOptions{
@@ -1132,8 +1430,12 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 		configLines = append(configLines, "token: "+token)
 	}
 
+	var containerdBlock string
 	if dataDir != "" {
 		configLines = append(configLines, "data-dir: "+dataDir)
+		// systemdnode.New only mounts the containerd config drop-in under the default data-dir.
+		containerdBlock = fmt.Sprintf("mkdir -p %[1]s/agent/etc/containerd/config-v3.toml.d\ncp %[2]s %[1]s/agent/etc/containerd/config-v3.toml.d/\n",
+			dataDir, systemdnode.ContainerdDropInPath(distro))
 	}
 
 	if isInit && distro == capr.RuntimeK3S {
@@ -1233,8 +1535,8 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 			rancherDir, registryHost, registryHost, caPath, caPath, string(registryCACert))
 	}
 
-	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
-		configDir, configDir, configContent, nodeIPBlock, extraFiles.String(), registryBlock, installCmd, serviceName, serviceName)
+	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
+		configDir, configDir, configContent, nodeIPBlock, extraFiles.String(), registryBlock, containerdBlock, installCmd, serviceName, serviceName)
 }
 
 func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {

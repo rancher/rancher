@@ -1,0 +1,68 @@
+name: "Build Rancher Components"
+description: "Build and upload the Rancher server and agent images"
+runs:
+  using: "composite"
+  steps:
+    - name: Arch environment variable
+      shell: bash
+      run: |
+        if [[ "$ARCH" == "x64" ]]; then
+          echo "ARCH=amd64" >> $GITHUB_ENV
+        fi
+    - name: Setup Environment Variables
+      uses: $/.github/actions/setup-tag-env
+    - id: env
+      name: Setup Dependencies Env Variables
+      uses: $/.github/actions/setup-build-env
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+      with:
+        images: ${{ github.repository_owner }}/rancher
+        flavor: |
+          latest=false
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      with:
+        driver-opts: network=host
+
+    - name: Build and export images
+      id: build-images
+      uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+      env:
+        REPO: ${{ github.repository_owner }}
+        DEST_DIR: /tmp
+      with:
+        files: |
+          ./docker-bake.hcl
+          cwd://${{ steps.meta.outputs.bake-file-labels }}
+        targets: default
+
+    - name: Upload server image
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: "rancher-server-${{ env.OS }}-${{ env.ARCH }}"
+        path: /tmp/rancher-server-${{ env.OS }}-${{ env.ARCH }}.tar
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false
+
+    - name: Upload agent image
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: "rancher-agent-${{ env.OS }}-${{ env.ARCH }}"
+        path: /tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false
+
+    - name: Upload demo image
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: "rancher-demo-${{ env.OS }}-${{ env.ARCH }}"
+        path: /tmp/rancher-demo-${{ env.OS }}-${{ env.ARCH }}.tar
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false

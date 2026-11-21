@@ -157,7 +157,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 
 	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config)
 	if err != nil {
-		return err
+		return ldap.IdentifierAttributeConfigError(err)
 	}
 
 	// If this works, save adConfig CR adding enabled flag.

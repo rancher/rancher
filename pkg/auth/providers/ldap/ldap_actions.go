@@ -162,7 +162,7 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 
 	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config)
 	if err != nil {
-		return err
+		return ldap.IdentifierAttributeConfigError(err)
 	}
 
 	// If this works, save LDAPConfig CR adding enabled flag.

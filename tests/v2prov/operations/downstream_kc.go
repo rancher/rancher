@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi/settings"
@@ -17,14 +18,34 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+var (
+	settingsRegisterLock sync.Mutex
+	settingsRegistered   bool
+)
+
+// registerSettings sets the global settings provider, which the kubeconfig manager reads the internal server URL + CA from.
+// settings.SetProvider writes an unsynchronized global, so this only registers once per process. Parallel tests and
+// failure hooks would otherwise race on it.
+func registerSettings(wContext *wrangler.Context) error {
+	settingsRegisterLock.Lock()
+	defer settingsRegisterLock.Unlock()
+
+	if settingsRegistered {
+		return nil
+	}
+	if err := settings.Register(wContext.Mgmt.Setting()); err != nil {
+		return err
+	}
+	settingsRegistered = true
+	return nil
+}
+
 func getDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*kubernetes.Clientset, error) {
 	wContext, err := wrangler.NewContext(context.TODO(), clients.ClientConfig, clients.RESTConfig)
 	if err != nil {
 		return nil, err
 	}
-	// Register settings so that the provider is set and we can retrieve the internal server URL + CA for the kubeconfig manager below.
-	err = settings.Register(wContext.Mgmt.Setting())
-	if err != nil {
+	if err := registerSettings(wContext); err != nil {
 		return nil, err
 	}
 	kcManager := kubeconfig.New(wContext)

@@ -486,7 +486,6 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 						Deletion: capi.MachineDeletionSpec{
 							NodeDrainTimeoutSeconds: durationToSeconds(machinePool.DrainBeforeDeleteTimeout, cluster),
 						},
-						Version: cluster.Spec.KubernetesVersion,
 					},
 				},
 				Paused: &machinePool.Paused,

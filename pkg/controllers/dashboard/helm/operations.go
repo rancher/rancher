@@ -165,7 +165,7 @@ func (o *operationHandler) cleanup(pod *corev1.Pod) error {
 			Stdout:    true,
 			Stderr:    true,
 			Container: "proxy",
-			Command:   []string{"pkill", "-x", "kubectl"},
+			Command:   []string{"pkill", "(^|/)kubectl[0-9.]*$"},
 		}, scheme.ParameterCodec).Do(o.ctx)
 	return result.Error()
 }

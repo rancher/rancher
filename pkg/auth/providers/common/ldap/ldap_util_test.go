@@ -1,11 +1,16 @@
 package ldap
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
+	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,7 +124,7 @@ func TestAttributesToPrincipal(t *testing.T) {
 		identifierAttribute string
 		wantName            string
 		wantDisplayName     string
-		wantErr             bool
+		wantErr             error
 	}{
 		{
 			name:                "user with default DN identifier",
@@ -154,7 +159,7 @@ func TestAttributesToPrincipal(t *testing.T) {
 			dn:                  "cn=John Doe,ou=Users,dc=example,dc=com",
 			scope:               "activedirectory_user",
 			identifierAttribute: "nonExistentAttr",
-			wantErr:             true,
+			wantErr:             ErrIdentifierAttributeMissing,
 		},
 		{
 			name:                "group with default DN identifier",
@@ -184,8 +189,8 @@ func TestAttributesToPrincipal(t *testing.T) {
 				"person", "name", "sAMAccountName", "group", "name",
 				tt.identifierAttribute,
 			)
-			if tt.wantErr {
-				require.Error(t, err)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
@@ -449,4 +454,54 @@ func TestGatherParentGroups(t *testing.T) {
 		require.ErrorContains(t, err, `failed to resolve group identifier "missing" to DN`)
 		assert.Empty(t, nested)
 	})
+}
+
+func TestIdentifierAttributeConfigError(t *testing.T) {
+	t.Parallel()
+
+	missing := fmt.Errorf("ldap: %w: %q on entry %s", ErrIdentifierAttributeMissing, "uid", "cn=admin,dc=foo")
+	wrongPassword := apierror.WrapAPIError(ldapv3.NewError(ldapv3.LDAPResultInvalidCredentials, errors.New("invalid credentials")), validation.Unauthorized, "Unauthorized")
+	plain := errors.New("connection refused")
+
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantMsg    string
+		wantSame   bool
+	}{
+		{
+			name:       "login error caused by a missing user ID attribute",
+			err:        apierror.WrapAPIError(missing, validation.Unauthorized, "Unauthorized"),
+			wantStatus: http.StatusUnprocessableEntity,
+			wantMsg:    `invalid userIDAttribute: ldap: identifier attribute not found: "uid" on entry cn=admin,dc=foo`,
+		},
+		{
+			name:     "other login error",
+			err:      wrongPassword,
+			wantSame: true,
+		},
+		{
+			name:     "error that is not an API error",
+			err:      plain,
+			wantSame: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := IdentifierAttributeConfigError(tt.err)
+			if tt.wantSame {
+				assert.Same(t, tt.err, got)
+				return
+			}
+
+			apiErr, ok := got.(*httperror.APIError)
+			require.True(t, ok, "want *httperror.APIError, got %T: %v", got, got)
+			assert.Equal(t, tt.wantStatus, apiErr.Code.Status)
+			assert.Equal(t, tt.wantMsg, apiErr.Message)
+		})
+	}
 }

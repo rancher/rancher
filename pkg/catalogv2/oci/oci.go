@@ -33,11 +33,9 @@ var maxHelmRepoIndexSize = 30 * 1024 * 1024 // 30 MiB
 // Chart returns an io.ReadCloser of the chart tar that is requested.
 // It uses oras Go library to download the manifest of the OCI artifact
 // checks if it is a Helm chart and then return the chart tar layer.
-func Chart(credentialSecret *corev1.Secret, chart *repo.ChartVersion, clusterRepoSpec v1.RepoSpec) (io.ReadCloser, error) {
+func Chart(credentialSecret *corev1.Secret, chartURL string, clusterRepoSpec v1.RepoSpec) (io.ReadCloser, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	chartURL := chart.URLs[0]
 
 	// Create a new OCIClient
 	ociClient, err := NewClient(chartURL, clusterRepoSpec, credentialSecret)

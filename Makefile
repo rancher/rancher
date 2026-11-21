@@ -12,6 +12,9 @@ quick-agent:
 quick-server:
 	@$(MAKE) quick TARGET="server"
 
+quick-demo:
+	@$(MAKE) quick TARGET="demo"
+
 quick-binary-server:
 	@$(MAKE) quick TARGET="binary-server"
 
@@ -34,4 +37,4 @@ integration-test-local:
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server quick-k3s-images integration-setup integration-test-local
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-demo quick-binary-server quick-k3s-images integration-setup integration-test-local

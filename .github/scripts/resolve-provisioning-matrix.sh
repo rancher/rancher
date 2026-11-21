@@ -242,8 +242,8 @@ fi
 echo "resolved selected scopes: [$selected]" >&2
 
 # Convert the YAML to JSON, then let jq collect the test rows for the picked
-# scopes and rename the friendly keys to the ones the workflow reads:
-#   dist -> V2PROV_TEST_DIST | regex -> V2PROV_TEST_RUN_REGEX | features -> CATTLE_FEATURES
+# scopes. Test row properties already use the environment names read by the
+# workflow, so each property can pass through without being listed here.
 # Each test lives in exactly one scope (see the YAML invariants), so no de-duplication
 # is needed. An empty `selected` will return {"include":[]}. This block also controls the
 # default configuration of the underlying ec2 runners, unless overridden by a specific test.
@@ -255,11 +255,17 @@ yq -o=json '.' "$CONFIG" | jq -c --arg selected "$selected" '
   | {
     include: [
       ($selected | split(" ") | map(select(length > 0))[]) as $scope
-      | ((.scopes[$scope] // $explicit[$scope] // {}).tests // [])[]
-      | { V2PROV_TEST_DIST: .dist, V2PROV_TEST_RUN_REGEX: .regex }
-        + (if .features then { CATTLE_FEATURES: .features } else {} end)
-        + (if .cpus then { V2PROV_TEST_CPUS: .cpus } else { V2PROV_TEST_CPUS: 16 } end)
-        + (if .parallelism then { V2PROV_TEST_PARALLELISM: .parallelism } else { V2PROV_TEST_PARALLELISM: 1 } end)
+      | (.scopes[$scope] // $explicit[$scope] // {}) as $def
+      | ($def.tests // [])[]
+      # A row without a dist runs once per distro.
+      | (.V2PROV_TEST_DIST // ("rke2", "k3s")) as $dist
+      # Scope meta provides defaults for every row; a value set on the row itself wins.
+      | ($def.meta // {} | with_entries(select(.key == "V2PROV_TEST_TIMEOUT" or .key == "V2PROV_RUNNER_FAMILY")))
+        + . + {
+          V2PROV_TEST_DIST: $dist,
+          V2PROV_TEST_CPUS: (.V2PROV_TEST_CPUS // 16),
+          V2PROV_TEST_PARALLELISM: (.V2PROV_TEST_PARALLELISM // 1)
+        }
     ]
   }
 '

@@ -64,6 +64,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreStaleAddressOutsideLeaderCe
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	requireHostIPFamilies(t, cs, []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol})
 
@@ -101,7 +102,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreStaleAddressOutsideLeaderCe
 	proof.create(t, fx)
 
 	before := time.Now()
-	RunETCDSnapshotSaveOperationTest(t, cs, fx.mgmtCluster.Name, fx.clusterRef)
+	RunETCDSnapshotSaveOperationTest(t, cs, fx.mgmtCluster.Name, fx.clusterRef, fx.kubectl(t))
 	snapshot := waitForBackpopulatedLocalSnapshotOnNode(t, cs, fx.mgmtCluster.Name, leaderName, before)
 
 	// The cloud now reports IPv6 first. The snapshot predates this, so the restore will roll the

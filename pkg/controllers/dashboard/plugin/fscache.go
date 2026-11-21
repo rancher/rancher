@@ -159,17 +159,25 @@ func Untar(dst string, r io.Reader) error {
 				return err
 			}
 
-		// if it's a file create it
+		// if it's a file create it, creating any missing parent directories along the way
 		case tar.TypeReg:
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return err
+			}
+
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
 
-			if _, err := io.Copy(f, tr); err != nil {
-				return err
+			_, copyErr := io.Copy(f, tr)
+			closeErr := f.Close()
+			if copyErr != nil {
+				return copyErr
 			}
-			f.Close()
+			if closeErr != nil {
+				return closeErr
+			}
 
 		default:
 			return fmt.Errorf("unknown type: %b in %s", header.Typeflag, header.Name)

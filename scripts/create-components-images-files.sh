@@ -16,9 +16,10 @@ mkdir -p ../dist
 
 cd ../bin
 
-if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
-fi
+# The image lists must match the charts baked into the Rancher Assets image in use, so check out the charts commit
+# referenced by that image's assets tag instead of using the branch head.
+source ../scripts/assets-charts-lib
+checkout_assets_charts
 
 CHARTS_DIRS="${CHARTS_DIRS:+${CHARTS_DIRS},}${CHART_REPO_DIR}"
 

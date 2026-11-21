@@ -103,6 +103,10 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
 	if err != nil {
+		if errors.Is(err, ldap.ErrIdentifierAttributeMissing) {
+			logrus.Warnf("loginUser: %s", err)
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
+		}
 		return v3.Principal{}, nil, err
 	}
 
@@ -506,6 +510,10 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 			config.GroupNameAttribute,
 			identifierAttr)
 		if err != nil {
+			if errors.Is(err, ldap.ErrIdentifierAttributeMissing) {
+				logrus.Warnf("Skipping search result: %s", err)
+				continue
+			}
 			return []v3.Principal{}, err
 		}
 		principals = append(principals, *principal)

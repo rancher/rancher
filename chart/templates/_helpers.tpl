@@ -48,7 +48,7 @@ Prepare the Rancher Image value w/ new fields as opt-in for now.
 Prepare the Rancher Image repo value w/ new fields as opt-in for now.
 */}}
 {{ define "rancher.imageRepo" -}}
-{{ default "rancher/rancher" .Values.image.repository -}}
+{{ default "rancher/rancher-server" .Values.image.repository -}}
 {{ end -}}
 
 

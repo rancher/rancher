@@ -37,7 +37,7 @@ auditLog:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/mirrored-bci-micro"
-    tag: 16.0-15.11
+    tag: 16.0-23.2
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
@@ -166,9 +166,9 @@ noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
 image:
   # Optional: Image-specific registry override
   # registry: ""
-  repository: rancher/rancher
+  repository: rancher/rancher-server
   # Defaults to .Chart.appVersion
-  # rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
+  # rancher/rancher-server image tag. https://hub.docker.com/r/rancher/rancher-server/tags/
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -176,7 +176,7 @@ image:
 # Override the name of the Rancher image to pull.
 # To override the registry location use systemDefaultRegistry instead.
 # rancherImage: ""
-# rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
+# rancher/rancher-server image tag. https://hub.docker.com/r/rancher/rancher-server/tags/
 # Defaults to .Chart.appVersion
 # rancherImageTag: v2.0.7
 # Override imagePullPolicy for rancher server images
@@ -225,7 +225,7 @@ useBundledSystemChart: false
 # Important: update build.yaml when this default image needs to be changed, then run `go generate`.
 assetsImage:
   repository: rancher/rancher-assets
-  tag: v2.16-20261027T2136Z-dev
+  tag: v2.16-20261120T1935Z-dev
 
 # Certmanager version compatibility
 certmanager:
@@ -255,7 +255,7 @@ postDelete:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.9.0-rc.1"
+    tag: "v0.9.1-rc.2"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
@@ -277,7 +277,7 @@ preUpgrade:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.9.0-rc.1"
+    tag: "v0.9.1-rc.2"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 
