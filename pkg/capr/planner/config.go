@@ -653,7 +653,67 @@ func updateConfigWithAdvertiseAddresses(config map[string]any, info *machineNetw
 	}
 }
 
-func addLabels(config map[string]any, cluster *capi.Cluster, entry *planEntry) error {
+// shouldEmbedLifecycleLabels reports whether the plan.cattle.io/* lifecycle labels should go into
+// the RKE2/K3s node-label setting for this node.
+//
+// node-label becomes kubelet --node-labels, which is non-dynamic: any change to it bumps
+// RESTART_STAMP and restarts rke2. Appending these labels unconditionally (the 2.15 behaviour) is
+// what restarts every downstream node after a management-server upgrade (rancher/rancher#58320).
+//
+// So we only embed them when a restart is happening regardless: first boot (no plan applied yet, so
+// the kubelet isn't running) or an in-flight Kubernetes version upgrade. On a steady-state reconcile
+// we return false and let the machinerole ImportedLabelSync controller stamp the labels on the Node
+// over the API instead, which doesn't restart anything.
+func shouldEmbedLifecycleLabels(controlPlane *rkev1.RKEControlPlane, entry *planEntry) bool {
+	if entry == nil || entry.Machine == nil {
+		return false
+	}
+	// First boot: no plan has ever been applied.
+	if entry.Plan == nil || entry.Plan.AppliedPlan == nil {
+		return true
+	}
+	// Version upgrade: kubelet isn't on the desired version yet, so rke2 is going to restart anyway.
+	if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
+		return true
+	}
+	// Latch: if the labels are already in the applied node-label, keep rendering them. The decision
+	// has to be one-way (off to on, never on to off): dropping labels that are already there would
+	// change node-label and cause the very restart we're avoiding. Nodes that never had the labels
+	// don't match and stay restart-free.
+	return appliedPlanHasLifecycleLabels(entry)
+}
+
+const lifecycleNodeLabelPrefix = "plan.cattle.io/"
+
+// appliedPlanHasLifecycleLabels reports whether the node's last-applied 50-rancher.yaml already has
+// a plan.cattle.io/* entry in its node-label. This is the latch for shouldEmbedLifecycleLabels. A
+// decode error is treated as "no labels", so the worst case is one reconcile re-rendering them.
+func appliedPlanHasLifecycleLabels(entry *planEntry) bool {
+	if entry.Plan == nil || entry.Plan.AppliedPlan == nil {
+		return false
+	}
+	for _, f := range entry.Plan.AppliedPlan.Files {
+		if !strings.HasSuffix(f.Path, "/50-rancher.yaml") {
+			continue
+		}
+		raw, err := base64.StdEncoding.DecodeString(f.Content)
+		if err != nil {
+			return false
+		}
+		cfg := map[string]any{}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			return false
+		}
+		for _, l := range convert.ToStringSlice(cfg["node-label"]) {
+			if strings.HasPrefix(l, lifecycleNodeLabelPrefix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func addLabels(config map[string]any, controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, entry *planEntry) error {
 	var labels []string
 	if data := entry.Metadata.Annotations[capr.LabelsAnnotation]; data != "" {
 		labelMap := map[string]string{}
@@ -667,20 +727,24 @@ func addLabels(config map[string]any, cluster *capi.Cluster, entry *planEntry) e
 
 	labels = append(labels, capr.MachineUIDLabel+"="+string(entry.Machine.UID))
 
-	lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
-	if err != nil {
-		return err
-	}
-	for k, v := range lifecycleLabels {
-		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
-	}
+	// Only put the plan.cattle.io/* labels in node-label when it won't cost an extra rke2 restart.
+	// Otherwise they're synced onto the Node by the machinerole controller. See rancher/rancher#58320.
+	if shouldEmbedLifecycleLabels(controlPlane, entry) {
+		lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
+		if err != nil {
+			return err
+		}
+		for k, v := range lifecycleLabels {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		}
 
-	lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
-	if err != nil {
-		return err
-	}
-	for k, v := range lifecycleLabels {
-		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
+		if err != nil {
+			return err
+		}
+		for k, v := range lifecycleLabels {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		}
 	}
 
 	sort.Strings(labels)
@@ -933,7 +997,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
-	if err := addLabels(config, cluster, entry); err != nil {
+	if err := addLabels(config, controlPlane, cluster, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
 	if err := addTaints(config, entry, controlPlane); err != nil {
