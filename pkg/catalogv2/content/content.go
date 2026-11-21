@@ -36,6 +36,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helm"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
+	"github.com/rancher/rancher/pkg/catalogv2/system/embedded"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -220,6 +221,12 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 //
 // The function returns an io.ReadCloser which represents the chart content.
 func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter bool) (io.ReadCloser, error) {
+	if name == "rancher-charts" {
+		if chart, ok := embedded.Get(chartName, version); ok {
+			logrus.Debugf("[contentManager] found chart %s in embedded system charts", chartName)
+			return chart, nil
+		}
+	}
 	index, err := c.Index(namespace, name, "", skipFilter)
 	if err != nil {
 		return nil, err

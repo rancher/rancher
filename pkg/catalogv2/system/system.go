@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalogv2/system/embedded"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -390,11 +391,6 @@ func (m *Manager) Remove(namespace, releaseName string) {
 // If a release with the version to be installed is already installed, or is pending install, upgrade or rollback, this
 // does nothing.
 func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]any, takeOwnership bool, installImageOverride string) error {
-	index, err := m.content.Index("", "rancher-charts", "", true)
-	if err != nil {
-		return err
-	}
-
 	if releaseName == "" {
 		releaseName = chartName
 	}
@@ -413,20 +409,31 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 		// This prevents automated downgrades of updates done manually through the web UI, e.g. for Fleet.
 	}
 
-	// This method from the Helm fork doesn't return an error when given a non-existent version, unfortunately.
-	// It instead returns the latest version in the index.
-	chart, err := index.Get(chartName, v)
-	if err != nil {
-		// The helm library is using github.com/pkg/errors which is deprecated
-		return errors.New(err.Error())
-	}
-	// Because of the behavior of `index.Get`, we need this check.
-	if v != latestVersionMatcher && chart.Version != v {
-		return fmt.Errorf("specified version %s doesn't exist in the index", v)
+	// The operations client later uses the content manager to retrieve the actual chart again, with specific name and version.
+	// Embedded charts support must be split between a existence check here, and the actual read in the `Chart()` method.
+	if embedded.Has(chartName, v) {
+		logrus.Debugf("[systemManager] found chart %s in embedded system charts, index lookup skipped", chartName)
+	} else {
+		index, err := m.content.Index("", "rancher-charts", "", true)
+		if err != nil {
+			return err
+		}
+
+		// This method from the Helm fork doesn't return an error when given a non-existent version, unfortunately.
+		// It instead returns the latest version in the index.
+		chart, err := index.Get(chartName, v)
+		if err != nil {
+			return err
+		}
+		// Because of the behavior of `index.Get`, we need this check.
+		if v != latestVersionMatcher && chart.Version != v {
+			return fmt.Errorf("specified version %s doesn't exist in the index", v)
+		}
+		v = chart.Version
 	}
 
 	// If the chart version is already installed, we do nothing
-	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, releaseName, minVersion, chart.Version, isExact, values)
+	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, releaseName, minVersion, v, isExact, values)
 	if err != nil {
 		return err
 	} else if installed {
