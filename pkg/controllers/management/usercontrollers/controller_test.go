@@ -11,11 +11,15 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 type removeTestEnv struct {
@@ -190,4 +194,23 @@ func TestRemoveGivesTheControllersTheirTimeFromTheUninstallNotFromTheDeletion(t 
 
 	assert.ErrorIs(t, err, generic.ErrSkip, "the uninstall was only just recorded")
 	assert.Empty(t, v32.ClusterConditionControllersStopped.GetStatus(env.stored))
+}
+
+func TestCleanupJobMeetsPodSecurityRestricted(t *testing.T) {
+	// The job runs in the default namespace, where an imported cluster may enforce the restricted level.
+	userContext := &config.UserContext{K8sClient: k8sfake.NewSimpleClientset()}
+	lifecycle := &ClusterLifecycleCleanup{}
+
+	job, err := lifecycle.createCleanupJob(userContext, newRemoveTestCluster(), "cattle-cleanup-sa", nil)
+
+	require.NoError(t, err)
+	require.Len(t, job.Spec.Template.Spec.Containers, 1)
+	sc := job.Spec.Template.Spec.Containers[0].SecurityContext
+	require.NotNil(t, sc)
+	assert.Equal(t, ptr.To(true), sc.RunAsNonRoot)
+	assert.Equal(t, ptr.To(false), sc.AllowPrivilegeEscalation)
+	require.NotNil(t, sc.Capabilities)
+	assert.Equal(t, []corev1.Capability{"ALL"}, sc.Capabilities.Drop)
+	require.NotNil(t, sc.SeccompProfile)
+	assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, sc.SeccompProfile.Type)
 }
