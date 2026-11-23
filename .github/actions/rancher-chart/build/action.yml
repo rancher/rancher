@@ -1,11 +1,18 @@
 name: "Setup and build chart"
 description: "Install dependencies, pull files and build the Rancher chart"
+outputs:
+  CHART_REPO:
+    description: "CHART_REPO used to build the chart"
+    value: ${{ steps.upload.outputs.CHART_REPO }}
+  CHART_VERSION:
+    description: "CHART_VERSION used to build the chart"
+    value: ${{ steps.upload.outputs.CHART_VERSION }}
+  CHART_FILENAME:
+    description: "CATTLE_KDM_BRANCH from package/Dockerfile"
+    value: ${{ steps.upload.outputs.CHART_FILENAME }}
 runs:
   using: "composite"
   steps:
-    - name: install dependencies
-      shell: bash
-      run: zypper install -y aws-cli
     - name: Setup Tag Env Variables
       uses: $/.github/actions/setup-tag-env
     - id: env
@@ -31,11 +38,16 @@ runs:
       shell: bash
       run: ./scripts/chart/package
     - name: Prepare for upload
+      id: upload
       shell: bash
       run: |
         set -e
         source scripts/version
         cp bin/chart/${CHART_REPO}/rancher-${CHART_VERSION}.tgz /tmp/rancher-chart.tgz
+
+        echo "CHART_REPO=$CHART_REPO" >> $GITHUB_OUTPUT
+        echo "CHART_VERSION=${CHART_VERSION}" >> $GITHUB_OUTPUT
+        echo "CHART_FILENAME=rancher-${CHART_VERSION}.tgz" >> $GITHUB_OUTPUT
     - name: Upload chart
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
