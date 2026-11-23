@@ -26,7 +26,7 @@ annotations:
     - name: mirrored-bci-micro
       image: rancher/mirrored-bci-micro:16.0-23.2
     - name: kube-api-auth
-      image: rancher/kube-api-auth:v0.16.0-rc.7
+      image: rancher/kube-api-auth:v0.16.0
     - name: rancher-agent
       image: rancher/rancher-agent:%APP_VERSION%
     - name: system-agent
