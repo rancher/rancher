@@ -10,7 +10,7 @@ const (
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261120T1935Z-dev"
 	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.7"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4-rc.2"
-	DefaultShellVersion       = "rancher/shell:v0.9.1-rc.6"
+	DefaultShellVersion       = "rancher/shell:v0.9.1-rc.7"
 	EksOperatorVersion        = "111.0.0+up1.16.0-rc.6"
 	FleetVersion              = "111.0.1+up0.17.0"
 	GkeOperatorVersion        = "111.0.0+up1.16.0-rc.5"

@@ -255,7 +255,7 @@ postDelete:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.9.1-rc.6"
+    tag: "v0.9.1-rc.7"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
@@ -277,7 +277,7 @@ preUpgrade:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.9.1-rc.6"
+    tag: "v0.9.1-rc.7"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 
