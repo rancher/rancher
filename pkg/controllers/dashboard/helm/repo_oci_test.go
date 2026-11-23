@@ -526,7 +526,7 @@ func TestShouldSkip(t *testing.T) {
 						},
 					}},
 			}
-			assert.Equal(t, testCase.expected, shouldSkip(clusterRepo, policy, catalog.OCIDownloaded, ociInterval, handler.clusterRepoController, &clusterRepo.Status))
+			assert.Equal(t, testCase.expected, shouldSkip(clusterRepo, policy, catalog.OCIDownloaded, ociInterval, handler.clusterRepoController, &clusterRepo.Status, false))
 		})
 	}
 }

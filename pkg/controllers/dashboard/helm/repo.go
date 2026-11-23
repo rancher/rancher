@@ -143,7 +143,16 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 		return setErrorCondition(repo, err, newStatus, interval, repoCondition, r.clusterRepos)
 	}
 
-	if shouldSkip(repo, retryPolicy, repoCondition, interval, r.clusterRepos, newStatus) {
+	// The bundled catalog may change when Rancher is upgraded without any changes to the
+	// ClusterRepo. If the bundled commit differs from the one recorded in the status,
+	// rebuild the index immediately instead of waiting for the refresh interval. Otherwise,
+	// the index may not contain the chart versions required by the new Rancher version.
+	forceRefresh := bundledCommitChanged(repo)
+	if forceRefresh {
+		logrus.Infof("clusterrepo %s: bundled catalog changed, refreshing the index", repo.Name)
+	}
+
+	if shouldSkip(repo, retryPolicy, repoCondition, interval, r.clusterRepos, newStatus, forceRefresh) {
 		return repo, nil
 	}
 	newStatus.ShouldNotSkip = false
@@ -171,6 +180,36 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 		Name:       repo.Name,
 		UID:        repo.UID,
 	}, interval, retryPolicy)
+}
+
+// bundledCommitChanged reports whether the current HEAD of the repository bundled
+// with the Rancher image differs from the commit recorded for the ClusterRepo index.
+//
+// Failed downloads are left to the existing retry policy. While the Downloaded
+// condition is False, this function does not force another refresh. Retries and
+// subsequent interval-based refreshes use the bundled repository's current HEAD.
+// If the refresh interval is negative, a manual refresh is required.
+//
+// If HEAD cannot be read, no forced refresh is requested because the download
+// would likely fail for the same reason.
+func bundledCommitChanged(repo *catalog.ClusterRepo) bool {
+	if isDisabled(repo) || repo.Spec.GitRepo == "" || repo.Status.Commit == "" ||
+		condition.Cond(repoCondition).IsFalse(repo) {
+		return false
+	}
+
+	changed, err := git.BundledCommitChanged(
+		repo.Namespace,
+		repo.Name,
+		repo.Spec.GitRepo,
+		repo.Status.Commit,
+	)
+	if err != nil {
+		logrus.Warnf("clusterrepo %s: failed to check bundled catalog commit: %v", repo.Name, err)
+		return false
+	}
+
+	return changed
 }
 
 func isDisabled(repo *catalog.ClusterRepo) bool {
@@ -447,12 +486,16 @@ func setErrorCondition(clusterRepo *catalog.ClusterRepo,
 
 // shouldSkip checks certain conditions to see if the handler should be skipped.
 // For information regarding the conditions, check the comments in the implementation.
+//
+// forceRefresh bypasses the refresh interval, including a negative interval.
+// The existing resource-version and retry handling remains unchanged.
 func shouldSkip(clusterRepo *catalog.ClusterRepo,
 	policy retryPolicy,
 	cond catalog.RepoCondition,
 	interval time.Duration,
 	controller catalogcontrollers.ClusterRepoController,
-	newStatus *catalog.RepoStatus) bool {
+	newStatus *catalog.RepoStatus,
+	forceRefresh bool) bool {
 	now := timeNow().UTC()
 	// this is to prevent the handler from making calls when the crd is outdated.
 	updatedRepo, err := controller.Get(clusterRepo.Name, metav1.GetOptions{})
@@ -468,7 +511,7 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 	}
 
 	// negative refresh interval disables periodic updates
-	if clusterRepo.Spec.RefreshInterval < 0 {
+	if clusterRepo.Spec.RefreshInterval < 0 && !forceRefresh {
 		return true
 	}
 
@@ -479,7 +522,7 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		return true
 	}
 
-	if newStatus.ShouldNotSkip { //checks if we should skip running the handler or not
+	if forceRefresh || newStatus.ShouldNotSkip {
 		return false
 	}
 

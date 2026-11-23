@@ -112,7 +112,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 
-	if shouldSkip(clusterRepo, retryPolicy, ociCondition, ociInterval, o.clusterRepoController, newStatus) {
+	if shouldSkip(clusterRepo, retryPolicy, ociCondition, ociInterval, o.clusterRepoController, newStatus, false) {
 		return clusterRepo, nil
 	}
 	newStatus.ShouldNotSkip = false
