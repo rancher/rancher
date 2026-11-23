@@ -35,4 +35,4 @@ annotations:
       image: rancher/wins:v0.16.0-rc.11
       os: windows
     - name: machine
-      image: rancher/machine:v0.15.0-rancher146-rc.11
+      image: rancher/machine:v0.15.0-rancher146
