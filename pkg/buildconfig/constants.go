@@ -14,7 +14,7 @@ const (
 	EksOperatorVersion        = "111.0.0+up1.16.0-rc.10"
 	FleetVersion              = "111.0.1+up0.17.0"
 	GkeOperatorVersion        = "111.0.0+up1.16.0-rc.7"
-	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.11"
+	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146"
 	PartnerChartDefaultBranch = "main"
 	RemoteDialerProxyVersion  = "111.0.1+up0.9.1"
 	Rke2ChartDefaultBranch    = "main"
