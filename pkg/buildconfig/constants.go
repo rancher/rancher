@@ -3,7 +3,7 @@
 package buildconfig
 
 const (
-	AksOperatorVersion        = "111.0.0+up1.16.0-rc.7"
+	AksOperatorVersion        = "111.0.0+up1.16.0-rc.9"
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-23.2"
 	ChartDefaultBranch        = "staging"
 	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4_turtles.3"
@@ -11,15 +11,15 @@ const (
 	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0-rc.7"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4-rc.2"
 	DefaultShellVersion       = "rancher/shell:v0.9.1-rc.6"
-	EksOperatorVersion        = "111.0.0+up1.16.0-rc.6"
+	EksOperatorVersion        = "111.0.0+up1.16.0-rc.10"
 	FleetVersion              = "111.0.1+up0.17.0"
-	GkeOperatorVersion        = "111.0.0+up1.16.0-rc.5"
+	GkeOperatorVersion        = "111.0.0+up1.16.0-rc.7"
 	MachineProvisionImage     = "rancher/machine:v0.15.0-rancher146-rc.11"
 	PartnerChartDefaultBranch = "main"
-	RemoteDialerProxyVersion  = "111.0.1+up0.9.1-rc.5"
+	RemoteDialerProxyVersion  = "111.0.1+up0.9.1"
 	Rke2ChartDefaultBranch    = "main"
 	SystemAgentVersion        = "v0.16.0-rc.10"
-	TurtlesVersion            = "111.0.0+up0.28.0-rc.8"
+	TurtlesVersion            = "111.0.0+up0.28.0"
 	WebhookVersion            = "111.0.1+up0.12.1-rc.21"
 	WinsAgentVersion          = "v0.16.0-rc.11"
 )
