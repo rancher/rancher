@@ -18,6 +18,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
+	chartutil "helm.sh/helm/v4/pkg/chart/v2/util"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
@@ -644,4 +645,113 @@ func createTestManifest(helmChartPath string, t *testing.T) (ocispec.Descriptor,
 	manifestJSON, err := json.Marshal(manifest)
 	assert.NoError(t, err)
 	return layerDesc, ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromBytes(manifestJSON), Size: int64(len(manifestJSON))}, manifestJSON, nil
+}
+
+// TestGenerateIndexNonCanonicalSemverTags makes sure that tags which are valid
+// semver but not in canonical form (leading zeros, missing patch number) are
+// fetched by the tag that exists in the registry, and are indexed with the
+// version written in the chart's Chart.yaml.
+func TestGenerateIndexNonCanonicalSemverTags(t *testing.T) {
+	// OCI tag -> chart version in Chart.yaml. Helm pushes a chart with its
+	// version as tag, replacing + with _.
+	charts := map[string]string{
+		"1.2":           "1.2",
+		"2.0.024":       "2.0.024",
+		"1.0.0_build.1": "1.0.0+build.1",
+	}
+
+	type artifact struct {
+		chartPath    string
+		layerDesc    ocispec.Descriptor
+		manifestDesc ocispec.Descriptor
+		manifestJSON []byte
+	}
+	artifacts := make(map[string]artifact, len(charts))
+	for tag, chartVersion := range charts {
+		chartPath, err := chartutil.Save(&chart.Chart{
+			Metadata: &chart.Metadata{APIVersion: chart.APIVersionV2, Name: "testingchart", Version: chartVersion},
+		}, t.TempDir())
+		if err != nil {
+			t.Fatalf("failed to save chart version %s: %v", chartVersion, err)
+		}
+		layerDesc, manifestDesc, manifestJSON, err := createTestManifest(chartPath, t)
+		if err != nil {
+			t.Fatalf("failed to create test manifest for version %s: %v", chartVersion, err)
+		}
+		artifacts[tag] = artifact{chartPath, layerDesc, manifestDesc, manifestJSON}
+	}
+
+	tests := []struct {
+		name             string
+		options          *v1.OCIOptions
+		chartsWithDigest []string
+	}{
+		{
+			name:             "fetches the latest tag as it is in the registry",
+			chartsWithDigest: []string{"2.0.024"},
+		},
+		{
+			name:             "fetches all tags as they are in the registry",
+			options:          &v1.OCIOptions{DownloadAllTags: true},
+			chartsWithDigest: []string{"1.2", "2.0.024", "1.0.0+build.1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/v2/_catalog":
+					fmt.Fprint(w, `{"repositories": ["testingchart"]}`)
+					return
+				case r.URL.Path == "/v2/testingchart/tags/list":
+					w.Header().Set("Content-Type", "application/json")
+					fmt.Fprint(w, `{"tags": ["1.2", "2.0.024", "1.0.0_build.1"]}`)
+					return
+				}
+				for tag, a := range artifacts {
+					switch r.URL.Path {
+					case "/v2/testingchart/manifests/" + tag:
+						w.Header().Set("Content-Type", a.manifestDesc.MediaType)
+						w.Header().Set("Docker-Content-Digest", a.manifestDesc.Digest.String())
+						w.Write(a.manifestJSON)
+						return
+					case "/v2/testingchart/blobs/" + a.layerDesc.Digest.String():
+						http.ServeFile(w, r, a.chartPath)
+						return
+					}
+				}
+				http.NotFound(w, r)
+			}))
+			defer srv.Close()
+
+			u := fmt.Sprintf("oci://%s/testingchart", strings.TrimPrefix(srv.URL, "http://"))
+			repoSpec := v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true, OCIOptions: tt.options}
+			ociClient, err := NewClient(u, repoSpec, nil)
+			assert.NoError(t, err)
+
+			i, err := GenerateIndex(ociClient, u, nil, repoSpec, v1.RepoStatus{}, repo.NewIndexFile())
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			versions := map[string]*repo.ChartVersion{}
+			for _, cv := range i.Entries["testingchart"] {
+				versions[cv.Version] = cv
+			}
+			assert.Len(t, versions, len(charts), "number of entries don't match")
+			for tag, chartVersion := range charts {
+				cv, ok := versions[chartVersion]
+				if !assert.True(t, ok, "version %s is missing from the index", chartVersion) {
+					continue
+				}
+				assert.Equal(t, []string{fmt.Sprintf("oci://%s/testingchart:%s", strings.TrimPrefix(srv.URL, "http://"), tag)}, cv.URLs)
+			}
+			for _, chartVersion := range tt.chartsWithDigest {
+				if cv, ok := versions[chartVersion]; ok {
+					assert.NotEmpty(t, cv.Digest, "version %s was not fetched", chartVersion)
+				}
+			}
+		})
+	}
 }
