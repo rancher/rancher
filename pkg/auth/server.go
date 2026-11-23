@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/data"
 	"github.com/rancher/rancher/pkg/auth/handler"
+	"github.com/rancher/rancher/pkg/auth/impersonation"
 	"github.com/rancher/rancher/pkg/auth/logout"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
@@ -68,6 +70,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
 
 	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
+	impersonationHandler := impersonation.NewHandler(scaledContext)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, logout, norman.ConfigureAPIUI)
 	if err != nil {
@@ -99,12 +102,13 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 		})
 
 		routes := authRoutes{
-			limit:    utils.APIBodyLimitingHandler(apiLimit),
-			saml:     saml,
-			v1Public: v1PublicAPI,
-			v3:       v3Handler,
-			logout:   logout,
-			next:     next,
+			limit:         utils.APIBodyLimitingHandler(apiLimit),
+			saml:          saml,
+			v1Public:      v1PublicAPI,
+			v3:            v3Handler,
+			logout:        logout,
+			impersonation: impersonationHandler,
+			next:          next,
 		}
 		if features.V3Public.Enabled() {
 			routes.v3Public = v3PublicAPI // Deprecated. Use /v1-public instead.
@@ -113,11 +117,15 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 			routes.scim = scim.NewHandler(scaledContext)
 		}
 
-		root := newRootMux(routes)
+		rootMux := newRootMux(routes)
 
 		p := handler.NewFromAuthConfigInterface(scaledContext.Management.AuthConfigs(""))
-		p.RegisterOIDCProviderHandlers(root)
+		p.RegisterOIDCProviderHandlers(rootMux)
 
+		var root http.Handler = rootMux
+		if routes.impersonation != nil {
+			root = routes.impersonation.AuditMiddleware(root)
+		}
 		return root
 	}, nil
 }
@@ -126,14 +134,15 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 // handlers are required except v3Public and scim, which are feature gated:
 // when nil, their paths fall through to next.
 type authRoutes struct {
-	limit    func(http.Handler) http.Handler
-	saml     http.Handler
-	v3Public http.Handler
-	v1Public http.Handler
-	scim     http.Handler
-	v3       http.Handler
-	logout   http.Handler
-	next     http.Handler
+	limit         func(http.Handler) http.Handler
+	saml          http.Handler
+	v3Public      http.Handler
+	v1Public      http.Handler
+	scim          http.Handler
+	v3            http.Handler
+	logout        http.Handler
+	impersonation *impersonation.Handler
+	next          http.Handler
 }
 
 func newRootMux(routes authRoutes) *http.ServeMux {
@@ -151,6 +160,17 @@ func newRootMux(routes authRoutes) *http.ServeMux {
 	// runs when MCM is enabled. Registering it here keeps logout working when
 	// MCM is disabled, as in standalone Harvester.
 	root.Handle("POST /v1/logout", routes.limit(requests.NewAuthenticatedFilter(routes.logout)))
+	root.Handle("/v1/management.cattle.io.users/", routes.limit(requests.NewAuthenticatedFilter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("action") != "impersonate" {
+			routes.next.ServeHTTP(w, r)
+			return
+		}
+		routes.impersonation.StartForUser(w, r, path.Base(r.URL.Path))
+	}))))
+	root.Handle("POST /v3/impersonation-sessions", routes.limit(requests.NewAuthenticatedFilter(http.HandlerFunc(routes.impersonation.Start))))
+	root.Handle("GET /v3/impersonation-sessions/current", routes.limit(requests.NewAuthenticatedFilter(http.HandlerFunc(routes.impersonation.Status))))
+	root.Handle("DELETE /v3/impersonation-sessions/current", routes.limit(requests.NewAuthenticatedFilter(http.HandlerFunc(routes.impersonation.Stop))))
+	root.Handle("POST /v3/impersonation-sessions/recover", routes.limit(http.HandlerFunc(routes.impersonation.Recover)))
 	root.Handle("/v3/", routes.v3)
 	root.Handle("/", routes.next)
 

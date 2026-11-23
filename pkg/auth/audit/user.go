@@ -79,6 +79,10 @@ type Impersonator struct {
 	Identity *Identity `json:"identity,omitempty"`
 
 	Group []string `json:"group,omitempty"`
+
+	// SessionID is the server-side resource ID of the original session. It is
+	// never a bearer secret or a cookie value.
+	SessionID string `json:"sessionId,omitempty"`
 }
 
 // SetIdentity sets Name, Identity and Group to the effective identity of the request from info.
@@ -105,6 +109,15 @@ func (u *User) SetImpersonatedBy(real user.Info) {
 		Identity: IdentityFromInfo(real).ref(),
 		Group:    real.GetGroups(),
 	}
+}
+
+// SetImpersonationSessionID associates the validated original session with the
+// impersonator. It does nothing unless identities are collected.
+func (u *User) SetImpersonationSessionID(sessionID string) {
+	if !u.withIdentity || u.ImpersonatedBy == nil {
+		return
+	}
+	u.ImpersonatedBy.SessionID = sessionID
 }
 
 // Impersonate records that real is impersonating effective: effective becomes the identity of the

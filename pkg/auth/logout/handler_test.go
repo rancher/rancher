@@ -81,10 +81,10 @@ func TestLogout(t *testing.T) {
 		}
 
 		checkCookiesUnset := func(t *testing.T, w *httptest.ResponseRecorder) {
-			require.Len(t, w.Result().Cookies(), 4)
+			require.Len(t, w.Result().Cookies(), 5)
 			for _, cookie := range w.Result().Cookies() {
 				switch cookie.Name {
-				case tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie:
+				case tokens.CookieName, tokens.OriginalSessionCookie, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie:
 					assert.Equal(t, "", cookie.Value)
 					assert.Equal(t, -1, cookie.MaxAge)
 					assert.True(t, cookie.HttpOnly)
@@ -233,4 +233,93 @@ func TestLogout(t *testing.T) {
 			assert.True(t, logoutCalled)
 		})
 	}
+}
+
+func TestLogoutDuringImpersonationRevokesBothSessions(t *testing.T) {
+	effectiveValue := "impersonation-token:effective-secret"
+	originalValue := "admin-token:admin-secret"
+	original := &v3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token"}, UserID: "u-admin"}
+	effective := &v3.Token{ObjectMeta: metav1.ObjectMeta{Name: "impersonation-token"}, UserID: "u-target"}
+	tokens.BindImpersonationSession(effective, original)
+
+	var deleted []string
+	tokenManager := &fakeTokenManager{
+		getTokenFunc: func(value string) (accessor.TokenAccessor, int, error) {
+			switch value {
+			case effectiveValue:
+				return effective, http.StatusOK, nil
+			case originalValue:
+				return original, http.StatusOK, nil
+			default:
+				return nil, http.StatusNotFound, errors.New("token not found")
+			}
+		},
+		deleteTokenByNameFunc: func(name string) (int, error) {
+			deleted = append(deleted, name)
+			return http.StatusOK, nil
+		},
+	}
+	var providerLogoutToken accessor.TokenAccessor
+	h := &handler{
+		tokenMgr: tokenManager,
+		logout: func(_ http.ResponseWriter, _ *http.Request, token accessor.TokenAccessor) error {
+			providerLogoutToken = token
+			return nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/logout", nil)
+	req.AddCookie(&http.Cookie{Name: tokens.CookieName, Value: effectiveValue})
+	req.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: originalValue})
+	response := httptest.NewRecorder()
+
+	h.ServeHTTP(response, req)
+
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, []string{"admin-token", "impersonation-token"}, deleted)
+	assert.Same(t, original, providerLogoutToken)
+}
+
+func TestLogoutDoesNotRevokeUnrelatedOriginalSession(t *testing.T) {
+	effectiveValue := "impersonation-token:effective-secret"
+	originalValue := "victim-token:victim-secret"
+	boundOriginal := &v3.Token{ObjectMeta: metav1.ObjectMeta{Name: "real-admin-token"}, UserID: "u-admin"}
+	unrelatedOriginal := &v3.Token{ObjectMeta: metav1.ObjectMeta{Name: "victim-token"}, UserID: "u-victim"}
+	effective := &v3.Token{ObjectMeta: metav1.ObjectMeta{Name: "impersonation-token"}, UserID: "u-target"}
+	tokens.BindImpersonationSession(effective, boundOriginal)
+
+	var deleted []string
+	tokenManager := &fakeTokenManager{
+		getTokenFunc: func(value string) (accessor.TokenAccessor, int, error) {
+			switch value {
+			case effectiveValue:
+				return effective, http.StatusOK, nil
+			case originalValue:
+				return unrelatedOriginal, http.StatusOK, nil
+			default:
+				return nil, http.StatusNotFound, errors.New("token not found")
+			}
+		},
+		deleteTokenByNameFunc: func(name string) (int, error) {
+			deleted = append(deleted, name)
+			return http.StatusOK, nil
+		},
+	}
+	var providerLogoutToken accessor.TokenAccessor
+	h := &handler{
+		tokenMgr: tokenManager,
+		logout: func(_ http.ResponseWriter, _ *http.Request, token accessor.TokenAccessor) error {
+			providerLogoutToken = token
+			return nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/logout", nil)
+	req.AddCookie(&http.Cookie{Name: tokens.CookieName, Value: effectiveValue})
+	req.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: originalValue})
+	response := httptest.NewRecorder()
+
+	h.ServeHTTP(response, req)
+
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, []string{"impersonation-token"}, deleted)
+	assert.Same(t, effective, providerLogoutToken)
 }

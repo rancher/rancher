@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/impersonation"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -31,6 +32,11 @@ func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.Ra
 
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
+	}
+	if h.Impersonator != nil && apiContext != nil && apiContext.Request != nil {
+		if eligible, err := h.Impersonator.CanImpersonateRequest(apiContext.Request, resource.ID); err == nil && eligible {
+			resource.AddAction(apiContext, "impersonate")
+		}
 	}
 
 	if !h.canDoUserAction(apiContext, "update") {
@@ -53,6 +59,15 @@ type Handler struct {
 	SecretLister             wranglerv1.SecretCache
 	SecretClient             wranglerv1.SecretClient
 	PwdChanger               PasswordUpdater
+	Impersonator             *impersonation.Handler
+	firstLoginSetter         func(string) error
+}
+
+func (h *Handler) setFirstLogin(value string) error {
+	if h.firstLoginSetter != nil {
+		return h.firstLoginSetter(value)
+	}
+	return settings.FirstLogin.Set(value)
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -69,6 +84,23 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 		if err := h.refreshAttributes(apiContext); err != nil {
 			return err
 		}
+	case "impersonate":
+		if h.Impersonator == nil {
+			return httperror.NewAPIError(httperror.ActionNotAvailable, "")
+		}
+		result, err := h.Impersonator.StartSession(apiContext.Request, apiContext.ID)
+		if err != nil {
+			startErr, ok := err.(*impersonation.StartError)
+			if !ok {
+				return httperror.NewAPIErrorLong(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), err.Error())
+			}
+			return httperror.NewAPIErrorLong(startErr.Status, http.StatusText(startErr.Status), startErr.Message)
+		}
+		h.Impersonator.WriteStartResponse(apiContext.Response, apiContext.Request, result)
+		if !strings.EqualFold(settings.FirstLogin.Get(), "false") {
+			_ = h.setFirstLogin("false")
+		}
+		return nil
 	default:
 		return errors.Errorf("bad action %v", actionName)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/vsphere"
 	managementapi "github.com/rancher/rancher/pkg/api/norman/server"
 	"github.com/rancher/rancher/pkg/api/steve/supportconfigs"
+	"github.com/rancher/rancher/pkg/auth/impersonation"
 	"github.com/rancher/rancher/pkg/auth/logout"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
@@ -57,6 +58,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	)
 
 	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
+	impersonationHandler := impersonation.NewHandler(scaledContext)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, logout, norman.ConfigureAPIUI)
 	if err != nil {
@@ -106,6 +108,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	// Setup middlewares for the service account authenticated routes.
 	saAuthedMW := func(h http.Handler) http.Handler {
 		h = requests.NewAuthenticatedFilter(h)
+		h = impersonationHandler.AuditMiddleware(h)
 		h = accessControlHandler(h)
 		h = saAuth.Chain(impersonatingAuth.ImpersonationMiddleware)(h)
 		return h
@@ -156,6 +159,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	metricsMW := func(h http.Handler) http.Handler {
 		h = metrics.NewMetricsHandler(scaledContext.K8sClient)(h)
 		h = requests.NewAuthenticatedFilter(h)
+		h = impersonationHandler.AuditMiddleware(h)
 		h = accessControlHandler(h)
 		h = tokenReviewAuth.Chain(impersonatingAuth.ImpersonationMiddleware)(h)
 		return h
@@ -166,6 +170,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	// Setup middlewares for authenticated routes.
 	authedMW := func(h http.Handler) http.Handler {
 		h = requests.NewAuthenticatedFilter(h)
+		h = impersonationHandler.AuditMiddleware(h)
 		h = accessControlHandler(h)
 		h = impersonatingAuth.ImpersonationMiddleware(h)
 		return h
@@ -190,6 +195,10 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.Handle("/meta/oci/{resource}", authedMW(oci.NewOCIHandler(scaledContext)))
 	authed.Handle("GET /meta/vsphere/{field}", authedMW(vsphere.NewVsphereHandler(scaledContext)))
 	authed.Handle("POST /v3/tokenreview", authedMW(&webhook.TokenReviewer{}))
+	authed.Handle("POST /v3/impersonation-sessions", authedMW(http.HandlerFunc(impersonationHandler.Start)))
+	authed.Handle("GET /v3/impersonation-sessions/current", authedMW(http.HandlerFunc(impersonationHandler.Status)))
+	authed.Handle("DELETE /v3/impersonation-sessions/current", authedMW(http.HandlerFunc(impersonationHandler.Stop)))
+	authed.Handle("POST /v3/impersonation-sessions/recover", http.HandlerFunc(impersonationHandler.Recover))
 	authed.Handle(supportconfigs.Endpoint, authedMW(&supportConfigGenerator))
 	authed.Handle("/meta/proxy/", authedMW(metaProxy))
 	route.HandleSubtree(authed, "/v3", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -123,6 +123,7 @@ type Rancher struct {
 	Handler          http.Handler
 	Wrangler         *wrangler.Context
 	Steve            *steveserver.Server
+	scaledContext    *config.ScaledContext
 	auditLog         *audit.Writer
 	telemetryManager telemetry.TelemetryExporterManager
 	authServer       *auth.Server
@@ -419,6 +420,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}.Handler(steve),
 		Wrangler:                       wranglerContext,
 		Steve:                          steve,
+		scaledContext:                  sc,
 		auditLog:                       auditLogWriter,
 		authServer:                     authServer,
 		telemetryManager:               telemetryManager,
@@ -481,7 +483,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return fmt.Errorf("error creating user manager: %w", err)
 	}
 
-	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler, userManager); err != nil {
+	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler, r.scaledContext, userManager); err != nil {
 		return err
 	}
 
