@@ -59,6 +59,46 @@ func (r testRoles) Get(name string, _ metav1.GetOptions) (*apiv3.GlobalRole, err
 	return role, nil
 }
 
+type countingUsers struct {
+	values testUsers
+	gets   map[string]int
+}
+
+func (u *countingUsers) Get(name string, options metav1.GetOptions) (*apiv3.User, error) {
+	u.gets[name]++
+	return u.values.Get(name, options)
+}
+
+type countingBindings struct {
+	values testBindings
+	lists  int
+}
+
+type countingAttributes struct {
+	values testUserAttributes
+	gets   int
+}
+
+func (a *countingAttributes) Get(name string, options metav1.GetOptions) (*apiv3.UserAttribute, error) {
+	a.gets++
+	return a.values.Get(name, options)
+}
+
+func (b *countingBindings) List(options metav1.ListOptions) (*apiv3.GlobalRoleBindingList, error) {
+	b.lists++
+	return b.values.List(options)
+}
+
+type countingRoles struct {
+	values testRoles
+	gets   map[string]int
+}
+
+func (r *countingRoles) Get(name string, options metav1.GetOptions) (*apiv3.GlobalRole, error) {
+	r.gets[name]++
+	return r.values.Get(name, options)
+}
+
 type failingBindings struct{ err error }
 
 func (f failingBindings) List(metav1.ListOptions) (*apiv3.GlobalRoleBindingList, error) {
@@ -262,6 +302,66 @@ func TestCanImpersonateUsesSharedEligibilityDecision(t *testing.T) {
 				t.Fatalf("unexpected eligibility: allowed=%v err=%v, want %v", allowed, err, test.wantAllowed)
 			}
 		})
+	}
+}
+
+func TestRequestEligibilityCacheReusesCallerAndAuthorizationLookups(t *testing.T) {
+	t.Parallel()
+
+	enabled := true
+	users := &countingUsers{
+		values: testUsers{
+			"u-admin":    {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
+			"u-target-1": {ObjectMeta: metav1.ObjectMeta{Name: "u-target-1"}, Enabled: &enabled, PrincipalIDs: []string{"local://target-1"}},
+			"u-target-2": {ObjectMeta: metav1.ObjectMeta{Name: "u-target-2"}, Enabled: &enabled, PrincipalIDs: []string{"local://target-2"}},
+		},
+		gets: map[string]int{},
+	}
+	bindings := &countingBindings{values: testBindings{items: []apiv3.GlobalRoleBinding{
+		{UserName: "u-admin", GlobalRoleName: "admin"},
+		{UserName: "u-target-1", GlobalRoleName: "user"},
+		{UserName: "u-target-2", GlobalRoleName: "user"},
+	}}}
+	roles := &countingRoles{
+		values: testRoles{
+			"admin": {ObjectMeta: metav1.ObjectMeta{Name: "admin"}, Builtin: true},
+			"user":  {ObjectMeta: metav1.ObjectMeta{Name: "user"}, Builtin: true},
+		},
+		gets: map[string]int{},
+	}
+	attributes := &countingAttributes{values: testUserAttributes{}}
+	h := &Handler{
+		users:              func(string) userGetter { return users },
+		userAttributes:     func(string) userAttributeGetter { return attributes },
+		globalRoleBindings: func(string) globalRoleBindingLister { return bindings },
+		globalRoles:        func(string) globalRoleGetter { return roles },
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v3/users", nil)
+	req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: "u-admin"}))
+	req = h.WithEligibilityCache(req)
+
+	for _, target := range []*apiv3.User{
+		users.values["u-target-1"],
+		users.values["u-target-1"],
+		users.values["u-target-2"],
+	} {
+		allowed, err := h.CanImpersonateUserRequest(req, target)
+		if err != nil || !allowed {
+			t.Fatalf("expected %s to be eligible, allowed=%v err=%v", target.Name, allowed, err)
+		}
+	}
+
+	if bindings.lists != 1 {
+		t.Fatalf("expected one global role binding list, got %d", bindings.lists)
+	}
+	if users.gets["u-admin"] != 1 || users.gets["u-target-1"] != 0 || users.gets["u-target-2"] != 0 {
+		t.Fatalf("unexpected user lookup counts: %#v", users.gets)
+	}
+	if roles.gets["admin"] != 1 || roles.gets["user"] != 1 {
+		t.Fatalf("unexpected role lookup counts: %#v", roles.gets)
+	}
+	if attributes.gets != 3 {
+		t.Fatalf("expected one cached attribute lookup per distinct user, got %d", attributes.gets)
 	}
 }
 

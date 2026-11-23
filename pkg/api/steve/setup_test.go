@@ -200,10 +200,10 @@ func TestUserImpersonationFormatterUsesLifecycleEligibility(t *testing.T) {
 	t.Parallel()
 
 	enabled := true
+	target := &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "u-target"}, Enabled: &enabled, PrincipalIDs: []string{"local://target"}}
 	users := steveTestUsers{
-		"u-admin":  {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
-		"u-target": {ObjectMeta: metav1.ObjectMeta{Name: "u-target"}, Enabled: &enabled, PrincipalIDs: []string{"local://target"}},
-		"u-user":   {ObjectMeta: metav1.ObjectMeta{Name: "u-user"}},
+		"u-admin": {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
+		"u-user":  {ObjectMeta: metav1.ObjectMeta{Name: "u-user"}},
 	}
 	handler := impersonation.NewHandlerForTest(
 		func(string) impersonation.UserGetter { return users },
@@ -237,7 +237,10 @@ func TestUserImpersonationFormatterUsesLifecycleEligibility(t *testing.T) {
 				urlBuilder.EXPECT().Action(gomock.Any(), "u-target", "impersonate").Return("/v3/users/u-target?action=impersonate")
 			}
 			apiRequest.URLBuilder = urlBuilder
-			resource := &apitypes.RawResource{ID: "u-target", Actions: map[string]string{}}
+			resource := &apitypes.RawResource{
+				ID: "u-target", Actions: map[string]string{},
+				APIObject: apitypes.APIObject{ID: "u-target", Object: target},
+			}
 
 			userImpersonationFormatter(handler)(apiRequest, resource)
 

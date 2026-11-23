@@ -475,9 +475,8 @@ func TestUserFormatterUsesImpersonationEligibilityInsteadOfUpdate(t *testing.T) 
 
 	enabled := true
 	users := formatterUsers{
-		"u-admin":  {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
-		"u-target": {ObjectMeta: metav1.ObjectMeta{Name: "u-target"}, Enabled: &enabled, PrincipalIDs: []string{"local://target"}},
-		"u-user":   {ObjectMeta: metav1.ObjectMeta{Name: "u-user"}},
+		"u-admin": {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
+		"u-user":  {ObjectMeta: metav1.ObjectMeta{Name: "u-user"}},
 	}
 	impersonator := impersonation.NewHandlerForTest(
 		func(string) impersonation.UserGetter { return users },
@@ -520,7 +519,13 @@ func TestUserFormatterUsesImpersonationEligibilityInsteadOfUpdate(t *testing.T) 
 					return req.WithContext(request.WithUser(req.Context(), httptestUser(test.caller)))
 				}(),
 			}
-			resource := &types.RawResource{ID: "u-target", Schema: schema, Actions: map[string]string{}, Links: map[string]string{}}
+			resource := &types.RawResource{
+				ID: "u-target", Schema: schema, Actions: map[string]string{}, Links: map[string]string{},
+				Values: map[string]interface{}{
+					"enabled":      enabled,
+					"principalIds": []string{"local://target"},
+				},
+			}
 			handler := &Handler{Impersonator: impersonator}
 
 			handler.UserFormatter(apiContext, resource)

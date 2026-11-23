@@ -6,6 +6,7 @@ import (
 	"path"
 
 	apitypes "github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/api/steve/clusters"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/navlinks"
 	"github.com/rancher/rancher/pkg/api/steve/settings"
 	"github.com/rancher/rancher/pkg/api/steve/userpreferences"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -67,7 +69,18 @@ func userImpersonationFormatter(handler *impersonation.Handler) func(*apitypes.A
 		if apiRequest == nil || apiRequest.Request == nil {
 			return
 		}
-		eligible, err := handler.CanImpersonateRequest(apiRequest.Request, resource.ID)
+		apiRequest.Request = handler.WithEligibilityCache(apiRequest.Request)
+		var eligible bool
+		var err error
+		target := &apiv3.User{}
+		if resource.APIObject.Object != nil && convert.ToObj(resource.APIObject.Object, target) == nil {
+			if target.Name == "" {
+				target.Name = resource.ID
+			}
+			eligible, err = handler.CanImpersonateUserRequest(apiRequest.Request, target)
+		} else {
+			eligible, err = handler.CanImpersonateRequest(apiRequest.Request, resource.ID)
+		}
 		if err == nil && eligible {
 			resource.AddAction(apiRequest, "impersonate")
 		}

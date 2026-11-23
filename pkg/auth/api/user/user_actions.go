@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/impersonation"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
@@ -34,7 +35,20 @@ func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.Ra
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
 	}
 	if h.Impersonator != nil && apiContext != nil && apiContext.Request != nil {
-		if eligible, err := h.Impersonator.CanImpersonateRequest(apiContext.Request, resource.ID); err == nil && eligible {
+		apiContext.Request = h.Impersonator.WithEligibilityCache(apiContext.Request)
+		target := &apiv3.User{}
+		converted := len(resource.Values) > 0 && convert.ToObj(resource.Values, target) == nil
+		if target.Name == "" {
+			target.Name = resource.ID
+		}
+		var eligible bool
+		var err error
+		if converted {
+			eligible, err = h.Impersonator.CanImpersonateUserRequest(apiContext.Request, target)
+		} else {
+			eligible, err = h.Impersonator.CanImpersonateRequest(apiContext.Request, resource.ID)
+		}
+		if err == nil && eligible {
 			resource.AddAction(apiContext, "impersonate")
 		}
 	}

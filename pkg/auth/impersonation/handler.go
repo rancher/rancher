@@ -1,10 +1,12 @@
 package impersonation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -13,11 +15,13 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -67,6 +71,41 @@ type Handler struct {
 	globalRoleBindings func(string) globalRoleBindingLister
 	globalRoles        func(string) globalRoleGetter
 	tokenManager       tokenManager
+
+	cachedUsers              func(string) userGetter
+	cachedUserAttributes     func(string) userAttributeGetter
+	cachedGlobalRoleBindings func(string) globalRoleBindingLister
+	cachedGlobalRoles        func(string) globalRoleGetter
+}
+
+type eligibilityCacheKey struct{}
+
+type eligibilityCache struct {
+	handler   *Handler
+	evaluator *Handler
+	mu        sync.Mutex
+
+	initialized   bool
+	callerAllowed bool
+	resolver      *adminResolver
+	err           error
+	targets       map[string]eligibilityDecision
+}
+
+type eligibilityDecision struct {
+	allowed bool
+	err     error
+}
+
+type adminResolver struct {
+	handler  *Handler
+	bindings []apiv3.GlobalRoleBinding
+	roles    map[string]adminRoleDecision
+}
+
+type adminRoleDecision struct {
+	admin bool
+	err   error
 }
 
 type userGetter interface {
@@ -83,6 +122,46 @@ type globalRoleBindingLister interface {
 
 type globalRoleGetter interface {
 	Get(string, metav1.GetOptions) (*apiv3.GlobalRole, error)
+}
+
+type userCacheAdapter struct {
+	cache managementcontrollers.UserCache
+}
+
+func (a userCacheAdapter) Get(name string, _ metav1.GetOptions) (*apiv3.User, error) {
+	return a.cache.Get(name)
+}
+
+type userAttributeCacheAdapter struct {
+	cache managementcontrollers.UserAttributeCache
+}
+
+func (a userAttributeCacheAdapter) Get(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+	return a.cache.Get(name)
+}
+
+type globalRoleBindingCacheAdapter struct {
+	cache managementcontrollers.GlobalRoleBindingCache
+}
+
+func (a globalRoleBindingCacheAdapter) List(metav1.ListOptions) (*apiv3.GlobalRoleBindingList, error) {
+	items, err := a.cache.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	result := &apiv3.GlobalRoleBindingList{Items: make([]apiv3.GlobalRoleBinding, 0, len(items))}
+	for _, item := range items {
+		result.Items = append(result.Items, *item)
+	}
+	return result, nil
+}
+
+type globalRoleCacheAdapter struct {
+	cache managementcontrollers.GlobalRoleCache
+}
+
+func (a globalRoleCacheAdapter) Get(name string, _ metav1.GetOptions) (*apiv3.GlobalRole, error) {
+	return a.cache.Get(name)
 }
 
 type tokenManager interface {
@@ -117,6 +196,18 @@ func NewHandler(management *config.ScaledContext) *Handler {
 		},
 		tokens.NewManager(management.Wrangler),
 	)
+	handler.cachedUsers = func(string) userGetter {
+		return userCacheAdapter{cache: management.Wrangler.Mgmt.User().Cache()}
+	}
+	handler.cachedUserAttributes = func(string) userAttributeGetter {
+		return userAttributeCacheAdapter{cache: management.Wrangler.Mgmt.UserAttribute().Cache()}
+	}
+	handler.cachedGlobalRoleBindings = func(string) globalRoleBindingLister {
+		return globalRoleBindingCacheAdapter{cache: management.Wrangler.Mgmt.GlobalRoleBinding().Cache()}
+	}
+	handler.cachedGlobalRoles = func(string) globalRoleGetter {
+		return globalRoleCacheAdapter{cache: management.Wrangler.Mgmt.GlobalRole().Cache()}
+	}
 	return handler
 }
 
@@ -272,7 +363,11 @@ func (h *Handler) CanImpersonate(callerID, targetID string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("get impersonation caller %s: %w", callerID, err)
 	}
-	callerAdmin, err := h.isAdmin(caller.Name)
+	resolver, err := h.newAdminResolver()
+	if err != nil {
+		return false, err
+	}
+	callerAdmin, err := resolver.isAdmin(caller)
 	if err != nil {
 		return false, err
 	}
@@ -280,11 +375,19 @@ func (h *Handler) CanImpersonate(callerID, targetID string) (bool, error) {
 		return false, nil
 	}
 
+	return h.canImpersonateTarget(resolver, targetID)
+}
+
+func (h *Handler) canImpersonateTarget(resolver *adminResolver, targetID string) (bool, error) {
 	target, err := h.users("").Get(targetID, metav1.GetOptions{})
 	if err != nil {
 		return false, fmt.Errorf("get impersonation target %s: %w", targetID, err)
 	}
-	targetAdmin, err := h.isAdmin(target.Name)
+	return h.canImpersonateUser(resolver, target)
+}
+
+func (h *Handler) canImpersonateUser(resolver *adminResolver, target *apiv3.User) (bool, error) {
+	targetAdmin, err := resolver.isAdmin(target)
 	if err != nil {
 		return false, err
 	}
@@ -294,9 +397,40 @@ func (h *Handler) CanImpersonate(callerID, targetID string) (bool, error) {
 	return true, nil
 }
 
+// WithEligibilityCache adds request-scoped memoization used by resource
+// formatters. The lifecycle action itself deliberately performs a fresh
+// authorization decision.
+func (h *Handler) WithEligibilityCache(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+	if cache, ok := r.Context().Value(eligibilityCacheKey{}).(*eligibilityCache); ok && cache.handler == h {
+		return r
+	}
+	cache := &eligibilityCache{
+		handler:   h,
+		evaluator: h.cachedEligibilityHandler(),
+		targets:   map[string]eligibilityDecision{},
+	}
+	return r.WithContext(context.WithValue(r.Context(), eligibilityCacheKey{}, cache))
+}
+
 // CanImpersonateRequest applies request-level constraints before the shared
 // caller/target eligibility decision.
 func (h *Handler) CanImpersonateRequest(r *http.Request, targetID string) (bool, error) {
+	return h.canImpersonateRequest(r, targetID, nil)
+}
+
+// CanImpersonateUserRequest evaluates a target already loaded by a resource
+// formatter, avoiding a second user lookup.
+func (h *Handler) CanImpersonateUserRequest(r *http.Request, target *apiv3.User) (bool, error) {
+	if target == nil || target.Name == "" {
+		return false, nil
+	}
+	return h.canImpersonateRequest(r, target.Name, target)
+}
+
+func (h *Handler) canImpersonateRequest(r *http.Request, targetID string, target *apiv3.User) (bool, error) {
 	caller, ok := request.UserFrom(r.Context())
 	if !ok || caller.GetName() == "" {
 		return false, nil
@@ -304,7 +438,67 @@ func (h *Handler) CanImpersonateRequest(r *http.Request, targetID string) (bool,
 	if _, err := r.Cookie(tokens.OriginalSessionCookie); err == nil {
 		return false, nil
 	}
+	if cache, ok := r.Context().Value(eligibilityCacheKey{}).(*eligibilityCache); ok && cache.handler == h {
+		return cache.canImpersonate(caller.GetName(), targetID, target)
+	}
+	if target != nil {
+		callerUser, err := h.users("").Get(caller.GetName(), metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("get impersonation caller %s: %w", caller.GetName(), err)
+		}
+		resolver, err := h.newAdminResolver()
+		if err != nil {
+			return false, err
+		}
+		admin, err := resolver.isAdmin(callerUser)
+		if err != nil || !admin {
+			return false, err
+		}
+		return h.canImpersonateUser(resolver, target)
+	}
 	return h.CanImpersonate(caller.GetName(), targetID)
+}
+
+func (c *eligibilityCache) canImpersonate(callerID, targetID string, target *apiv3.User) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.initialized {
+		c.initialized = true
+		caller, err := c.evaluator.users("").Get(callerID, metav1.GetOptions{})
+		if err != nil {
+			c.err = fmt.Errorf("get impersonation caller %s: %w", callerID, err)
+		} else if c.resolver, c.err = c.evaluator.newAdminResolver(); c.err == nil {
+			c.callerAllowed, c.err = c.resolver.isAdmin(caller)
+		}
+	}
+	if c.err != nil || !c.callerAllowed {
+		return false, c.err
+	}
+	if decision, ok := c.targets[targetID]; ok {
+		return decision.allowed, decision.err
+	}
+	var allowed bool
+	var err error
+	if target == nil {
+		allowed, err = c.evaluator.canImpersonateTarget(c.resolver, targetID)
+	} else {
+		allowed, err = c.evaluator.canImpersonateUser(c.resolver, target)
+	}
+	c.targets[targetID] = eligibilityDecision{allowed: allowed, err: err}
+	return allowed, err
+}
+
+func (h *Handler) cachedEligibilityHandler() *Handler {
+	if h.cachedUsers == nil || h.cachedUserAttributes == nil || h.cachedGlobalRoleBindings == nil || h.cachedGlobalRoles == nil {
+		return h
+	}
+	cached := *h
+	cached.users = h.cachedUsers
+	cached.userAttributes = h.cachedUserAttributes
+	cached.globalRoleBindings = h.cachedGlobalRoleBindings
+	cached.globalRoles = h.cachedGlobalRoles
+	return &cached
 }
 
 func (h *Handler) start(w http.ResponseWriter, r *http.Request, userID string) {
@@ -594,15 +788,39 @@ func (h *Handler) isAdmin(userID string) (bool, error) {
 	if user == nil {
 		return false, fmt.Errorf("get user %s: empty response", userID)
 	}
+	resolver := &adminResolver{
+		handler:  h,
+		bindings: bindings.Items,
+		roles:    map[string]adminRoleDecision{},
+	}
+	return resolver.isAdmin(user)
+}
+
+func (h *Handler) newAdminResolver() (*adminResolver, error) {
+	bindings, err := h.globalRoleBindings("").List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list global role bindings: %w", err)
+	}
+	return &adminResolver{
+		handler:  h,
+		bindings: bindings.Items,
+		roles:    map[string]adminRoleDecision{},
+	}, nil
+}
+
+func (r *adminResolver) isAdmin(user *apiv3.User) (bool, error) {
+	if user == nil {
+		return false, fmt.Errorf("get user: empty response")
+	}
 	principals := map[string]struct{}{}
 	for _, principalID := range user.PrincipalIDs {
 		if principalID != "" {
 			principals[principalID] = struct{}{}
 		}
 	}
-	attributes, err := h.userAttributes("").Get(userID, metav1.GetOptions{})
+	attributes, err := r.handler.userAttributes("").Get(user.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		return false, fmt.Errorf("get user attributes %s: %w", userID, err)
+		return false, fmt.Errorf("get user attributes %s: %w", user.Name, err)
 	}
 	if err == nil && attributes != nil {
 		for _, groups := range attributes.GroupPrincipals {
@@ -613,8 +831,8 @@ func (h *Handler) isAdmin(userID string) (bool, error) {
 			}
 		}
 	}
-	for _, binding := range bindings.Items {
-		matches := binding.UserName != "" && binding.UserName == userID
+	for _, binding := range r.bindings {
+		matches := binding.UserName != "" && binding.UserName == user.Name
 		if !matches && binding.UserPrincipalName != "" {
 			_, matches = principals[binding.UserPrincipalName]
 		}
@@ -624,18 +842,33 @@ func (h *Handler) isAdmin(userID string) (bool, error) {
 		if !matches {
 			continue
 		}
-		role, err := h.globalRoles("").Get(binding.GlobalRoleName, metav1.GetOptions{})
+		admin, err := r.isAdminRole(binding.GlobalRoleName)
 		if err != nil {
-			return false, fmt.Errorf("get global role %s: %w", binding.GlobalRoleName, err)
+			return false, err
 		}
-		if role == nil {
-			return false, fmt.Errorf("get global role %s: empty response", binding.GlobalRoleName)
-		}
-		if rbac.IsAdminGlobalRole(role) {
+		if admin {
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+func (r *adminResolver) isAdminRole(name string) (bool, error) {
+	if decision, ok := r.roles[name]; ok {
+		return decision.admin, decision.err
+	}
+	role, err := r.handler.globalRoles("").Get(name, metav1.GetOptions{})
+	if err != nil {
+		err = fmt.Errorf("get global role %s: %w", name, err)
+	} else if role == nil {
+		err = fmt.Errorf("get global role %s: empty response", name)
+	}
+	decision := adminRoleDecision{err: err}
+	if err == nil {
+		decision.admin = rbac.IsAdminGlobalRole(role)
+	}
+	r.roles[name] = decision
+	return decision.admin, decision.err
 }
 
 func requestUserID(r *http.Request) string {
