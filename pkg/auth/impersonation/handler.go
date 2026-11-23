@@ -467,38 +467,78 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// AuditMiddleware preserves the administrator identity in audit entries while
-// the target user's session is active.
+// AuditMiddleware enforces the original-to-effective session binding and
+// preserves the administrator identity in audit entries.
 func (h *Handler) AuditMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Recovery validates both cookies itself and must remain reachable after
+		// the effective token has expired.
+		if r.URL.Path == "/v3/impersonation-sessions/recover" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		original, originalErr := r.Cookie(tokens.OriginalSessionCookie)
 		effective, effectiveErr := r.Cookie(sessionCookie)
 		current, currentErr := request.UserFrom(r.Context())
 		auditUser, auditOK := audit.FromContext(r.Context())
-		if originalErr == nil && effectiveErr == nil && original.Value != "" && effective.Value != "" && currentErr && current.GetName() != "" && auditOK {
-			if originalToken, _, err := h.validateSession(r, original.Value, effective.Value); err == nil {
-				realPrincipal := originalToken.GetUserPrincipal()
-				realExtra := map[string][]string{}
-				for key, value := range realPrincipal.ExtraInfo {
-					realExtra[key] = []string{value}
-				}
-				realGroups := make([]string, 0, len(originalToken.GetGroupPrincipals()))
-				for _, group := range originalToken.GetGroupPrincipals() {
-					realGroups = append(realGroups, group.Name)
-				}
-				real := audit.WithIdentity(&k8suser.DefaultInfo{
-					Name:   originalToken.GetUserID(),
-					UID:    originalToken.GetUserID(),
-					Groups: realGroups,
-					Extra:  realExtra,
-				}, audit.Identity{
-					Username:    realPrincipal.LoginName,
-					Provider:    realPrincipal.Provider,
-					PrincipalID: realPrincipal.Name,
-				})
-				auditUser.Impersonate(real, current)
-				auditUser.SetImpersonationSessionID(originalToken.GetFullName())
+
+		var effectiveToken accessor.TokenAccessor
+		var effectiveStatus int
+		var effectiveLookupErr error
+		if effectiveErr == nil && effective.Value != "" {
+			effectiveToken, effectiveStatus, effectiveLookupErr = h.tokenManager.GetToken(effective.Value)
+		}
+		hasOriginal := originalErr == nil && original.Value != ""
+		if effectiveErr == nil && effective.Value != "" && (effectiveLookupErr != nil || effectiveToken == nil) {
+			status := http.StatusUnauthorized
+			if effectiveStatus >= http.StatusInternalServerError {
+				status = http.StatusInternalServerError
 			}
+			http.Error(w, "unable to validate current session", status)
+			return
+		}
+		isImpersonating := tokens.IsImpersonationSession(effectiveToken)
+		if !isImpersonating && !hasOriginal {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if effectiveErr != nil || effective.Value == "" || !currentErr || current.GetName() == "" {
+			http.Error(w, "current impersonation session is invalid", http.StatusUnauthorized)
+			return
+		}
+		if !hasOriginal {
+			http.Error(w, "original administrator session is invalid", http.StatusUnauthorized)
+			return
+		}
+
+		originalToken, _, err := h.validateSession(r, original.Value, effective.Value)
+		if err != nil {
+			http.Error(w, err.Error(), sessionErrorStatus(err))
+			return
+		}
+		if auditOK {
+			realPrincipal := originalToken.GetUserPrincipal()
+			realExtra := map[string][]string{}
+			for key, value := range realPrincipal.ExtraInfo {
+				realExtra[key] = []string{value}
+			}
+			realGroups := make([]string, 0, len(originalToken.GetGroupPrincipals()))
+			for _, group := range originalToken.GetGroupPrincipals() {
+				realGroups = append(realGroups, group.Name)
+			}
+			real := audit.WithIdentity(&k8suser.DefaultInfo{
+				Name:   originalToken.GetUserID(),
+				UID:    originalToken.GetUserID(),
+				Groups: realGroups,
+				Extra:  realExtra,
+			}, audit.Identity{
+				Username:    realPrincipal.LoginName,
+				Provider:    realPrincipal.Provider,
+				PrincipalID: realPrincipal.Name,
+			})
+			auditUser.Impersonate(real, current)
+			auditUser.SetImpersonationSessionID(originalToken.GetFullName())
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -556,7 +596,9 @@ func (h *Handler) isAdmin(userID string) (bool, error) {
 	}
 	principals := map[string]struct{}{}
 	for _, principalID := range user.PrincipalIDs {
-		principals[principalID] = struct{}{}
+		if principalID != "" {
+			principals[principalID] = struct{}{}
+		}
 	}
 	attributes, err := h.userAttributes("").Get(userID, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -565,16 +607,18 @@ func (h *Handler) isAdmin(userID string) (bool, error) {
 	if err == nil && attributes != nil {
 		for _, groups := range attributes.GroupPrincipals {
 			for _, group := range groups.Items {
-				principals[group.Name] = struct{}{}
+				if group.Name != "" {
+					principals[group.Name] = struct{}{}
+				}
 			}
 		}
 	}
 	for _, binding := range bindings.Items {
-		matches := binding.UserName == userID
-		if !matches {
+		matches := binding.UserName != "" && binding.UserName == userID
+		if !matches && binding.UserPrincipalName != "" {
 			_, matches = principals[binding.UserPrincipalName]
 		}
-		if !matches {
+		if !matches && binding.GroupPrincipalName != "" {
 			_, matches = principals[binding.GroupPrincipalName]
 		}
 		if !matches {

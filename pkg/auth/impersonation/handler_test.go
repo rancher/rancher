@@ -371,6 +371,64 @@ func TestIsAdminRecognizesGroupBinding(t *testing.T) {
 	}
 }
 
+func TestIsAdminIgnoresEmptyPrincipalSelectors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		principals []string
+		groups     []apiv3.Principal
+		binding    apiv3.GlobalRoleBinding
+	}{
+		{
+			name:       "empty user principal",
+			principals: []string{""},
+			binding:    apiv3.GlobalRoleBinding{UserPrincipalName: "", GlobalRoleName: "admin"},
+		},
+		{
+			name:    "empty group principal",
+			groups:  []apiv3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: ""}}},
+			binding: apiv3.GlobalRoleBinding{GroupPrincipalName: "", GlobalRoleName: "admin"},
+		},
+		{
+			name:    "entirely empty binding",
+			binding: apiv3.GlobalRoleBinding{GlobalRoleName: "admin"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			h := &Handler{
+				users: func(string) userGetter {
+					return testUsers{"u-user": {
+						ObjectMeta:   metav1.ObjectMeta{Name: "u-user"},
+						PrincipalIDs: test.principals,
+					}}
+				},
+				userAttributes: func(string) userAttributeGetter {
+					return testUserAttributes{"u-user": {
+						GroupPrincipals: map[string]apiv3.Principals{
+							"local": {Items: test.groups},
+						},
+					}}
+				},
+				globalRoleBindings: func(string) globalRoleBindingLister {
+					return testBindings{items: []apiv3.GlobalRoleBinding{test.binding}}
+				},
+				globalRoles: func(string) globalRoleGetter {
+					return testRoles{"admin": {ObjectMeta: metav1.ObjectMeta{Name: "admin"}, Builtin: true}}
+				},
+			}
+
+			admin, err := h.isAdmin("u-user")
+			if err != nil || admin {
+				t.Fatalf("expected empty selectors not to grant admin, admin=%v err=%v", admin, err)
+			}
+		})
+	}
+}
+
 func TestIsAdminDoesNotTreatBuiltinUserRoleAsAdmin(t *testing.T) {
 	t.Parallel()
 
@@ -1355,6 +1413,59 @@ func TestAuditMiddlewareRecordsImpersonator(t *testing.T) {
 	}
 }
 
+func TestAuditMiddlewareRecordsOpaqueAttributionWithoutUsernameFeature(t *testing.T) {
+	t.Parallel()
+
+	original := &apiv3.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"},
+		UserID:     "u-admin",
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: "local://admin"},
+			LoginName:  "admin",
+			Provider:   "local",
+		},
+	}
+	effective := boundEffectiveToken("impersonation-token", "u-target", original)
+	manager := &testTokenManager{tokens: map[string]accessor.TokenAccessor{
+		"admin-token":     original,
+		"effective-token": effective,
+	}}
+	h := lifecycleHandler(manager)
+	output := &bytes.Buffer{}
+	writer, err := audit.NewWriter(output, audit.WriterOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(func() bool { return false }))(h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
+
+	req := impersonationRequest(http.MethodGet, "u-target")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected valid session to continue, got %d", response.Code)
+	}
+	var entry struct {
+		User struct {
+			Name           string `json:"name"`
+			ImpersonatedBy struct {
+				Name      string         `json:"name"`
+				SessionID string         `json:"sessionId"`
+				Identity  map[string]any `json:"identity"`
+			} `json:"impersonatedBy"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
+		t.Fatal(err)
+	}
+	if entry.User.Name != "u-target" || entry.User.ImpersonatedBy.Name != "u-admin" || entry.User.ImpersonatedBy.SessionID != "admin-token-id" {
+		t.Fatalf("unexpected audit identity: %#v", entry.User)
+	}
+	if entry.User.ImpersonatedBy.Identity != nil || strings.Contains(output.String(), `"username":"admin"`) {
+		t.Fatalf("username feature disabled but human-readable identity was recorded: %s", output.String())
+	}
+}
+
 func TestAuditMiddlewareRejectsUnrelatedSessions(t *testing.T) {
 	t.Parallel()
 
@@ -1374,18 +1485,60 @@ func TestAuditMiddlewareRejectsUnrelatedSessions(t *testing.T) {
 	handler := audit.NewAuditLogMiddleware(writer, audit.WithIncludeUsername(func() bool { return true }))(h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
 	req := impersonationRequest(http.MethodGet, "u-target")
 
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
 
-	var entry struct {
-		User struct {
-			ImpersonatedBy any `json:"impersonatedBy"`
-		} `json:"user"`
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unrelated session binding to return 401, got %d", response.Code)
 	}
-	if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
-		t.Fatal(err)
+	if strings.Contains(output.String(), `"impersonatedBy"`) {
+		t.Fatalf("unexpected impersonator for unrelated sessions: %s", output.String())
 	}
-	if entry.User.ImpersonatedBy != nil {
-		t.Fatalf("unexpected impersonator for unrelated sessions: %#v", entry.User.ImpersonatedBy)
+}
+
+func TestAuditMiddlewareRejectsBoundSessionWithoutOriginalCookie(t *testing.T) {
+	t.Parallel()
+
+	original := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"}, UserID: "u-admin"}
+	effective := boundEffectiveToken("impersonation-token", "u-target", original)
+	manager := &testTokenManager{tokens: map[string]accessor.TokenAccessor{"effective-token": effective}}
+	h := lifecycleHandler(manager)
+	called := false
+	handler := h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/v3/management.cattle.io.users", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "effective-token"})
+	req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: "u-target"}))
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, req)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected missing original cookie to return 401, got %d", response.Code)
+	}
+	if called {
+		t.Fatal("request with missing original cookie reached the protected handler")
+	}
+}
+
+func TestAuditMiddlewareAllowsRecoveryToValidateExpiredSession(t *testing.T) {
+	t.Parallel()
+
+	h := lifecycleHandler(&testTokenManager{})
+	called := false
+	handler := h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/v3/impersonation-sessions/recover", nil)
+	req.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: "admin-token"})
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "expired-effective-token"})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, req)
+
+	if !called {
+		t.Fatal("recovery request did not reach its dedicated validator")
 	}
 }
 

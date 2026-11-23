@@ -22,6 +22,19 @@ func BindImpersonationSession(effective *apiv3.Token, original accessor.TokenAcc
 	effective.Annotations[ImpersonatorUserAnnotation] = original.GetUserID()
 }
 
+// IsImpersonationSession reports whether token is an effective token created
+// for an impersonation session.
+func IsImpersonationSession(token accessor.TokenAccessor) bool {
+	if token == nil {
+		return false
+	}
+	annotated, ok := token.(interface{ GetAnnotations() map[string]string })
+	if !ok {
+		return false
+	}
+	return annotated.GetAnnotations()[ImpersonationSessionAnnotation] == "true"
+}
+
 // IsImpersonationSessionBound verifies that effective was created from the
 // supplied original session.
 func IsImpersonationSessionBound(effective, original accessor.TokenAccessor) bool {
@@ -33,7 +46,7 @@ func IsImpersonationSessionBound(effective, original accessor.TokenAccessor) boo
 		return false
 	}
 	annotations := annotated.GetAnnotations()
-	return annotations[ImpersonationSessionAnnotation] == "true" &&
+	return IsImpersonationSession(effective) &&
 		annotations[ImpersonatorTokenAnnotation] == original.GetFullName() &&
 		annotations[ImpersonatorUserAnnotation] == original.GetUserID()
 }
