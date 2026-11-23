@@ -2,7 +2,6 @@ package impersonation
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -784,11 +783,15 @@ func TestStartSessionSuccessCreatesExactlyOneBoundToken(t *testing.T) {
 			original := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"}, UserID: "u-admin"}
 			manager := &testTokenManager{tokens: map[string]accessor.TokenAccessor{"admin-token": original}}
 			h := lifecycleHandler(manager)
-			h.users = func(string) userGetter {
-				return testUsers{
+			users := &countingUsers{
+				values: testUsers{
 					"u-admin":     {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
 					test.targetID: {ObjectMeta: metav1.ObjectMeta{Name: test.targetName}, PrincipalIDs: []string{test.principal}},
-				}
+				},
+				gets: map[string]int{},
+			}
+			h.users = func(string) userGetter {
+				return users
 			}
 			req := httptest.NewRequest(http.MethodPost, "/v3/impersonation-sessions", nil)
 			req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "admin-token"})
@@ -805,6 +808,9 @@ func TestStartSessionSuccessCreatesExactlyOneBoundToken(t *testing.T) {
 			if manager.created != 1 {
 				t.Fatalf("expected exactly one created token, got %d", manager.created)
 			}
+			if users.gets["u-admin"] != 1 || users.gets[test.targetID] != 1 {
+				t.Fatalf("expected one caller and target lookup, got %#v", users.gets)
+			}
 			if !tokens.IsImpersonationSessionBound(manager.token, original) {
 				t.Fatalf("expected effective token to be bound to original token: %#v", manager.token.GetAnnotations())
 			}
@@ -815,6 +821,35 @@ func TestStartSessionSuccessCreatesExactlyOneBoundToken(t *testing.T) {
 				t.Fatalf("unexpected token binding: %#v", annotations)
 			}
 		})
+	}
+}
+
+func TestStartSessionRejectsEmptyTargetWithoutPanicking(t *testing.T) {
+	manager := &testTokenManager{tokens: map[string]accessor.TokenAccessor{
+		"admin-token": &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"}, UserID: "u-admin"},
+	}}
+	h := lifecycleHandler(manager)
+	h.users = func(string) userGetter {
+		return testUsers{
+			"u-admin":  {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
+			"u-target": nil,
+		}
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v3/impersonation-sessions", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "admin-token"})
+	req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: "u-admin"}))
+
+	result, err := h.StartSession(req, "u-target")
+
+	if result != nil || err == nil {
+		t.Fatalf("expected empty target to be rejected, result=%#v err=%v", result, err)
+	}
+	startErr, ok := err.(*StartError)
+	if !ok || startErr.Status != http.StatusInternalServerError {
+		t.Fatalf("expected empty target to return 500, got %T %#v", err, err)
+	}
+	if manager.created != 0 {
+		t.Fatalf("expected no token creation, got %d", manager.created)
 	}
 }
 
@@ -1201,8 +1236,7 @@ func TestStartLimitsImpersonationTTLToOriginalSession(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("expected impersonation to start, got %d", response.Code)
 	}
-	remaining := time.Until(originalExpiryTime)
-	if manager.ttl <= 0 || time.Duration(manager.ttl)*time.Millisecond > remaining {
+	if manager.ttl <= 0 || manager.ttl > (2*time.Minute).Milliseconds() {
 		t.Fatalf("expected TTL to be limited to original session, got %d", manager.ttl)
 	}
 }
@@ -1265,21 +1299,20 @@ func TestStartCleansUpTokenWhenBindingFails(t *testing.T) {
 	}
 }
 
-func TestSecureCookiesRequireTLS(t *testing.T) {
+func TestImpersonationCookiesAreAlwaysSecure(t *testing.T) {
 	t.Parallel()
 
-	h := &Handler{}
-
-	forwardedRequest := httptest.NewRequest(http.MethodGet, "http://localhost", nil)
-	forwardedRequest.Header.Set("X-Forwarded-Proto", "https")
-	if h.isSecureRequest(forwardedRequest) {
-		t.Fatal("expected an untrusted forwarded header not to enable Secure cookies")
+	response := httptest.NewRecorder()
+	setSessionCookie(response, sessionCookie, "token")
+	clearCookie(response, tokens.OriginalSessionCookie)
+	cookies := response.Result().Cookies()
+	if len(cookies) != 2 {
+		t.Fatalf("expected two cookies, got %#v", cookies)
 	}
-
-	tlsRequest := httptest.NewRequest(http.MethodGet, "https://localhost", nil)
-	tlsRequest.TLS = &tls.ConnectionState{}
-	if !h.isSecureRequest(tlsRequest) {
-		t.Fatal("expected TLS requests to enable Secure cookies")
+	for _, cookie := range cookies {
+		if !cookie.Secure {
+			t.Fatalf("expected %s to always be Secure", cookie.Name)
+		}
 	}
 }
 
@@ -1317,6 +1350,7 @@ func TestStatusAcceptsBoundSession(t *testing.T) {
 
 	original := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"}, UserID: "u-admin"}
 	effective := boundEffectiveToken("impersonation-token", "u-target", original)
+	effective.UserPrincipal = apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: "token-principal"}}
 	manager := &testTokenManager{tokens: map[string]accessor.TokenAccessor{
 		"admin-token":     original,
 		"effective-token": effective,
@@ -1335,7 +1369,7 @@ func TestStatusAcceptsBoundSession(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("expected valid status response: %v", err)
 	}
-	if body.UserID != "u-target" || body.PrincipalID != "local://target" || !body.Impersonating {
+	if body.UserID != "u-target" || body.PrincipalID != "token-principal" || !body.Impersonating {
 		t.Fatalf("expected effective user identity in status response, got %#v", body)
 	}
 }

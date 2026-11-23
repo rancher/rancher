@@ -274,7 +274,7 @@ func (h *Handler) StartSession(r *http.Request, userID string) (*StartResponse, 
 		return nil, &StartError{Status: http.StatusConflict, Message: "nested impersonation is not allowed"}
 	}
 
-	eligible, err := h.CanImpersonateRequest(r, userID)
+	target, eligible, err := h.resolveImpersonation(current.GetName(), userID)
 	if err != nil {
 		status := http.StatusInternalServerError
 		message := "unable to determine impersonation eligibility"
@@ -288,13 +288,6 @@ func (h *Handler) StartSession(r *http.Request, userID string) (*StartResponse, 
 		return nil, &StartError{Status: http.StatusForbidden, Message: "impersonation requires administrator access"}
 	}
 
-	target, err := h.users("").Get(userID, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, &StartError{Status: http.StatusForbidden, Message: "user is not eligible for impersonation"}
-		}
-		return nil, &StartError{Status: http.StatusInternalServerError, Message: "unable to resolve target user"}
-	}
 	original, err := r.Cookie(sessionCookie)
 	if err != nil || original.Value == "" {
 		return nil, &StartError{Status: http.StatusUnauthorized, Message: "current session is unavailable"}
@@ -346,10 +339,9 @@ func (h *Handler) StartSession(r *http.Request, userID string) (*StartResponse, 
 }
 
 // WriteStartResponse is the shared successful HTTP adapter.
-func (h *Handler) WriteStartResponse(w http.ResponseWriter, r *http.Request, result *StartResponse) {
-	secure := h.isSecureRequest(r)
-	setSessionCookie(w, tokens.OriginalSessionCookie, result.OriginalSessionValue, secure)
-	setSessionCookie(w, sessionCookie, result.SessionValue, secure)
+func (h *Handler) WriteStartResponse(w http.ResponseWriter, _ *http.Request, result *StartResponse) {
+	setSessionCookie(w, tokens.OriginalSessionCookie, result.OriginalSessionValue)
+	setSessionCookie(w, sessionCookie, result.SessionValue)
 	writeJSON(w, http.StatusOK, responseBody{
 		UserID: result.UserID, DisplayName: result.DisplayName, PrincipalID: result.PrincipalID, Impersonating: true,
 	})
@@ -359,23 +351,36 @@ func (h *Handler) WriteStartResponse(w http.ResponseWriter, r *http.Request, res
 // impersonation lifecycle and resource action formatters. A false result is a
 // deliberate denial; an error means the decision could not be determined.
 func (h *Handler) CanImpersonate(callerID, targetID string) (bool, error) {
+	_, eligible, err := h.resolveImpersonation(callerID, targetID)
+	return eligible, err
+}
+
+func (h *Handler) resolveImpersonation(callerID, targetID string) (*apiv3.User, bool, error) {
 	caller, err := h.users("").Get(callerID, metav1.GetOptions{})
 	if err != nil {
-		return false, fmt.Errorf("get impersonation caller %s: %w", callerID, err)
+		return nil, false, fmt.Errorf("get impersonation caller %s: %w", callerID, err)
 	}
 	resolver, err := h.newAdminResolver()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	callerAdmin, err := resolver.isAdmin(caller)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if !callerAdmin {
-		return false, nil
+		return nil, false, nil
 	}
 
-	return h.canImpersonateTarget(resolver, targetID)
+	target, err := h.users("").Get(targetID, metav1.GetOptions{})
+	if err != nil {
+		return nil, false, fmt.Errorf("get impersonation target %s: %w", targetID, err)
+	}
+	if target == nil {
+		return nil, false, fmt.Errorf("get impersonation target %s: empty response", targetID)
+	}
+	eligible, err := h.canImpersonateUser(resolver, target)
+	return target, eligible, err
 }
 
 func (h *Handler) canImpersonateTarget(resolver *adminResolver, targetID string) (bool, error) {
@@ -542,9 +547,8 @@ func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secure := h.isSecureRequest(r)
-	setSessionCookie(w, sessionCookie, original.Value, secure)
-	clearCookie(w, tokens.OriginalSessionCookie, secure)
+	setSessionCookie(w, sessionCookie, original.Value)
+	clearCookie(w, tokens.OriginalSessionCookie)
 	writeJSON(w, http.StatusOK, responseBody{Impersonating: false})
 }
 
@@ -561,9 +565,8 @@ func (h *Handler) Recover(w http.ResponseWriter, r *http.Request) {
 	originalCookie, originalErr := r.Cookie(tokens.OriginalSessionCookie)
 	effectiveCookie, effectiveErr := r.Cookie(sessionCookie)
 	clear := func() {
-		secure := h.isSecureRequest(r)
-		clearCookie(w, sessionCookie, secure)
-		clearCookie(w, tokens.OriginalSessionCookie, secure)
+		clearCookie(w, sessionCookie)
+		clearCookie(w, tokens.OriginalSessionCookie)
 	}
 	cleanup := func() {
 		clear()
@@ -611,9 +614,8 @@ func (h *Handler) Recover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secure := h.isSecureRequest(r)
-	setSessionCookie(w, sessionCookie, originalCookie.Value, secure)
-	clearCookie(w, tokens.OriginalSessionCookie, secure)
+	setSessionCookie(w, sessionCookie, originalCookie.Value)
+	clearCookie(w, tokens.OriginalSessionCookie)
 	writeJSON(w, http.StatusOK, recoveryResponse{Impersonating: false, Restored: true})
 }
 
@@ -639,22 +641,21 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "current impersonation session is unavailable", http.StatusUnauthorized)
 		return
 	}
-	if _, _, err := h.validateSession(r, original.Value, effective.Value); err != nil {
+	_, effectiveToken, err := h.validateSession(r, original.Value, effective.Value)
+	if err != nil {
 		http.Error(w, err.Error(), sessionErrorStatus(err))
 		return
 	}
 
-	displayName := current.GetName()
-	principalID := ""
-	if target, err := h.users("").Get(current.GetName(), metav1.GetOptions{}); err == nil {
+	userID := effectiveToken.GetUserID()
+	displayName := userID
+	principalID := effectiveToken.GetUserPrincipal().Name
+	if target, err := h.users("").Get(userID, metav1.GetOptions{}); err == nil && target != nil && target.DisplayName != "" {
 		displayName = target.DisplayName
-		if len(target.PrincipalIDs) > 0 {
-			principalID = target.PrincipalIDs[0]
-		}
 	}
 
 	writeJSON(w, http.StatusOK, responseBody{
-		UserID:        current.GetName(),
+		UserID:        userID,
 		DisplayName:   displayName,
 		PrincipalID:   principalID,
 		Impersonating: true,
@@ -879,19 +880,15 @@ func requestUserID(r *http.Request) string {
 	return current.GetName()
 }
 
-func (h *Handler) isSecureRequest(r *http.Request) bool {
-	return r.TLS != nil
-}
-
-func setSessionCookie(w http.ResponseWriter, name, value string, secure bool) {
+func setSessionCookie(w http.ResponseWriter, name, value string) {
 	http.SetCookie(w, &http.Cookie{
-		Name: name, Value: value, Path: "/", Secure: secure, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		Name: name, Value: value, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
 	})
 }
 
-func clearCookie(w http.ResponseWriter, name string, secure bool) {
+func clearCookie(w http.ResponseWriter, name string) {
 	http.SetCookie(w, &http.Cookie{
-		Name: name, Value: "", Path: "/", Secure: secure, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		Name: name, Value: "", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})
 }
 
