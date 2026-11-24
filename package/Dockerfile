@@ -266,7 +266,7 @@ RUN case "${ARCH}" in \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
 
-ENV CATTLE_DASHBOARD_UI_VERSION=master
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.16.0-rc1
 
 ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
 
