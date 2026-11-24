@@ -265,6 +265,45 @@ func TestGetTokenLegacy(t *testing.T) {
 	assert.Equal(t, legacyToken, token.(*apiv3.Token))
 }
 
+func TestGetTokenByName(t *testing.T) {
+	t.Parallel()
+
+	selectedToken := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "impersonation-token"}}
+
+	t.Run("uses cache", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		tokenCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
+		tokenCache.EXPECT().Get(selectedToken.Name).Return(selectedToken, nil)
+		manager := Manager{tokenCache: tokenCache}
+
+		token, code, err := manager.GetTokenByName(selectedToken.Name)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 0, code)
+		assert.Same(t, selectedToken, token)
+	})
+
+	t.Run("falls back to API on cache miss", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		tokenCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
+		tokenCache.EXPECT().Get(selectedToken.Name).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, selectedToken.Name))
+		manager := Manager{
+			tokenCache: tokenCache,
+			tokens:     &fakeTokenClient{get: selectedToken},
+		}
+
+		token, code, err := manager.GetTokenByName(selectedToken.Name)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 0, code)
+		assert.Equal(t, selectedToken, token)
+	})
+}
+
 func TestGetTokenExt(t *testing.T) {
 	tokenName := "testname"
 	tokenKey := "dddddddddddddddddddddddddddddddddddddddddddddddddddddd"

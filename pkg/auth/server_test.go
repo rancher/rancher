@@ -117,6 +117,15 @@ func (m *routeRecoveryTokenManager) GetToken(value string) (accessor.TokenAccess
 	return token, http.StatusOK, nil
 }
 
+func (m *routeRecoveryTokenManager) GetTokenByName(name string) (accessor.TokenAccessor, int, error) {
+	for _, token := range m.tokens {
+		if token.Name == name {
+			return token, 0, nil
+		}
+	}
+	return nil, http.StatusNotFound, errors.New("token not found")
+}
+
 func (m *routeRecoveryTokenManager) GetTokenForRecovery(value string) (*apiv3.Token, bool, error) {
 	parts := strings.SplitN(value, ":", 2)
 	if len(parts) != 2 {
@@ -372,7 +381,12 @@ func TestRegisteredAuthenticatedRouteAuditsImpersonationAndIsolatesContext(t *te
 	first := httptest.NewRequest(http.MethodGet, "/v3/impersonation-sessions/current", nil)
 	first.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: "admin-token:admin-secret"})
 	first.AddCookie(&http.Cookie{Name: tokens.CookieName, Value: "effective-token:effective-secret"})
-	first = first.WithContext(request.WithUser(first.Context(), &user.DefaultInfo{Name: "u-target"}))
+	first = first.WithContext(request.WithUser(first.Context(), &user.DefaultInfo{
+		Name: "u-target",
+		Extra: map[string][]string{
+			tokens.ImpersonationTokenIDUserExtra: {"effective-token"},
+		},
+	}))
 	firstResponse := httptest.NewRecorder()
 	audited.ServeHTTP(firstResponse, first)
 	require.Equal(t, http.StatusOK, firstResponse.Code)

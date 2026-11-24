@@ -13,6 +13,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests/mocks"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -96,6 +97,43 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				UID:    "impUser",
 				Groups: []string{"system:authenticated"},
 				Extra:  nil,
+			},
+			wantNextHandlerCalled: true,
+			status:                http.StatusOK,
+		},
+		{
+			desc: "impersonate user preserves authenticated session marker",
+			req: func() *http.Request {
+				authenticatedUser := &user.DefaultInfo{
+					Name: "user",
+					Extra: map[string][]string{
+						tokens.ImpersonationTokenIDUserExtra: {"impersonation-token"},
+					},
+				}
+				ctx := request.WithUser(context.Background(), authenticatedUser)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User": {"impUser"},
+						"Impersonate-Extra-" + tokens.ImpersonationTokenIDUserExtra: {"attacker-token"},
+					},
+				}
+				return req.WithContext(ctx)
+			},
+			sar: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
+					tokens.ImpersonationTokenIDUserExtra: {"attacker-token"},
+				}).Return(true, nil)
+				return mock
+			},
+			wantUserInfo: &user.DefaultInfo{
+				Name:   "impUser",
+				UID:    "impUser",
+				Groups: []string{"system:authenticated"},
+				Extra: map[string][]string{
+					tokens.ImpersonationTokenIDUserExtra: {"impersonation-token"},
+				},
 			},
 			wantNextHandlerCalled: true,
 			status:                http.StatusOK,

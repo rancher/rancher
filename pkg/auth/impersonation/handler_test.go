@@ -190,6 +190,15 @@ func (m *testTokenManager) GetToken(value string) (accessor.TokenAccessor, int, 
 	return nil, http.StatusNotFound, errors.New("token not found")
 }
 
+func (m *testTokenManager) GetTokenByName(name string) (accessor.TokenAccessor, int, error) {
+	for _, token := range m.tokens {
+		if token.GetFullName() == name {
+			return token, http.StatusOK, nil
+		}
+	}
+	return nil, http.StatusNotFound, errors.New("token not found")
+}
+
 func (m *testTokenManager) DeleteTokenByName(name string) (int, error) {
 	m.deleted = append(m.deleted, name)
 	return http.StatusOK, nil
@@ -1524,7 +1533,7 @@ func TestAuditMiddlewareRecordsImpersonator(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v3/management.cattle.io.users", nil)
 	req.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: "admin-token"})
 	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "effective-token"})
-	req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: "u-target"}))
+	req = req.WithContext(request.WithUser(req.Context(), impersonationRequestUser("u-target")))
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	var entry struct {
@@ -1643,7 +1652,12 @@ func TestAuditMiddlewareRejectsBoundSessionWithoutOriginalCookie(t *testing.T) {
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/v3/management.cattle.io.users", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "effective-token"})
-	req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: "u-target"}))
+	req = req.WithContext(request.WithUser(req.Context(), &requestUser{
+		Name: "u-target",
+		Extra: map[string][]string{
+			tokens.ImpersonationTokenIDUserExtra: {"impersonation-token"},
+		},
+	}))
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, req)
@@ -1653,6 +1667,163 @@ func TestAuditMiddlewareRejectsBoundSessionWithoutOriginalCookie(t *testing.T) {
 	}
 	if called {
 		t.Fatal("request with missing original cookie reached the protected handler")
+	}
+}
+
+func TestAuditMiddlewareEnforcesBearerImpersonationSession(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                string
+		authorization       string
+		originalCookieValue string
+		includeOriginal     bool
+		sessionCookieValue  string
+		wantStatus          int
+		wantCalled          bool
+	}{
+		{
+			name:                "valid bearer session",
+			authorization:       tokens.AuthValuePrefix + " impersonation-token:bearer-secret",
+			originalCookieValue: "admin-token",
+			includeOriginal:     true,
+			wantStatus:          http.StatusOK,
+			wantCalled:          true,
+		},
+		{
+			name:          "bearer session without original cookie",
+			authorization: tokens.AuthValuePrefix + " impersonation-token:bearer-secret",
+			wantStatus:    http.StatusUnauthorized,
+		},
+		{
+			name:                "bearer session with revoked original",
+			authorization:       tokens.AuthValuePrefix + " impersonation-token:bearer-secret",
+			originalCookieValue: "revoked-admin-token",
+			wantStatus:          http.StatusUnauthorized,
+		},
+		{
+			name:                "bearer header takes precedence over session cookie",
+			authorization:       tokens.AuthValuePrefix + " impersonation-token:bearer-secret",
+			originalCookieValue: "admin-token",
+			includeOriginal:     true,
+			sessionCookieValue:  "normal-cookie-token",
+			wantStatus:          http.StatusOK,
+			wantCalled:          true,
+		},
+		{
+			name:                "Rancher OIDC JWT selects underlying effective token",
+			authorization:       tokens.AuthValuePrefix + " header.payload.signature",
+			originalCookieValue: "admin-token",
+			includeOriginal:     true,
+			wantStatus:          http.StatusOK,
+			wantCalled:          true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			original := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"}, UserID: "u-admin"}
+			effective := boundEffectiveToken("impersonation-token", "u-target", original)
+			managerTokens := map[string]accessor.TokenAccessor{
+				"impersonation-token:bearer-secret": effective,
+			}
+			if test.includeOriginal {
+				managerTokens["admin-token"] = original
+			}
+			if test.sessionCookieValue != "" {
+				managerTokens[test.sessionCookieValue] = &apiv3.Token{
+					ObjectMeta: metav1.ObjectMeta{Name: "normal-token"},
+					UserID:     "u-other",
+				}
+			}
+			h := lifecycleHandler(&testTokenManager{tokens: managerTokens})
+			called := false
+			handler := h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				called = true
+			}))
+			req := httptest.NewRequest(http.MethodGet, "/v3/management.cattle.io.users", nil)
+			req.Header.Set(tokens.AuthHeaderName, test.authorization)
+			if test.originalCookieValue != "" {
+				req.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: test.originalCookieValue})
+			}
+			if test.sessionCookieValue != "" {
+				req.AddCookie(&http.Cookie{Name: sessionCookie, Value: test.sessionCookieValue})
+			}
+			req = req.WithContext(request.WithUser(req.Context(), &requestUser{
+				Name: "u-target",
+				Extra: map[string][]string{
+					tokens.ImpersonationTokenIDUserExtra: {"impersonation-token"},
+				},
+			}))
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, req)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("expected status %d, got %d", test.wantStatus, response.Code)
+			}
+			if called != test.wantCalled {
+				t.Fatalf("protected handler called=%v, want %v", called, test.wantCalled)
+			}
+		})
+	}
+}
+
+func TestAuditMiddlewareAllowsNonImpersonationAuthorization(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		authorization string
+		requestUser   string
+		tokens        map[string]accessor.TokenAccessor
+	}{
+		{
+			name:          "legacy bearer token",
+			authorization: tokens.AuthValuePrefix + " normal-token:normal-secret",
+			requestUser:   "u-user",
+			tokens: map[string]accessor.TokenAccessor{
+				"normal-token:normal-secret": &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "normal-token"}, UserID: "u-user"},
+			},
+		},
+		{
+			name:          "Rancher OIDC bearer JWT",
+			authorization: tokens.AuthValuePrefix + " header.payload.signature",
+			requestUser:   "u-user",
+		},
+		{
+			name:          "unauthenticated basic request",
+			authorization: tokens.BasicAuthPrefix + " dXNlcjpwYXNzd29yZA==",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := lifecycleHandler(&testTokenManager{tokens: test.tokens})
+			called := false
+			handler := h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				called = true
+			}))
+			req := httptest.NewRequest(http.MethodGet, "/v3/management.cattle.io.users", nil)
+			req.Header.Set(tokens.AuthHeaderName, test.authorization)
+			if test.requestUser != "" {
+				req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: test.requestUser}))
+			}
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, req)
+
+			if response.Code != http.StatusOK {
+				t.Fatalf("expected non-impersonation authorization to continue, got %d", response.Code)
+			}
+			if !called {
+				t.Fatal("non-impersonation authorization did not reach the protected handler")
+			}
+		})
 	}
 }
 
@@ -1779,7 +1950,13 @@ func TestAuditMiddlewareNeverAttributesInvalidSessions(t *testing.T) {
 			if test.includeEffective {
 				req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "effective-token"})
 			}
-			req = req.WithContext(request.WithUser(req.Context(), &requestUser{Name: test.requestUser}))
+			requestUser := &requestUser{Name: test.requestUser}
+			if test.effective != nil && tokens.IsImpersonationSession(test.effective) {
+				requestUser.Extra = map[string][]string{
+					tokens.ImpersonationTokenIDUserExtra: {test.effective.GetName()},
+				}
+			}
+			req = req.WithContext(request.WithUser(req.Context(), requestUser))
 
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
@@ -1791,13 +1968,14 @@ func TestAuditMiddlewareNeverAttributesInvalidSessions(t *testing.T) {
 }
 
 type requestUser struct {
-	Name string
+	Name  string
+	Extra map[string][]string
 }
 
 func (u *requestUser) GetName() string               { return u.Name }
 func (u *requestUser) GetUID() string                { return u.Name }
 func (u *requestUser) GetGroups() []string           { return nil }
-func (u *requestUser) GetExtra() map[string][]string { return nil }
+func (u *requestUser) GetExtra() map[string][]string { return u.Extra }
 
 func boundEffectiveToken(name, userID string, original accessor.TokenAccessor) *apiv3.Token {
 	token := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: name}, UserID: userID}
@@ -1809,7 +1987,16 @@ func impersonationRequest(method, userID string) *http.Request {
 	req := httptest.NewRequest(method, "/v3/impersonation-sessions/current", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "effective-token"})
 	req.AddCookie(&http.Cookie{Name: tokens.OriginalSessionCookie, Value: "admin-token"})
-	return req.WithContext(request.WithUser(req.Context(), &requestUser{Name: userID}))
+	return req.WithContext(request.WithUser(req.Context(), impersonationRequestUser(userID)))
+}
+
+func impersonationRequestUser(userID string) *requestUser {
+	return &requestUser{
+		Name: userID,
+		Extra: map[string][]string{
+			tokens.ImpersonationTokenIDUserExtra: {"impersonation-token"},
+		},
+	}
 }
 
 var _ interface {

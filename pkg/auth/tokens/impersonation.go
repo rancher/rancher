@@ -9,6 +9,7 @@ const (
 	ImpersonationSessionAnnotation = "authn.management.cattle.io/impersonation-session"
 	ImpersonatorTokenAnnotation    = "authn.management.cattle.io/impersonator-token-id"
 	ImpersonatorUserAnnotation     = "authn.management.cattle.io/impersonator-user-id"
+	ImpersonationTokenIDUserExtra  = "authn.management.cattle.io/impersonation-token-id"
 )
 
 // BindImpersonationSession records the identities of the original session and

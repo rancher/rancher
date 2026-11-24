@@ -172,6 +172,10 @@ type tokenManager interface {
 	DeleteTokenByName(string) (int, error)
 }
 
+type tokenByNameGetter interface {
+	GetTokenByName(string) (accessor.TokenAccessor, int, error)
+}
+
 // The exported aliases allow package-level route tests to construct a handler
 // with deterministic dependencies without changing the production constructor.
 type UserGetter = userGetter
@@ -674,18 +678,35 @@ func (h *Handler) AuditMiddleware(next http.Handler) http.Handler {
 		}
 
 		original, originalErr := r.Cookie(tokens.OriginalSessionCookie)
-		effective, effectiveErr := r.Cookie(sessionCookie)
 		current, currentErr := request.UserFrom(r.Context())
 		auditUser, auditOK := audit.FromContext(r.Context())
-
-		var effectiveToken accessor.TokenAccessor
-		var effectiveStatus int
-		var effectiveLookupErr error
-		if effectiveErr == nil && effective.Value != "" {
-			effectiveToken, effectiveStatus, effectiveLookupErr = h.tokenManager.GetToken(effective.Value)
-		}
 		hasOriginal := originalErr == nil && original.Value != ""
-		if effectiveErr == nil && effective.Value != "" && (effectiveLookupErr != nil || effectiveToken == nil) {
+		hasAuthenticatedUser := currentErr && current.GetName() != "" && current.GetName() != "system:cattle:error"
+		var tokenIDs []string
+		if hasAuthenticatedUser {
+			tokenIDs = current.GetExtra()[tokens.ImpersonationTokenIDUserExtra]
+		}
+		selectedImpersonation := len(tokenIDs) > 0
+
+		// Public, failed-authentication, and regular authenticated requests are
+		// enforced by their route handlers. A trusted authenticator marker
+		// identifies the exact selected token, independent of its transport.
+		if !selectedImpersonation {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if len(tokenIDs) != 1 || tokenIDs[0] == "" {
+			http.Error(w, "current impersonation session is invalid", http.StatusUnauthorized)
+			return
+		}
+		tokenGetter, ok := h.tokenManager.(tokenByNameGetter)
+		if !ok {
+			http.Error(w, "unable to validate current session", http.StatusInternalServerError)
+			return
+		}
+		effectiveToken, effectiveStatus, effectiveLookupErr := tokenGetter.GetTokenByName(tokenIDs[0])
+		if effectiveLookupErr != nil || effectiveToken == nil {
 			status := http.StatusUnauthorized
 			if effectiveStatus >= http.StatusInternalServerError {
 				status = http.StatusInternalServerError
@@ -693,12 +714,7 @@ func (h *Handler) AuditMiddleware(next http.Handler) http.Handler {
 			http.Error(w, "unable to validate current session", status)
 			return
 		}
-		isImpersonating := tokens.IsImpersonationSession(effectiveToken)
-		if !isImpersonating && !hasOriginal {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if effectiveErr != nil || effective.Value == "" || !currentErr || current.GetName() == "" {
+		if !tokens.IsImpersonationSession(effectiveToken) {
 			http.Error(w, "current impersonation session is invalid", http.StatusUnauthorized)
 			return
 		}
@@ -707,7 +723,7 @@ func (h *Handler) AuditMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		originalToken, _, err := h.validateSession(r, original.Value, effective.Value)
+		originalToken, err := h.validateSelectedSession(r, original.Value, effectiveToken)
 		if err != nil {
 			http.Error(w, err.Error(), sessionErrorStatus(err))
 			return
@@ -740,25 +756,36 @@ func (h *Handler) AuditMiddleware(next http.Handler) http.Handler {
 }
 
 func (h *Handler) validateSession(r *http.Request, originalValue, effectiveValue string) (accessor.TokenAccessor, accessor.TokenAccessor, error) {
+	effectiveToken, _, err := h.tokenManager.GetToken(effectiveValue)
+	if err != nil || effectiveToken == nil {
+		return nil, nil, sessionError{status: http.StatusUnauthorized, message: "current impersonation session is invalid"}
+	}
+	originalToken, err := h.validateSelectedSession(r, originalValue, effectiveToken)
+	if err != nil {
+		return nil, nil, err
+	}
+	return originalToken, effectiveToken, nil
+}
+
+func (h *Handler) validateSelectedSession(r *http.Request, originalValue string, effectiveToken accessor.TokenAccessor) (accessor.TokenAccessor, error) {
 	originalToken, _, err := h.tokenManager.GetToken(originalValue)
 	if err != nil || originalToken == nil || originalToken.GetUserID() == "" || originalToken.GetIsExpired() {
-		return nil, nil, sessionError{status: http.StatusUnauthorized, message: "original administrator session is invalid"}
+		return nil, sessionError{status: http.StatusUnauthorized, message: "original administrator session is invalid"}
 	}
 	admin, err := h.isAdmin(originalToken.GetUserID())
 	if err != nil {
-		return nil, nil, sessionError{status: http.StatusInternalServerError, message: "unable to determine administrator access"}
+		return nil, sessionError{status: http.StatusInternalServerError, message: "unable to determine administrator access"}
 	}
 	if !admin {
-		return nil, nil, sessionError{status: http.StatusUnauthorized, message: "original administrator session is invalid"}
+		return nil, sessionError{status: http.StatusUnauthorized, message: "original administrator session is invalid"}
 	}
-	effectiveToken, _, err := h.tokenManager.GetToken(effectiveValue)
-	if err != nil || effectiveToken == nil || effectiveToken.GetUserID() != requestUserID(r) || effectiveToken.GetIsExpired() {
-		return nil, nil, sessionError{status: http.StatusUnauthorized, message: "current impersonation session is invalid"}
+	if effectiveToken.GetUserID() != requestUserID(r) || effectiveToken.GetIsExpired() {
+		return nil, sessionError{status: http.StatusUnauthorized, message: "current impersonation session is invalid"}
 	}
 	if !tokens.IsImpersonationSessionBound(effectiveToken, originalToken) {
-		return nil, nil, sessionError{status: http.StatusUnauthorized, message: "impersonation session binding is invalid"}
+		return nil, sessionError{status: http.StatusUnauthorized, message: "impersonation session binding is invalid"}
 	}
-	return originalToken, effectiveToken, nil
+	return originalToken, nil
 }
 
 type sessionError struct {

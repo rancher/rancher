@@ -11,6 +11,7 @@ import (
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -123,6 +124,18 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 					}
 				}
 				reqGroup = append(reqGroup, k8sUser.AllAuthenticated)
+
+				// These values describe the authenticated session, not the
+				// requested Kubernetes identity. Preserve trusted values and
+				// discard client-supplied impersonation extras with the same
+				// names.
+				delete(reqExtras, tokens.ImpersonationTokenIDUserExtra)
+				if values := userInfo.GetExtra()[tokens.ImpersonationTokenIDUserExtra]; len(values) > 0 {
+					if reqExtras == nil {
+						reqExtras = map[string][]string{}
+					}
+					reqExtras[tokens.ImpersonationTokenIDUserExtra] = append([]string(nil), values...)
+				}
 
 				impersonated := &k8sUser.DefaultInfo{
 					Name:   reqUser,
