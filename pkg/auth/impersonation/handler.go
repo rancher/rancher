@@ -723,7 +723,10 @@ func (h *Handler) AuditMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		originalToken, err := h.validateSelectedSession(r, original.Value, effectiveToken)
+		// Re-evaluate the original administrator against the latest informer
+		// state on every request. This keeps role revocation effective without
+		// amplifying normal Dashboard traffic into management API calls.
+		originalToken, err := h.cachedEligibilityHandler().validateSelectedSession(r, original.Value, effectiveToken)
 		if err != nil {
 			http.Error(w, err.Error(), sessionErrorStatus(err))
 			return

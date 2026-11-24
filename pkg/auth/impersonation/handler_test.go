@@ -1771,6 +1771,88 @@ func TestAuditMiddlewareEnforcesBearerImpersonationSession(t *testing.T) {
 	}
 }
 
+func TestAuditMiddlewareUsesInformerCachesAndObservesRevocation(t *testing.T) {
+	original := &apiv3.Token{ObjectMeta: metav1.ObjectMeta{Name: "admin-token-id"}, UserID: "u-admin"}
+	effective := boundEffectiveToken("impersonation-token", "u-target", original)
+	manager := &testTokenManager{tokens: map[string]accessor.TokenAccessor{
+		"admin-token":     original,
+		"effective-token": effective,
+	}}
+	h := lifecycleHandler(manager)
+
+	freshCalls := 0
+	h.users = func(string) userGetter {
+		freshCalls++
+		return testUsers{}
+	}
+	h.userAttributes = func(string) userAttributeGetter {
+		freshCalls++
+		return testUserAttributes{}
+	}
+	h.globalRoleBindings = func(string) globalRoleBindingLister {
+		freshCalls++
+		return testBindings{}
+	}
+	h.globalRoles = func(string) globalRoleGetter {
+		freshCalls++
+		return testRoles{}
+	}
+
+	cachedBindings := []apiv3.GlobalRoleBinding{{
+		UserName:       "u-admin",
+		GlobalRoleName: "admin",
+	}}
+	h.cachedUsers = func(string) userGetter {
+		return testUsers{
+			"u-admin":  {ObjectMeta: metav1.ObjectMeta{Name: "u-admin"}},
+			"u-target": {ObjectMeta: metav1.ObjectMeta{Name: "u-target"}},
+		}
+	}
+	h.cachedUserAttributes = func(string) userAttributeGetter {
+		return testUserAttributes{}
+	}
+	h.cachedGlobalRoleBindings = func(string) globalRoleBindingLister {
+		return testBindings{items: cachedBindings}
+	}
+	h.cachedGlobalRoles = func(string) globalRoleGetter {
+		return testRoles{
+			"admin": {ObjectMeta: metav1.ObjectMeta{Name: "admin"}, Builtin: true},
+		}
+	}
+
+	protectedCalls := 0
+	handler := h.AuditMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		protectedCalls++
+	}))
+
+	firstResponse := httptest.NewRecorder()
+	handler.ServeHTTP(firstResponse, impersonationRequest(http.MethodGet, "u-target"))
+	if firstResponse.Code != http.StatusOK {
+		t.Fatalf("expected cached administrator authorization to continue, got %d", firstResponse.Code)
+	}
+	if freshCalls != 0 {
+		t.Fatalf("request enforcement used management API dependencies %d times", freshCalls)
+	}
+	if protectedCalls != 1 {
+		t.Fatalf("expected protected handler to be called once, got %d", protectedCalls)
+	}
+
+	// Informer-backed data is read again for each request, so removing the
+	// binding revokes the effective session without waiting for token expiry.
+	cachedBindings = nil
+	secondResponse := httptest.NewRecorder()
+	handler.ServeHTTP(secondResponse, impersonationRequest(http.MethodGet, "u-target"))
+	if secondResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("expected cached role revocation to return 401, got %d", secondResponse.Code)
+	}
+	if freshCalls != 0 {
+		t.Fatalf("revocation check used management API dependencies %d times", freshCalls)
+	}
+	if protectedCalls != 1 {
+		t.Fatalf("revoked session reached protected handler; calls=%d", protectedCalls)
+	}
+}
+
 func TestAuditMiddlewareAllowsNonImpersonationAuthorization(t *testing.T) {
 	t.Parallel()
 
