@@ -337,8 +337,8 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     mkdir -p /var/lib/rancher-data/driver-metadata && \
     rm /tmp/etcd.tar.gz
 
-ENV CATTLE_UI_VERSION=2.13.12-rc2
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.13.12-rc2
+ENV CATTLE_UI_VERSION=2.13.12
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.13.12
 
 ENV CATTLE_CLI_VERSION=v2.13.12
 
