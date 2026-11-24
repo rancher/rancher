@@ -3,7 +3,7 @@ chartAuditLogImage: rancher/mirrored-bci-micro:16.0-23.2
 defaultShellVersion: rancher/shell:v0.9.1
 defaultSccOperatorImage: rancher/scc-operator:v0.5.4
 # Notes: ClusterRepo asset and branch versions
-defaultAssetsImage: rancher/rancher-assets:v2.16-20261124T1304Z-dev
+defaultAssetsImage: rancher/rancher-assets:v2.16-20261124T1432Z-dev
 defaultKubeAPIAuthImage: rancher/kube-api-auth:v0.16.0
 chartDefaultBranch: staging
 partnerChartDefaultBranch: main
@@ -18,9 +18,9 @@ winsAgentVersion: v0.16.0
 aksOperatorVersion: 111.0.0+up1.16.0
 eksOperatorVersion: 111.0.0+up1.16.0
 gkeOperatorVersion: 111.0.0+up1.16.0
-fleetVersion: 111.0.2+up0.17.1-alpha.1
+fleetVersion: 111.0.1+up0.17.0
 remoteDialerProxyVersion: 111.0.1+up0.9.1
 turtlesVersion: 111.0.0+up0.28.0
 # Notes: tracks the CAPI version used by turtles
 clusterAPIControllerImage: rancher/cluster-api-controller:v1.14.4_turtles.3
-webhookVersion: 111.0.1+up0.12.1-rc.22
+webhookVersion: 111.0.1+up0.12.1
