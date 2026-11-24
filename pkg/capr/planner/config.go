@@ -45,6 +45,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const lifecycleNodeLabelPrefix = "plan.cattle.io/"
+
 // addEtcd mutates the given config map with etcd-specific configuration elements, and adds S3-related arguments and files if renderS3 is true.
 func (p *Planner) addETCD(config map[string]any, controlPlane *rkev1.RKEControlPlane, entry *planEntry, renderS3 bool) (result []plan.File, _ error) {
 	if !isEtcd(entry) || controlPlane.Spec.ETCD == nil {
@@ -682,8 +684,6 @@ func shouldEmbedLifecycleLabels(controlPlane *rkev1.RKEControlPlane, entry *plan
 	// don't match and stay restart-free.
 	return appliedPlanHasLifecycleLabels(entry)
 }
-
-const lifecycleNodeLabelPrefix = "plan.cattle.io/"
 
 // appliedPlanHasLifecycleLabels reports whether the node's last-applied 50-rancher.yaml already has
 // a plan.cattle.io/* entry in its node-label. This is the latch for shouldEmbedLifecycleLabels. A
