@@ -332,47 +332,45 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, nil
 	}
 
-	// Initial provisioning not finished
-	if cond := capr.GetCondition(infra.data, createJobConditionType); cond != nil && cond.Status() == "Unknown" {
-		job, err := h.getJobFromInfraMachine(infra)
-		if apierrors.IsNotFound(err) {
-			// If the job is not found, go ahead and proceed with machine deletion
-			return obj, h.apply.WithOwner(obj).ApplyObjects()
-		} else if err != nil {
-			return obj, err
-		}
-		logrus.Debugf("[machineprovision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
-		// WaitForClient handler will not run when the infra machine is being deleted, we have to reconcile here in order to
-		// finish the create job, since it has to have completed successfully or never ran for the delete job to run
-		state, _, err := h.run(infra, true)
+	// The Job can exist before OnChange records the CreateJob condition.
+	// Check the API directly so an informer delay cannot hide a running Job.
+	if cond := capr.GetCondition(infra.data, createJobConditionType); cond == nil || cond.Status() == "Unknown" {
+		jobs, err := h.jobController.List(infra.meta.GetNamespace(), metav1.ListOptions{
+			LabelSelector: infra.jobSelector().String(),
+		})
 		if err != nil {
 			return obj, err
 		}
-		if err = reconcileStatus(infra.data, state); err != nil {
+		if len(jobs.Items) == 0 {
+			if cond == nil {
+				return obj, nil
+			}
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
+		}
+		job := &jobs.Items[0]
+		if !condition.Cond("Complete").IsTrue(job) && !condition.Cond("Failed").IsTrue(job) {
+			return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infra.meta.GetName())
+		}
+
+		// OnChange skips deleting machines. Record the outcome here so the
+		// next removal sync can start the delete job.
+		newStatus, err := h.getMachineStatus(job)
+		if err != nil {
 			return obj, err
 		}
-		if job != nil {
-			newStatus, err := h.getMachineStatus(job)
-			if err != nil {
-				return obj, err
-			}
-			newStatus.JobName = job.Name
-
-			err = reconcileStatus(infra.data, newStatus)
-			if err != nil {
-				return obj, err
-			}
+		newStatus.JobName = job.Name
+		if err = reconcileStatus(infra.data, newStatus); err != nil {
+			return obj, err
+		}
+		if cond := capr.GetCondition(infra.data, createJobConditionType); cond == nil || cond.Status() == "Unknown" {
+			return obj, fmt.Errorf("waiting for pod status for create job %s", job.Name)
 		}
 		if obj, err = h.dynamic.UpdateStatus(&unstructured.Unstructured{
 			Object: infra.data,
 		}); err != nil {
 			return obj, err
 		}
-		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infra.meta.GetName())
-	} else if cond == nil {
-		// If the createJobCondition is not set on this infra object, that means we never actually tried to run a create job
-		// so there should be no infrastructure, proceed with delete
-		return obj, nil
+		return obj, generic.ErrSkip
 	}
 
 	// infrastructure deletion finished
@@ -790,14 +788,17 @@ func reconcileStatus(d data.Object, state rkev1.RKEMachineStatus) error {
 	return nil
 }
 
-func (h *handler) getJobFromInfraMachine(infra *infraObject) (*batchv1.Job, error) {
+func (infra *infraObject) jobSelector() labels.Selector {
 	gvk := infra.obj.GetObjectKind().GroupVersionKind()
-	jobs, err := h.jobs.List(infra.meta.GetNamespace(), labels.Set{
+	return labels.Set{
 		InfraMachineGroup:   gvk.Group,
 		InfraMachineVersion: gvk.Version,
 		InfraMachineKind:    gvk.Kind,
-		InfraMachineName:    infra.meta.GetName()}.AsSelector(),
-	)
+		InfraMachineName:    infra.meta.GetName()}.AsSelector()
+}
+
+func (h *handler) getJobFromInfraMachine(infra *infraObject) (*batchv1.Job, error) {
+	jobs, err := h.jobs.List(infra.meta.GetNamespace(), infra.jobSelector())
 	if err != nil {
 		return nil, err
 	} else if len(jobs) == 0 {

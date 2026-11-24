@@ -20,6 +20,7 @@ import (
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -77,7 +78,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	provcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
-		clients.Apply.
+		replicaAwareApply{clients.Apply.
 			// Because capi wants to own objects we don't set ownerreference with apply
 			WithDynamicLookup().
 			WithNullSafePatch(rkev1.SchemeGroupVersion.WithKind("RKEControlPlane")).
@@ -88,7 +89,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 				clients.RKE.RKEControlPlane(),
 				clients.RKE.RKECluster(),
 				clients.RKE.RKEBootstrapTemplate(),
-			),
+			)},
 		"RKECluster",
 		"rke-cluster",
 		h.OnRancherClusterChange,
@@ -115,6 +116,40 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-change", h.OnChange)
 	clients.Provisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)
+}
+
+// replicaAwareApply keeps the initial pool quantity on create and leaves
+// replicas to the autoscaler once the MachineDeployment exists.
+type replicaAwareApply struct {
+	clusterApply
+}
+
+type clusterApply = apply.Apply
+
+func (a replicaAwareApply) WithRestrictClusterScoped() apply.Apply {
+	return replicaAwareApply{a.clusterApply.WithRestrictClusterScoped()}
+}
+
+func (a replicaAwareApply) WithOwner(obj runtime.Object) apply.Apply {
+	return replicaAwareApply{a.clusterApply.WithOwner(obj)}
+}
+
+func (a replicaAwareApply) WithSetID(id string) apply.Apply {
+	return replicaAwareApply{a.clusterApply.WithSetID(id)}
+}
+
+func (a replicaAwareApply) ApplyObjects(objs ...runtime.Object) error {
+	applier := a.clusterApply
+	for _, obj := range objs {
+		md, ok := obj.(*capi.MachineDeployment)
+		if ok && md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" && md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
+			// Exclude replicas from all three inputs to the update diff, including
+			// the previous applied configuration on existing deployments.
+			applier = applier.WithDiffPatch(capi.GroupVersion.WithKind("MachineDeployment"), md.Namespace, md.Name,
+				[]byte(`[{"op":"remove","path":"/spec/replicas"}]`))
+		}
+	}
+	return applier.ApplyObjects(objs...)
 }
 
 func byNodeInfraIndex(obj *provv1.Cluster) ([]string, error) {

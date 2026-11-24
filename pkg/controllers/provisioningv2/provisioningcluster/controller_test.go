@@ -3,16 +3,27 @@ package provisioningcluster
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"testing"
 
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/lasso/pkg/dynamic"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	capictrl "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
+	mgmtctrl "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provctrl "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	rkectrl "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
+	corectrl "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	wfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
@@ -21,7 +32,16 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	dynamicclient "k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -1158,4 +1178,139 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAutoscaledMachineDeploymentReplicas(t *testing.T) {
+	tests := []struct {
+		name                         string
+		min, max                     *int32
+		quantity                     int32
+		scaledReplicas, wantReplicas int64
+		disableAutoscaling           bool
+	}{
+		{name: "stale pool quantity after scale up", min: ptr.To[int32](1), max: ptr.To[int32](5), quantity: 2, scaledReplicas: 3, wantReplicas: 3},
+		{name: "stale pool quantity after scale to zero", min: ptr.To[int32](0), max: ptr.To[int32](5), quantity: 2, scaledReplicas: 0, wantReplicas: 0},
+		{name: "fixed size pool", quantity: 2, scaledReplicas: 3, wantReplicas: 2},
+		{name: "fixed size pool at zero", quantity: 0, scaledReplicas: 3, wantReplicas: 0},
+		{name: "disable autoscaling", min: ptr.To[int32](1), max: ptr.To[int32](5), quantity: 2, scaledReplicas: 3, wantReplicas: 2, disableAutoscaling: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", Finalizers: []string{"test"}},
+				Status:     provv1.ClusterStatus{ClusterName: "c-m-test"},
+				Spec: provv1.ClusterSpec{
+					KubernetesVersion: "v1.35.1+rke2r1",
+					RKEConfig: &provv1.RKEConfig{
+						MachinePools: []provv1.RKEMachinePool{{
+							Name: "workers", WorkerRole: true, Quantity: &tt.quantity,
+							AutoscalingMinSize: tt.min, AutoscalingMaxSize: tt.max,
+							NodeConfig: &corev1.ObjectReference{APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2", Kind: "ExternalMachineTemplate", Name: "workers"},
+						}},
+					},
+				},
+			}
+			reconcile, client, deployments := registerReplicaTestController(t)
+			_, err := reconcile("ns/cluster", cluster)
+			require.NoError(t, err)
+			resource := client.Resource(capi.GroupVersion.WithResource("machinedeployments")).Namespace(cluster.Namespace)
+			live, err := resource.Get(t.Context(), "cluster-workers", metav1.GetOptions{})
+			require.NoError(t, err)
+			initial, exists, err := unstructured.NestedInt64(live.Object, "spec", "replicas")
+			require.NoError(t, err)
+			require.True(t, exists)
+			assert.Equal(t, int64(tt.quantity), initial, "initial MachineDeployment replicas")
+
+			// The autoscaler writes the live replica count while the Cluster still has the old quantity.
+			require.NoError(t, unstructured.SetNestedField(live.Object, tt.scaledReplicas, "spec", "replicas"))
+			live, err = resource.Update(t.Context(), live, metav1.UpdateOptions{})
+			require.NoError(t, err)
+			var cached capi.MachineDeployment
+			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(live.Object, &cached))
+			require.NoError(t, deployments.GetIndexer().Add(&cached))
+
+			// Change an unrelated field so reconciliation must still update the deployment.
+			pool := &cluster.Spec.RKEConfig.MachinePools[0]
+			pool.Paused = true
+			if tt.disableAutoscaling {
+				pool.AutoscalingMinSize, pool.AutoscalingMaxSize = nil, nil
+			}
+			_, err = reconcile("ns/cluster", cluster)
+			require.NoError(t, err)
+			live, err = resource.Get(t.Context(), live.GetName(), metav1.GetOptions{})
+			require.NoError(t, err)
+			paused, _, err := unstructured.NestedBool(live.Object, "spec", "paused")
+			require.NoError(t, err)
+			assert.True(t, paused)
+			replicas, exists, err := unstructured.NestedInt64(live.Object, "spec", "replicas")
+			require.NoError(t, err)
+			require.True(t, exists)
+			assert.Equal(t, tt.wantReplicas, replicas, "reconciled MachineDeployment replicas")
+		})
+	}
+}
+
+func registerReplicaTestController(t *testing.T) (generic.Handler, *dynamicfake.FakeDynamicClient, cache.SharedIndexInformer) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	provisioning := wfake.NewMockControllerInterface[*provv1.Cluster, *provv1.ClusterList](ctrl)
+	provisioningCache := wfake.NewMockCacheInterface[*provv1.Cluster](ctrl)
+	provisioningCache.EXPECT().AddIndexer(byNodeInfra, gomock.Any())
+	provisioning.EXPECT().Cache().Return(provisioningCache).AnyTimes()
+	provisioning.EXPECT().GroupVersionKind().Return(provv1.SchemeGroupVersion.WithKind("Cluster"))
+	provisioning.EXPECT().Informer().Return(cache.NewSharedIndexInformer(nil, &provv1.Cluster{}, 0, cache.Indexers{})).AnyTimes()
+	provisioning.EXPECT().OnChange(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	provisioning.EXPECT().OnRemove(gomock.Any(), gomock.Any(), gomock.Any())
+	provisioning.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(c *provv1.Cluster) (*provv1.Cluster, error) { return c, nil }).AnyTimes()
+	var reconcile generic.Handler
+	provisioning.EXPECT().AddGenericHandler(gomock.Any(), "rke-cluster", gomock.Any()).
+		Do(func(_ context.Context, _ string, handler generic.Handler) { reconcile = handler })
+	provisioning.EXPECT().AddGenericHandler(gomock.Any(), gomock.Not("rke-cluster"), gomock.Any()).AnyTimes()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, capi.AddToScheme(scheme))
+	require.NoError(t, rkev1.AddToScheme(scheme))
+	require.NoError(t, planv1alpha1.AddToScheme(scheme))
+	client := dynamicfake.NewSimpleDynamicClient(scheme)
+	resource := func(name, kind string) metav1.APIResource {
+		return metav1.APIResource{Name: name, Kind: kind, Namespaced: true}
+	}
+	discovery := &discoveryfake.FakeDiscovery{Fake: &clienttesting.Fake{}}
+	discovery.Resources = []*metav1.APIResourceList{
+		{GroupVersion: capi.GroupVersion.String(), APIResources: []metav1.APIResource{
+			resource("clusters", "Cluster"), resource("machinedeployments", "MachineDeployment"), resource("machinehealthchecks", "MachineHealthCheck"),
+		}},
+		{GroupVersion: rkev1.SchemeGroupVersion.String(), APIResources: []metav1.APIResource{
+			resource("rkeclusters", "RKECluster"), resource("rkecontrolplanes", "RKEControlPlane"), resource("rkebootstraptemplates", "RKEBootstrapTemplate"),
+		}},
+		{GroupVersion: planv1alpha1.SchemeGroupVersion.String(), APIResources: []metav1.APIResource{resource("beacons", "Beacon")}},
+	}
+	applier := apply.New(discovery, func(gvr schema.GroupVersionResource) (dynamicclient.NamespaceableResourceInterface, error) {
+		return client.Resource(gvr), nil
+	})
+	factory, err := controller.NewSharedControllerFactoryFromConfig(&rest.Config{Host: "http://localhost"}, wrangler.Scheme)
+	require.NoError(t, err)
+	capiControllers := capictrl.New(factory)
+	Register(t.Context(), &wrangler.CAPIContext{
+		CAPI: capiControllers,
+		Context: &wrangler.Context{
+			Core:         corectrl.New(factory),
+			Mgmt:         mgmtctrl.New(factory),
+			RKE:          rkectrl.New(factory),
+			Provisioning: replicaTestProvisioning{cluster: provisioning},
+			Dynamic:      dynamic.New(discovery),
+			Apply:        applier,
+		},
+	})
+	require.NotNil(t, reconcile)
+	return reconcile, client, capiControllers.MachineDeployment().Informer()
+}
+
+type replicaTestProvisioning struct {
+	provctrl.Interface
+	cluster provctrl.ClusterController
+}
+
+func (p replicaTestProvisioning) Cluster() provctrl.ClusterController {
+	return p.cluster
 }
