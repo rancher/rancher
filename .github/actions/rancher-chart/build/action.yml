@@ -44,6 +44,7 @@ runs:
         set -e
         source scripts/version
         cp bin/chart/${CHART_REPO}/rancher-${CHART_VERSION}.tgz /tmp/rancher-chart.tgz
+        cp bin/chart/${CHART_REPO}/index.yaml /tmp/rancher-chart-index.yaml
 
         echo "CHART_REPO=$CHART_REPO" >> $GITHUB_OUTPUT
         echo "CHART_VERSION=${CHART_VERSION}" >> $GITHUB_OUTPUT
@@ -53,6 +54,14 @@ runs:
       with:
         name: "rancher-chart"
         path: /tmp/rancher-chart.tgz
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false
+    - name: Upload chart index
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: "rancher-chart-index"
+        path: /tmp/rancher-chart-index.yaml
         if-no-files-found: error
         retention-days: 4
         overwrite: false
