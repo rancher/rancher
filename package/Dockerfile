@@ -268,7 +268,7 @@ RUN case "${ARCH}" in \
 
 ENV CATTLE_DASHBOARD_UI_VERSION=v2.16.0-rc1
 
-ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
+ENV CATTLE_CLI_VERSION=v2.16.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
