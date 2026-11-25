@@ -157,24 +157,8 @@ func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.
 // Stop stops the controllers of cluster and forgets why they last failed to start, if they did. A stop
 // asked for from outside is deliberate - the cluster is gone, or its controllers are being restarted - so
 // an earlier failure no longer describes them, and ControllersState reports them stopped rather than
-// failed. Failures noticed by the manager itself go through stopWithError or handleStartFailure instead,
-// which record the failure after stopping.
+// failed.
 func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
-	m.stop(cluster, nil)
-}
-
-// stopWithError stops the controllers of cluster because they couldn't be started with err, and records
-// err so ControllersState reports them failed.
-//
-// No retry delay is recorded: err is returned to the caller of Start, so the controller loop backs the
-// cluster off itself.
-func (m *Manager) stopWithError(cluster *apimgmtv3.Cluster, err error) {
-	m.stop(cluster, &startFailure{err: err})
-}
-
-// stop stops the record of cluster and sets its failure to failure, or forgets it if failure is nil, as one
-// change.
-func (m *Manager) stop(cluster *apimgmtv3.Cluster, failure *startFailure) {
 	var r *record
 	if obj, ok := m.controllers.Load(cluster.UID); ok {
 		r = obj.(*record)
@@ -188,11 +172,23 @@ func (m *Manager) stop(cluster *apimgmtv3.Cluster, failure *startFailure) {
 	if r != nil {
 		m.stopRecord(r)
 	}
-	if failure == nil {
-		m.failures.Delete(cluster.UID)
-	} else {
-		m.failures.Store(cluster.UID, failure)
+	m.failures.Delete(cluster.UID)
+}
+
+// recordBuildFailure reports an error from building a record. A concurrent start may have installed
+// a record or already scheduled an asynchronous retry while the build was in progress.
+func (m *Manager) recordBuildFailure(cluster *apimgmtv3.Cluster, err error) {
+	m.failuresLock.Lock()
+	defer m.failuresLock.Unlock()
+
+	if _, ok := m.controllers.Load(cluster.UID); ok {
+		return
 	}
+	if obj, ok := m.failures.Load(cluster.UID); ok && time.Now().Before(obj.(*startFailure).retryAt) {
+		return
+	}
+	// Start returns the error, so the controller loop supplies the retry delay.
+	m.failures.Store(cluster.UID, &startFailure{err: err})
 }
 
 // ControllersState reports the state of the controllers of cluster on this replica. The state of a
@@ -303,7 +299,7 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
 		if controllers {
-			m.stopWithError(cluster, err)
+			m.recordBuildFailure(cluster, err)
 		}
 		return nil, err
 	}
