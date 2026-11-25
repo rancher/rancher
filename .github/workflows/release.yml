@@ -46,8 +46,8 @@ jobs:
       ARCH: amd64
       REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
     outputs:
-      chart_repo: ${{ steps.build.outputs.chart_repo }}
-      chart_filename: ${{ steps.build.outputs.chart_filename }}
+      chart_repo: ${{ steps.build.outputs.CHART_REPO }}
+      chart_filename: ${{ steps.build.outputs.CHART_FILENAME }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -106,8 +106,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: publish
         with:
-          chart_repo: ${{ needs.build-chart.output.chart_repo }}
-          chart_filename: ${{ needs.build-chart.output.chart_filename }}
+          chart_repo: ${{ needs.build-chart.outputs.CHART_REPO }}
+          chart_filename: ${{ needs.build-chart.outputs.CHART_FILENAME }}
         uses: $/.github/actions/rancher-chart/publish-gcp
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
