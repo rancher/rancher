@@ -4,6 +4,7 @@ package buildconfig
 
 const (
 	AksOperatorVersion        = "111.0.0+up1.16.0"
+	AliOperatorVersion        = "111.0.0+up1.16.0-rc.3"
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-23.2"
 	ChartDefaultBranch        = "staging"
 	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4_turtles.3"

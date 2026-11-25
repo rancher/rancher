@@ -257,7 +257,7 @@ var (
 	GkeOperatorVersion = NewSetting("gke-operator-version", buildconfig.GkeOperatorVersion)
 
 	// AliOperatorVersion is the exact version of the ali-operator and ali-operator-crd chart that Rancher will install.
-	AliOperatorVersion = NewSetting("ali-operator-version", "")
+	AliOperatorVersion = NewSetting("ali-operator-version", buildconfig.AliOperatorVersion)
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// 0 means the max. A default above the max is capped to the max, which is the smaller of
