@@ -22,6 +22,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/tests/v2/integration/defaults"
@@ -115,6 +116,8 @@ type ClusterRepoParams struct {
 	Type              RepoType // Type of the ClusterRepo resource
 	URL1              string   // URL to use when creating the ClusterRepo resource
 	URL2              string   // URL to use when updating the ClusterRepo resource to a new URL
+	Branch1           string
+	Branch2           string
 	InsecurePlainHTTP bool
 	StatusCode        int
 	StatusCodeMessage string
@@ -139,10 +142,12 @@ func (c *ClusterRepoTestSuite) TestHTTPRepo() {
 // TestGitRepo tests CREATE, UPDATE, and DELETE operations of Git ClusterRepo resources
 func (c *ClusterRepoTestSuite) TestGitRepo() {
 	c.testClusterRepo(ClusterRepoParams{
-		Name: GitClusterRepoName,
-		URL1: RancherChartsGitRepoURL,
-		URL2: RKE2ChartsGitRepoURL,
-		Type: Git,
+		Name:    GitClusterRepoName,
+		URL1:    RancherChartsGitRepoURL,
+		URL2:    RKE2ChartsGitRepoURL,
+		Branch1: buildconfig.ChartDefaultBranch,
+		Branch2: buildconfig.Rke2ChartDefaultBranch,
+		Type:    Git,
 	})
 }
 
@@ -952,37 +957,53 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 		Spec: v1.RepoSpec{ExponentialBackOffValues: &v1.ExponentialBackOffValues{MinWait: 30, MaxWait: 60, MaxRetries: 2}},
 	})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
+	cr.Spec.GitBranch = params.Branch1
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
 	require.NoError(c.T(), err)
 	time.Sleep(1 * time.Second)
 
 	// Validate the ClusterRepo was created and resources were downloaded
-	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
+	_, err = c.pollUntilDownloaded(params.Name, metav1.Time{})
+	require.NoError(c.T(), err)
+
+	// check that it was reconciliated (shouldNotSkip == false)
+	clusterRepo, err := c.pollClusterRepoUntil(params.Name, func(obj *stevev1.SteveAPIObject, status *v1.RepoStatus) bool {
+		return !status.ShouldNotSkip && status.ObservedGeneration == obj.Generation && isRepoDownloaded(status)
+	})
 	require.NoError(c.T(), err)
 
 	status := c.getStatusFromClusterRepo(clusterRepo)
 	assert.Equal(c.T(), params.URL1, status.URL)
 
-	// Save download timestamp and generation count before changing the URL
-	downloadTime := status.DownloadTime
-	observedGeneration := status.ObservedGeneration
+	originalGeneration := status.ObservedGeneration
+	originalCommit := status.Commit
 
-	// Validate updating the ClusterRepo by changing the repo URL and verifying DownloadTime was updated (meaning new resources were pulled)
-	spec := c.getSpecFromClusterRepo(clusterRepo)
-	setClusterRepoURL(spec, params.Type, params.URL2)
-	clusterRepoUpdated := *clusterRepo
-	clusterRepoUpdated.Spec = spec
-
-	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(&clusterRepoUpdated)
+	// Update the clusterRepo
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		currentRepo, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(params.Name)
+		if err != nil {
+			return err
+		}
+		spec := c.getSpecFromClusterRepo(currentRepo)
+		setClusterRepoURL(spec, params.Type, params.URL2)
+		spec.GitBranch = params.Branch2
+		currentRepo.Spec = spec
+		_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(currentRepo)
+		return err
+	})
 	require.NoError(c.T(), err)
 
-	clusterRepo, err = c.pollUntilDownloaded(params.Name, downloadTime)
+	// Validate by checking if the url, generation and commit changed
+	clusterRepo, err = c.pollClusterRepoUntil(params.Name, func(obj *stevev1.SteveAPIObject, status *v1.RepoStatus) bool {
+		return status.URL == params.URL2 && status.ObservedGeneration > originalGeneration && isRepoDownloaded(status) &&
+			(params.Type != Git || (status.Commit != "" && status.Commit != originalCommit))
+	})
 	require.NoError(c.T(), err)
 
 	status = c.getStatusFromClusterRepo(clusterRepo)
 	assert.Equal(c.T(), params.URL2, status.URL)
-	assert.Greater(c.T(), status.ObservedGeneration, observedGeneration)
+	assert.Greater(c.T(), status.ObservedGeneration, originalGeneration)
 
 	// Validate deleting the ClusterRepo
 	err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Delete(clusterRepo)
@@ -1226,6 +1247,32 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 		c.T().Logf("Error while downloading ClusterRepo %s from catalog: %v. \n CR status: \n %v", ClusterRepoName, err, clusterRepo.Status)
 	}
 	return clusterRepo, err
+}
+
+// pollClusterRepoUntil polls the ClusterRepo of the given name until done returns true
+func (c *ClusterRepoTestSuite) pollClusterRepoUntil(ClusterRepoName string, done func(*stevev1.SteveAPIObject, *v1.RepoStatus) bool) (*stevev1.SteveAPIObject, error) {
+	var clusterRepo *stevev1.SteveAPIObject
+	err := wait.Poll(PollInterval, PollTimeout, func() (bool, error) {
+		var err error
+		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(ClusterRepoName)
+		if err != nil {
+			return false, err
+		}
+		return done(clusterRepo, c.getStatusFromClusterRepo(clusterRepo)), nil
+	})
+	if err != nil && clusterRepo != nil {
+		c.T().Logf("Error while polling ClusterRepo %s: %v. \n CR status: \n %v", ClusterRepoName, err, clusterRepo.Status)
+	}
+	return clusterRepo, err
+}
+
+func isRepoDownloaded(status *v1.RepoStatus) bool {
+	for _, cond := range status.Conditions {
+		if t := v1.RepoCondition(cond.Type); t == v1.RepoDownloaded || t == v1.OCIDownloaded {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 func (c *ClusterRepoTestSuite) getSpecFromClusterRepo(obj *stevev1.SteveAPIObject) *v1.RepoSpec {
