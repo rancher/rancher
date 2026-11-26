@@ -5,7 +5,7 @@ package buildconfig
 const (
 	AksOperatorVersion        = "111.0.0+up1.16.0"
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-23.2"
-	ChartDefaultBranch        = "production"
+	ChartDefaultBranch        = "release-v2.16"
 	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4_turtles.3"
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261126T1714Z"
 	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0"

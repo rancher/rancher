@@ -5,7 +5,7 @@ defaultSccOperatorImage: rancher/scc-operator:v0.5.4
 # Notes: ClusterRepo asset and branch versions
 defaultAssetsImage: rancher/rancher-assets:v2.16-20261126T1714Z
 defaultKubeAPIAuthImage: rancher/kube-api-auth:v0.16.0
-chartDefaultBranch: production
+chartDefaultBranch: release-v2.16
 partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main
 # Component versions (machine: the tag of its image) are synced into package/Dockerfile and Dockerfile.runtime by go generate
