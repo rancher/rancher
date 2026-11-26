@@ -759,7 +759,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	assert.NoError(c.T(), err)
 
 	// Validate the ClusterRepo was created
-	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	_, err = c.pollUntilDownloaded(repoName)
 	require.NoError(c.T(), err)
 
 	// check if chart can be fetched
@@ -865,7 +865,7 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 	}
 	_, err = c.catalogClient.ClusterRepos().Create(context.Background(), clusterRepo, metav1.CreateOptions{})
 	assert.NoError(c.T(), err)
-	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	_, err = c.pollUntilDownloaded(repoName)
 	require.NoError(c.T(), err)
 
 	// Disable the clusterrepo
@@ -892,7 +892,7 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
 	clusterRepo, err = c.catalogClient.ClusterRepos().Update(context.Background(), clusterRepo, metav1.UpdateOptions{})
 	assert.NoError(c.T(), err)
-	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	_, err = c.pollUntilDownloaded(repoName)
 	require.NoError(c.T(), err)
 
 	// Check configmap for chart or version and the new chart should not exist
@@ -927,7 +927,7 @@ func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
 	_, err = c.catalogClient.ClusterRepos().Update(context.Background(), clusterRepo, metav1.UpdateOptions{})
 	assert.NoError(c.T(), err)
-	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	_, err = c.pollUntilDownloaded(repoName)
 	require.NoError(c.T(), err)
 
 	// Check configmap for chart or version and 2 charts must exist now
@@ -963,11 +963,8 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	require.NoError(c.T(), err)
 	time.Sleep(1 * time.Second)
 
-	// Validate the ClusterRepo was created and resources were downloaded
-	_, err = c.pollUntilDownloaded(params.Name, metav1.Time{})
-	require.NoError(c.T(), err)
-
-	// check that it was reconciliated (shouldNotSkip == false)
+	// Validate the ClusterRepo was created and resources were downloaded, and wait for the
+	// follow-up reconcile (shouldNotSkip == false)
 	clusterRepo, err := c.pollClusterRepoUntil(params.Name, func(obj *stevev1.SteveAPIObject, status *v1.RepoStatus) bool {
 		return !status.ShouldNotSkip && status.ObservedGeneration == obj.Generation && isRepoDownloaded(status)
 	})
@@ -1025,7 +1022,7 @@ func (c *ClusterRepoTestSuite) testClusterRepoOCIOptions(params ClusterRepoParam
 	time.Sleep(1 * time.Second)
 
 	// Validate the ClusterRepo was created and resources were downloaded
-	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
+	clusterRepo, err := c.pollUntilDownloaded(params.Name)
 	require.NoError(c.T(), err)
 
 	status := c.getStatusFromClusterRepo(clusterRepo)
@@ -1215,7 +1212,7 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	require.NoError(c.T(), err)
 
 	// Validate the ClusterRepo was created and resources were downloaded
-	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
+	clusterRepo, err := c.pollUntilDownloaded(params.Name)
 	require.NoError(c.T(), err)
 
 	status := c.getStatusFromClusterRepo(clusterRepo)
@@ -1228,25 +1225,11 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	assert.Error(c.T(), err)
 }
 
-// pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
-func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) (*stevev1.SteveAPIObject, error) {
-	var clusterRepo *stevev1.SteveAPIObject
-	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
-		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(ClusterRepoName)
-		if err != nil {
-			return false, err
-		}
-		status := c.getStatusFromClusterRepo(clusterRepo)
-		if clusterRepo.Name != ClusterRepoName {
-			return false, nil
-		}
-
-		return status.DownloadTime != prevDownloadTime, nil
+// pollUntilDownloaded polls until the ClusterRepo of the given name has been downloaded
+func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string) (*stevev1.SteveAPIObject, error) {
+	return c.pollClusterRepoUntil(ClusterRepoName, func(_ *stevev1.SteveAPIObject, status *v1.RepoStatus) bool {
+		return !status.DownloadTime.IsZero()
 	})
-	if err != nil {
-		c.T().Logf("Error while downloading ClusterRepo %s from catalog: %v. \n CR status: \n %v", ClusterRepoName, err, clusterRepo.Status)
-	}
-	return clusterRepo, err
 }
 
 // pollClusterRepoUntil polls the ClusterRepo of the given name until done returns true
