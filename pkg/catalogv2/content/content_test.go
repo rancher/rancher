@@ -902,8 +902,16 @@ func TestManager_Chart_CacheMissAndPopulate(t *testing.T) {
 		revision: "1",
 	}
 
+	cacheHas := func(digest string) bool {
+		r, err := cas.Get(digest)
+		if r != nil {
+			_ = r.Close()
+		}
+		return err == nil
+	}
+
 	// 1. First call: Cache miss -> fetches from HTTP server -> populates CAS cache
-	assert.False(t, cas.Has(digest))
+	assert.False(t, cacheHas(digest))
 	rc1, err := m.Chart("", "test-repo", "fleet", "108.0.0", true)
 	require.NoError(t, err)
 	data1, err := io.ReadAll(rc1)
@@ -911,7 +919,7 @@ func TestManager_Chart_CacheMissAndPopulate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, content, data1)
 	assert.Equal(t, int32(1), atomic.LoadInt32(&remoteCalls))
-	assert.True(t, cas.Has(digest), "chart should now be stored in CAS cache")
+	assert.True(t, cacheHas(digest), "chart should now be stored in CAS cache")
 
 	// 2. Second call: Cache hit -> served from CAS cache without hitting HTTP server
 	rc2, err := m.Chart("", "test-repo", "fleet", "108.0.0", true)

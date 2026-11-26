@@ -34,8 +34,6 @@ const (
 type CAS interface {
 	Get(digest string) (io.ReadCloser, error)
 	Put(digest string, r io.Reader) error
-	Has(digest string) bool
-	Path(digest string) (string, error)
 }
 
 // DiskCAS implements CAS on the local filesystem.
@@ -79,8 +77,8 @@ func (c *DiskCAS) pathNormalized(hash string) string {
 	return filepath.Join(c.rootDir, hash[:2], hash+".tgz")
 }
 
-// Path returns the filesystem path where the chart archive for the given digest is located.
-func (c *DiskCAS) Path(digest string) (string, error) {
+// path returns the filesystem path where the chart archive for the given digest is located.
+func (c *DiskCAS) path(digest string) (string, error) {
 	hash, err := NormalizeDigest(digest)
 	if err != nil {
 		return "", err
@@ -88,9 +86,9 @@ func (c *DiskCAS) Path(digest string) (string, error) {
 	return c.pathNormalized(hash), nil
 }
 
-// Has reports whether a chart archive with the given digest exists in the cache.
-func (c *DiskCAS) Has(digest string) bool {
-	target, err := c.Path(digest)
+// has reports whether a chart archive with the given digest exists in the cache.
+func (c *DiskCAS) has(digest string) bool {
+	target, err := c.path(digest)
 	if err != nil {
 		return false
 	}

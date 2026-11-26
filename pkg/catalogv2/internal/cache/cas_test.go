@@ -22,7 +22,7 @@ func Test_DiskCAS_PutAndGet(t *testing.T) {
 	sum := sha256.Sum256(content)
 	digest := hex.EncodeToString(sum[:])
 
-	assert.False(t, cas.Has(digest))
+	assert.False(t, cas.has(digest))
 
 	_, err = cas.Get(digest)
 	assert.ErrorIs(t, err, ErrNotFound)
@@ -32,8 +32,8 @@ func Test_DiskCAS_PutAndGet(t *testing.T) {
 	require.NoError(t, err)
 
 	// Has should now be true with or without prefix
-	assert.True(t, cas.Has(digest))
-	assert.True(t, cas.Has("sha256:"+digest))
+	assert.True(t, cas.has(digest))
+	assert.True(t, cas.has("sha256:"+digest))
 
 	// Get should now succeed
 	rc, err := cas.Get(digest)
@@ -57,7 +57,7 @@ func Test_DiskCAS_PutWithoutDigest(t *testing.T) {
 	err = cas.Put("", bytes.NewReader(content))
 	require.NoError(t, err)
 
-	assert.True(t, cas.Has(digest))
+	assert.True(t, cas.has(digest))
 
 	rc, err := cas.Get(digest)
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func Test_DiskCAS_DigestMismatch(t *testing.T) {
 
 	err = cas.Put(badDigest, bytes.NewReader(content))
 	assert.ErrorIs(t, err, ErrDigestMismatch)
-	assert.False(t, cas.Has(badDigest))
+	assert.False(t, cas.has(badDigest))
 }
 
 func Test_DiskCAS_GetCorruptedFile(t *testing.T) {
@@ -94,7 +94,7 @@ func Test_DiskCAS_GetCorruptedFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Tamper with the file on disk
-	target, err := cas.Path(digest)
+	target, err := cas.path(digest)
 	require.NoError(t, err)
 	require.NoError(t, os.Chmod(target, 0o600))
 	require.NoError(t, os.WriteFile(target, []byte("tampered content"), 0o600))
@@ -105,7 +105,7 @@ func Test_DiskCAS_GetCorruptedFile(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotFound)
 
 	// Corrupted file must be removed from cache
-	assert.False(t, cas.Has(digest))
+	assert.False(t, cas.has(digest))
 }
 
 func Test_NormalizeDigest(t *testing.T) {
