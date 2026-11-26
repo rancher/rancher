@@ -15,6 +15,11 @@ runs:
       with:
         name: "rancher-chart"
         path: /tmp
+    - name: Download rancher chart index
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: "rancher-chart-index"
+        path: /tmp
     - name: Prepare for upload
       shell: bash
       env:
@@ -23,6 +28,7 @@ runs:
       run: |
         mkdir -p "bin/chart/${CHART_REPO}"
         cp /tmp/rancher-chart.tgz "bin/chart/${CHART_REPO}/${CHART_FILENAME}"
+        cp /tmp/rancher-chart-index.yaml "bin/chart/${CHART_REPO}/index.yaml"
     - name: Authenticate with Google Cloud
       uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
       with:
