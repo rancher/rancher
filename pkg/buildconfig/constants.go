@@ -8,7 +8,7 @@ const (
 	ChartDefaultBranch        = "production"
 	ClusterAPIControllerImage = "rancher/cluster-api-controller:v1.14.4_turtles.3"
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20261124T2304Z"
-	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.0"
+	DefaultKubeAPIAuthImage   = "rancher/kube-api-auth:v0.16.1-rc.0"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.4"
 	DefaultShellVersion       = "rancher/shell:v0.9.1"
 	EksOperatorVersion        = "111.0.0+up1.16.0"
