@@ -26,6 +26,12 @@ runs:
       with:
         name: "rancher-chart"
         path: /tmp
+    - name: Download rancher chart index
+      if: ${{ inputs.use_local != 'true' }}
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: "rancher-chart-index"
+        path: /tmp
     - name: Prepare for upload
       if: ${{ inputs.use_local != 'true' }}
       shell: bash
@@ -35,6 +41,7 @@ runs:
       run: |
         mkdir -p "bin/chart/${CHART_REPO}"
         cp /tmp/rancher-chart.tgz "bin/chart/${CHART_REPO}/${CHART_FILENAME}"
+        cp /tmp/rancher-chart-index.yaml "bin/chart/${CHART_REPO}/index.yaml"
     - name: install dependencies
       shell: bash
       run: zypper install -y aws-cli
