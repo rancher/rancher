@@ -141,6 +141,9 @@ service:
   # An optional security setting to disables the HTTP port of the rancher service
   # When set true, you must also set `ingress.servicePort` to 443 and the appropriate ingress annotation to use HTTPS
   disableHTTP: false
+  # Optional node port for the https service port, used when `service.type` is NodePort (e.g. 30443)
+  # Valid range is 30000-32767. Leave empty to let kubernetes assign a port.
+  nodePort: null
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
