@@ -21,10 +21,12 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/cache"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
 	"github.com/sirupsen/logrus"
@@ -510,6 +512,15 @@ func (g *gitGo) reset(rev string) error {
 	if err != nil {
 		return err
 	}
+	// PlainOpen's default storage reopens the packfile for each object. Reuse a
+	// bounded number of descriptors during checkout, especially for large chart
+	// repositories, and release them on every return path. Keep PlainOpen's
+	// filesystem resolution (including .git files) when configuring the storage.
+	storage := filesystem.NewStorageWithOptions(repo.Storer.(*filesystem.Storage).Filesystem(), cache.NewObjectLRUDefault(), filesystem.Options{
+		MaxOpenDescriptors: 16,
+	})
+	defer storage.Close()
+	repo.Storer = storage
 
 	w, err := repo.Worktree()
 	if err != nil {
