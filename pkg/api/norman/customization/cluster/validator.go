@@ -312,7 +312,7 @@ func (v *Validator) validateAKSNetworkPolicy(clusterSpec *v32.ClusterSpec, prevC
 	}
 
 	// network policy enabled on the AKS cluster is a prerequisite for PNI
-	if to.Bool(clusterSpec.EnableNetworkPolicy) && networkPolicy != string(armcontainerservice.NetworkPolicyAzure) && networkPolicy != string(armcontainerservice.NetworkPolicyCalico) {
+	if to.Bool(clusterSpec.EnableNetworkPolicy) && networkPolicy != string(armcontainerservice.NetworkPolicyAzure) && networkPolicy != string(armcontainerservice.NetworkPolicyCalico) && networkPolicy != string(armcontainerservice.NetworkPolicyCilium) {
 		return httperror.NewAPIError(
 			httperror.InvalidBodyContent,
 			"Network Policy support must be enabled on AKS cluster in order to enable Project Network Isolation",
