@@ -32,9 +32,14 @@
 #       V2PROV_TEST_PARALLELISM (optional; defaults to 1)
 #       V2PROV_TEST_TIMEOUT     (optional; overrides the scope's meta value, see below)
 #       V2PROV_RUNNER_FAMILY    (optional; overrides the scope's meta value, see below)
+#       V2PROV_TEST_RUN_ON_RELEASE (optional; not read by this repo. Downstream repos that import the
+#           provisioning tests use it, see the kdm explicit scope. Like any other key it is passed
+#           through to the matrix unchanged.)
 #
 #   scopes.<name>.meta : optional defaults applied to every row in the scope (explicit scopes
-#       accept the same block). A row that sets the same key keeps its own value.
+#       accept the same block). A row that sets the same key keeps its own value. Only the two
+#       keys below are read from meta; any other key (e.g. V2PROV_TEST_CPUS) is ignored and must
+#       be set on each row instead.
 #       V2PROV_TEST_TIMEOUT  : a go duration in minutes or hours (e.g. 300m or 5h). It becomes the
 #           go test -timeout in place of the 60m default. The GitHub job itself is still capped
 #           at 360 minutes, which also has to cover cluster setup before go test starts.
@@ -70,9 +75,10 @@ explicit:
   - name: nightly
     meta:
       V2PROV_TEST_TIMEOUT: 200m
-      V2PROV_RUNNER_FAMILY: c6id
+      # V2PROV_RUNNER_FAMILY: c6id, restore once snapshot races are resolved
       branches:
         - main
+        - release/v2.16
         - release/v2.15
     tests:
       # Give restore and lifecycle-hook tests separate package timeout budgets.
@@ -81,6 +87,7 @@ explicit:
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_.*LifecycleHook.*$' }
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_.*$' }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_General_PreBootstrap_.*$', V2PROV_TEST_CPUS: 8 }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$' }
       - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$' }
@@ -99,9 +106,16 @@ explicit:
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$' }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneLocal|KubernetesVersionLocal|KubernetesVersionLocalHA|AllLocal)$', V2PROV_TEST_CPUS: 8 }
       - { V2PROV_TEST_DIST: rke2, V2PROV_TEST_RUN_REGEX: '^Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode(NoneS3|KubernetesVersionS3|AllS3)$', V2PROV_TEST_CPUS: 8 }
+  - name: kdm
+    meta:
+      V2PROV_TEST_TIMEOUT: 60m
+    tests:
+      - { V2PROV_TEST_RUN_REGEX: '^Test_Operation_(SetA|SetC)_.*$', V2PROV_TEST_RUN_ON_RELEASE: true }
+      - { V2PROV_TEST_RUN_REGEX: '^Test_Operation_SetB_.*$', V2PROV_TEST_RUN_ON_RELEASE: true }
+      - { V2PROV_TEST_RUN_REGEX: '^Test_Provisioning_.*$', V2PROV_TEST_RUN_ON_RELEASE: true }
+
 # This field could also track scopes for repos
 # which import the provisioning tests.
-# - name: kdm
 # - name: system-agent
 # - name: turtles
 
@@ -246,7 +260,7 @@ scopes:
       - path: '^trigger-prebootstrap-ci$' # created by the 'Create CI Testing PR' workflow
     tests:
       # rke2 runs this via basic's General row.
-#      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_General_PreBootstrap_.*$', V2PROV_TEST_CPUS: 8 }
+      - { V2PROV_TEST_DIST: k3s,  V2PROV_TEST_RUN_REGEX: '^Test_General_PreBootstrap_.*$', V2PROV_TEST_CPUS: 8 }
 
 full:
   - path: '^build.yaml'

@@ -70,6 +70,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreColonToken(t *testi
 		t.Fatal(err)
 	}
 	defer cs.Close()
+	t.Parallel()
 
 	fx := setUpImportedCluster(t, cs, "test-restore-colon-token", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
@@ -95,7 +96,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestoreColonToken(t *testi
 	cm.create(t, fx)
 
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef, fx.kubectl(t))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 	waitForSnapshots(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, snapshotsValidAfter, 1)
 	snapshot := waitForBackpopulatedSnapshot(t, cs, fx.mgmtCluster.Name, fx.mgmtCluster.Name, "imported-init-0", snapshotsValidAfter)

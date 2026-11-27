@@ -11,6 +11,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +135,7 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 
 	// Keep selection scoped to the snapshot created by this test run.
 	snapshotsValidAfter := time.Now().Add(-30 * time.Second)
-	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.Namespace, capiClusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, cs, fx.Namespace, capiClusterRef, caprke2Kubectl(t, cs, fx))
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	// For Turtles-imported CAPRKE2, snapshotbackpopulate writes snapshots to the management-cluster
@@ -194,6 +195,15 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	ekrOp := RunEncryptionKeyRotationOperationTest(t, cs, fx.Namespace, capiClusterRef)
 	t.Logf("encryption key rotation operation %s/%s completed", ekrOp.Namespace, ekrOp.Name)
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, ekrOp.Status.Phase)
+}
+
+// caprke2Kubectl returns an operations.Kubectl that runs on the newest control-plane machine, picked
+// on every call so it follows machine replacement.
+func caprke2Kubectl(t *testing.T, cs *clients.Clients, fx *cluster.CAPRKE2Fixture) operations.Kubectl {
+	return func(ctx context.Context, args ...string) ([]byte, error) {
+		t.Helper()
+		return cluster.RunCAPRKE2Kubectl(ctx, pickCAPRKE2InitMachineName(t, cs, fx), args...)
+	}
 }
 
 // pickCAPRKE2InitMachineName returns the name of the newest control-plane CAPI Machine in the

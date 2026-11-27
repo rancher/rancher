@@ -171,7 +171,7 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 
 	preSaveFeedback := getMachinePlanFeedbackState(t, clients, fixture.mgmtCluster.Name, newMachinePlanSecretName)
 	t.Logf("pre-save machine-plan feedback on %s: %s", newMachinePlanSecretName, formatMachinePlanFeedbackState(preSaveFeedback))
-	saveOp := RunETCDSnapshotSaveOperationTest(t, clients, fixture.ns.Name, fixture.clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, clients, fixture.ns.Name, fixture.clusterRef, fixture.kubectl(t))
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, saveOp.Status.Phase)
 	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&saveOp.Status))
 	assert.NotContains(t, opv1alpha1.InProgressCondition.GetMessage(&saveOp.Status), planner.WaitingPlanStatusMessage)
