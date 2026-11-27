@@ -82,21 +82,6 @@ func TestStopForgetsAFailure(t *testing.T) {
 	assert.Equal(t, ControllersStopped, m.ControllersState(cluster).Phase)
 }
 
-func TestStopWithErrorStopsAndRecordsTheFailure(t *testing.T) {
-	// Stop forgets failures, so the failure has to survive the stop it comes with.
-	m := &Manager{}
-	r := newStartedTestRecord("c-m-test", "uid-1", true)
-	m.controllers.Store(r.clusterRec.UID, r)
-	boom := errors.New("boom")
-
-	m.stopWithError(r.clusterRec, boom)
-
-	assert.Error(t, r.ctx.Err(), "the record should be stopped")
-	state := m.ControllersState(r.clusterRec)
-	assert.Equal(t, ControllersFailed, state.Phase)
-	assert.Same(t, boom, state.Err)
-}
-
 func TestHandleStartSuccessRecordsRunningAndEnqueues(t *testing.T) {
 	clusters := newTestClusters(newTestCluster("c-m-test", "uid-1"))
 	m := &Manager{clusters: clusters}
@@ -218,14 +203,27 @@ func TestStartRetryDelay(t *testing.T) {
 	assert.Equal(t, startRetryMaxDelay, startRetryDelay(math.MaxInt), "the delay is capped without overflowing")
 }
 
-func TestStopWithErrorLeavesTheBackoffToTheCaller(t *testing.T) {
+func TestRecordBuildFailureLeavesTheBackoffToTheCaller(t *testing.T) {
 	// The error is returned from Start, so the controller loop backs the cluster off.
 	m := &Manager{}
 	cluster := newTestCluster("c-m-test", "uid-1")
 
-	m.stopWithError(cluster, errors.New("boom"))
+	boom := errors.New("boom")
+	m.recordBuildFailure(cluster, boom)
 
-	assert.True(t, m.ControllersState(cluster).RetryAt.IsZero())
+	assert.Equal(t, ControllersState{Phase: ControllersFailed, Err: boom}, m.ControllersState(cluster))
+}
+
+func TestRecordBuildFailureKeepsPendingBackoff(t *testing.T) {
+	m := &Manager{}
+	cluster := newTestCluster("c-m-test", "uid-1")
+	startErr := errors.New("controller startup failed")
+	retryAt := time.Now().Add(time.Minute)
+	m.failures.Store(cluster.UID, &startFailure{err: startErr, attempts: 1, retryAt: retryAt})
+
+	m.recordBuildFailure(cluster, errors.New("record build failed"))
+
+	assert.Equal(t, ControllersState{Phase: ControllersFailed, Err: startErr, RetryAt: retryAt}, m.ControllersState(cluster))
 }
 
 func TestStartRecordsAFailureToBuildTheRecord(t *testing.T) {

@@ -55,23 +55,22 @@ func TestStopAndAFailedStartNeverLeaveAFailure(t *testing.T) {
 	}
 }
 
-func TestStopWithErrorAndAStartThatSucceededNeverLoseTheFailure(t *testing.T) {
-	// A start that succeeded only forgets failures while its record is current. Once stopWithError has
-	// replaced it, the failure it recorded is the cluster's.
+func TestRecordBuildFailureAndAStartThatSucceededKeepTheRecord(t *testing.T) {
+	// The successful start owns the current record, regardless of when the build failure is reported.
 	for range 500 {
 		m := &Manager{clusters: newTestClusters(newTestCluster("c-m-test", "uid-1"))}
 		r := newStartedTestRecord("c-m-test", "uid-1", true)
 		m.controllers.Store(r.clusterRec.UID, r)
-		boom := errors.New("boom")
-
 		runConcurrently(t,
 			func() { m.handleStartSuccess(r) },
-			func() { m.stopWithError(r.clusterRec, boom) },
+			func() { m.recordBuildFailure(r.clusterRec, errors.New("boom")) },
 		)
 
 		state := m.ControllersState(r.clusterRec)
-		require.Equal(t, ControllersFailed, state.Phase)
-		require.Same(t, boom, state.Err)
+		require.Equal(t, ControllersState{Phase: ControllersRunning, Owner: true}, state)
+		require.NoError(t, r.ctx.Err())
+		_, failed := m.failures.Load(r.clusterRec.UID)
+		require.False(t, failed)
 	}
 }
 
@@ -88,7 +87,7 @@ func TestFailuresAndRecordsCanBeUsedConcurrently(t *testing.T) {
 			func() { m.handleStartFailure(r, errors.New("boom")) },
 			func() { m.handleStartSuccess(r) },
 			func() { m.Stop(r.clusterRec) },
-			func() { m.stopWithError(r.clusterRec, errors.New("unreachable")) },
+			func() { m.recordBuildFailure(r.clusterRec, errors.New("unreachable")) },
 			func() { _ = m.ControllersState(r.clusterRec) },
 			func() {
 				// As in start: a record is installed before its start can fail.
