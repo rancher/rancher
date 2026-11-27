@@ -465,9 +465,9 @@ RUN mkdir /root/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config
 
-ENV CATTLE_ETCD_VERSION=v3.7.3
-ENV CATTLE_ETCD_CHECKSUM_amd64=5dfa9cc3b3ce3b4b491fbcc2057d3daa166bcc6676f743fcd20f8e5760cb9775
-ENV CATTLE_ETCD_CHECKSUM_arm64=ce4c08f5f43d99f0d1993552ce2906829c0366077a97e5e52529337f151a29fb
+ENV CATTLE_ETCD_VERSION=v3.7.4
+ENV CATTLE_ETCD_CHECKSUM_amd64=a0d47d07d081c12611fe69dc81a16ae8dd758401c0fe3a83d508823a1dac558e
+ENV CATTLE_ETCD_CHECKSUM_arm64=3f5d12a3b4119141bd5bc80a0a895100d049d6c85a2c76b1bb767204a899024a
 RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     case "${ARCH}" in \
         amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
