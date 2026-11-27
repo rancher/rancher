@@ -293,10 +293,24 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
-
-	result := s.h.chartVersionsForCluster(cluster)
-	s.Equal("1.34.5-15.1", result.imageTag)
+	for _, tt := range []struct {
+		version      string
+		imageTag     string
+		chartVersion string
+	}{
+		{"v1.36.0+k3s1", "1.36.2-6.1", "9.59.0"},
+		{"v1.35.0+k3s1", "1.35.3-14.1", "9.59.0"},
+		{"v1.34.0+k3s1", "1.34.5-18.1", "9.53.0"},
+		{"v1.33.0+k3s1", "1.33.4-18.1", "9.51.0"},
+		{"v1.32.0+k3s1", "1.32.7-16.1", "9.50.1"},
+	} {
+		s.Run(tt.version, func() {
+			s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", tt.version, true)
+			result := s.h.chartVersionsForCluster(cluster)
+			s.Equal(tt.imageTag, result.imageTag)
+			s.Equal(tt.chartVersion, result.chartVersion)
+		})
+	}
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
@@ -308,7 +322,14 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 	}
 
 	result := s.h.chartVersionsForCluster(cluster)
-	s.Equal(defaultChartVersionConfigs.imageTag, result.imageTag)
+	s.Equal("1.35.3-14.1", result.imageTag)
+	s.Equal("9.59.0", result.chartVersion)
+
+	cluster = s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.37.0+k3s1", true)
+	result = s.h.chartVersionsForCluster(cluster)
+	s.Equal("1.35.3-14.1", result.imageTag)
+	s.Equal("9.59.0", result.chartVersion)
 }
 
 // Test cases for getChartImageSettings method
