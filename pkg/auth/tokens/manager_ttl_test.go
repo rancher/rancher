@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/stretchr/testify/assert"
@@ -175,6 +176,62 @@ func TestCreateDerivedTokenTTL(t *testing.T) {
 			assert.Equal(t, test.want, tokens.created[0].TTLMillis)
 		})
 	}
+}
+
+func TestCreateDerivedTokenTTLAboveMax(t *testing.T) {
+	tests := []struct {
+		name string
+		ttl  int64
+	}{
+		{
+			name: "above the hard limit",
+			ttl:  exttokenstore.MaxTTL + 1,
+		},
+		{
+			name: "above the range of time.Duration",
+			ttl:  10_000_000_000_000, // about 317 years
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setTokenTTLSettings(t, "0", "43200", "129600", "43200")
+
+			tokenName := "login"
+			tokenKey := mustGenerateRandomToken(t)
+			tokens := &recordingTokenClient{
+				fakeTokenClient: fakeTokenClient{
+					get: &apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{Name: tokenName},
+						Token:      tokenKey,
+						UserID:     "u-mo12345",
+					},
+				},
+			}
+			di := &dummyIndexer{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
+			di.Empty()
+			manager := Manager{tokenIndexer: di, tokens: tokens}
+
+			_, _, status, err := manager.createDerivedToken(clientv3.Token{TTLMillis: test.ttl}, tokenName+":"+tokenKey)
+			require.ErrorIs(t, err, exttokenstore.ErrTTLExceedsMax)
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Empty(t, tokens.created)
+		})
+	}
+}
+
+func TestSetTokenExpiresAtLongTTL(t *testing.T) {
+	created := time.Date(2026, time.November, 9, 0, 0, 0, 0, time.UTC)
+	token := &apiv3.Token{
+		ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.NewTime(created)},
+		TTLMillis:  10_000_000_000_000, // about 317 years
+	}
+
+	SetTokenExpiresAt(token)
+
+	expiresAt, err := time.Parse(time.RFC3339, token.ExpiresAt)
+	require.NoError(t, err)
+	assert.True(t, expiresAt.After(created.Add(290*365*24*time.Hour)), "expiresAt %s", token.ExpiresAt)
 }
 
 func TestEnsureClusterTokenNegativeTTL(t *testing.T) {
