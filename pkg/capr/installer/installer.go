@@ -108,7 +108,11 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 		if envVar.Value == "" {
 			continue
 		}
-		envVarBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", envVar.Name, envVar.Value))
+		if !capr.IsValidEnvVarName(envVar.Name) {
+			logrus.Warnf("skipping invalid shell variable name: %q", envVar.Name)
+			continue
+		}
+		envVarBuf.WriteString(fmt.Sprintf("export %s=%s\n", envVar.Name, capr.ShellSingleQuote(envVar.Value)))
 	}
 	server := ""
 	if settings.ServerURL.Get() != "" {
@@ -177,15 +181,17 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 			Name:  "CATTLE_TOKEN",
 			Value: token,
 		}, false)
-		cattleRoleNone = capr.FormatWindowsEnvVar(corev1.EnvVar{
-			Name:  "CATTLE_ROLE_NONE",
-			Value: "\"true\"",
-		}, false)
+		// FormatWindowsEnvVar would turn "true" into the PowerShell boolean.
+		cattleRoleNone = fmt.Sprintf("$env:CATTLE_ROLE_NONE=%s", capr.PowerShellQuote("true"))
 	}
 
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
 		if envVar.Value == "" {
+			continue
+		}
+		if !capr.IsValidEnvVarName(strings.TrimPrefix(envVar.Name, "$env:")) {
+			logrus.Warnf("skipping invalid PowerShell variable name: %q", envVar.Name)
 			continue
 		}
 		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false) + "\n")
@@ -214,11 +220,11 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 # Enables CSI Proxy
 $env:CSI_PROXY_URL = "%s"
 $env:CSI_PROXY_VERSION = "%s"
-$env:CSI_PROXY_KUBELET_PATH = "C:%s/bin/kubelet.exe"
+$env:CSI_PROXY_KUBELET_PATH = %s
 $env:STRICT_VERIFY = "%s"
 %s
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, dataDir, strictVerify, cattleRoleNone)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, capr.PowerShellQuote("C:"+dataDir+"/bin/kubelet.exe"), strictVerify, cattleRoleNone)), nil
 }

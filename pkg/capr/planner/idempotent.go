@@ -49,7 +49,7 @@ func generateIdempotencyCleanupInstruction(controlPlane *rkev1.RKEControlPlane, 
 		Command: "/bin/sh",
 		Args: []string{
 			"-c",
-			fmt.Sprintf("rm -rf %s/idempotence/%s", capr.GetProvisioningDataDir(&controlPlane.Spec.ClusterConfiguration), key),
+			fmt.Sprintf("rm -rf %s", capr.ShellQuote(capr.GetProvisioningDataDir(&controlPlane.Spec.ClusterConfiguration)+"/idempotence/"+key)),
 		},
 	}
 }
