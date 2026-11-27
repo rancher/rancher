@@ -444,6 +444,8 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = configType
+	// All SAML providers support Single Log Out.
+	config.LogoutAllSupported = true
 	config.ObjectMeta = storedMeta
 
 	var field string

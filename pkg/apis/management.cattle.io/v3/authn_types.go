@@ -317,7 +317,7 @@ type AuthConfig struct {
 	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
 
 	// Flag. True when the auth provider supports a `Logout All` operation.
-	// Currently only the SAML providers do, with their `Single Log Out` flow.
+	// Set by the SAML, OIDC-based and Azure AD providers when their config is saved.
 	LogoutAllSupported bool `json:"logoutAllSupported,omitempty"`
 
 	// DisplayName is the user friendly name shown in the UI.

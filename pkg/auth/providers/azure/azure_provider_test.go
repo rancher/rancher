@@ -409,12 +409,8 @@ func TestPreserveStoredFields(t *testing.T) {
 			want:     v3.AzureADConfig{},
 		},
 		{
-			name: "LogoutAllSupported preserved from stored",
-			stored: v3.AzureADConfig{
-				AuthConfig: v3.AuthConfig{
-					LogoutAllSupported: true,
-				},
-			},
+			name:     "LogoutAllSupported set even when stored is false",
+			stored:   v3.AzureADConfig{},
 			incoming: v3.AzureADConfig{},
 			want: v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
@@ -548,6 +544,8 @@ func TestPreserveStoredFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			preserveStoredFields(&tt.stored, &tt.incoming)
+			// LogoutAllSupported is a provider capability and is always set.
+			tt.want.LogoutAllSupported = true
 			assert.Equal(t, tt.want, tt.incoming)
 		})
 	}

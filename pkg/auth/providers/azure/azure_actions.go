@@ -153,7 +153,8 @@ func preserveStoredFields(stored, incoming *apiv3.AzureADConfig) {
 	if incoming.EndSessionEndpoint == "" {
 		incoming.EndSessionEndpoint = stored.EndSessionEndpoint
 	}
-	incoming.LogoutAllSupported = stored.LogoutAllSupported
+	// Azure AD supports SSO logout; this is a capability of the provider, not a user setting.
+	incoming.LogoutAllSupported = true
 }
 
 // migrateNewFlowAnnotation ensures the proposed config has the GraphEndpointMigratedAnnotation set.
