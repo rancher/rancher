@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/channelserver/pkg/server"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/data"
-	"github.com/rancher/wrangler/v3/pkg/schemas"
 	"github.com/sirupsen/logrus"
 )
 
@@ -78,8 +77,8 @@ func (d *DynamicSource) URL() string {
 
 func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernetesVersion string) model.Release {
 	fallBack := model.Release{
-		AgentArgs:  map[string]schemas.Field{},
-		ServerArgs: map[string]schemas.Field{},
+		AgentArgs:  map[string]model.Arg{},
+		ServerArgs: map[string]model.Arg{},
 	}
 	cfg := GetReleaseConfigByRuntime(ctx, runtime)
 	if cfg == nil {
