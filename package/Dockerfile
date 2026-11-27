@@ -100,6 +100,13 @@ RUN ./export-images -arch ${TARGETARCH} -k3s-version ${CATTLE_K3S_VERSION} -outp
 FROM scratch AS k3s-images
 COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
 
+# Download system charts for embedding
+FROM --platform=$BUILDPLATFORM go-builder AS systemcharts
+ARG TARGETARCH
+WORKDIR /src
+COPY hack/systemcharts/* build.yaml /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go run ./main.go --build-yaml build.yaml --output-dir /systemcharts
+
 # rancher-build is an intermediate target to build Rancher's go binaries.
 # go mod dependencies are early loaded, to optimize caching
 FROM --platform=$BUILDPLATFORM go-builder AS rancher-build
@@ -130,7 +137,7 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod do
 
 ARG VERSION
 ARG COMMIT
-ARG TAGS="k8s"
+ARG TAGS="embedded_systemcharts"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG GCFLAGS
 ARG TARGETOS
@@ -139,6 +146,7 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 COPY pkg/ pkg/
 COPY main.go ./
+COPY --from=systemcharts /systemcharts/*.tgz pkg/catalogv2/system/embedded/
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "-X main.VERSION=${VERSION} ${LINKFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
