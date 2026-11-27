@@ -1602,6 +1602,23 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"redirectUrl":        "https://example.com/realms/rancher/protocol/openid-connect/auth?client_id=rancher&response_type=code&redirect_uri=https://localhost:9443/verify-auth",
 			},
 		},
+		"with no API Host and a query string in the auth endpoint": {
+			beforeAuthConfig: map[string]any{
+				"metadata": map[string]any{
+					"name": "genericoidc",
+				},
+				"clientId":     "rancher",
+				"rancherUrl":   "https://localhost:9443/verify-auth",
+				"authEndpoint": "https://example.us.auth0.com/authorize?connection=my-connection",
+			},
+			want: map[string]any{
+				"id":                 "genericoidc",
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+				"logoutAllSupported": false,
+				"redirectUrl":        "https://example.us.auth0.com/authorize?connection=my-connection&client_id=rancher&response_type=code&redirect_uri=https://localhost:9443/verify-auth",
+			},
+		},
 		"with an API Host configured": {
 			beforeAuthConfig: map[string]any{
 				"metadata": map[string]any{
@@ -1722,6 +1739,16 @@ func TestGetOIDCRedirectionURL(t *testing.T) {
 			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback",
 		},
 		{
+			name: "Auth endpoint with a trailing question mark",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth?",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback",
+			},
+			pkceVerifier: "",
+			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback",
+		},
+		{
 			name: "With special characters in URLs",
 			config: map[string]any{
 				"authEndpoint": "https://provider.example.com/auth?extra=param",
@@ -1729,7 +1756,7 @@ func TestGetOIDCRedirectionURL(t *testing.T) {
 				"rancherUrl":   "https://rancher.example.com/callback?state=xyz",
 			},
 			pkceVerifier: "",
-			expectedURL:  "https://provider.example.com/auth?extra=param?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback?state=xyz",
+			expectedURL:  "https://provider.example.com/auth?extra=param&client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback?state=xyz",
 		},
 	}
 
