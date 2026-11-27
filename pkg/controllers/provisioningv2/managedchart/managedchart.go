@@ -40,13 +40,17 @@ type chartGetter interface {
 	Chart(namespace, name, chartName, version string, skipFilter bool) (io.ReadCloser, error)
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context) error {
+	contentManager, err := content.NewManager(
+		clients.K8s.Discovery(),
+		clients.Core.ConfigMap().Cache(),
+		clients.Core.Secret().Cache(),
+		clients.Catalog.ClusterRepo().Cache())
+	if err != nil {
+		return fmt.Errorf("failed to initialize catalog manager: %w", err)
+	}
 	h := &handler{
-		charts: content.NewManager(
-			clients.K8s.Discovery(),
-			clients.Core.ConfigMap().Cache(),
-			clients.Core.Secret().Cache(),
-			clients.Catalog.ClusterRepo().Cache()),
+		charts:        contentManager,
 		mccCache:      clients.Mgmt.ManagedChart().Cache(),
 		mccController: clients.Mgmt.ManagedChart(),
 		bundleCache:   clients.Fleet.Bundle().Cache(),
@@ -74,6 +78,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.Mgmt.ManagedChart().Cache().AddIndexer(chartByRepo, func(obj *v3.ManagedChart) ([]string, error) {
 		return []string{obj.Spec.RepoName}, nil
 	})
+
+	return nil
 }
 
 type handler struct {

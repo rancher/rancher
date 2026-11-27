@@ -499,16 +499,19 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	content := content.NewManager(
+	contentManager, err := content.NewManager(
 		k8s.Discovery(),
 		core.Core().V1().ConfigMap().Cache(),
 		core.Core().V1().Secret().Cache(),
 		helm.Catalog().V1().ClusterRepo().Cache())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create content manager: %w", err)
+	}
 
 	helmop := helmop.NewOperations(cg,
 		helm.Catalog().V1(),
 		rbac.Rbac().V1(),
-		content,
+		contentManager,
 		core.Core().V1().Pod(),
 		core.Core().V1().Node(),
 		core.Core().V1().Secret())
@@ -523,7 +526,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 	helmClient := helmcfg.NewClient(restClientGetter)
 
-	systemCharts, err := system.NewManager(ctx, content, helmop, core.Core().V1().Pod(),
+	systemCharts, err := system.NewManager(ctx, contentManager, helmop, core.Core().V1().Pod(),
 		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo(), helmClient)
 	if err != nil {
 		return nil, err
@@ -572,7 +575,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		controllerLock:          &sync.Mutex{},
 		PeerManager:             peerManager,
 		RESTClientGetter:        restClientGetter,
-		CatalogContentManager:   content,
+		CatalogContentManager:   contentManager,
 		HelmOperations:          helmop,
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
