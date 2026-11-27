@@ -99,7 +99,10 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 			if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup {
 				logrus.Tracef("[unmanaged] handling related resource for CAPI machine %s/%s", m.Namespace, m.Name)
 				rkeCluster, err := clients.RKE.RKECluster().Get(m.Namespace, m.Spec.ClusterName, metav1.GetOptions{})
-				if err != nil {
+				if apierror.IsNotFound(err) {
+					// A cluster with a custom infrastructureRef has no RKECluster, so it cannot opt in to deleting missing machines.
+					return nil, nil
+				} else if err != nil {
 					return nil, err
 				}
 				if rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation] != "" && machineHasNodeNotFoundCondition(m) {
@@ -791,7 +794,10 @@ func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.Custom
 
 	clusterName := customMachine.Labels[capi.ClusterNameLabel]
 	rkeCluster, err := h.rkeClusterCache.Get(customMachine.Namespace, clusterName)
-	if err != nil {
+	if apierror.IsNotFound(err) {
+		// A cluster with a custom infrastructureRef has no RKECluster, so it cannot opt in to deleting missing machines.
+		return customMachine, nil
+	} else if err != nil {
 		return customMachine, err
 	}
 
