@@ -100,7 +100,6 @@ func Test_Provisioning_SetA_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +153,8 @@ func Test_Provisioning_SetA_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.
 						ControlPlaneRole: true,
 						WorkerRole:       true,
 						Quantity:         &defaults.One,
-					}},
+					},
+				},
 			},
 			ClusterAgentDeploymentCustomization: &provisioningv1api.AgentDeploymentCustomization{
 				OverrideAffinity: &corev1.Affinity{
@@ -357,6 +357,17 @@ func Test_Provisioning_SetB_MP_MachineTemplateClonedAnnotations(t *testing.T) {
 	}
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func Test_Provisioning_SetB_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
@@ -424,6 +435,17 @@ func Test_Provisioning_SetB_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	}
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func Test_Provisioning_SetB_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
