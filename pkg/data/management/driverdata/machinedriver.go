@@ -4,25 +4,25 @@
 package driverdata
 
 const (
-	AlibabaDriver      = "aliyunecs"
-	Amazonec2driver    = "amazonec2"
-	Azuredriver        = "azure"
-	DigitalOceandriver = "digitalocean"
-	ExoscaleDriver     = "exoscale"
-	HarvesterDriver    = "harvester"
-	Linodedriver       = "linode"
-	NutanixDriver      = "nutanix"
-	OCIDriver          = "oci"
-	OTCDriver          = "otc"
-	OpenstackDriver    = "openstack"
-	PacketDriver       = "packet"
-	PhoenixNAPDriver   = "pnap"
-	PodDriver          = "pod"
-	RackspaceDriver    = "rackspace"
-	SoftLayerDriver    = "softlayer"
-	Vmwaredriver       = "vmwarevsphere"
-	GoogleDriver       = "google"
-	OutscaleDriver     = "outscale"
+	AlibabaDriver          = "aliyunecs"
+	Amazonec2driver        = "amazonec2"
+	Azuredriver            = "azure"
+	DigitalOceandriver     = "digitalocean"
+	ExoscaleDriver         = "exoscale"
+	HarvesterDriver        = "harvester"
+	Linodedriver           = "linode"
+	NutanixDriver          = "nutanix"
+	OCIDriver              = "oci"
+	OpenTelekomCloudDriver = "opentelekomcloud"
+	OpenstackDriver        = "openstack"
+	PacketDriver           = "packet"
+	PhoenixNAPDriver       = "pnap"
+	PodDriver              = "pod"
+	RackspaceDriver        = "rackspace"
+	SoftLayerDriver        = "softlayer"
+	Vmwaredriver           = "vmwarevsphere"
+	GoogleDriver           = "google"
+	OutscaleDriver         = "outscale"
 )
 
 // DriverDataConfig contains driver‑specific metadata that is parsed as
@@ -80,10 +80,13 @@ var DriverData = map[string]DriverDataConfig{
 		PrivateCredentialFields: []string{"privateKeyContents"},
 		PasswordFields:          []string{"privateKeyPassphrase"},
 	},
-	OTCDriver: {
-		FileToFieldAliases:      map[string]string{"privateKeyFile": "privateKeyFile"},
-		PublicCredentialFields:  []string{"accessKey", "username"},
+	OpenTelekomCloudDriver: {
+		FileToFieldAliases:      map[string]string{"privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+		PublicCredentialFields:  []string{"accessKey", "username", "domainId", "domainName", "projectId", "projectName", "region", "authUrl"},
 		PrivateCredentialFields: []string{"secretKey", "password", "token"},
+		PasswordFields:          []string{"secretKey", "password", "token"},
+		// The driver accepts alternative authentication methods, so no single credential field is required.
+		OptionalCredentialFields: []string{"accessKey", "username", "domainId", "domainName", "projectId", "projectName", "region", "authUrl", "secretKey", "password", "token"},
 	},
 	OpenstackDriver: {
 		FileToFieldAliases:      map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
