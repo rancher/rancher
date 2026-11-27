@@ -79,7 +79,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
 	if features.OIDCProvider.Enabled() {
 		rb.addRole("Manage OIDC Clients", "manage-oidc-clients").
-			addRule().apiGroups("management.cattle.io").resources("oidcclients").verbs("get", "list", "patch", "create", "update", "watch", "delete", "deletecollection")
+			addRule().apiGroups("management.cattle.io").resources("oidcclients").verbs("get", "list", "patch", "create", "update", "watch", "delete", "deletecollection").
+			addNamespacedRule("cattle-oidc-client-secrets").addRule().apiGroups("").resources("secrets").verbs("get", "list", "watch")
 	}
 	rb.addRole("Admin", "admin").
 		addRule().apiGroups("*").resources("*").verbs("*").
