@@ -25,6 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	setID  = "rke2-machine-config-cleanup"
+	prefix = "rke2-machineconfig-cleanup"
+)
+
 type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	secretCache               corecontrollers.SecretCache
@@ -72,7 +77,7 @@ func (h *handler) onChange(_ string, obj *v3apis.ClusterRegistrationToken) (_ *v
 	}
 
 	if err := h.apply.
-		WithSetID("rke2-machine-config-cleanup").
+		WithSetID(setID).
 		WithDynamicLookup().
 		WithNoDelete().ApplyObjects(cleanupObjects(token)...); err != nil {
 		return nil, err
@@ -100,7 +105,6 @@ func cleanupObjects(token string) []runtime.Object {
 
 	// Use fleet-local namespace as it's guaranteed to exist.
 	namespace := fleet.ClustersLocalNamespace
-	prefix := "rke2-machineconfig-cleanup"
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
