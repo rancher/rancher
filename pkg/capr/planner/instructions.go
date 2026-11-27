@@ -141,7 +141,7 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 					"-c",
 					// the grep here is to make the command fail if we don't get the output we expect, like empty string.
 					fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert %s https://localhost:%d/db/info | grep 'clientURLs'",
-						path.Join(capr.GetDistroDataDir(controlPlane), "server/tls/server-ca.crt"),
+						capr.ShellQuote(path.Join(capr.GetDistroDataDir(controlPlane), "server/tls/server-ca.crt")),
 						capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
 				},
 			},
@@ -153,7 +153,7 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 				Command: "sh",
 				Args: []string{
 					"-c",
-					fmt.Sprintf("cat %s", path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/name")),
+					fmt.Sprintf("cat %s", capr.ShellQuote(path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/name"))),
 				},
 			},
 			PeriodSeconds: 600,
@@ -174,7 +174,7 @@ func generateManifestRemovalInstruction(controlPlane *rkev1.RKEControlPlane, ent
 			Command: "/bin/sh",
 			Args: []string{
 				"-c",
-				fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests"), runtime),
+				fmt.Sprintf("rm -rf %s/%s-*.yaml", capr.ShellQuote(path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests")), runtime),
 			},
 		},
 	}

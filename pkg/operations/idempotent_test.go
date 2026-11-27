@@ -3,6 +3,9 @@ package operations
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -193,5 +196,57 @@ func TestIdempotentInstructionChangesWithValue(t *testing.T) {
 
 	if a.Name == b.Name {
 		t.Errorf("instruction Name should differ when value changes: %q", a.Name)
+	}
+}
+
+func TestGenerateIdempotencyCleanupInstructionHostilePath(t *testing.T) {
+	t.Parallel()
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skipf("/bin/sh is not available: %v", err)
+	}
+
+	base := t.TempDir()
+	canary := filepath.Join(base, "canary")
+	tests := []struct {
+		name    string
+		dirName string
+	}{
+		{name: "normal", dirName: "capr"},
+		{name: "space", dirName: "with space"},
+		{name: "newline", dirName: "new\nline"},
+		{name: "single quote", dirName: "it's"},
+		{name: "backslash", dirName: `back\slash`},
+		{name: "substitution", dirName: "$(touch " + canary + ")"},
+		{name: "backtick", dirName: "`touch " + canary + "`"},
+		{name: "semicolon", dirName: "x;touch " + canary},
+		{name: "quote escape", dirName: "x'; touch " + canary + "; echo '"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provisioningDir := filepath.Join(base, strings.ReplaceAll(tt.name, " ", "-"), tt.dirName)
+			target := filepath.Join(provisioningDir, "idempotence", "etcd-restore")
+			if err := os.MkdirAll(target, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			keep := filepath.Join(provisioningDir, "idempotence", "other")
+			if err := os.MkdirAll(keep, 0o700); err != nil {
+				t.Fatal(err)
+			}
+
+			got := GenerateIdempotencyCleanupInstruction(provisioningDir, "etcd-restore")
+			if out, err := exec.Command(got.Command, got.Args...).CombinedOutput(); err != nil {
+				t.Fatalf("command failed: %v, output: %s", err, out)
+			}
+
+			if _, err := os.Stat(target); !os.IsNotExist(err) {
+				t.Errorf("target %q still exists, err = %v", target, err)
+			}
+			if _, err := os.Stat(keep); err != nil {
+				t.Errorf("sibling %q was removed: %v", keep, err)
+			}
+			if _, err := os.Stat(canary); !os.IsNotExist(err) {
+				t.Errorf("the command ran a second command, err = %v", err)
+			}
+		})
 	}
 }
