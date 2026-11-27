@@ -21,6 +21,8 @@ const (
 	DynamicSchemaFieldName                 = "name"
 	DynamicSchemaFieldOwnerReferences      = "ownerReferences"
 	DynamicSchemaFieldPluralName           = "pluralName"
+	DynamicSchemaFieldPrivateFields        = "privateFields"
+	DynamicSchemaFieldPublicFields         = "publicFields"
 	DynamicSchemaFieldRemoved              = "removed"
 	DynamicSchemaFieldResourceActions      = "resourceActions"
 	DynamicSchemaFieldResourceFields       = "resourceFields"
@@ -50,6 +52,8 @@ type DynamicSchema struct {
 	Name                 string               `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PluralName           string               `json:"pluralName,omitempty" yaml:"pluralName,omitempty"`
+	PrivateFields        []string             `json:"privateFields,omitempty" yaml:"privateFields,omitempty"`
+	PublicFields         []string             `json:"publicFields,omitempty" yaml:"publicFields,omitempty"`
 	Removed              string               `json:"removed,omitempty" yaml:"removed,omitempty"`
 	ResourceActions      map[string]Action    `json:"resourceActions,omitempty" yaml:"resourceActions,omitempty"`
 	ResourceFields       map[string]Field     `json:"resourceFields,omitempty" yaml:"resourceFields,omitempty"`
