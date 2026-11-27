@@ -1128,3 +1128,65 @@ func Test_getNamespacedSecret(t *testing.T) {
 	assert.Equal(t, "old-value", src.Annotations[userSecretAnnotation])
 	assert.Equal(t, "src-namespace", src.Namespace)
 }
+
+func Test_areSecretsSame_pssCopyLabels(t *testing.T) {
+	pssLabels := map[string]string{
+		ProjectScopedSecretLabel:        "p-thisp",
+		ProjectScopedSecretClusterLabel: "c-m-cluster",
+	}
+	annotations := map[string]string{pssCopyAnnotation: "true"}
+	data := map[string][]byte{"key": []byte("value")}
+
+	original := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      pssLabels,
+			Annotations: annotations,
+		},
+		Data: data,
+	}
+
+	tests := []struct {
+		name string
+		s2   *corev1.Secret
+		want bool
+	}{
+		{
+			name: "identical copy carrying both PSS labels is the same secret",
+			s2: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{ProjectScopedSecretLabel: "p-thisp", ProjectScopedSecretClusterLabel: "c-m-cluster"},
+					Annotations: annotations,
+				},
+				Data: map[string][]byte{"key": []byte("value")},
+			},
+			want: true,
+		},
+		{
+			name: "copy with a different project label is not the same secret",
+			s2: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{ProjectScopedSecretLabel: "p-other", ProjectScopedSecretClusterLabel: "c-m-cluster"},
+					Annotations: annotations,
+				},
+				Data: data,
+			},
+			want: false,
+		},
+		{
+			name: "copy missing the cluster label is not the same secret",
+			s2: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{ProjectScopedSecretLabel: "p-thisp"},
+					Annotations: annotations,
+				},
+				Data: data,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, areSecretsSame(original, tt.s2))
+		})
+	}
+}
