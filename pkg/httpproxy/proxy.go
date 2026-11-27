@@ -1,6 +1,11 @@
 package httpproxy
 
 import (
+	"bytes"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -23,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/publicsuffix"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -41,42 +47,39 @@ const (
 	hostRegex    = "[A-Za-z0-9-]+"
 	CSP          = "Content-Security-Policy"
 	XContentType = "X-Content-Type-Options"
+
+	MatchScoreExcellent = 3
+	MatchScoreGood      = 2
+	MatchScoreFair      = 1
+	MatchScorePoor      = 0
+	MatchScoreLowest    = -1
+
+	maxCABundleBytes = 100000
 )
 
 var (
 	httpStart  = regexp.MustCompile("^http:/([^/])")
 	httpsStart = regexp.MustCompile("^https:/([^/])")
 	badHeaders = map[string]bool{
-		"host":                    true,
-		"transfer-encoding":       true,
-		"content-length":          true,
-		"x-api-auth-header":       true,
-		"x-api-cattleauth-header": true,
 		"authorization":           true,
-		"cookie":                  true,
 		"cf-connecting-ip":        true,
 		"cf-ray":                  true,
+		"content-length":          true,
+		"cookie":                  true,
+		"host":                    true,
+		"referer":                 true,
+		"transfer-encoding":       true,
+		"x-api-auth-header":       true,
+		"x-api-cattleauth-header": true,
 	}
 	badHeaderPrefixes = []string{
 		"impersonate-",
+		"sec-",
+		"x-api",
+		"x-forwarded",
+		"x-real",
 	}
 )
-
-func isBadHeader(header string) bool {
-	header = strings.ToLower(header)
-
-	if badHeaders[header] {
-		return true
-	}
-
-	for _, prefix := range badHeaderPrefixes {
-		if strings.HasPrefix(header, prefix) {
-			return true
-		}
-	}
-
-	return false
-}
 
 type Supplier func() []string
 
@@ -86,37 +89,9 @@ type proxy struct {
 	credentials        v1.SecretInterface
 	mgmtClustersCache  mgmtv3.ClusterCache
 	provClustersCache  provv1.ClusterCache
+	proxyEndpointCache mgmtv3.ProxyEndpointCache
 	authorizer         authorizer.Authorizer
-}
-
-func (p *proxy) isAllowed(host string) bool {
-	for _, valid := range p.validHostsSupplier() {
-		if valid == host {
-			return true
-		}
-
-		// Ideally the rancher webhook would prevent resources from specifying an overly
-		// broad domain from the get-go, but due to rancher/rancher/issues/50631,
-		// this may not always be the case. To prevent potential security issues,
-		// we also check for overly broad domains here and skip them if found.
-		if isOverlyBroad(valid) {
-			logrus.Debugf("Skipping overly broad wildcard match for proxy request: %s", valid)
-			continue
-		}
-
-		if strings.HasPrefix(valid, "*") && strings.HasSuffix(host, valid[1:]) {
-			return true
-		}
-
-		if strings.Contains(valid, ".%.") || strings.HasPrefix(valid, "%.") {
-			r := constructRegex(valid)
-			if match := r.MatchString(host); match {
-				return true
-			}
-		}
-	}
-
-	return false
+	insecureTransport  http.RoundTripper
 }
 
 func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) (http.Handler, error) {
@@ -127,18 +102,22 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		WebhookRetryBackoff:       &auth.WebhookBackoff,
 	}
 
-	authorizer, err := cfg.New()
+	authorizerConfig, err := cfg.New()
 	if err != nil {
 		return nil, err
 	}
 
+	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	p := proxy{
-		authorizer:         authorizer,
+		authorizer:         authorizerConfig,
 		prefix:             prefix,
 		validHostsSupplier: validHosts,
 		credentials:        scaledContext.Core.Secrets(""),
 		mgmtClustersCache:  scaledContext.Wrangler.Mgmt.Cluster().Cache(),
 		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
+		proxyEndpointCache: scaledContext.Wrangler.Mgmt.ProxyEndpoint().Cache(),
+		insecureTransport:  insecureTransport,
 	}
 
 	return stripInheritedCSP(newHandler(&p)), nil
@@ -150,6 +129,7 @@ func newHandler(p *proxy) http.Handler {
 	rp := &httputil.ReverseProxy{
 		Director:       func(*http.Request) {},
 		ModifyResponse: setModifiedHeaders,
+		Transport:      &perRouteTLSTransport{proxy: p},
 	}
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -171,20 +151,7 @@ func stripInheritedCSP(next http.Handler) http.Handler {
 	})
 }
 
-func setModifiedHeaders(res *http.Response) error {
-	// replace set cookies
-	res.Header.Del(APISetCookie)
-	// There may be multiple set cookies
-	for _, setCookie := range res.Header[SetCookie] {
-		res.Header.Add(APISetCookie, setCookie)
-	}
-	res.Header.Del(SetCookie)
-	// add security headers (similar to raw.githubusercontent)
-	res.Header.Set(CSP, "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-	res.Header.Set(XContentType, "nosniff")
-	return nil
-}
-
+// main proxy method on the proxy type
 func (p *proxy) proxy(req *http.Request) error {
 	path := req.URL.String()
 	index := strings.Index(path, p.prefix)
@@ -220,15 +187,16 @@ func (p *proxy) proxy(req *http.Request) error {
 	cAuth := req.Header.Get(CattleAuth)
 
 	for key, value := range req.Header {
-		if isBadHeader(key) {
+		// APICookie matches the x-api prefix but replaceCookies below needs it.
+		if isBadHeader(key) && !strings.EqualFold(key, APICookie) {
 			continue
 		}
 
-		copy := make([]string, len(value))
+		copiedValues := make([]string, len(value))
 		for i := range value {
-			copy[i] = strings.TrimPrefix(value[i], "rancher:")
+			copiedValues[i] = strings.TrimPrefix(value[i], "rancher:")
 		}
-		headerCopy[key] = copy
+		headerCopy[key] = copiedValues
 	}
 
 	req.Host = destURLHostname
@@ -241,11 +209,17 @@ func (p *proxy) proxy(req *http.Request) error {
 	if auth != "" { // non-empty AuthHeader is noop
 		req.Header.Set(AuthHeader, auth)
 	} else if cAuth != "" {
-		// setting CattleAuthHeader will replace credential id with secret data
-		// and generate signature
+		// If a known signer mode is specified by the client, use it directly.
 		signer := newSigner(cAuth)
 		if signer != nil {
 			return signer.sign(req, p.secretGetter(req, cAuth), cAuth)
+		}
+		// No client-specified mode: check whether the matching ProxyEndpoint route
+		// defines a server-side injection pattern. This allows extension authors to
+		// control how credentials are applied without requiring the client to know
+		// the injection details.
+		if route := p.findMatchingRoute(destURLHostname); route != nil && route.CredentialInjection != nil {
+			return p.applyRouteInjection(req, cAuth, route)
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
@@ -253,42 +227,48 @@ func (p *proxy) proxy(req *http.Request) error {
 	return nil
 }
 
-func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
-	clusterID := getRequestParams(cAuth)["clusterID"]
-	return func(namespace, name string) (*corev1.Secret, error) {
-		user, ok := request.UserFrom(req.Context())
-		if !ok {
-			return nil, fmt.Errorf("failed to find user")
-		}
-		decision, reason, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
-			User:            user,
-			Verb:            "get",
-			Namespace:       namespace,
-			APIVersion:      "v1",
-			Resource:        "secrets",
-			Name:            name,
-			ResourceRequest: true,
-		})
-		if err != nil {
-			return nil, err
-		}
-		unauthorizedErr := fmt.Errorf("unauthorized %s to %s/%s: %s", user.GetName(), namespace, name, reason)
-		if decision != authorizer.DecisionAllow {
-			decision, err = p.checkIndirectAccessViaCluster(req, user, clusterID, fmt.Sprintf("%s:%s", namespace, name))
-			if err != nil {
-				return nil, err
-			}
-			if decision != authorizer.DecisionAllow {
-				return nil, unauthorizedErr
-			}
-		}
-		return p.credentials.Controller().Lister().Get(namespace, name)
+func decodeCABundleIfPossible(route *mgmt.ProxyEndpointRoute) {
+	if route.CABundle == "" {
+		return
 	}
+	possible, err := base64.StdEncoding.DecodeString(route.CABundle)
+	if err != nil {
+		return
+	}
+
+	route.CABundle = string(possible)
+}
+
+// applyRouteInjection fetches the credential identified by credID in cAuth, then applies the
+// injection pattern defined on the matching ProxyEndpoint route to the outgoing request.
+func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt.ProxyEndpointRoute) error {
+	credID := credentialIDFromCattleAuth(cAuth)
+	if credID == "" {
+		return fmt.Errorf("server-defined injection requires credID (credential ID) in %s header", CattleAuth)
+	}
+	secretData, err := getCredential(credID, p.secretGetter(req, cAuth))
+	if err != nil {
+		return fmt.Errorf("failed to retrieve credential for route injection: %w", err)
+	}
+	return applyInjectionSpec(req, route.CredentialInjection, secretData)
+}
+
+func (p *proxy) checkAccessToV3ClusterWithID(req *http.Request, user user.Info, clusterID string) (authorizer.Decision, error) {
+	decision, _, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
+		User:            user,
+		Verb:            "update",
+		APIGroup:        v3.GroupName,
+		APIVersion:      v3.Version,
+		Resource:        "clusters",
+		Name:            clusterID,
+		ResourceRequest: true,
+	})
+	return decision, err
 }
 
 // checkIndirectAccessViaCluster checks if the user has access to the cloud credential via being owner of a cluster associated to the cloud credential.
 // Currently, only EKS and provisioningv2 clusters are supported because those clusters have a cloud credential associated to them.
-// GKE and AKS clusters also have cloud credential associated to them, but those are checked via specific proxies (not the meta proxy).
+// GKE and AKS clusters also have cloud credentials associated to them, but those are checked via specific proxies (not the meta proxy).
 func (p *proxy) checkIndirectAccessViaCluster(req *http.Request, user user.Info, clusterID, credID string) (authorizer.Decision, error) {
 	var (
 		mgmtClusters []*mgmt.Cluster
@@ -348,28 +328,177 @@ func (p *proxy) checkIndirectAccessViaCluster(req *http.Request, user user.Info,
 	return authorizer.DecisionDeny, nil
 }
 
-func (p *proxy) checkAccessToV3ClusterWithID(req *http.Request, user user.Info, clusterID string) (authorizer.Decision, error) {
-	decision, _, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
-		User:            user,
-		Verb:            "update",
-		APIGroup:        v3.GroupName,
-		APIVersion:      v3.Version,
-		Resource:        "clusters",
-		Name:            clusterID,
-		ResourceRequest: true,
-	})
+func (p *proxy) isAllowed(host string) bool {
+	for _, valid := range p.validHostsSupplier() {
+		if valid == host {
+			return true
+		}
 
-	return decision, err
+		// Ideally the rancher webhook would prevent resources from specifying an overly
+		// broad domain from the get-go, but due to rancher/rancher/issues/50631,
+		// this may not always be the case. To prevent potential security issues,
+		// we also check for overly broad domains here and skip them if found.
+		if isOverlyBroad(valid) {
+			logrus.Debugf("Skipping overly broad wildcard match for proxy request: %s", valid)
+			continue
+		}
+
+		if strings.HasPrefix(valid, "*") && strings.HasSuffix(host, valid[1:]) {
+			return true
+		}
+
+		if strings.Contains(valid, ".%.") || strings.HasPrefix(valid, "%.") {
+			r := constructRegex(valid)
+			if match := r.MatchString(host); match {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
-func replaceCookies(req *http.Request) {
-	// Do not forward rancher cookies to third parties
-	req.Header.Del(Cookie)
-	// Allow client to use their own cookies with Cookie header
-	if cookie := req.Header.Get(APICookie); cookie != "" {
-		req.Header.Set(Cookie, cookie)
-		req.Header.Del(APICookie)
+// findMatchingRoute returns the most-specific ProxyEndpointRoute whose domain pattern matches host,
+// or nil if no match is found.
+//
+// Specificity order:
+// 1. exact domain match
+// 2. single-segment wildcard (%) pattern match
+// 3. prefix wildcard (*) pattern match
+//
+// Within the same class, the longer pattern wins.
+func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
+	endpoints, err := p.proxyEndpointCache.List(labels.Everything())
+	if err != nil {
+		logrus.Debugf("httpproxy: failed to list ProxyEndpoints for route lookup: %v", err)
+		return nil
 	}
+	var best *mgmt.ProxyEndpointRoute
+	bestScore := MatchScoreLowest
+	bestPatternLen := -1
+	for _, ep := range endpoints {
+		for i := range ep.Spec.Routes {
+			route := &ep.Spec.Routes[i]
+			score, matches := routeMatchScore(route.Domain, host)
+			if !matches {
+				continue
+			}
+			if score > bestScore || (score == bestScore && len(route.Domain) > bestPatternLen) {
+				best = route
+				bestScore = score
+				bestPatternLen = len(route.Domain)
+			}
+		}
+	}
+	return best
+}
+
+func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
+	clusterID := getRequestParams(cAuth)["clusterID"]
+	return func(namespace, name string) (*corev1.Secret, error) {
+		user, ok := request.UserFrom(req.Context())
+		if !ok {
+			return nil, fmt.Errorf("failed to find user")
+		}
+		decision, reason, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
+			User:            user,
+			Verb:            "get",
+			Namespace:       namespace,
+			APIVersion:      "v1",
+			Resource:        "secrets",
+			Name:            name,
+			ResourceRequest: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		unauthorizedErr := fmt.Errorf("unauthorized %s to %s/%s: %s", user.GetName(), namespace, name, reason)
+		if decision != authorizer.DecisionAllow {
+			decision, err = p.checkIndirectAccessViaCluster(req, user, clusterID, fmt.Sprintf("%s:%s", namespace, name))
+			if err != nil {
+				return nil, err
+			}
+			if decision != authorizer.DecisionAllow {
+				return nil, unauthorizedErr
+			}
+		}
+		return p.credentials.Controller().Lister().Get(namespace, name)
+	}
+}
+
+// perRouteTLSTransport selects the appropriate HTTP transport based on whether the destination
+// ProxyEndpointRoute has InsecureSkipTLSVerify enabled or provides a CABundle.
+type perRouteTLSTransport struct {
+	proxy *proxy
+}
+
+func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	route := t.proxy.findMatchingRoute(req.URL.Hostname())
+
+	if route == nil {
+		// Use the default transport for standard certificate verification
+		return http.DefaultTransport.RoundTrip(req)
+	}
+
+	// If the route explicitly disables TLS verification, use the insecure transport
+	if route.InsecureSkipTLSVerify {
+		return t.proxy.insecureTransport.RoundTrip(req)
+	}
+
+	// If the route has custom certificate settings, build a transport for it
+	if route.CABundle != "" {
+		decodeCABundleIfPossible(route)
+		transport, err := buildTransportForRoute(route)
+		if err != nil {
+			logrus.Warnf("httpproxy: failed to build transport for route: %v", err)
+			// Fall through to default transport
+			return http.DefaultTransport.RoundTrip(req)
+		}
+		return transport.RoundTrip(req)
+	}
+
+	// Use the default transport for standard certificate verification
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+// Helper functions
+
+// buildTLSConfigForRoute creates a complete TLS config based on route certificate settings.
+// It handles CA bundles, client certificates, server name indication, and verification options.
+func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute) (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
+
+	// Set up root CAs from CA bundle
+	if route.CABundle != "" {
+		caCertPool, err := parseCACertificates(route.CABundle)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CA bundle: %w", err)
+		}
+		tlsConfig.RootCAs = caCertPool
+	} else {
+		// Use system cert pool
+		caCertPool, err := x509.SystemCertPool()
+		if err != nil {
+			logrus.Debugf("httpproxy: failed to get system cert pool: %v", err)
+			caCertPool = x509.NewCertPool()
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	return tlsConfig, nil
+}
+
+// buildTransportForRoute creates an HTTP transport based on the route's certificate settings.
+func buildTransportForRoute(route *mgmt.ProxyEndpointRoute) (*http.Transport, error) {
+	tlsConfig, err := buildTLSConfigForRoute(route)
+	if err != nil {
+		return nil, err
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
+	return transport, nil
 }
 
 func constructRegex(host string) *regexp.Regexp {
@@ -387,6 +516,26 @@ func constructRegex(host string) *regexp.Regexp {
 	str := "^" + strings.Join(parts, "\\.") + "$"
 
 	return regexp.MustCompile(str)
+}
+
+func isBadHeader(headerKey string) bool {
+	headerKey = strings.ToLower(headerKey)
+
+	if badHeaders[headerKey] {
+		return true
+	}
+
+	for _, prefix := range badHeaderPrefixes {
+		if strings.HasPrefix(headerKey, prefix) {
+			return true
+		}
+	}
+
+	if strings.HasPrefix(headerKey, "x-") || strings.HasPrefix(headerKey, "sec-") {
+		return true
+	}
+
+	return false
 }
 
 // isOverlyBroad checks if the given domain is an overly broad wildcard
@@ -418,4 +567,109 @@ func isOverlyBroad(pattern string) bool {
 
 	// check if that label is a plain wildcard.
 	return targetLabel == "*" || targetLabel == "%"
+}
+
+// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool
+// containing only the provided CA.
+func parseCACertificates(caBundle string) (*x509.CertPool, error) {
+	if err := validateCABundleSecurity(caBundle); err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+
+	// Add the provided CA certificates to the pool
+	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
+		return nil, fmt.Errorf("failed to append CA certificates from PEM data")
+	}
+
+	return caCertPool, nil
+}
+
+func replaceCookies(req *http.Request) {
+	// Do not forward rancher cookies to third parties
+	req.Header.Del(Cookie)
+	// Allow client to use their own cookies with Cookie header
+	if cookie := req.Header.Get(APICookie); cookie != "" {
+		req.Header.Set(Cookie, cookie)
+		req.Header.Del(APICookie)
+	}
+}
+
+// routeMatchesHost reports whether the domain pattern from a ProxyEndpointRoute matches host,
+// using the same rules as proxy.isAllowed.
+func routeMatchesHost(pattern, host string) bool {
+	_, matches := routeMatchScore(pattern, host)
+	return matches
+}
+
+// routeMatchScore returns a specificity score and whether pattern matches host.
+// Higher score means higher specificity.
+func routeMatchScore(pattern, host string) (int, bool) {
+	if pattern == host {
+		return MatchScoreExcellent, true
+	}
+	if isOverlyBroad(pattern) {
+		return MatchScorePoor, false
+	}
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(host, pattern[1:]) {
+		return MatchScoreFair, true
+	}
+	if strings.Contains(pattern, ".%.") || strings.HasPrefix(pattern, "%.") {
+		if constructRegex(pattern).MatchString(host) {
+			return MatchScoreGood, true
+		}
+	}
+	return MatchScorePoor, false
+}
+
+func setModifiedHeaders(res *http.Response) error {
+	// replace set cookies
+	res.Header.Del(APISetCookie)
+	// There may be multiple set cookies
+	for _, setCookie := range res.Header[SetCookie] {
+		res.Header.Add(APISetCookie, setCookie)
+	}
+	res.Header.Del(SetCookie)
+	// add security headers (similar to raw.githubusercontent)
+	res.Header.Set(CSP, "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	res.Header.Set(XContentType, "nosniff")
+	return nil
+}
+
+// validateCABundleSecurity applies defensive checks for user-provided PEM data.
+// It rejects oversized bundles and accidental private key material.
+func validateCABundleSecurity(caBundle string) error {
+	if len(caBundle) > maxCABundleBytes {
+		return fmt.Errorf("CA bundle exceeds maximum size of %d bytes", maxCABundleBytes)
+	}
+
+	remaining := []byte(caBundle)
+	foundCertificate := false
+
+	for len(remaining) > 0 {
+		if len(bytes.TrimSpace(remaining)) == 0 {
+			break
+		}
+
+		block, rest := pem.Decode(remaining)
+		if block == nil {
+			return fmt.Errorf("failed to parse CA bundle PEM data")
+		}
+
+		if strings.Contains(strings.ToUpper(block.Type), "PRIVATE KEY") {
+			return fmt.Errorf("CA bundle must not contain private key material")
+		}
+
+		if strings.EqualFold(block.Type, "CERTIFICATE") {
+			foundCertificate = true
+		}
+
+		remaining = rest
+	}
+
+	if !foundCertificate {
+		return fmt.Errorf("CA bundle must contain at least one CERTIFICATE PEM block")
+	}
+
+	return nil
 }
