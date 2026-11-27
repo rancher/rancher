@@ -206,10 +206,11 @@ type NodeDriverStatus struct {
 }
 
 var (
-	NodeDriverConditionDownloaded condition.Cond = "Downloaded"
-	NodeDriverConditionInstalled  condition.Cond = "Installed"
-	NodeDriverConditionActive     condition.Cond = "Active"
-	NodeDriverConditionInactive   condition.Cond = "Inactive"
+	NodeDriverConditionDownloaded  condition.Cond = "Downloaded"
+	NodeDriverConditionInstalled   condition.Cond = "Installed"
+	NodeDriverConditionActive      condition.Cond = "Active"
+	NodeDriverConditionInactive    condition.Cond = "Inactive"
+	NodeDriverConditionProgressing condition.Cond = "Progressing"
 )
 
 type NodeDriverSpec struct {
