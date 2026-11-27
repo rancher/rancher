@@ -255,6 +255,18 @@ func TestUserImpersonate(t *testing.T) {
 	assert.Equal(t, []string{"real-group"}, realGroups, "the caller's groups must not be modified in place")
 }
 
+func TestUserImpersonateWithoutIdentityDetails(t *testing.T) {
+	real := &user.DefaultInfo{Name: "u-real", Groups: []string{"real-group"}}
+	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"system:authenticated"}}
+	u := &User{}
+
+	u.Impersonate(real, effective)
+	u.SetImpersonationSessionID("token-1")
+
+	assert.Equal(t, "u-target", u.Name)
+	assert.Equal(t, &Impersonator{Name: "u-real", SessionID: "token-1"}, u.ImpersonatedBy)
+}
+
 func TestUserImpersonatedByJSON(t *testing.T) {
 	plain, err := json.Marshal(&User{Name: "u-1"})
 	require.NoError(t, err)
@@ -405,8 +417,8 @@ func TestMiddlewareFillsIdentityFromResolver(t *testing.T) {
 	}
 }
 
-// TestMiddlewareOmitsIdentityByDefault checks that the entry format only grows when WithIncludeUsername
-// reports true, and that no user lookup is made otherwise.
+// TestMiddlewareOmitsIdentityByDefault checks that human-readable identity is omitted and no user
+// lookup is made by default, while opaque impersonator attribution remains available.
 func TestMiddlewareOmitsIdentityByDefault(t *testing.T) {
 	lookups := 0
 	resolver := func(string) (string, string, bool) {
@@ -433,7 +445,10 @@ func TestMiddlewareOmitsIdentityByDefault(t *testing.T) {
 		User map[string]any `json:"user"`
 	}
 	require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
-	assert.Equal(t, map[string]any{"name": "u-target"}, entry.User)
+	assert.Equal(t, map[string]any{
+		"name":           "u-target",
+		"impersonatedBy": map[string]any{"name": "u-real"},
+	}, entry.User)
 	assert.Zero(t, lookups)
 }
 
@@ -467,9 +482,9 @@ func TestMiddlewareUsernameFollowsToggle(t *testing.T) {
 	assert.NotContains(t, serve(), "identity")
 }
 
-// TestUserWithoutIdentityAssignsNothing checks that when identities are off the name and groups are
-// still set, but no identity or impersonator is derived or assigned.
-func TestUserWithoutIdentityAssignsNothing(t *testing.T) {
+// TestUserWithoutIdentityKeepsOpaqueAttribution checks that names remain available while optional
+// identity and impersonator group details are not derived.
+func TestUserWithoutIdentityKeepsOpaqueAttribution(t *testing.T) {
 	real := WithIdentity(&user.DefaultInfo{Name: "u-real", Extra: map[string][]string{"username": {"alice"}}}, Identity{Username: "alice", Provider: "local"})
 	effective := &user.DefaultInfo{Name: "u-target", Groups: []string{"g"}, Extra: map[string][]string{"username": {"target"}}}
 
@@ -481,5 +496,10 @@ func TestUserWithoutIdentityAssignsNothing(t *testing.T) {
 		return "", "", false
 	}}).fillIdentity(u)
 
-	assert.Equal(t, &User{Name: "u-target", Group: []string{"g"}, Extra: real.GetExtra()}, u)
+	assert.Equal(t, &User{
+		Name:           "u-target",
+		Group:          []string{"g"},
+		Extra:          real.GetExtra(),
+		ImpersonatedBy: &Impersonator{Name: "u-real"},
+	}, u)
 }

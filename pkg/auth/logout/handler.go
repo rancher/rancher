@@ -40,9 +40,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isSecure := r.URL.Scheme == "https"
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 
-	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie} {
+	for _, cookieName := range []string{tokens.CookieName, tokens.OriginalSessionCookie, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie} {
 		tokenCookie := &http.Cookie{
 			Name:     cookieName,
 			Value:    "",
@@ -73,12 +73,24 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	isLogoutAll := r.URL.Query().Has("all") || r.URL.Query().Get("action") == "logoutAll"
+	var originalToken accessor.TokenAccessor
+	if originalCookie, cookieErr := r.Cookie(tokens.OriginalSessionCookie); cookieErr == nil && originalCookie.Value != "" {
+		if candidate, _, tokenErr := h.tokenMgr.GetToken(originalCookie.Value); tokenErr == nil &&
+			tokens.IsImpersonationSessionBound(storedToken, candidate) {
+			originalToken = candidate
+		}
+	}
 
+	providerToken := storedToken
+	if originalToken != nil {
+		providerToken = originalToken
+	}
+
+	isLogoutAll := r.URL.Query().Has("all") || r.URL.Query().Get("action") == "logoutAll"
 	if isLogoutAll {
-		err = h.logoutAll(w, r, storedToken)
+		err = h.logoutAll(w, r, providerToken)
 	} else {
-		err = h.logout(w, r, storedToken)
+		err = h.logout(w, r, providerToken)
 	}
 	if err != nil {
 		logrus.Errorf("logout: provider logout: %v", err)
@@ -88,6 +100,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if status == http.StatusGone {
 		return
+	}
+
+	if originalToken != nil {
+		if _, err = h.tokenMgr.DeleteTokenByName(originalToken.GetFullName()); err != nil {
+			logrus.Errorf("logout: deleting original impersonator session token %s: %v", originalToken.GetFullName(), err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	_, err = h.tokenMgr.DeleteTokenByName(storedToken.GetFullName())

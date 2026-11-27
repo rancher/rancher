@@ -266,6 +266,9 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	for key, value := range getUserExtraInfo(token, authUser, attribs, configName, providerName) {
 		extras[key] = value
 	}
+	if tokens.IsImpersonationSession(token) {
+		extras[tokens.ImpersonationTokenIDUserExtra] = []string{token.GetName()}
+	}
 
 	authResp := &AuthenticatorResponse{
 		IsAuthed:      true,

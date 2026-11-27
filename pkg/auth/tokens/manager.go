@@ -214,6 +214,58 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 	return storedToken, 0, nil
 }
 
+// GetTokenByName returns a legacy token that has already been selected and
+// verified by request authentication. It does not re-verify the bearer secret.
+func (m *Manager) GetTokenByName(name string) (accessor.TokenAccessor, int, error) {
+	if name == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no name present")
+	}
+	token, err := m.tokenCache.Get(name)
+	if apierrors.IsNotFound(err) {
+		token, err = m.tokens.Get(name, metav1.GetOptions{})
+	}
+	if err != nil {
+		status := http.StatusInternalServerError
+		if apierrors.IsNotFound(err) {
+			status = http.StatusNotFound
+		}
+		return nil, status, fmt.Errorf("failed to retrieve selected auth token: %w", err)
+	}
+	return token, 0, nil
+}
+
+// GetTokenForRecovery verifies a legacy token secret but returns the token
+// even when its TTL or idle timeout has elapsed. Normal authentication must
+// continue using GetToken.
+func (m *Manager) GetTokenForRecovery(tokenAuthValue string) (*apiv3.Token, bool, error) {
+	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
+	if tokenName == "" || tokenKey == "" || strings.HasPrefix(tokenName, "ext/") {
+		return nil, false, fmt.Errorf("invalid recovery token")
+	}
+
+	var (
+		storedToken *apiv3.Token
+		err         error
+	)
+	objs, indexErr := m.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
+	if indexErr != nil && !apierrors.IsNotFound(indexErr) {
+		return nil, false, fmt.Errorf("failed to retrieve auth token from cache: %w", indexErr)
+	}
+	if len(objs) == 0 {
+		storedToken, err = m.tokens.Get(tokenName, metav1.GetOptions{})
+	} else {
+		storedToken, _ = objs[0].(*apiv3.Token)
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if _, err := VerifyTokenKey(storedToken, tokenName, tokenKey); err != nil {
+		return nil, false, err
+	}
+
+	return storedToken, IsExpired(storedToken) || IsIdleExpired(storedToken, time.Now()), nil
+}
+
 // getTokens will list all (login and derived, and even expired) tokens of the
 // authenticated user - BEWARE that while the session token identified by
 // `tokenAuthValue` is allowed to be an ext token, the returned tokens will

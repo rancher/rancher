@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -268,6 +269,21 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Equal(t, token.Name, resp.Extras[common.ExtraRequestTokenID][0])
 		require.Len(t, resp.Extras[common.ExtraRequestHost], 1)
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
+	})
+
+	t.Run("marks a selected impersonation token", func(t *testing.T) {
+		originalAnnotations := token.Annotations
+		defer func() {
+			token.Annotations = originalAnnotations
+		}()
+		token.Annotations = map[string]string{tokens.ImpersonationSessionAnnotation: "true"}
+		conflictingRequest := req.Clone(req.Context())
+		conflictingRequest.AddCookie(&http.Cookie{Name: tokens.CookieName, Value: "normal-cookie-token"})
+
+		resp, err := authenticator.Authenticate(conflictingRequest)
+
+		require.NoError(t, err)
+		require.Equal(t, []string{token.Name}, resp.Extras[tokens.ImpersonationTokenIDUserExtra])
 	})
 
 	t.Run("audit entry shows the identity next to the user ID", func(t *testing.T) {

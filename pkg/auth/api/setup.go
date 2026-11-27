@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/auth/api/user"
+	"github.com/rancher/rancher/pkg/auth/impersonation"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -40,6 +41,7 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 		SecretLister:             management.Wrangler.Core.Secret().Cache(),
 		SecretClient:             management.Wrangler.Core.Secret(),
 		PwdChanger:               pbkdf2.New(management.Wrangler.Core.Secret().Cache(), management.Wrangler.Core.Secret()),
+		Impersonator:             impersonation.NewHandler(management),
 	}
 
 	schema.Formatter = handler.UserFormatter

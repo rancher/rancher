@@ -135,6 +135,19 @@ func TestVerifyToken(t *testing.T) {
 	}
 }
 
+func TestVerifyTokenKeyAcceptsExpiredTokenWithValidSecret(t *testing.T) {
+	token := expireToken(&apiv3.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "expired-token"},
+		Token:      "dddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+	})
+
+	responseCode, err := VerifyTokenKey(token, token.Name, token.Token)
+	require.NoError(t, err)
+	assert.Equal(t, 200, responseCode)
+	_, err = VerifyToken(token, token.Name, token.Token)
+	require.Error(t, err)
+}
+
 func TestExtVerifyToken(t *testing.T) {
 	tokenName := "test-token"
 	hashedTokenName := "hashed-test-token"

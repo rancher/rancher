@@ -143,6 +143,34 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
+	if code, err := verifyTokenKey(storedToken, tokenKey); err != nil {
+		return code, err
+	}
+
+	if IsExpired(storedToken) {
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
+	}
+
+	if IsIdleExpired(storedToken, time.Now()) {
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
+	}
+
+	return http.StatusOK, nil
+}
+
+// VerifyTokenKey verifies the token secret without applying expiry checks.
+// It is intended only for narrowly scoped recovery flows.
+func VerifyTokenKey(storedToken *apiv3.Token, tokenName, tokenKey string) (int, error) {
+	if storedToken == nil || storedToken.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
+
+	return verifyTokenKey(storedToken, tokenKey)
+}
+
+func verifyTokenKey(storedToken *apiv3.Token, tokenKey string) (int, error) {
 	if storedToken.Annotations != nil && storedToken.Annotations[TokenHashed] == "true" {
 		hasher, err := hashers.GetHasherForHash(storedToken.Token)
 		if err != nil {
@@ -158,16 +186,6 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 			logrus.Errorf("token mismatch")
 			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
-	}
-
-	if IsExpired(storedToken) {
-		logrus.Errorf("token expired: %q", storedToken.Name)
-		return http.StatusGone, errInvalidAuthToken
-	}
-
-	if IsIdleExpired(storedToken, time.Now()) {
-		logrus.Errorf("token idle expired: %q", storedToken.Name)
-		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil

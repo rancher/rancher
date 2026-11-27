@@ -56,6 +56,10 @@ func (t *Token) GetLabels() map[string]string {
 	return t.ObjectMeta.Labels
 }
 
+func (t *Token) GetAnnotations() map[string]string {
+	return t.ObjectMeta.Annotations
+}
+
 func (t *Token) GetName() string {
 	return t.ObjectMeta.Name
 }

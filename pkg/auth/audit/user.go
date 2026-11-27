@@ -37,9 +37,8 @@ type User struct {
 	// RequestGroups is the --as-group list
 	RequestGroups []string `json:"requestGroups,omitempty"`
 
-	// withIdentity is whether Identity and ImpersonatedBy are collected for this entry. It is decided
-	// once when the entry is created, from the audit-log-username feature, so when it is off no
-	// identity is looked up or assigned.
+	// withIdentity is whether human-readable identity details are collected for this entry. It is
+	// decided once when the entry is created from the audit-log-username feature.
 	withIdentity bool
 }
 
@@ -79,6 +78,10 @@ type Impersonator struct {
 	Identity *Identity `json:"identity,omitempty"`
 
 	Group []string `json:"group,omitempty"`
+
+	// SessionID is the server-side resource ID of the original session. It is
+	// never a bearer secret or a cookie value.
+	SessionID string `json:"sessionId,omitempty"`
 }
 
 // SetIdentity sets Name, Identity and Group to the effective identity of the request from info.
@@ -94,17 +97,23 @@ func (u *User) SetIdentity(info user.Info) {
 	u.Group = info.GetGroups()
 }
 
-// SetImpersonatedBy records real as the authenticated caller that impersonated the effective user. It
-// does nothing unless identities are collected for the entry.
+// SetImpersonatedBy records real as the authenticated caller that impersonated the effective user.
+// The opaque Rancher user ID is always recorded; human-readable identity details are optional.
 func (u *User) SetImpersonatedBy(real user.Info) {
-	if !u.withIdentity {
+	u.ImpersonatedBy = &Impersonator{Name: real.GetName()}
+	if u.withIdentity {
+		u.ImpersonatedBy.Identity = IdentityFromInfo(real).ref()
+		u.ImpersonatedBy.Group = real.GetGroups()
+	}
+}
+
+// SetImpersonationSessionID associates the validated original session with the
+// impersonator.
+func (u *User) SetImpersonationSessionID(sessionID string) {
+	if u.ImpersonatedBy == nil {
 		return
 	}
-	u.ImpersonatedBy = &Impersonator{
-		Name:     real.GetName(),
-		Identity: IdentityFromInfo(real).ref(),
-		Group:    real.GetGroups(),
-	}
+	u.ImpersonatedBy.SessionID = sessionID
 }
 
 // Impersonate records that real is impersonating effective: effective becomes the identity of the
