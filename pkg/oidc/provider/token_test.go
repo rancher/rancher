@@ -1188,7 +1188,41 @@ func TestTokenEndpoint(t *testing.T) {
 				anotherKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&anotherKey.PublicKey, nil)
 			},
-			wantError:  `{"error":"server_error","error_description":"failed to parse refresh token: token signature is invalid: crypto/rsa: verification error"}`,
+			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token signature is invalid: crypto/rsa: verification error"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		"refresh_token returns server_error when the public key can't be retrieved": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "refresh_token")
+				data.Set("refresh_token", fakeRefreshTokenString)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(nil, fmt.Errorf("getting public key: unexpected error"))
+			},
+			wantError:  `{"error":"server_error","error_description":"failed to get public key: getting public key: unexpected error"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		"refresh_token returns invalid_grant when the kid is unknown": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "refresh_token")
+				data.Set("refresh_token", fakeRefreshTokenString)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(nil, errPublicKeyNotFound)
+			},
+			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token is unverifiable: error while executing keyfunc: public key not found"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"refresh_token fails when the associated Rancher token is no longer present": {
@@ -1281,7 +1315,7 @@ func TestTokenEndpoint(t *testing.T) {
 				})).Return(fakeTokenList, nil)
 				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{}, nil)
 			},
-			wantError:  `{"error":"server_error","error_description":"failed to get oidc client: no OIDC clients found"}`,
+			wantError:  `{"error":"invalid_grant","error_description":"the OIDC client that issued this refresh token no longer exists"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"refresh_token fails when it is expired": {
@@ -1309,7 +1343,30 @@ func TestTokenEndpoint(t *testing.T) {
 			mockSetup: func(m mockParams) {
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
-			wantError:  `{"error":"server_error","error_description":"failed to parse refresh token: token has invalid claims: token is expired"}`,
+			wantError:  `{"error":"invalid_grant","error_description":"failed to parse refresh token: token has invalid claims: token is expired"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		"unsupported grant_type returns unsupported_grant_type": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "password")
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+				return req
+			},
+			wantError:  `{"error":"unsupported_grant_type","error_description":"grant_type not supported"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		"missing grant_type returns invalid_request": {
+			req: func() *http.Request {
+				data := url.Values{}
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+				return req
+			},
+			wantError:  `{"error":"invalid_request","error_description":"missing grant_type"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		"token endpoint sets cache-control headers": {
