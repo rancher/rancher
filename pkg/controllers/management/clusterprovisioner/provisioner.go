@@ -315,18 +315,12 @@ func (p *Provisioner) update(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv
 		return cluster, err
 	}
 
-	// Persist Provisioned/Pending conditions immediately.
+	// The caller persists status after the condition callback has finalized it.
 	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) || !apimgmtv3.ClusterConditionPending.IsTrue(cluster) {
 		apimgmtv3.ClusterConditionProvisioned.True(cluster)
 		apimgmtv3.ClusterConditionProvisioned.Message(cluster, "")
 		apimgmtv3.ClusterConditionProvisioned.Reason(cluster, "")
 		apimgmtv3.ClusterConditionPending.True(cluster)
-
-		updatedCluster, err := p.Clusters.UpdateStatus(cluster)
-		if err != nil {
-			return cluster, err
-		}
-		cluster = updatedCluster
 	}
 
 	if cluster.Spec.GenericEngineConfig != nil {
@@ -337,24 +331,21 @@ func (p *Provisioner) update(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv
 		return cluster, err
 	}
 
-	statusChanged, specChanged, err := p.k3sBasedClusterConfig(cluster, nodes)
+	_, specChanged, err := p.k3sBasedClusterConfig(cluster, nodes)
 	if err != nil {
 		return cluster, err
 	}
 
 	if specChanged {
-		// Save driver field before calling Update(), since Update() only persists
-		// spec and returns the old status from the server.
-		savedDriver := cluster.Status.Driver
+		// Update only persists spec and returns the server's status. Preserve all
+		// pending status changes for the caller's batched UpdateStatus.
+		savedStatus := cluster.Status
 		updatedCluster, err := p.Clusters.Update(cluster)
 		if err != nil {
 			return cluster, err
 		}
 		cluster = updatedCluster
-		if statusChanged {
-			// Restore the driver field so the batched UpdateStatus can persist it.
-			cluster.Status.Driver = savedDriver
-		}
+		cluster.Status = savedStatus
 	}
 
 	return cluster, nil
@@ -395,10 +386,24 @@ func (p *Provisioner) Create(cluster *apimgmtv3.Cluster) (runtime.Object, error)
 }
 
 func (p *Provisioner) provision(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	originalStatus := cluster.Status.DeepCopy()
 	obj, err := apimgmtv3.ClusterConditionProvisioned.Do(cluster, func() (runtime.Object, error) {
 		return p.update(cluster, true)
 	})
-	return obj.(*apimgmtv3.Cluster), err
+	cluster = obj.(*apimgmtv3.Cluster)
+	// Do temporarily changes Provisioned to Unknown. Persist only the final
+	// status so retries waiting for discovery do not continually rewrite it.
+	if !reflect.DeepEqual(originalStatus, &cluster.Status) {
+		updatedCluster, statusErr := p.Clusters.UpdateStatus(cluster)
+		if statusErr != nil {
+			if err == nil {
+				return cluster, statusErr
+			}
+		} else {
+			cluster = updatedCluster
+		}
+	}
+	return cluster, err
 }
 
 func (p *Provisioner) pending(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
