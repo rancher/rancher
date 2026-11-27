@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
@@ -68,6 +69,9 @@ const (
 	controlPlaneTier = "control plane"
 	workerTier       = "worker"
 
+	protectedHandoffRetryDelay = 5 * time.Second
+	protectedHandoffWait       = "waiting for the replacement to join the existing etcd cluster through %s; a restore may be required if the existing cluster can't recover"
+
 	auditPolicyArg         = "audit-policy-file"
 	cloudProviderConfigArg = "cloud-provider-config"
 	privateRegistryArg     = "private-registry"
@@ -122,6 +126,7 @@ type Planner struct {
 	capiClient                    capicontrollers.ClusterClient
 	capiClusters                  capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
+	managementNodes               mgmtcontrollers.NodeCache
 	rancherClusterCache           ranchercontrollers.ClusterCache
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
@@ -165,6 +170,7 @@ func New(ctx context.Context, clients *wrangler.CAPIContext, functions InfoFunct
 		capiClient:                    clients.CAPI.Cluster(),
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
+		managementNodes:               clients.Mgmt.Node().Cache(),
 		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
 		rkeBootstrap:                  clients.RKE.RKEBootstrap(),
@@ -302,13 +308,8 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 			return status, errWaitingf("uninitializing CAPI cluster: %v", err)
 		}
 
-		// Collect all nodes that are etcd and deleting. At this point, if we have any etcd nodes left in the cluster,
-		// they will be deleting, so force delete them to prevent quorum loss.
-		etcdDeleting, err := p.forceDeleteAllDeletingEtcdMachines(cp, plan)
-		if err != nil {
-			return status, err
-		} else if etcdDeleting != 0 {
-			return status, errWaiting("waiting for all etcd machines to be deleted")
+		if len(collect(plan, roleAnd(isEtcd, isDeleting))) > 0 && len(collect(plan, roleAnd(isEtcd, roleNot(isDeleting)))) == 0 {
+			return status, errWaiting("last etcd member is protected: waiting for a replacement etcd node, add an etcd node or scale the pool up")
 		}
 		return status, errWaiting("waiting for at least one control plane, etcd, and worker node to be registered")
 	}
@@ -344,11 +345,14 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, errWaitingf("CAPI cluster or RKEControlPlane is paused")
 	}
 
-	// In the case where the cluster has been bootstrapped and no plans have been
-	// delivered to any etcd nodes, don't proceed with electing a new init node.
-	// The only way out of this is to restore an etcd snapshot.
-	if (capr.Bootstrapped.IsTrue(&status) || len(collect(plan, roleOr(hasJoinURL, hasJoinedTo))) != 0) && len(collect(plan, roleAnd(isEtcd, anyPlanDataExists))) == 0 {
-		// deliver an etcd snapshot list command to the etcd nodes.
+	// If previous provisioning state exists but no non-deleting etcd plan or protected join target remains,
+	// don't elect a new init node; a snapshot restore is required.
+	protectedTarget := protectedInitTarget(cp, plan)
+	hasPreviousProvisioningState := capr.Bootstrapped.IsTrue(&status) ||
+		len(collect(plan, roleOr(hasJoinURL, hasJoinedTo))) != 0 ||
+		len(collect(plan, roleAnd(isEtcd, anyPlanDataExists))) != 0
+	hasNonDeletingEtcdPlan := len(collect(plan, roleAnd(isEtcd, roleAnd(roleNot(isDeleting), anyPlanDataExists)))) != 0
+	if hasPreviousProvisioningState && !hasNonDeletingEtcdPlan && protectedTarget == nil {
 		capr.Stable.False(&status) // Set the Stable condition on the controlplane to False. This will be used to hide the v3.Cluster Ready condition from the UI.
 		return status, errWaiting("rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.")
 	}
@@ -356,11 +360,50 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	return p.fullReconcile(cp, status, capiCluster, clusterSecretTokens, plan, false)
 }
 
+// fullReconcile selects the init node and reconciles Machine plans in bootstrap, etcd, control-plane and worker order.
+// Ordinary reconciliation preserves the deleting init node's join target until a replacement qualifies.
+// Restore restart phases pass ignoreDrainAndConcurrency=true to omit configured drain/concurrency settings
+// and bypass the ordinary hand-off, using the existing init election for the restored cluster.
 func (p *Planner) fullReconcile(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, cluster *capi.Cluster, clusterSecretTokens plan.Secret, plan *plan.Plan, ignoreDrainAndConcurrency bool) (rkev1.RKEControlPlaneStatus, error) {
-	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err := p.electInitNode(controlPlane, plan, true)
-	if err != nil {
-		return status, err
+	// Process passes false for ordinary reconciliation; only the restore restart phases pass true.
+	// A restore must restart the restored cluster, not wait for a replacement to join the old etcd cluster.
+	var protectedTarget *planEntry
+	if !ignoreDrainAndConcurrency {
+		protectedTarget = protectedInitTarget(controlPlane, plan)
+	}
+
+	var joinServer string
+	var err error
+	// During a hand-off, keep the tier's detail and say why the old node is still there.
+	handoffWaiting := func(err error) error {
+		if protectedTarget == nil || !IsErrWaiting(err) {
+			return err
+		}
+		return errWaitingf("%s; "+protectedHandoffWait, err.Error(), protectedTarget.Machine.Name)
+	}
+	if protectedTarget != nil {
+		replacement := p.protectedInitReplacement(controlPlane, plan, protectedTarget)
+		// Refuse any other non-deleting init mark before writing, so a partial move cannot leave two live init nodes.
+		for _, entry := range collect(plan, roleAnd(isEtcd, isInitNode)) {
+			if isDeleting(entry) || (replacement != nil && entry.Machine.Name == replacement.Machine.Name) {
+				continue
+			}
+			return status, errWaitingf("multiple init nodes found: %s", entry.Machine.Name)
+		}
+		// If a qualified replacement exists, move the init mark to the selected replacement.
+		// The target still carries the init mark, so the move always returns ErrSkip or a real error.
+		if replacement != nil {
+			return status, p.moveInitNodeMark(protectedTarget, replacement)
+		}
+		// EtcdIsVoter arrives on the v3 Node, which doesn't wake the planner, so re-check while the hand-off waits.
+		p.rkeControlPlanes.EnqueueAfter(controlPlane.Namespace, controlPlane.Name, protectedHandoffRetryDelay)
+		joinServer = protectedTarget.Metadata.Annotations[capr.JoinURLAnnotation]
+	} else {
+		// On the first run through, electInitNode returns ErrSkip while its cache catches up.
+		joinServer, err = p.electInitNode(controlPlane, plan, true)
+		if err != nil {
+			return status, err
+		}
 	}
 
 	var (
@@ -381,7 +424,7 @@ func (p *Planner) fullReconcile(controlPlane *rkev1.RKEControlPlane, status rkev
 	capr.Bootstrapped.True(&status)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return status, err
+		return status, handoffWaiting(err)
 	}
 
 	if joinServer == "" {
@@ -389,9 +432,9 @@ func (p *Planner) fullReconcile(controlPlane *rkev1.RKEControlPlane, status rkev
 		if err != nil {
 			return status, err
 		} else if joinServer == "" && firstIgnoreError != nil {
-			return status, errWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
+			return status, handoffWaiting(errWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node"))
 		} else if joinServer == "" {
-			return status, errWaiting("waiting for join url to be available on bootstrap node")
+			return status, handoffWaiting(errWaiting("waiting for join url to be available on bootstrap node"))
 		}
 	}
 
@@ -399,24 +442,27 @@ func (p *Planner) fullReconcile(controlPlane *rkev1.RKEControlPlane, status rkev
 	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting, "1", joinServer, controlPlaneDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return status, err
+		return status, handoffWaiting(err)
 	}
 
 	// Process all nodes that have the controlplane role and are NOT an init node or deleting.
 	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting, controlPlaneConcurrency, joinServer, controlPlaneDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return status, err
+		return status, handoffWaiting(err)
 	}
 
 	// If there are any suitable controlplane nodes with join URL annotations
 	if len(collect(plan, roleAnd(isControlPlane, roleAnd(hasJoinURL, roleNot(isDeleting))))) == 0 {
-		return status, errWaiting("waiting for control plane to be available")
+		return status, handoffWaiting(errWaiting("waiting for control plane to be available"))
 	}
 
 	if !ptr.Deref(status.Initialization.ControlPlaneInitialized, false) {
 		status.Initialization.ControlPlaneInitialized = ptr.To(true)
-		return status, errWaiting("marking control plane as initialized")
+		return status, handoffWaiting(errWaiting("marking control plane as initialized"))
+	}
+	if protectedTarget != nil {
+		return status, errWaitingf(protectedHandoffWait, protectedTarget.Machine.Name)
 	}
 
 	// Process all nodes that are ONLY linux worker nodes.
