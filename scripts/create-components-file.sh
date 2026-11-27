@@ -1,5 +1,5 @@
 #!/bin/bash
-# This script will create a txt file with -rc images/components which will be used as (pre) release description by Drone
+# This script will create a txt file with -rc images/components used as the draft release notes by .github/workflows/release.yml
 set -e -x
 
 echo "Creating ./bin/rancher-components.txt"
@@ -38,6 +38,11 @@ fi
 
 echo "# Chart/KDM sources" >>$COMPONENTSFILE
 
-bash ./scripts/check-chart-kdm-source-values >>$COMPONENTSFILE
+{
+  echo "* chartDefaultBranch: $(grep -m1 '^chartDefaultBranch:' build.yaml | cut -d ' ' -f2) (\`build.yaml\`)"
+  echo "* CATTLE_KDM_BRANCH: $(grep -m1 '^ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2) (\`package/Dockerfile\`)"
+  echo "* CATTLE_KDM_BRANCH: $(grep -m1 '^ENV CATTLE_KDM_BRANCH=' Dockerfile.runtime | cut -d '=' -f2) (\`Dockerfile.runtime\`)"
+  echo "* KDMBranch: $(grep -m1 '^\s*KDMBranch\s*=' pkg/settings/setting.go | awk -F', ' '{ print $2 }' | sed 's/)//; s/"//g') (\`pkg/settings/setting.go\`)"
+} >>$COMPONENTSFILE
 
 echo "Done creating ./bin/rancher-components.txt"
