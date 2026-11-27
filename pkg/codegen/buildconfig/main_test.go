@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v4/pkg/chart/v2/loader"
+	"helm.sh/helm/v4/pkg/chart/v2/util"
 )
 
 func TestChartTarget(t *testing.T) {
@@ -79,6 +81,22 @@ func TestUpdateChartYamlInDir(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(got), "rancher/rancher-assets:v1")
 	require.NotContains(t, string(got), "stale")
+}
+
+func TestRancherChartKubernetesSupportRange(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.CopyFS(dir, os.DirFS("../../../chart")))
+	require.NoError(t, updateChartYaml(targetConfig, dir))
+
+	chart, err := loader.Load(dir)
+	require.NoError(t, err)
+	archive, err := util.Save(chart, t.TempDir())
+	require.NoError(t, err)
+	packaged, err := loader.Load(archive)
+	require.NoError(t, err)
+
+	require.Equal(t, ">= 1.35.0-0 < 1.38.0-0", packaged.Metadata.Annotations["catalog.cattle.io/kube-version"])
+	require.Equal(t, "< 1.38.0-0", packaged.Metadata.KubeVersion)
 }
 
 func TestUpdateChartValuesInDir(t *testing.T) {
