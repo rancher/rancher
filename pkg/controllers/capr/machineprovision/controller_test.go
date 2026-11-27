@@ -7,10 +7,12 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/apply/fake"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/batch/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -19,6 +21,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -552,5 +555,72 @@ func newTestInfraMachine(withFailure bool) *unstructured.Unstructured {
 
 	return &unstructured.Unstructured{
 		Object: objectData,
+	}
+}
+
+func TestRemoveBeforeCreateJobCondition(t *testing.T) {
+	tests := []struct {
+		name                string
+		jobStatus           *batchv1.JobStatus
+		wantCreateCondition bool
+	}{
+		{
+			name:      "create job exists before condition",
+			jobStatus: &batchv1.JobStatus{Active: 1},
+		},
+		{
+			name:                "create job finished before condition",
+			jobStatus:           &batchv1.JobStatus{Conditions: []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}},
+			wantCreateCondition: true,
+		},
+		{name: "no create job"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			namespaces := ctrlfake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			infra := newTestInfraMachine(false)
+			infra.SetAPIVersion("rke-machine.cattle.io/v1")
+			infra.SetKind("Amazonec2Machine")
+			infra.SetDeletionTimestamp(ptr.To(metav1.Now()))
+			const finalizer = "wrangler.cattle.io/machine-provision-remove"
+			infra.SetFinalizers([]string{finalizer})
+			namespaces.EXPECT().Get(infra.GetNamespace()).Return(&corev1.Namespace{}, nil)
+			var list batchv1.JobList
+			if tt.jobStatus != nil {
+				jobObjects := objects(false, driverArgs{
+					MachineName: infra.GetName(), MachineNamespace: infra.GetNamespace(),
+					MachineGVK: infra.GroupVersionKind(), BootstrapRequired: true, EnvSecret: &corev1.Secret{},
+				})
+				job := jobObjects[len(jobObjects)-1].(*batchv1.Job)
+				job.Status = *tt.jobStatus
+				list.Items = []batchv1.Job{*job}
+			}
+			jobs := ctrlfake.NewMockControllerInterface[*batchv1.Job, *batchv1.JobList](ctrl)
+			selector := labels.Set{
+				InfraMachineGroup: "rke-machine.cattle.io", InfraMachineVersion: "v1",
+				InfraMachineKind: "Amazonec2Machine", InfraMachineName: infra.GetName(),
+			}.String()
+			jobs.EXPECT().List(infra.GetNamespace(), metav1.ListOptions{LabelSelector: selector}).Return(&list, nil).AnyTimes()
+			h := handler{namespaces: namespaces, jobController: jobs, dynamic: &dynamicControllerFake{}}
+			remove := generic.NewRemoveHandler("machine-provision-remove", func(obj runtime.Object) (runtime.Object, error) {
+				return obj, nil
+			}, h.OnRemove)
+			result, err := remove("namespace/name", infra)
+			got := result.(*unstructured.Unstructured)
+			if tt.jobStatus != nil {
+				assert.Contains(t, got.GetFinalizers(), finalizer, "existing create job must block finalizer removal")
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Empty(t, got.GetFinalizers())
+			}
+			if tt.wantCreateCondition {
+				cond := capr.GetCondition(data.Object(got.Object), createJobConditionType)
+				if assert.NotNil(t, cond) {
+					assert.Equal(t, "True", cond.Status())
+				}
+			}
+		})
 	}
 }
