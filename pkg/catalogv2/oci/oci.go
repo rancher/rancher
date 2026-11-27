@@ -151,9 +151,13 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 				continue
 			}
 
-			existingTags[semverTag.String()] = true
+			// Keep the version as it is written in the tag (with + instead of _).
+			// semverTag.String() normalizes it (e.g. 1.2 -> 1.2.0, 2.0.024 -> 2.0.24),
+			// and the normalized tag might not exist in the registry.
+			tagVersion := semverTag.Original()
+			existingTags[tagVersion] = true
 			if clusterRepoSpec.OCIOptions != nil && clusterRepoSpec.OCIOptions.DownloadAllTags {
-				ociClient.tag = semverTag.String()
+				ociClient.tag = tagVersion
 				orasRepository, err := ociClient.GetOrasRepository()
 				if err != nil {
 					return fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
@@ -175,14 +179,14 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 
 			if maxSemver == nil || maxSemver.LessThan(semverTag) {
 				maxSemver = semverTag
-				maxTag = semverTag.String()
+				maxTag = tagVersion
 			}
 
 			// Add tags into the helm repo index
-			if !indexHas(indexFile, chartName, semverTag.String()) {
+			if !indexHas(indexFile, chartName, tagVersion) {
 				chartVersion := &repo.ChartVersion{
 					Metadata: &chart.Metadata{
-						Version: semverTag.String(),
+						Version: tagVersion,
 						Name:    chartName,
 					},
 					URLs: []string{fmt.Sprintf("oci://%s/%s:%s", ociClient.registry, ociClient.repository, tags[i])},
