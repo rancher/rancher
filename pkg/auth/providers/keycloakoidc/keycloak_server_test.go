@@ -17,7 +17,16 @@ import (
 // newFakeKeycloakServer creates an http server that responds like a Keycloak
 // server.
 func newFakeKeycloakServer(t *testing.T, privateKey *rsa.PrivateKey, verifyFunc func(t *testing.T, r *http.Request) bool) *httptest.Server {
+	return newFakeKeycloakServerWithRoutes(t, privateKey, verifyFunc, nil)
+}
+
+// newFakeKeycloakServerWithRoutes is newFakeKeycloakServer, with the option of
+// registering extra routes on the server's mux.
+func newFakeKeycloakServerWithRoutes(t *testing.T, privateKey *rsa.PrivateKey, verifyFunc func(t *testing.T, r *http.Request) bool, addRoutes func(mux *http.ServeMux)) *httptest.Server {
 	mux := http.NewServeMux()
+	if addRoutes != nil {
+		addRoutes(mux)
+	}
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 

@@ -397,19 +397,27 @@ func (r *refresher) refreshProvider(
 		}
 		// The token was issued by this config, so its provider is already known.
 		userPrincipal, err := providers.GetPrincipalFromProvider(providerName, principalID, token)
-		if err != nil {
+		var unavailable *common.ExtrasUnavailableError
+		switch {
+		case errors.As(err, &unavailable):
+			// The provider can't read the user's own record, e.g. the user lacks
+			// permission to look themselves up. The groups are refreshed, so keep
+			// the stored extras rather than fail and requeue the refresh forever.
+			logrus.Debugf("Keeping stored extra attributes of userattribute %s for auth config %s: %v", attribs.Name, configName, err)
+		case err != nil:
 			return false, false, err
-		}
-		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-		if userExtraInfo != nil {
-			if attribs.ExtraByProvider == nil {
-				attribs.ExtraByProvider = make(map[string]map[string][]string)
+		default:
+			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+			if userExtraInfo != nil {
+				if attribs.ExtraByProvider == nil {
+					attribs.ExtraByProvider = make(map[string]map[string][]string)
+				}
+				if scimconfig.Enabled(r.configMapCache, configName) {
+					// Keep the stored keys the refresh doesn't set, such as SCIM's externalid and email.
+					userExtraInfo = common.MergeUserExtraAttributes(attribs.ExtraByProvider[configName], userExtraInfo)
+				}
+				attribs.ExtraByProvider[configName] = userExtraInfo
 			}
-			if scimconfig.Enabled(r.configMapCache, configName) {
-				// Keep the stored keys the refresh doesn't set, such as SCIM's externalid and email.
-				userExtraInfo = common.MergeUserExtraAttributes(attribs.ExtraByProvider[configName], userExtraInfo)
-			}
-			attribs.ExtraByProvider[configName] = userExtraInfo
 		}
 	}
 

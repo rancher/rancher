@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -718,5 +719,52 @@ func TestGetPrincipalOfOtherConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, localUser, got)
 		assert.Empty(t, lp.calls)
+	})
+}
+
+// A provider reports an ExtrasUnavailableError for the provider refresh's
+// benefit. GetPrincipal's other callers, such as the principals API, must get
+// the original error back because API responses depend on its type.
+func TestGetPrincipalExtrasUnavailable(t *testing.T) {
+	const principalID = "github-eu_user://1"
+
+	ctrl := gomock.NewController(t)
+	githubProvider := mocks.NewMockAuthProvider(ctrl)
+	original := httperror.NewAPIError(httperror.PermissionDenied, "access denied")
+	githubProvider.EXPECT().
+		GetPrincipal(principalID, gomock.Any()).
+		Return(apiv3.Principal{}, &common.ExtrasUnavailableError{Err: original}).
+		AnyTimes()
+	SetProviders(map[string]common.AuthProvider{
+		local.Name: mocks.NewMockAuthProvider(ctrl),
+		"github":   githubProvider,
+	})
+	t.Cleanup(func() { SetProviders(nil) })
+	SetAuthConfigLister(&fakes.AuthConfigListerMock{
+		GetFunc: func(_ string, name string) (*apiv3.AuthConfig, error) {
+			return &apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: name}, Type: client.GithubConfigType}, nil
+		},
+	})
+	t.Cleanup(func() { SetAuthConfigLister(nil) })
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: principalID}},
+	}
+
+	t.Run("GetPrincipal returns the original error", func(t *testing.T) {
+		_, err := GetPrincipal(principalID, token)
+
+		var unavailable *common.ExtrasUnavailableError
+		assert.False(t, errors.As(err, &unavailable), "the wrapper must not reach callers, got %v", err)
+		assert.True(t, httperror.IsAPIError(err), "expected the original API error, got %T: %v", err, err)
+		assert.Same(t, original, err)
+	})
+
+	t.Run("GetPrincipalFromProvider keeps the wrapper for the provider refresh", func(t *testing.T) {
+		_, err := GetPrincipalFromProvider("github", principalID, token)
+
+		var unavailable *common.ExtrasUnavailableError
+		require.ErrorAs(t, err, &unavailable)
+		assert.Same(t, original, unavailable.Err)
 	})
 }
