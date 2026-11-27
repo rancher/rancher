@@ -102,6 +102,10 @@ func (c *Manager) Index(namespace, name, targetK8sVersion string, skipFilter boo
 		return nil, err
 	}
 
+	if r.status.IndexConfigMapName == "" {
+		return nil, apierror.NewAPIError(validation.NotFound, "chart index has not been published")
+	}
+
 	cm, err := c.configMaps.Get(r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)
 	if err != nil {
 		return nil, err
