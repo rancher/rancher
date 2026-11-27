@@ -106,6 +106,32 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	return commit, err
 }
 
+// BundledCommitChanged reports whether the repository is bundled with the Rancher image
+// and its current HEAD differs from the commit used to build the ClusterRepo index.
+//
+// When Rancher is upgraded, the bundled repository may contain updated charts, while
+// the index stored in the cluster still reflects the previous image. Comparing the
+// local HEAD with the recorded commit detects this change without fetching from an
+// upstream repository or modifying the bundled repository.
+//
+// If HEAD cannot be read, the function returns an error.
+func BundledCommitChanged(namespace, name, gitURL, commit string) (bool, error) {
+	dir := RepoDir(namespace, name, gitURL)
+	if !IsBundled(dir) || settings.SystemCatalog.Get() != "bundled" {
+		return false, nil
+	}
+
+	git, err := newGitGo(dir, gitURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("reading bundled repository %s: %w", dir, err)
+	}
+	head, err := git.currentCommit()
+	if err != nil {
+		return false, fmt.Errorf("reading HEAD of bundled repository %s: %w", dir, err)
+	}
+	return head != commit, nil
+}
+
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (gitClient, error) {
 	err := validateURL(gitURL)
 	if err != nil {

@@ -137,7 +137,7 @@ func TestClusterRepoOnChangeDoesNotSkipOnRestart(t *testing.T) {
 
 	restarted := clusterRepo.DeepCopy()
 	restarted.Status = initialStatus
-	assert.False(t, shouldSkip(restarted, defaultHandlerErrRetryPolicy, repoCondition, defaultInterval, clusterRepos, initialStatus.DeepCopy()),
+	assert.False(t, shouldSkip(restarted, defaultHandlerErrRetryPolicy, repoCondition, defaultInterval, clusterRepos, initialStatus.DeepCopy(), false),
 		"a reconcile right after restart must not be skipped if downloaded = false")
 
 	lastStatus := statuses[1]
