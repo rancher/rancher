@@ -224,6 +224,36 @@ func Test_Provisioning_SetA_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.
 		t.Fatal(err)
 	}
 
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for all nodes to be ready
+	err = retry.OnError(defaults.DownstreamRetry, func(err error) bool {
+		logrus.Warnf("failed to get downstream nodes for cluster '%s', will retry: %v", c.Name, err)
+		return true
+	}, func() error {
+		nodes, err := kc.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(nodes.Items) != 2 {
+			return fmt.Errorf("nodes did not match 2: actual: %d", len(nodes.Items))
+		}
+		for _, n := range nodes.Items {
+			if !capr.Ready.IsTrue(n) {
+				return fmt.Errorf("node %s was not ready", n.Name)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Delete the cluster and wait for cleanup.
 	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
 	if err != nil {
