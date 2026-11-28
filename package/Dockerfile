@@ -196,9 +196,9 @@ ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.3.1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.1.1
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=719ac4b604f2d75143e6d42e917209ff28db5bff06cb89d700ffd63d581cf341
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e47daaa358f744f1b456a80a6f0add84b9f3031323abae8afb86739ace426716
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.1.2
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=b9932712edc7c558b5722da9fb257ecdeb5055a36a33d6b4bfd80e81fdc76195
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=7cced57bc432dc772bb2014946223e405732ac04908a3c2a5f604dfd9f3dd6e5
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
 # Managed by go generate from build.yaml (winsAgentVersion); do not edit.
 # The CATTLE_WINS_AGENT_CHECKSUM* lines are NOT generated: updatecli refreshes them on bumps; edit by hand otherwise.
